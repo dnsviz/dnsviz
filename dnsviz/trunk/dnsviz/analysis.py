@@ -1222,13 +1222,31 @@ class DomainNameAnalysis(object):
                 for soa_owner_name, servers_clients in query.nxdomain_info[qname_sought].items():
                     self.nxdomain_servers_clients[(qname_sought, rdtype)].update(servers_clients)
 
-                    if soa_owner_name is None:
-                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
-                    elif not qname_sought.is_subdomain(soa_owner_name):
-                        if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
-                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_clients)
-                        soa_owner_name = None
+                    if qname_sought == qname or query.flags & dns.flags.RD:
+                        if soa_owner_name is None:
+                            if qname_sought == qname:
+                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
+                            else:
+                                servers_affected = set()
+                                for server_client in servers_clients:
+                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                                        servers_affected.add(server_client)
+                                if servers_affected:
+                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_affected
+                        elif not qname_sought.is_subdomain(soa_owner_name):
+                            if qname_sought == qname:
+                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
+                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_clients)
+                            else:
+                                servers_affected = set()
+                                for server_client in servers_clients:
+                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                                        servers_affected.add(server_client)
+                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
+                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_affected)
+                            soa_owner_name = None
 
                     if soa_owner_name is None:
                         if qname_obj is not None:
@@ -1319,13 +1337,31 @@ class DomainNameAnalysis(object):
                 for soa_owner_name, servers_clients in query.rrset_noanswer_info[qname_sought].items():
                     self.noanswer_servers_clients[(qname_sought, rdtype)].update(servers_clients)
 
-                    if soa_owner_name is None:
-                        self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
-                    elif not qname_sought.is_subdomain(soa_owner_name):
-                        if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
-                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
-                        self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_clients)
-                        soa_owner_name = None
+                    if qname_sought == qname or query.flags & dns.flags.RD:
+                        if soa_owner_name is None:
+                            if qname_sought == qname:
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_clients.copy()
+                            else:
+                                servers_affected = set()
+                                for server_client in servers_clients:
+                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                                        servers_affected.add(server_client)
+                                if servers_affected:
+                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_affected
+                        elif not qname_sought.is_subdomain(soa_owner_name):
+                            if qname_sought == qname:
+                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
+                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_clients)
+                            else:
+                                servers_affected = set()
+                                for server_client in servers_clients:
+                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                                        servers_affected.add(server_client)
+                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
+                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_affected)
+                            soa_owner_name = None
 
                     if soa_owner_name is None:
                         if qname_obj is not None:
