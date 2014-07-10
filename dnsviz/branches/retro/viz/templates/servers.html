@@ -1,0 +1,122 @@
+{% extends "domain_page.html" %}
+
+{% block extra_media %}
+	{{ block.super }}
+	<script type="text/javascript" src="{{ STATIC_URL }}js/jquery.tooltip.js"></script>
+	<script type="text/javascript" src="{{ STATIC_URL }}js/raphael-min.js"></script>
+	<link rel="stylesheet" href="{{ STATIC_URL }}css/jquery.tooltip.css" />
+	<script type="text/javascript">
+		<!--
+		$(document).ready(function() {
+			$('.servers-tooltip').tooltip({
+				track: true,
+				delay: 0,
+				showURL: false,
+				extraClass: "fixed-width"
+			});
+
+			$('tr.vertical').each(function(){
+				var maxwidth = 0;
+				var maxheight = 0;
+				var buffer = 1;
+				var papers = new Array();
+				var titles = new Array();
+				$(this).children('.vertical').each(function() {
+					var title = $(this).html();
+					$(this).html('');
+					var paper = Raphael($(this).get(0), 0, 0);
+					var text = paper.text(0, 0, title).attr({ 'font-size': 14, 'font-weight': 'bold' });
+					var dims = text.getBBox();
+					var half_width = parseInt(dims['width']/2) + buffer;
+					var half_height = parseInt(dims['height']/2) + buffer;
+					text.transform('R-90,0,0T'+half_height+',-'+half_width);
+					papers.push(paper);
+					titles.push(text);
+					if (dims['width'] > maxwidth) {
+						maxwidth = dims['width'];
+					}
+					if (dims['height'] > maxheight) {
+						maxheight = dims['height'];
+					}
+				});
+				maxheight += buffer*2;
+				maxwidth += buffer*2;
+				for (var i = 0; i < papers.length; i++) {
+					titles[i].transform('...T0,'+maxwidth);
+					papers[i].setSize(maxheight, maxwidth);
+				}
+				$('th.vertical').each(function(){
+					$(this).css('width', maxheight).css('height', maxwidth);
+				});
+			});
+		});
+		-->
+
+	</script>
+{% endblock %}
+
+{% block page_content %}
+	<div id="viz">
+		<div id="viz-headers">
+				<div id="consistency-header">DNS Server Status</div>
+		</div>
+		<div id="consistency-region">
+		<img alt="Notice" src="{{ STATIC_URL }}images/dnssec_legend/warning.png" /><b>Notice:</b> The features on this page are not yet fully developed but it has been deployed in its infant form to further aid with DNS/DNSSEC troubleshooting.  This page will be updated in due time to make it more useful for troubleshooting.
+			<div class="consistency-matrix">
+			<h4>Delegation Information</h4>
+				<table>
+					<tr><th{% if zone_obj.to_text != "." %} rowspan="2"{% endif %}>Name</th>{% if zone_obj.to_text != "." %}<th colspan="3">Parent zone</th><th>Child zone</th>{% endif %}{% if zone_obj.version >= 6 %}{#XXX hack for versions < 6 #}<th colspan="2"{% if zone_obj.to_text != "." %} rowspan="2"{% endif %}>Authoritative IPs</th>{% endif %}</tr>
+				{% if zone_obj.to_text != "." %}<tr><th>Exists?</th><th colspan="2">Glue/additional records</th><th>Exists?</th></tr>{% endif %}
+				{% for name, parent_vals, child_vals in delegation %}
+				<!--{% cycle "grouping-1" "grouping-2" as row_class %}-->
+				<tr class="{{ row_class }}"><td rowspan="2">{{ name }}</td>{% if zone_obj.to_text != "." %}<td rowspan="2"{% if not parent_vals.parent_status.in_parent %} colspan="3"{% if not no_non_auth_parent_msg or not show_msg %} class="non-existent servers-tooltip" title="The delegation NS RRset for {{ zone_obj }} in the {{ zone_obj.parent }} zone does not include {{ name }}."{% endif %}{% endif %}>{{ parent_vals.parent_status.in_parent|yesno:"yes,no,indeterminate*" }}</td>{% if parent_vals.parent_status.in_parent %}{% if parent_vals.glue_ips_v4 or parent_vals.glue_ips_v6 %}<td>A</td>
+					<td>{% for ip in parent_vals.glue_ips_v4 %}<span{% if ips_from_child and ip not in ips_from_child %} class="warnings servers-tooltip" title="This server IP is not found among those resulting from resolving names from the authoritative NS RRset."{% endif %}>{{ ip }}</span>{% if not forloop.last %}<br />{% endif %}{% endfor %}</td>{% else %}<td rowspan="2" colspan="2"{% if parent_vals.parent_status.glue_required %} class="non-existent servers-tooltip" title="A glue record is required in the {{ zone_obj.parent }} zone for {{ name }}, but none exists."{% endif %}>{% if parent_vals.parent_status.in_bailiwick %}None{% else %}N/A (out of bailiwick){% endif %}</td>{% endif %}{% endif %}<td rowspan="2"{% if not child_vals.in_child %} class="non-existent servers-tooltip" title="The authoritative NS RRset for {{ zone_obj }} does not include {{ name }}."{% endif %}>{{ child_vals.in_child|yesno:"yes,no,indeterminate" }}</td>{% endif %}{% if zone_obj.version >= 6 %}{#XXX hack for versions < 6 #}{% if child_vals.auth_ips_v4 or child_vals.auth_ips_v6 %}<td>A</td><td>{% for ip in child_vals.auth_ips_v4 %}<span{% if ips_from_parent and ip not in ips_from_parent %} class="warnings servers-tooltip" title="This server IP is not found among those provided in glue records for in-bailiwick names (subdomains of {{ zone_obj.parent }}) or resulting from resolving names that are out of bailiwick."{% endif %}>{{ ip }}</span>{% if not forloop.last %}<br />{% endif %}{% endfor %}</td>{% else %}<td rowspan="2" colspan="2" class="warnings servers-tooltip" title="We were unable to obtain IP addresses for {{ name }} from an authoritative source.">Unable to resolve</td>{% endif %}{% endif %}</tr>
+				<tr class="{{ row_class }}">{% if zone_obj.to_text != "." %}{% if parent_vals.parent_status.in_parent %}{% if parent_vals.glue_ips_v4 or parent_vals.glue_ips_v6 %}<td>AAAA</td><td>{% for ip in parent_vals.glue_ips_v6 %}<span{% if ips_from_child and ip not in ips_from_child %} class="warnings servers-tooltip" title="This server IP is not found among those resulting from resolving names from the authoritative NS RRset."{% endif %}>{{ ip }}</span>{% if not forloop.last %}<br />{% endif %}{% endfor %}</td>{% endif %}{% endif %}{% endif %}{% if child_vals.auth_ips_v4 or child_vals.auth_ips_v6 %}{% if zone_obj.version >= 6 %}{#XXX hack to handle versions < 6 #}<td>AAAA</td><td>{% for ip in child_vals.auth_ips_v6 %}<span{% if ips_from_parent and ip not in ips_from_parent %} class="warnings servers-tooltip" title="This server IP is not found among those provided in glue records for in-bailiwick names (subdomains of {{ zone_obj.parent }}) or resulting from resolving names that are out of bailiwick."{% endif %}>{{ ip }}</span>{% if not forloop.last %}<br />{% endif %}{% endfor %}</td>{% endif %}{% endif %}</tr>
+				{% endfor %}
+				</table>
+				{% if show_msg and no_non_auth_parent_msg %}<p>* {{ no_non_auth_parent_msg }}</p>{% endif %}
+			</div>
+			{% if stealth %}
+			<div class="consistency-matrix">
+			<h4>Stealth Servers</h4>
+				<p>(non-delegated servers from ancestor zones answering authoritatively)</p>
+				<table>
+					<tr><th>Name</th><th>Zone</th><th>IP</th></tr>
+					{% for names,zone,server in stealth %}
+					<!--{% cycle "grouping-1" "grouping-2" as row_class %}-->
+						{% if names %}
+							{% for name in names %}
+								<tr class="{{ row_class }}">
+									<td>{{ name }}</td>
+									{% if forloop.first %}
+									<td rowspan="{{ names|length }}">{{ zone }}</td><td rowspan="{{ names|length }}">{{ server }}</td>
+									{% endif %}
+								</tr>
+							{% endfor %}
+						{% else %}
+						{#XXX hack for versions < 6 #}
+							<tr class="{{ row_class }}">
+								<td>(unknown)</td><td>{{ zone }}</td><td>{{ server }}</td>
+							</tr>
+						{% endif %}
+					{% endfor %}
+				</table>
+			</div>
+			{% endif %}
+			<div class="consistency-matrix">
+				<h4>Server information</h4>
+				<table>
+					<tr class="vertical"><th></th>{% for server in servers %}<th class="vertical servers-tooltip" title="{{ server.1|join:", " }} ({{ server.0 }})">{{ server.1|join:", " }} ({{ server.0 }})</th>{% endfor %}</tr>
+					{% for row in server_matrix %}
+					<!--{% cycle "grouping-1" "grouping-2" as row_class %}-->
+					{% autoescape off %}
+					<tr class="{{ row_class }}">
+						{% for col, style, url, tooltip, col_count in row %}<td{% if style or tooltip or url %} class="{% if style %}{{ style }}{% if tooltip or url %} {% endif %}{% endif %}{% if tooltip %}servers-tooltip{% if url %} {% endif %}{% endif %}{% if url %}servers-popup{% endif %}"{% endif %}{% if col_count %} colspan="{{ col_count }}"{% endif %}{% if tooltip %} title="{{ tooltip }}"{% endif %}>{% if url %}<a href="{{ url }}">{% endif %}{{ col }}{% if url %}</a>{% endif %}</td>{% endfor %}
+					</tr>
+					{% endautoescape %}
+					{% endfor %}
+				</table>
+			</div>
+		</div>
+	</div>
+{% endblock %}

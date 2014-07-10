@@ -1,0 +1,4 @@
+digraph {
+	graph [rankdir="BT"]
+	c [label="non-existent.example.com/A", fontsize="10", shape="rectangle", style="rounded,filled", fillcolor="#fffa8f", penwidth="1.5"]
+}

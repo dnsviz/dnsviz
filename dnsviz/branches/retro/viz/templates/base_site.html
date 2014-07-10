@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+	{% block body_tag %}
+	<body>
+	{% endblock %}
+
+	<div id="banner">
+		<div id="logo">
+			<p><a title="Sandia Corporate Website" accesskey="h" href="http://www.sandia.gov/"><img src="{% firstof STATIC_URL "/static/" %}images/logo.gif" alt="Click the Sandia thunderbird logo to go to Sandia's corporate website" /></a></p>
+		</div>
+	</div>
+
+	{% block crumbtrail %}
+	{% endblock %}
+
+	<div id="container">
+		{% block search_form %}
+		<!-- SEARCH AGAIN FORM -->
+		<div id="search-again">
+			<form method="get" action="/search/">
+				<fieldset>
+					<input id="search-again-field" name="d" value="Go to domain name&hellip;" size="35" onfocus="if (this.value == 'Go to domain name&hellip;') { this.value = ''; }" onblur="if (this.value == '') { this.value = 'Go to domain name&hellip;'; }" />
+					<input type="submit" class="button" value="Go &raquo;" />
+				</fieldset>
+			</form>
+		</div>
+		{% endblock %}
+
+		<!-- WEBSITE TITLE -->
+		<h1 class="site-title"><a href="/">DNSViz</a></h1>
+		<h2 class="site-subtitle">A DNS visualization tool</h2>
+
+		<div id="content-sub">
+		<!-- BEGIN CONTENT -->
+		{% block maincontent %}
+		{% endblock %}
+		</div><!-- #content-sub -->
+
+		<div id="footer">
+			<a name="footer"></a>
+			<p>Copyright &copy; 2010 - 2013 Sandia Corporation | <a href="/contact/">Questions and Comments</a> | <a href="http://www.sandia.gov/general/privacy-security/index.html">Privacy and Security</a> | <a href="http://www.sandia.gov">Sandia Corporate Website</a></p>
+
+			<br />
+			<div id="footer-buttons">
+			<ul>
+			<li><a href="http://validator.w3.org/check?uri=referer"><img
+					src="http://www.w3.org/Icons/valid-xhtml10"
+					alt="Valid XHTML 1.0 Strict" height="31" width="88" /></a>
+			</li>
+			</ul>
+			</div>
+		</div>
+
+	</div><!-- #container -->
+	</body>
+
+{% endblock %}

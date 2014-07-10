@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+	<head>
+		<title>{% if title %}{{ title }} | DNSViz{% else %}DNSViz | A DNS visualization tool{% endif %}</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<!-- use no-cache if refresh problems occur: -->
+		<!-- <meta http-equiv="cache-control" content="no-cache" />
+		<meta http-equiv="pragma" content="no-cache" /> -->
+		
+		<link rel="icon" href="http://www.sandia.gov/images2005/snl_icon.png" type="image/png" />
+		<link rel="stylesheet" type="text/css" href="{% firstof STATIC_URL "/static/" %}css/sandia.css" media="all" />
+		<link rel="stylesheet" type="text/css" href="http://www.sandia.gov/css/print.css" media="print" />
+		<link rel="stylesheet" type="text/css" href="{% firstof STATIC_URL "/static/" %}css/DNSViz.css" media="all" />
+		<!--[if IE 6]>
+			<link rel="stylesheet" type="text/css" href="{% firstof STATIC_URL "/static/" %}css/ie6.css" />
+		<![endif]-->
+		{% block extra_media %}
+		{% endblock %}
+	</head>
+
+	{% block body %}
+	{% endblock %}
+
+</html>

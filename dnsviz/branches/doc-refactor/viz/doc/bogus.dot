@@ -1,0 +1,5 @@
+digraph {
+	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">      </FONT><BR/><FONT POINT-SIZE="10">               </FONT>>, color="#be1515", penwidth="1.5"]
+	b [label=<<FONT POINT-SIZE="12" FACE="Helvetica">    </FONT>>, shape="diamond", color="#be1515", penwidth="1.5"]
+	c [label="               ", fontsize="10", shape="rectangle", style="rounded", color="#be1515", penwidth="1.5"]
+}

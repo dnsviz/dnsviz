@@ -1,0 +1,26 @@
+.ui-tooltip {
+	max-width: none;
+}
+.ui-tooltip-content {
+	font-size: 10pt;
+	padding: 0pt;
+	margin: -8px;
+}
+.ui-tooltip-content ul { list-style:none; }
+
+.dnsviz-secure { background-color: #8ffeff; }
+.dnsviz-insecure { background-color: #b7b7b7; }
+.dnsviz-bogus { background-color: #f17b7b; }
+.dnsviz-incomplete { background-color: #fffa8f; }
+ 
+.dnsviz-valid { background-color: #8ffeff; }
+.dnsviz-indeterminate { background-color: #fffa8f; }
+.dnsviz-indeterminate-no-dnskey { background-color: #fffa8f; }
+.dnsviz-indeterminate-unknown-algorithm { background-color: #fffa8f; }
+.dnsviz-expired { background-color: #ad7fed; }
+.dnsviz-premature { background-color: #ad7fed; }
+.dnsviz-invalid-sig { background-color: #f17b7b; }
+.dnsviz-invalid-digest { background-color: #f17b7b; }
+.dnsviz-invalid-target { background-color: #f17b7b; }
+.dnsviz-invalid { background-color: #f17b7b; }
+.dnsviz-match-pre-revoke { background-color: #fffa8f; }

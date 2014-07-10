@@ -1,0 +1,116 @@
+{% extends "base_site.html" %}
+
+{% block crumbtrail %}
+<div id="crumbtrail"><a href="/">DNSViz Home</a> &raquo; {{ name_obj }}</div>
+{% endblock %}
+
+{% block extra_media %}
+	<script type="text/javascript" src="http://platform.twitter.com/widgets.js" ></script>
+	<script type="text/javascript" src="https://apis.google.com/js/plusone.js">
+		{lang:'en-US', parsetags:'explicit'}
+	</script>
+	<script type="text/javascript" src="{{ STATIC_URL }}js/jquery-1.7.1.min.js"></script>
+	<script type="text/javascript" src="{{ STATIC_URL }}js/jquery.timeago.js"></script>
+	<script type="text/javascript">
+		$(document).ready(function() {
+			var now = new Date();
+			$('abbr.timeago').timeago();
+			{% if url_subdir != "analyze/" %}
+			$('.datepicker').datepicker({ showOn: 'both', buttonImageOnly: true, buttonImage: '{{ STATIC_URL }}images/calendar.gif', buttonText: 'Select a date', dateFormat: 'yy-mm-dd', minDate: '{{ name_obj.first.analysis_end|date:"Y-m-d" }}', maxDate: new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) });
+			{% endif %}
+		});
+	</script>
+	{{ date_form.media }}
+{% endblock %}
+
+{% block maincontent %}
+<h3><span id="domain" class="domain">{{ name_obj }}</span></h3>
+
+{% if url_subdir != "analyze/" %}
+<div id="date-search"><form action="" method="get">
+<fieldset>
+{% for field in date_form %}{{ field }}{% endfor %}
+<input type="submit" name="date_search" class="button" value="Go &raquo;" />
+</fieldset>
+</form></div>
+{% endif %}
+
+{% if name_obj.analysis_end %}
+<div id="last-updated">
+	Updated: <span id="updated-time"><strong>{% if url_subdir != "analyze/" %}<a href="{{ name_obj.base_url_with_timestamp }}{{ url_subdir }}{% if query_string %}?{{ query_string|safe }}{% endif %}">{{ name_obj.analysis_end|date }} UTC</a>{% else %}{{ name_obj.analysis_end|date }} UTC{% endif %}</strong> (<abbr class="timeago" title="{{ name_obj.analysis_end|date:"c" }}">{{ name_obj.updated_ago_str }} ago</abbr>)</span>
+<span id="most-recent">
+{% if name_obj.next %}
+	<a href="{{ name_obj.base_url }}{{ url_subdir }}">Go to most recent &raquo;</a>
+{% else %}
+	<a href="{{ name_obj.base_url }}analyze/">Update now</a>
+{% endif %}
+</span>
+</div>
+
+{% if url_subdir != "analyze/" %}
+<div id="time-navigation">
+{% if name_obj.previous %} 
+  <span id="previous-analysis"><a href="{{ name_obj.previous.base_url_with_timestamp }}{{ url_subdir }}{% if query_string %}?{{ query_string|safe }}{% endif %}">&laquo; Previous analysis</a></span>
+{% else %}
+	<span id="previous-analysis" class="inactive">&laquo; Previous analysis</span>
+{% endif %}
+|
+{% if name_obj.next %}
+	<span id="next-analysis"><a href="{{ name_obj.next.base_url_with_timestamp }}{{ url_subdir }}{% if query_string %}?{{ query_string|safe }}{% endif %}">Next analysis &raquo;</a></span>
+{% else %}
+	<span id="next-analysis" class="inactive">Next analysis &raquo;</span>
+{% endif %}
+</div>
+
+{% endif %}
+
+{% endif %}
+
+<div class="panel">
+	<div id="share-buttons">
+		<ul>
+			<li><a href="https://twitter.com/share?count=none" class="twitter-share-button">Tweet</a></li>
+			<li><div id="plusone-div">
+				<script type="text/javascript">
+					gapi.plusone.render('plusone-div',{"size": "medium", "annotation": "none", "width": "120" });
+				</script>
+			</div></li>
+		</ul>
+	</div>
+
+	<!-- TABS -->
+
+	{% block view_tabs %}
+	<ul class="tabs">
+		{% if url_subdir == "dnssec/" %}
+		<li class="active"><a>DNSSEC</a></li>
+		{% else %}
+		<li><a{% if name_obj.analysis_end %} href="{% if timestamp %}{{ name_obj.base_url_with_timestamp }}{% else %}{{ name_obj.base_url }}{% endif %}dnssec/"{% endif %}>DNSSEC</a></li>
+		{% endif %}
+		{% if url_subdir == "responses/" %}
+		<li class="active"><a>Responses</a></li>
+		{% else %}
+		<li><a{% if name_obj.analysis_end %} href="{% if timestamp %}{{ name_obj.base_url_with_timestamp }}{% else %}{{ name_obj.base_url }}{% endif %}responses/"{% endif %}>Responses</a></li>
+		{% endif %}
+		{% if url_subdir == "servers/" %}
+		<li class="active"><a>Servers</a></li>
+		{% else %}
+		<li><a{% if name_obj.analysis_end %} href="{% if timestamp %}{{ name_obj.base_url_with_timestamp }}{% else %}{{ name_obj.base_url }}{% endif %}servers/"{% endif %}>Servers</a></li>
+		{% endif %}
+		{% if url_subdir == "analyze/" %}
+		<li class="active"><a>Analyze</a></li>
+		{% else %}
+		<li><a href="{{ name_obj.base_url }}analyze/">Analyze</a></li>
+		{% endif %}
+	</ul>
+	{% endblock %}
+
+	{% block page_info %}
+	{% endblock %}
+
+	{% block page_content %}
+	{% endblock %}
+
+</div> <!-- panel -->
+
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base_site.html" %}
+
+{% block body_tag %}
+	<body id="dnsviz-home">
+{% endblock %}
+
+{% block crumbtrail %}
+<div id="crumbtrail"><a href="/">DNSViz Home</a> &raquo; Contact</div>
+{% endblock %}
+
+{% block maincontent %}
+<h3>Contact</h3>
+<p>DNSViz is developed and maintained by <a href="http://www.sandia.gov/~ctdecci/">Casey Deccio</a> at <a href="http://www.sandia.gov/">Sandia National Laboratories</a>.</p>
+<p>Please use the form below to contact us with your comments and questions.  We appreciate your feedback!</p>
+	<form action="" method="post">
+		{% csrf_token %}
+		{% for field in form %}
+		<p>
+			{% if field.errors %}
+				<ul class="formfield-error-list">
+				{% for err in field.errors %}
+					<li>{{ err }}	
+				{% endfor %}
+				</ul> 
+			{% endif %}
+			{% if field.label %}{{ field.label_tag }}:{% endif %}
+			{{ field }}
+			{% if field.help_text %}
+			<br />{{ field.help_text }}
+			{% endif %}
+		</p>
+		{% endfor %}
+		<p><input type="submit" class="button" value="Submit" /></p>
+	</form>
+{% endblock %}
