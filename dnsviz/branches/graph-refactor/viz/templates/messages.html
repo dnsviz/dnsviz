@@ -1,0 +1,8 @@
+		{% if msgs %}
+		<h2>Notices</h2>
+		<ul>
+		{% for color,msg in msgs %}
+			<li><span style="color: {{ color }};">{{ msg }}<span></li>
+		{% endfor %}
+		</ul>
+		{% endif %}

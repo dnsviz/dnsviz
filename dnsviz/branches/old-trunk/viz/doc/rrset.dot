@@ -1,0 +1,4 @@
+digraph {
+	graph [rankdir="BT"]
+	c [label="example.com/SOA", fontsize="10", shape="rectangle", style="rounded", penwidth="1.5"]
+}

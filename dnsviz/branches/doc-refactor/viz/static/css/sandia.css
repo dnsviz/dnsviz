@@ -1,0 +1,356 @@
+html, body { top: 0; 
+	left: 0; 
+	border: 0; 
+	font: 85% Verdana, Arial, Helvetica, sans-serif; 
+	}
+
+* {margin: 0; padding: 0;}
+
+h2 {
+	color: #990000;
+	border-bottom: 1px dotted #B09B88;
+	font-size:1.66em;
+	font-weight:bold;
+	font-family:Verdana, Arial, Helvetica, sans-serif;
+	padding-bottom: 0.15em;
+	margin-left: 182px;
+}
+h3 {
+	color: #333;
+	font: bolder 1.20em Verdana, Arial, Helvetica, sans-serif;
+	margin: 1.25em 0 0.25em;
+}
+h4 {
+	margin: 1.25em 0 0.25em; 
+	font: bolder 1.10em Verdana, Arial, Helvetica, sans-serif;
+}
+h5 {
+	margin: 1.25em 0 0.25em; 
+	font: bolder 1.0em Verdana, Arial, Helvetica, sans-serif;
+}
+p {
+	margin: .90em 0 0.85em;
+}
+a:link /*, #content-sub a:visited*/ { 
+	color: #004B8C; 
+}	
+a:hover { 
+	color: #990033; 
+}
+img { border-style: none; }
+ul {
+      margin: 1px 0 5px 0;
+	  padding: 0;
+}
+ul ul { margin: 0 0 0 3.25em; }
+ol { margin: .90em 0 0 3.25em; }
+ol ol { margin: 0 0 0 3.25em; }
+li {
+      margin: 5px 0 0 3.25em;
+	  top: 0;
+	  padding: 0;
+}
+blockquote {
+	margin: .90em 0 0 3.25em;
+}
+hr {
+	border: 1px dotted gray; 
+	border-color: #B09B88 white white; 
+	background: #fff;
+}
+td { vertical-align: top; }
+
+#content-sub .text-nowrap { 
+	white-space:nowrap; 
+	}
+
+
+
+
+
+
+.skip-nav { display: none; }
+
+#container {
+	width: 95%;
+	margin: 10px auto;
+	background-color: #fff;
+	color: #333;
+	line-height: 130%;
+}
+
+
+#content-sub {
+	margin-left: 182px;
+	margin-right: 170px;
+	border-right: 1px dotted #B09B88;
+	max-width: 65em;
+	padding-right: 1em;
+	vertical-align:top;
+	font: normal 1.04em/1.35em Verdana, Arial, Helvetica, sans-serif;
+}
+
+
+
+
+
+/*HEADER*/
+#banner { 
+	background: #004889 url(http://www.sandia.gov/images2005/bn-background.jpg) no-repeat; 
+	position: relative;
+	width: 100%;
+	height: 78px;
+	z-index: 15;
+	}
+#banner * { margin:0; padding:0; }
+#logo {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 205px;
+	height: 60px;
+	text-decoration: none;
+	z-index: 200;
+	}
+#logo h3 {padding-left: 0;}
+#tools { 
+	z-index: 113; 
+	color: #fff; 
+	}
+
+#tools.left, #tools.right { 
+	white-space: nowrap;
+	position: absolute; 
+	top: 0.5em; 
+	}
+
+.left  { 
+	left: 0.5em;
+	text-align: left;
+	}
+
+.right { 
+	right: 15px;
+	text-align: right; 
+	}
+
+#tools a { 
+	text-decoration: none; 
+	color: #fff; 
+	}
+
+#tools a:hover { 
+	color: #B1E2FB; 
+	}
+#banner-nav { 
+	position: absolute; 
+	width: 100%;
+	bottom: 2px;
+	left: 0;
+	color: #fff;
+	z-index: 116;
+	font: 1em/1.3em Verdana, Arial, Helvetica, sans-serif;
+	white-space: nowrap;
+	}
+
+#banner-nav li {
+	float: left;
+	border-right: 1px dotted #FFF; 
+	list-style: none;
+	text-decoration: none;
+	z-index: 116;
+	}
+
+#banner-nav li.first { 
+	padding-left: 177px; 
+	}
+
+#banner-nav li a:link, #banner-nav li a:visited {
+	color: #fff;
+	text-decoration: none;
+	padding: 2px 5px;
+	}
+
+#banner-nav li.last { 
+	border-right: none !important; 
+	}
+
+#banner-nav li a:hover { 
+	color: #B1E2FB;
+	text-decoration: none; 
+	}
+
+#banner-nav a:active { 
+	color: #e5e5e5; 
+	text-decoration: none; 
+	}
+	
+	
+	
+/*HEADER-SEARCH*/
+#search {
+	position: absolute;
+	top: 18px;
+	right: 0;
+	color: #fff;
+	z-index: 116;
+	padding: 10px 15px 0 0;
+	white-space: nowrap;
+	text-align: right;
+	}
+
+#search li {
+	display: inline;
+	list-style: none;
+	text-decoration: none;
+	padding-left: 5px; 
+	color: #fff; 
+	}
+
+#search li a:link, #search li a:visited:hover, #search li a:visited, #search li.first a:link { 
+	color: #fff;
+	text-decoration: none;  
+}
+
+#search li a:hover, #search li.first a:hover {
+	color: #B1E2FB;
+	text-decoration: none; 
+	}
+
+#search input {
+	background: #fff;  
+	border-color: transparent;
+	color: #5a5a5a; 
+	white-space: nowrap;
+	}
+
+#search input.submit { 
+	vertical-align: -3px;
+	padding: 0; /*padding: 1px;*/
+	background: transparent; 
+	color: #fff; 
+	font: 11px/12px Verdana,Arial, Helvetica, sans-serif; /*font: 10px/12px Verdana,Arial, Helvetica, sans-serif;*/  
+	}
+
+#search input.text { 
+	background: #fff; 
+	}
+
+
+
+
+/*FOOTER*/
+#footer { 
+	font: .90em/1.25em Verdana, Arial, Helvetica, sans-serif; 
+	color: #222;
+	white-space: nowrap;
+	vertical-align: top; 
+	border-top: 1px dotted #B59F87;
+	clear: both;
+	}
+#footer * { margin:0; padding:0; }
+#footer p {
+	line-height: 1.55em; 
+	text-align:center;
+	}
+
+#footer a:link { color: #333399; 
+	text-decoration: none; 
+	}
+
+#footer a:visited { /*color: #333399; */
+	text-decoration: none; 
+	}
+
+#footer a:hover, #footer a:visited:hover { 
+	color: #22225F;
+	text-decoration: underline; 
+	}
+
+
+
+
+/*INLINE STYLES*/
+.small { 
+	font: normal .95em/1.35em Verdana, Arial, Helvetica, sans-serif; 
+	}
+
+.raise {
+	font-size: .65em; 
+	vertical-align: super; 
+	}
+
+.lower {
+	font-size: .65em; 
+	vertical-align: sub; 
+	}
+  
+/*PULLQUOTE - CREATES FLOATING IMAGES IN BODY CONTENT AREA. CAN CREATE LISTED PROJECT HTML UNDER THE IMAGES*/
+
+div.pullquote-right {
+	float: right; 
+	width: 250px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 12px 5px; 
+	margin: 5px 0px 5px 0px; 
+	}
+
+div.pullquote-left {
+	float: left; 
+	width: 250px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 12px 5px; 
+	margin: 5px 0px 5px 0px; 
+	}
+ 
+/*PULLQUOTE - CREATES FLOATING IMAGES IN BODY CONTENT AREA. CAN CREATE LISTED PROJECT HTML UNDER THE IMAGES*/
+
+div.pullquote-right180 {
+	float: right; 
+	width: 180px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 12px 5px; 
+	margin: 5px 0px 5px 0px; 
+	}
+
+div.pullquote-left180 {
+	float: left; 
+	width: 180px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 12px 5px; 
+	margin: 5px 0px 5px 0px; 
+	}
+
+/*PULLQUOTE - CREATES FLOATING IMAGES IN BODY CONTENT AREA. CAN CREATE LISTED PROJECT HTML UNDER THE IMAGES*/
+
+div.pullquote-rt-150px {
+	float: right; 
+	width: 150px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 2px 5px; 
+	margin: 5px 0px 2px 0px; 
+	}
+
+/*PULLQUOTE - CREATES FLOATING IMAGES IN BODY CONTENT AREA. CAN CREATE LISTED PROJECT HTML UNDER THE IMAGES*/
+div.pullquote-right150 {
+	float: right; 
+	width: 150px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 2px 5px; 
+	margin: 5px 0px 2px 0px; 
+	}
+
+div.pullquote-left150 {
+	float: left; 
+	width: 150px; 
+	color: #000; 
+	font: normal .95em Verdana, Arial, Helvetica, sans-serif; 
+	padding: 0px 12px 2px 5px; 
+	margin: 5px 0px 2px 0px; 
+	}

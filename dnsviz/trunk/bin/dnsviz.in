@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+
+import getopt
+import json
+import os
+import re
+import sys
+
+import dns.message, dns.name 
+
+from dnsviz.analysis import DomainNameAnalysis
+from dnsviz.viz.dnssec import DNSAuthGraph
+from dnsviz import format as fmt
+
+ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
+BLANK_LINES_RE = re.compile(r'\n\s*\n')
+
+MEDIA_URL = 'file://' + os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz')
+DNSSEC_TEMPLATE_FILE = os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz', 'html', 'dnssec-template.html')
+
+def get_trusted_keys(filename):
+    trusted_keys = []
+
+    tk_str = open(filename, 'r').read()
+    tk_str = ZONE_COMMENTS_RE.sub('', tk_str)
+    tk_str = BLANK_LINES_RE.sub(r'\n', tk_str)
+    tk_str = tk_str.strip()
+    m = dns.message.from_text(str(';ANSWER\n'+tk_str))
+    for rrset in m.answer:
+        if rrset.rdtype != dns.rdatatype.DNSKEY:
+            pass
+        for dnskey in rrset:
+            if dnskey.flags & fmt.DNSKEY_FLAGS['revoke']:
+                pass
+            trusted_keys.append((rrset.name,dnskey))
+
+    return trusted_keys
+
+def usage():
+    sys.stderr.write('''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
+
+Options:
+    -f <filename>  - read names from a file (one name per line), instead of from command line
+    -r <filename>  - read analysis from a file, instead of from stdin
+    -y             - read in yaml, instead of json
+    -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
+    -O             - derive the filename(s) from the format provided to -T and the domain name(s)
+    -o <filename>  - save the image to filename instead of to stdout
+    -T <format>    - the format of the output (dot, png, jpg, svg, html)
+''' % sys.argv[0])
+
+def finish_graph(G, trusted_keys, fmt, filename):
+    G.add_trust(trusted_keys)
+    G.remove_extra_edges()
+
+    if fmt == 'html':
+        js_img = G.draw('js')
+
+        template_str = open(DNSSEC_TEMPLATE_FILE, 'r').read()
+        template_str = template_str.replace('MEDIA_URL', MEDIA_URL)
+        template_str = template_str.replace('JS_CODE', js_img)
+        if filename is None:
+             return template_str
+        else:
+             open(filename, 'w').write(template_str)
+    else:
+        if filename is None:
+            return G.draw(fmt)
+        else:
+            G.draw(fmt, path=filename)
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Oo:T:')
+    except getopt.GetoptError:
+        usage()
+        sys.exit(1)
+
+    opts = dict(opts)
+    if ('-f' in opts and args) or not ('-f' in opts or args):
+        usage()
+        sys.exit(1)
+
+    if '-T' in opts:
+        fmt = opts['-T']
+    elif '-o' in opts:
+        fmt = opts['-o'].split('.')[-1]
+    else:
+        fmt = 'dot'
+    if fmt not in ('dot','png','jpg','svg','html'):
+        usage()
+        sys.exit(1)
+
+    if '-o' in opts and '-O' in opts:
+        usage()
+        sys.exit(1)
+
+    #TODO: support unicode
+    if '-f' in opts:
+        names = []
+        with open(opts['-f']) as f:
+            for line in f:
+                names.append(dns.name.from_text(line.strip()))
+    else:
+        names = map(dns.name.from_text, args)
+
+    if '-r' not in opts or opts['-r'] == '-':
+        analysis_str = sys.stdin.read()
+    else:
+        analysis_str = open(opts['-r']).read()
+    if '-y' in opts:
+        import yaml
+        analysis_structured = yaml.load(analysis_str)
+    else:
+        analysis_structured = json.loads(analysis_str)
+
+    if '-t' in opts:
+        trusted_keys = get_trusted_keys(opts['-t'])
+    else:
+        trusted_keys = ()
+
+    name_objs = []
+    for name in names:
+        name_objs.append(DomainNameAnalysis.deserialize(name, analysis_structured))
+
+    G = DNSAuthGraph()
+    for name_obj in name_objs:
+        name_obj.populate_status(trusted_keys)
+        for qname, rdtype in name_obj.queries:
+            if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
+                continue
+            #XXX filter negative responses
+            #if (qname, rdtype) in name_obj.nxdomain_servers_clients or \
+            #        (qname, rdtype) in name_obj.noanswer_servers_clients:
+            #    continue
+            G.graph_rrset_auth(name_obj, qname, rdtype)
+
+        if '-O' in opts:
+            if name_obj.name == dns.name.root:
+                name = 'root'
+            else:
+                name = name_obj.name.canonicalize().to_text().rstrip('.')
+            finish_graph(G, trusted_keys, fmt, '%s.%s' % (name, fmt))
+            G = DNSAuthGraph()
+
+    if '-O' not in opts:
+        if '-o' not in opts or opts['-o'] == '-':
+            filename = None
+            img = finish_graph(G, trusted_keys, fmt, filename)
+            sys.stdout.write(img)
+        else:
+            finish_graph(G, trusted_keys, fmt, opts['-o'])
+
+if __name__ == "__main__":
+    main()

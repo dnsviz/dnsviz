@@ -1,0 +1,185 @@
+{% extends "domain_page.html" %}
+
+{% block extra_media %}
+
+	{{ block.super }}
+
+	<script src="{{ STATIC_URL }}js/json2.js"></script>
+	<script src="http://www.java.com/js/deployJava.js"></script>
+	<script type="text/javascript">
+		<!--
+		var appletID = 'DNSHelperApplet';
+		function activateApplet() {
+			var attributes = { id: appletID, code: 'net.dnsviz.dnshelper.DNSHelperApplet', width: 1, height: 1 };
+			var parameters = { jnlp_href: '{{ STATIC_URL }}applets/dnshelper-applet.jnlp' };
+
+			var legitWrite = document.write;
+			var intercepted = '';
+			document.write = function(arg) { intercepted += arg; }
+			deployJava.runApplet(attributes, parameters, '1.6');
+			document.write = legitWrite;
+			$('body').append(intercepted);
+		}
+
+		/* Attempt to load the applet up to "X" times with a delay. If it succeeds, then execute the callback function. */
+		function waitForAppletLoad(attempts, delay, onSuccessCallback, onFailCallback) {
+			var el = document.getElementById(appletID);
+			if (el != undefined && el.getDNSCacheAnalyst != undefined) {
+				onSuccessCallback(); //Go do it.
+				return true;
+			} else {
+				if (attempts == 0) {
+					onFailCallback();
+					return false;
+				} else {
+					//Put it back in the hopper.
+					setTimeout(function () {
+							waitForAppletLoad(--attempts, delay, onSuccessCallback, onFailCallback);
+						}, delay);
+				}
+			}
+		}
+
+		function runDNSAnalysisFromApplet(qname, server, rdtypes) {
+			var helperApplet = document.getElementById(appletID);
+			var cacheAnalyst = helperApplet.getDNSCacheAnalyst(server);
+			var responseMap = cacheAnalyst.analyze(qname, rdtypes);
+			var resources = responseMap.keySet().toArray();
+			var responses = {};
+			for (var i = 0; i < resources.length; i++) {
+				var responseObj = responseMap.get(resources[i]);
+				responses[resources[i]] = {
+						server: responseObj.getServer(),
+						client: responseObj.getClient(),
+						response: responseObj.getResponse() == null ? null : responseObj.getEncodedResponse(),
+						responseCD: responseObj.getResponseCD() == null ? null : responseObj.getEncodedResponseCD(),
+						timestamp: responseObj.getTimestampInSeconds(),
+						timeout: responseObj.getTimeout(),
+						formErr: responseObj.getFormErr()
+				};
+			}
+			return responses;
+		}
+
+		function testAnalysis(server) {
+			var helperApplet = document.getElementById(appletID);
+			var cacheAnalyst = helperApplet.getDNSCacheAnalyst(server);
+			var responseMap = cacheAnalyst.analyze('.', [6]);
+			return responseMap.containsKey('./SOA') && (responseMap.get('./SOA').getResponse() != null || responseMap.get('./SOA').getResponseCD() != null);
+		}
+
+		function getClientAddress(server) {
+			var helperApplet = document.getElementById(appletID);
+			var cacheAnalyst = helperApplet.getDNSCacheAnalyst(server);
+			return cacheAnalyst.getLocalAddress();
+		}
+
+		function analyzeName(qname, server) {
+			var rdtypes = [ 1, 6, 12, 15, 16, 28 ]; // A, SOA, PTR,  MX, TXT, AAAA
+
+			try {
+				if (!testAnalysis(server)) {
+					$('#options input[name=errors]').val('Unable to recursively query ' + server + '.  Please check that there is a route to the DNS server and that no firewalls are obstructing packets.');
+					return;
+				}
+			} catch (e) {
+				$('#options input[name=errors]').val(e + ' -  encountered while testing DNS analyst.');
+				return;
+			}
+
+			try {
+				var client = getClientAddress(server);
+			} catch (e) {
+				$('#options input[name=errors]').val(e + '  - encountered while obtaining client address.');
+				return;
+			}
+
+			try {
+				var responses = runDNSAnalysisFromApplet(qname, server, rdtypes);
+			} catch (e) {
+				$('#options input[name=errors]').val(e + '  - encountered while analyzing ' + qname + '.');
+				return;
+			}
+
+			var json_txt = JSON.stringify(responses);
+			$('#options input[name=responses]').val(json_txt);
+			$('#options input[name=client]').val(client);
+		}
+
+		$(document).ready(function() {
+			$('#options form').submit(function() {
+				$('#analysis-text').hide();
+				$('#analysis-progress').show();
+
+				var form = $('#options form');
+				form.unbind('submit');
+
+				if ($('#options input:radio[name=perspective]:checked').val() == "client") {
+					var qname = "{{ name_obj.to_text }}";
+					var server = $('#options input[name=server]').val();
+
+					setTimeout(activateApplet(), 0);
+					waitForAppletLoad(10, 1000,
+						function() {
+							analyzeName(qname, server);
+							form.submit();
+						}, function () {
+							$('#options input[name=errors]').val('Unable to load Java applet.  Please check to make sure that your browser supports and is configured to allow applet plugins.');
+							form.submit();
+						}
+					);
+					return false;
+				}
+			});
+		});
+		-->
+	</script>
+{% endblock %}
+
+{% block page_content %}
+	<div id="analysis-text">
+	{% if error_msg %}
+		<p class="form-error">
+		{{ error_msg }}
+		</p> 
+	{% else %}
+		<p>
+		<span class="domain">{{ name_obj }}</span> was last analyzed on {{ name_obj.updated_utc|date }}.  To analyze <span class="domain">{{ name_obj }}</span> using a particular DNS resolver, fill out the form below.
+		</p>
+	{% endif %}
+	<fieldset id="options">
+	<form action="" method="post">
+		{% if options_form.errors %}
+			<p class="form-error">
+			There were errors processing the DNSSEC options.  Please correct below and re-submit.
+			</p> 
+		{% endif %}
+		<ol id="options-list" class="analysis-options">
+			{% for field in analyze_form %}
+			<li>
+				{{ field.label }}: {{ field }}
+				{% if field.errors %}
+					<ul class="formfield-error-list">
+					{% for err in field.errors %}
+						<li>{{ err }}	
+					{% endfor %}
+					</ul> 
+				{% endif %}
+			</li>
+			{% endfor %}
+		</ol>
+		<p id="analysis-submit">
+			<input type="hidden" name="responses" value="" />
+			<input type="hidden" name="client" value="" />
+			<input type="hidden" name="errors" value="" />
+			<input type="submit" class="button" value="Analyze" />
+		</p>
+	</form>
+	</fieldset>
+	</div>
+
+	<div id="analysis-progress">
+		<p>Please be patient while we analyze <span class="domain">{{ name_obj }}</span>.</p>
+		<img alt="progress bar" src="{{ STATIC_URL }}images/progress.gif" />
+	</div>
+{% endblock %}

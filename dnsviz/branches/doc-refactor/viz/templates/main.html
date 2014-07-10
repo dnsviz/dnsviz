@@ -1,0 +1,34 @@
+{% extends "base_site.html" %}
+
+{% block extra_media %}
+	<script type="text/javascript" src="http://platform.twitter.com/widgets.js" ></script>
+	<script type="text/javascript" src="https://apis.google.com/js/plusone.js">
+		{lang:'en-US', parsetags:'explicit'}
+	</script>
+{% endblock %}
+
+{% block body_tag %}
+	<body id="dnsviz-home">
+{% endblock %}
+
+{% block search_form %}
+{% endblock %}
+
+{% block maincontent %}
+	<p>
+	DNSViz is a tool for visualizing the status of a DNS zone.  It was designed as a resource for understanding and troubleshooting deployment of the DNS Security Extensions (DNSSEC).  It provides a visual analysis of the DNSSEC authentication chain for a domain name and its resolution path in the DNS namespace, and it lists configuration errors detected by the tool.  Your <a href="/contact/">feedback</a> is appreciated.
+	</p>
+	<div class="share-buttons">
+		<ul>
+			<li><a href="https://twitter.com/share" class="twitter-share-button">Tweet</a></li>
+			<li><div id="plusone-div">
+				<script type="text/javascript">
+					gapi.plusone.render('plusone-div',{"size": "medium", "width": "120" });
+				</script>
+			</div></li>
+		</ul>
+	</div>
+
+	{% include "search_panel.html" %}
+
+{% endblock %}

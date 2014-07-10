@@ -1,0 +1,3 @@
+digraph {
+	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT>>, shape="diamond", style="filled", fillcolor="#fffa8f", penwidth="1.5"]
+}

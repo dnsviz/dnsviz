@@ -1,0 +1,166 @@
+diff -uar m2crypto-0.21.1/M2Crypto/DSA.py m2crypto-0.21.1.new/M2Crypto/DSA.py
+--- m2crypto-0.21.1/M2Crypto/DSA.py	2011-01-15 11:10:05.000000000 -0800
++++ m2crypto-0.21.1.new/M2Crypto/DSA.py	2011-10-07 15:28:53.000000000 -0700
+@@ -394,6 +394,29 @@
+         raise DSAError('problem loading DSA key pair')
+     return DSA(dsa, 1)
+ 
++def pub_key_from_params(p, q, g, pub):
++    """
++    Factory function that instantiates a DSA_pub object using
++    the parameters and public key specified.
++
++    @type  p: str
++    @param p: value of p, a "byte string"
++    @type  q: str
++    @param q: value of q, a "byte string"
++    @type  g: str
++    @param g: value of g, a "byte string"
++    @type  pub: str
++    @param pub: value of the public key, a "byte string"
++    @rtype:   DSA_pub
++    @return:  instance of DSA_pub.
++    """
++    dsa = m2.dsa_new()
++    m2.dsa_set_p(dsa, p)
++    m2.dsa_set_q(dsa, q)
++    m2.dsa_set_g(dsa, g)
++    m2.dsa_set_pub(dsa, pub)
++    return DSA_pub(dsa, 1)
++
+ 
+ def load_pub_key(file, callback=util.passphrase_callback):
+     """
+diff -uar m2crypto-0.21.1/M2Crypto/EVP.py m2crypto-0.21.1.new/M2Crypto/EVP.py
+--- m2crypto-0.21.1/M2Crypto/EVP.py	2011-01-15 11:10:05.000000000 -0800
++++ m2crypto-0.21.1.new/M2Crypto/EVP.py	2011-10-07 15:29:19.000000000 -0700
+@@ -389,6 +389,25 @@
+         raise EVPError(Err.get_error())
+     return PKey(cptr, 1)
+ 
++def load_key_bio_pubkey(bio, callback=util.passphrase_callback):
++    """
++    Load an M2Crypto.EVP.PKey from a public key as a M2Crypto.BIO object.
++
++    @type bio: M2Crypto.BIO
++    @param bio: M2Crypto.BIO object containing the key in PEM format.
++
++    @type callback: Python callable
++    @param callback: A Python callable object that is invoked
++    to acquire a passphrase with which to protect the key.
++
++    @rtype: M2Crypto.EVP.PKey
++    @return: M2Crypto.EVP.PKey object.
++    """
++    cptr = m2.pkey_read_pem_pubkey(bio._ptr(), callback)
++    if cptr is None:
++        raise EVPError(Err.get_error())
++    return PKey(cptr, 1)
++
+ def load_key_string(string, callback=util.passphrase_callback):
+     """
+     Load an M2Crypto.EVP.PKey from a string.
+@@ -406,3 +425,20 @@
+     bio = BIO.MemoryBuffer(string)
+     return load_key_bio( bio, callback)
+ 
++def load_key_string_pubkey(string, callback=util.passphrase_callback):
++    """
++    Load an M2Crypto.EVP.PKey from a public key as a string.
++
++    @type string: string
++    @param string: String containing the key in PEM format.
++
++    @type callback: Python callable
++    @param callback: A Python callable object that is invoked
++    to acquire a passphrase with which to protect the key.
++
++    @rtype: M2Crypto.EVP.PKey
++    @return: M2Crypto.EVP.PKey object.
++    """
++    bio = BIO.MemoryBuffer(string)
++    return load_key_bio_pubkey( bio, callback)
++
+diff -uar m2crypto-0.21.1/SWIG/_dsa.i m2crypto-0.21.1.new/SWIG/_dsa.i
+--- m2crypto-0.21.1/SWIG/_dsa.i	2011-01-15 11:10:06.000000000 -0800
++++ m2crypto-0.21.1.new/SWIG/_dsa.i	2011-10-07 15:28:53.000000000 -0700
+@@ -153,6 +153,25 @@
+     Py_INCREF(Py_None);
+     return Py_None;
+ }
++
++PyObject *dsa_set_pub(DSA *dsa, PyObject *value) {
++    BIGNUM *bn;
++    const void *vbuf;
++    int vlen;
++
++    if (m2_PyObject_AsReadBufferInt(value, &vbuf, &vlen) == -1)
++        return NULL;
++
++    if (!(bn = BN_mpi2bn((unsigned char *)vbuf, vlen, NULL))) {
++        PyErr_SetString(_dsa_err, ERR_reason_error_string(ERR_get_error()));
++        return NULL;
++    }
++    if (dsa->pub_key)
++        BN_free(dsa->pub_key);
++    dsa->pub_key = bn;
++    Py_INCREF(Py_None);
++    return Py_None;
++}
+ %}
+ 
+ %inline %{
+diff -uar m2crypto-0.21.1/SWIG/_evp.i m2crypto-0.21.1.new/SWIG/_evp.i
+--- m2crypto-0.21.1/SWIG/_evp.i	2011-01-15 11:10:06.000000000 -0800
++++ m2crypto-0.21.1.new/SWIG/_evp.i	2011-10-07 15:29:19.000000000 -0700
+@@ -49,6 +49,9 @@
+ %rename(digest_init) EVP_DigestInit;
+ extern int EVP_DigestInit(EVP_MD_CTX *, const EVP_MD *);
+ 
++%rename(get_digestbyname) EVP_get_digestbyname;
++extern EVP_MD *EVP_get_digestbyname(const char * name);
++
+ %rename(des_ecb) EVP_des_ecb;
+ extern const EVP_CIPHER *EVP_des_ecb(void);
+ %rename(des_ede_ecb) EVP_des_ede;
+@@ -504,6 +507,17 @@
+     Py_END_ALLOW_THREADS
+     Py_DECREF(pyfunc);
+     return pk;
++}
++
++EVP_PKEY *pkey_read_pem_pubkey(BIO *f, PyObject *pyfunc) {
++    EVP_PKEY *pk;
++
++    Py_INCREF(pyfunc);
++    Py_BEGIN_ALLOW_THREADS
++    pk = PEM_read_bio_PUBKEY(f, NULL, passphrase_callback, (void *)pyfunc);
++    Py_END_ALLOW_THREADS
++    Py_DECREF(pyfunc);
++    return pk;
+ }
+ 
+ int pkey_assign_rsa(EVP_PKEY *pkey, RSA *rsa) {
+diff -uar m2crypto-0.21.1/tests/test_dsa.py m2crypto-0.21.1.new/tests/test_dsa.py
+--- m2crypto-0.21.1/tests/test_dsa.py	2011-01-15 11:10:05.000000000 -0800
++++ m2crypto-0.21.1.new/tests/test_dsa.py	2011-10-07 15:28:53.000000000 -0700
+@@ -87,6 +87,19 @@
+         r,s = dsa2.sign(self.data)
+         assert dsa2.verify(self.data, r, s)
+ 
++    def test_pub_key_from_params(self):
++        dsa = DSA.gen_params(1024, self.callback)
++        dsa.gen_key()
++        assert len(dsa) == 1024
++        p = dsa.p
++        q = dsa.q
++        g = dsa.g
++        pub = dsa.pub
++        dsa2 = DSA.pub_key_from_params(p,q,g,pub)
++        assert dsa2.check_key()
++        r,s = dsa.sign(self.data)
++        assert dsa2.verify(self.data, r, s)
++
+ def suite():
+     return unittest.makeSuite(DSATestCase)
+     

@@ -1,0 +1,582 @@
+Query/response
+==============
+>>> import struct
+>>> from dnsviz.analysis import *
+>>> from dnsviz.util.query import *
+>>> from dnsviz.util.response import *
+
+>>> gov_dnskey_wire = '\xf6\xab\x84\x00\x00\x01\x00\x03\x00\x00\x00\x01\x03gov\x00\x000\x00\x01\xc0\x0c\x000\x00\x01\x00\x00\x0e\x10\x00\x86\x01\x00\x03\x08\x01\x03\xd4>s\xa6\xac\x80\x94(e\xf3\xfc]{\xbb\x07\x00P6\x8e\xa5,\xd7\xb5\x8c\x95\xa6\x97\xc5(\xb0\xac\xb5\x18.\x1b\xb3\'\x89@\xd0\xef\xf4\xf9\x91\xff\xadW\xb1\x0fqU\xdck\x88\x89s\x95\x8f\x84\xa41\tn\xce\xd2d\x95\x12X\tM\xb6S\x80\xe3\xe9\x97\x94\xc2\r\x83Q-\xd6\xac\xed|\xc9\xb3\x16\x9d\xbfaHu\x07\x95\xa2\x90\xf7\xb6\\`\xb2 w3W\xa9TL\x82K\xd4\xb1>\x11 J\xd2\xdb\xd4\x0f\xc2\x9e@\x987\xc0\x0c\x000\x00\x01\x00\x00\x0e\x10\x01\x06\x01\x01\x03\x08\x01\x03\xbcu\xa6\xb3\xec\x1f\xb2\xb2\x13\x9f/\xad+\xca\xd2\x9d\xf5\xa3\x92\xba8)\xa2q0\xdd\xfc\x010@\xb7\xff\xe7\xbd_1\xf0\xdaO\x95*v\xc9M\x9f\x90i[i}Gu\xab\xd1\xcad\x8b\xffrO7\x1a^S\x8d\x82\x84\xe6;Tgi)\x106_T\xd1\xaf\xeb,t\xb2kV\x01{\xf5\x9c"R\xf6\x88g\xc8\xe4\xdd\xdf\xde\xde2\x88\xc6\x0cz\xa4\x10/\xae\xa21\x12q\x98^\x12C1\xce\x00\x99\xc00,\xfb\xf0\x92S\xb9\x92\xb8{BE\x99\xf5\xf7\x19YQ\xdeF\xbf\xbc\x83Cy\x9b9L.\xcb}(JM3\xd5\x0eTP\xfah\x8a\x13\xae\x80\x86G\x15~\x89\x93\xb3K\x89m\xb0\x96\xa7\xea\xf6\xa8U\xe38\xfbN b%\x8d&\t\xce3\x1c\xdf?j\xad\x95(1\xe9\xd8\xd6\xbb\x99l\xef+$\xf2\xf9&\x10\x90\x14?\xd3\xc2\xdb?\x08\xfd`\xc7>\xb8,\xca/\xab\x14\xfc\xe6\xc7\xbf^\xc4\x16\x10\xfch\xf0\xdf\xb51\xd9\xbd_K\xf8\xe6k\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x01\x17\x000\x08\x01\x00\x01Q\x80SDnsS0\xa6\xc7\x1e\x12\x03gov\x00Y\x86\x96\xc3$\xf6B\xa9\x9c\xe7\x99\xf3\x7f\xbe{\x88\x9a\xa0\x8d\xfc\xc0\xa7}\xc9x\xce\xa7\xdd\xfe\xfb`\xe3X$rG\xa9\xe4\x04Y\xbb,\ro_\xa4\xdd\xc0) q\x83\xfdw\x1eQ\xb3\xe4\xbbL\x1c\xd0\xf0\x81H\x98\xb2\xd3\x17\xa9\xa4\x8a\r\xb5\x7fp\xc6B\xeaaO\xef\x95Py\xb2\xa2C\x18\x90\xe3\xd5\xa4\xc5c\x01d\xb7\x16\xf3\xb9)O\xdf\x06+\xb0\xb0\xab\xba\xb8}\xdaH\\\t\x90\xfd\x1b\xc8\x8a\xc1MnJ> Y*!\xf1\xbd\x08t\x1d\x0f\x1f\xd4\xb7\xc7\x14\x89Kp0%]\xd5{\xb4\xad\xae\x01\x84\x84\xcb\x0eY<tm!\n\x95\x1bC\xad\x8f\x16\x06\x0e\xb2Y\xf7\xca\x08\x0e<\xce\xc4e\xb9\xd3\xaa\n\xe4\x0e\xf7\xd0\x14\x07\xba\'\xdfk\nL\x08\xf7\xed\x9e\xeb\x1b\xfc{\x8d\xcdr\x10\xe1\xb34\xc4<\xc9Z\xc8~I\x89\xfd\xaa8\xdb\xe6k\xf4i\xb9\xa46\xd1\xf6\xafwAh5j\xcfHY\xe0\xe2\x8d\xa4\xe5\'\xaezP7\x15\x8f\xa3\x98\x00\x00)\x05\xc0\x00\x00\x00\x00\x00\x00'
+>>> sandia_gov_referral_wire = "|\xfd\x80\x00\x00\x01\x00\x00\x00\t\x00\t\x06sandia\x03gov\x00\x00\x02\x00\x01\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\t\x03ns2\x02ca\xc0\x0c\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns1\xc0,\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns9\xc0\x0c\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns8\xc0\x0c\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00$\x8c\xc1\x07\x02Fwbj\xbei\xfd\x1d\x8d\xd8\xe5\xde\x10S=+&J\x91\xa7\xbf\x1a\xb3\xa6\xbf\xfcL@\x8a7R\xff\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00$Q\x03\x07\x02\x0c_L\xdf\xf8\x82Fe\xac\xd1\xd8\xa12\x95\x1b\x19<Y\xfa\x7f\xe6\xcf{\x1f\x82HL%\xb4\x10\xcd\xc6\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00\x18Q\x03\x07\x01<\xa4a\xffT\x96\xbcr\xa7r\x05d\x89\xd9Db\x1e\xdawN\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00\x18\x8c\xc1\x07\x01\xe3;E&\xce\xcf*\x1b|s=d[0\xcd\\\x91-\x958\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x00\x97\x00+\x08\x02\x00\x00\x0e\x10S9\xe5yS0\xaa\xf9\xca\xd9\x03gov\x00\xd3\x863\xbc\x81=\x15\xca\xbe.eF\x95\x02\xd3\xf2\xad]?\xeb\xb59W\n|k\x9c\x98\x8c\x19\xd6w\np\xdc\xb8\xfe\xffK\xe2\x1e\x98H\x8d\xce&\xdad\xbd\x1f=2\x8c\xdbK\xa7\x9f\xa3 \x95?k\x9f\xa6qM\x9c?\x8b.;JD\x8a?\xf3E\x90M\xa8m\xd8\xd4\xd8\xe9\x11U\xc8\xf7\x88}\xab\x02u.'~\xc6\xc57\xcc\\\\\x07\xe4ThJ\x12\xdf\x08\xe4\xe6\x97M\xa2\xcb\xf0\xed+\xea\x7fR\xeb\x94\xf0\\\xe9\x00\x00)\x05\xc0\x00\x00\x00\x00\x00\x00\xc0=\x00\x01\x00\x01\x00\x01Q\x80\x00\x04\xc6\xce\xdbA\xc0(\x00\x01\x00\x01\x00\x01Q\x80\x00\x04\xc6\xce\xdbB\xc0a\x00\x01\x00\x01\x00\x01Q\x80\x00\x04\x84\xaf\x07\xd1\xc0O\x00\x01\x00\x01\x00\x01Q\x80\x00\x04\x84\xaf\x07\xd2\xc0=\x00\x1c\x00\x01\x00\x01Q\x80\x00\x10& \x01\x06`\x00\x00@\x00\x00\x00\x00\x00\x00\x00e\xc0(\x00\x1c\x00\x01\x00\x01Q\x80\x00\x10& \x01\x06`\x00\x00@\x00\x00\x00\x00\x00\x00\x00f\xc0a\x00\x1c\x00\x01\x00\x01Q\x80\x00\x10& \x01\x06`\x08\x00\x07\x00\x00\x00\x00\x00\x00\x02\t\xc0O\x00\x1c\x00\x01\x00\x01Q\x80\x00\x10& \x01\x06`\x08\x00\x07\x00\x00\x00\x00\x00\x00\x02\x10"
+>>> sandia_gov_ds_wire = '\xb7\xfb\x84\x00\x00\x01\x00\x05\x00\x00\x00\x01\x06sandia\x03gov\x00\x00+\x00\x01\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00$Q\x03\x07\x02\x0c_L\xdf\xf8\x82Fe\xac\xd1\xd8\xa12\x95\x1b\x19<Y\xfa\x7f\xe6\xcf{\x1f\x82HL%\xb4\x10\xcd\xc6\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00\x18Q\x03\x07\x01<\xa4a\xffT\x96\xbcr\xa7r\x05d\x89\xd9Db\x1e\xdawN\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00\x18\x8c\xc1\x07\x01\xe3;E&\xce\xcf*\x1b|s=d[0\xcd\\\x91-\x958\xc0\x0c\x00+\x00\x01\x00\x00\x0e\x10\x00$\x8c\xc1\x07\x02Fwbj\xbei\xfd\x1d\x8d\xd8\xe5\xde\x10S=+&J\x91\xa7\xbf\x1a\xb3\xa6\xbf\xfcL@\x8a7R\xff\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x00\x97\x00+\x08\x02\x00\x00\x0e\x10S<4\x18S2\xf9\x98\xca\xd9\x03gov\x00Ch\xa3\x8f{\xe3\xc1W\\e\x88\xd1X+Y\xbf64j\xee{\xb0\x1aq\x12bKng\x97,\xd5\xfb\xd7~|R\xb1\xce\xdf\xff\xe8(\xbf\x9bX7\xfa\x00\x16Y\x9dW\xc5H?n\xb1"\xe1F\xec}\x07\xc2\x0e\xcc\xeb\xf2\xedz\xbf\xea\x10\xde\x14A\x11\x88%\x90y\xa1[E\x87<0}\xde\x19\x12\xaaUq\xd4\xfc\x9b\xa5j\xa1\x0ei\xc4\xec\xcf\xa3\xc3\xb7\xefU\x1bm\x0f\x02\x90\x88\x10\xfe\xba\xa2H\xfcy8\x88\xb2\xcc\x00\x00)\x05\xc0\x00\x00\x00\x00\x00\x00'
+>>> sandia_gov_ns_auth_wire = "\x8fw\x85\x00\x00\x01\x00\x05\x00\x00\x00\x01\x06sandia\x03gov\x00\x00\x02\x00\x01\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\t\x03ns1\x02ca\xc0\x0c\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns2\xc0,\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns9\xc0\x0c\xc0\x0c\x00\x02\x00\x01\x00\x01Q\x80\x00\x06\x03ns8\xc0\x0c\xc0\x0c\x00.\x00\x01\x00\x01Q\x80\x00\x9e\x00\x02\x07\x02\x00\x01Q\x80SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\xa8\x92\x0b\xb8=\x93\x0f\x1d+\x80\xb3r'%&\xf8Xq\x8dZI\x0cI\xd7F\xad=\xf1\xe5\xd6\xdc\xce\x985I\xe3\xb1\x8b#s\x08m\xd2\xe4O\x89\x7f\xcc\\\xbe\x19\xbd\xb3\xd1z=Sd\xe3\xb4.\xbe{\xbbn[7\xba)\xdd\x8f\xdd\x17\x10A\xe0\x1c]\xa4[\x13\x0f\x82\xb4_\x869\x01\x07\x8c\x87\xdc\xc6\x87\x97@+\x8a\x122\xc5a%@,\xfe\xec\x92\xf3\x8d\xa2\xb9\x8c\xdf@\x83\xd5\xfd%I\xf7\x01\xbd\xe3}\xfa\xb3^\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00"
+>>> sandia_gov_dnskey_wire = '\x88\x81\x84\x00\x00\x01\x00\x05\x00\x00\x00\x01\x06sandia\x03gov\x00\x000\x00\x01\xc0\x0c\x000\x00\x01\x00\x01Q\x80\x01\x08\x01\x01\x03\x07\x03\x01\x00\x01\xe5\x82Y\x98L}L\x19IO\xb7J\xaa\xa4\xdc\xeb\xc3\x083\xf0\xf6\xc0V/\xb1\xe2\xa0\xd8\xe8\xf0R=\xd1\x07[5\x84a\xeb?J\xb3g\xc4\xa2\x0b\x8cDyS\xa1\xb5[\xa6\xd2v\xc2TP=d\xf2\x0b\xca\xa5ii\xd3\xf3h]\x8f\x9bi;3e~\xe5\xb2\xc1\x1b\xbbc\x0f\x838\x12TOWu\xca\x0c\x06V_Xl\xd9v\x83\x0e\t\t\xb5c\xab&e\xd9* \\\x05\xd6%\xe7\x10*\xb2Y\x81:\x18[\xf8d\xa15\x16\x12u\xbc\xd2>\xb4\xc3\x05\xf2x\x14zLLU5;.\x8aex\xbc\xd6\xac\xd6p\xea)\xdd\xe3\x7f\xc7\xd2\xa6\xcc\xc7\xe4!Q\xfd\x8bp\xdb\xd7\xf8\xa9\xa6Q\xc4g\xe0\xb5\x07\xf4\xe4\x0c\x0c.\xb2\x8d~!\xd7\x8d\x19\xe1C\xf5\x9c\xe2*\xe3[\x8a:\'N\xf1&\xe9\x9dVm\x9ev\xf7\xaf;\x03\xdc\xe4{\xe8M\xc1\xca\xb9\xe0g\xfb\xc72\xab\xb1CsJp\xba\xd0u\xf7AU\xf1e:]4\xd00\x94)8\x01\xc0\x0c\x000\x00\x01\x00\x01Q\x80\x00\x88\x01\x00\x03\x07\x03\x01\x00\x01\xd5\xfc\xdd\xe5<\xdbz\x16M\x93Q}\x06`\xaai\xa2O\x89\xbd\xfc\xe9\xcd\x9f7\xdd\xaa\xec\xbf!*<\xc4\xad\xe1\xadb\xeb\x13y\x0c\x94\x92\x9dw-\x00\x9b4\\\x14:|\xbc\xcb7\x061\xeb\xf3\xb7T\xf5\x9f\xfd\x01\xa5\x18\x9c5)v\xadb\x15\t\xba5sX\x9cF\xae[z3\xff\xa0\xa1B\x87\xf9w][\xc56\xc5UJK\n\x06\xd5\xe4)[ \x118L\xfaO\x7f>\x1b<<C\xfd^\x0b\xbasER3\x11\xc0\x0c\x000\x00\x01\x00\x01Q\x80\x01\x08\x01\x01\x03\x07\x03\x01\x00\x01\xbf4\x1ct\x17n\xbb+\x9ao\x0b\xe5=U\xdd\x00\xe8\\A\x03&\x9bl\xe1.\xad\xb6AU9\xaf\x9fo\x86\xa71M\xc1\xec\xa3J\xe28 \xf2\xc0\xd72\x10\xdf\x815\x879\xcfD\x10\x0b\xb2\xdc\xe6\xef\xff\xa0+\x0f\x8f\xb7\xf3\x93\xfe\x12\xe1\xf94b\xdd\xe5\xff\xe5Z_\x06\x0b\xd4\xb6\xe2`\xd3\xa5\xed\xac4\xa8\xb8\x00rP\xc6tD\xb8\x8f\x0e\xc6\xbf\xcc\x87\xdd\x96\xe7\xe1\xd6\r\xd2\x01\xb7\x92\n\x1f\xf9\xee\xf5i_\xef\xa6 \xdf\x1f#\x1d\x96 \xc5PL\x80\xf1\x85\xf9F\x141\x02\xca\x02;I\xfdqQ9\xb2\xcb/\xe4P5\xd3d\x06\xaa\xd0,9\x0f\x07\x16\xc6\xd6o+\x0c\xd6\xbe\xb8&\xc1\x88\xe5\x86\x066q\xae12@ ?\xd9\x90\nC\xd9aTVV\xbb\x16\xfc\x0c\r\xe6z+\xbc\xb1\xf8Vo{[\xb9\x91\xe1\t\xbd\x87\x9e%x\xde\x83\xca #x\x19\xd2\x03\xact$d%\x0e\xccC\n-,\x97\xf7\xc5VB\x81\xddi\xa3\x93\xd6+\xc0\x0c\x00.\x00\x01\x00\x01Q\x80\x01\x1e\x000\x07\x02\x00\x01Q\x80SW\x82\x19S/\xf5\x19Q\x03\x06sandia\x03gov\x00\x0cM\xf6\xf4\xf0\xe6\xfe\x19\xecS\r\x9d\xac\xd9B\x86&\xf9\x1d\x84u!\xe8\xd9\xd3u@\xcb\xbeK\x80\x18s!\x91\x12\x8d+\x85\xb2\'?\x99\xea\x0e\xabC\x91 2@M\xab\xfc\xa1\xf4\xae\x06%\xde\xb8A\x0bmeX\x1bP\nn0\xc9)\x89\xe8\xbc0\xban\xcbU\x8b\n\\LK\xff\x02\xdc\xde\x1d\xccPU\x9f\x01j{\xc2\xe6\xdfF\x87j\x87\xdb/\xb9{\xfe\xf7Bmc\xe8B\x1e\x89kz/7/\x04\xe2\xff\xce\xfe\xa2\xae\xfd|"\xb0\rl\xd9s\xd5\xd1\x8b\x97\xbc\x80%4\x93\x16.9g\xce?\xd3C-\xb4\x17\nk\xb9\xe9\xc0L\x82c\x10\xb0K\xda\xd3\x151plo\xc6MV\xc4B4\x14\xca\xc2\x9b\x86\xd8.+\xda\xefy\x94\x1b\x19\xddn\xc0\x86\x15\xeb\x18\x81g.\x8b\xb8\xee3\xb0G\xbd\xcf\xe3\xe6\xc3\xbc\xf4\xd3\xd9\xe5\xea;\x0e\xe4\xfc\x0e\x10\xdcF\xbe\xae\xb2\xc1\x06i\xc6O3\xad\x0e\xadD\xf9\xa6@V.J\xa4\xdd\xd2\x04\x9b\xa4\xc0\x0c\x00.\x00\x01\x00\x01Q\x80\x01\x1e\x000\x07\x02\x00\x01Q\x80SW\x82\x19S/\xf5\x19\x8c\xc1\x06sandia\x03gov\x00V6\xd5r\xe3\x9f\xbav}R\xfaQ\r#I\xf0\x86}\xa3\twO\x19\xdf\x82w\xfd\x7f\xa3\xd7\x90O\xdah\x08\xb4\x8e\x1f:J\xd8a\xef\xf1\x8eO1\xf8\xd3.>\x94\x07\x10a\xeaJ\xe8(Y\xec,7\xff\xbdjl\x08\xe9\xcf\xc3<\x9a\xce\x0c\xfb\xf6\xe1 \xb6$\xce\xb3 w\xc6\xa1\xf7~\xc70\xf6\x16\xa3i2\xfe\xc3\x9eZ\xcc\xcf\xbf\x8d\xae/o\x0bjW_}h\x06\xe80,\x99\x1b&-\x87\xc4\xda<V\x1c\x912\x0f\tk\xee\xf4Euy\x85\xa8]\xbd\x85\xd4\x82c\x85\xc7$\xbc\x8dLa\x9b\x85$\xa2\xb6V\xfd\xd4\xfe\xc5\x98pF\xd6*\xa7\x93\xa4&cwM\xec#\x1c\xf1:\xfe\x068<.\x14y\xa4\xc9\xa3g\xda\xab\x15\x17\xe8\xc7\x88\xcb\xc7\xa0\xac\xdc\xa5Yw/P8C\xe8T\xe0R\xaf\xecw\x0f\xeaq7\xd50]\xb0V+\xd0`^\x00\x96\xb0R\'\\\xe1%\xc5\xeeg\x13\xf1\xf6\xbd\xc9\xf71\xa1\xaf\xd0\xf1\t\xa1\x08n\x07\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> sandia_gov_soa_wire = '\xbd9\x84\x00\x00\x01\x00\x02\x00\x00\x00\x01\x06sandia\x03gov\x00\x00\x06\x00\x01\xc0\x0c\x00\x06\x00\x01\x00\x01Q\x80\x00(\x06taurus\xc0\x0c\x08dnsadmin\xc0\x0c\x00\x06\xf5\xee\x00\x00\x07\x08\x00\x00\x03\x84\x00\t:\x80\x00\x00\x0e\x10\xc0\x0c\x00.\x00\x01\x00\x01Q\x80\x00\x9e\x00\x06\x07\x02\x00\x01Q\x80SY\x97rS1\xfcb\x1a\x8d\x06sandia\x03gov\x00i~\xcc\x84\xf5\x1c\xc2\x03u\xec\x8f\xf8\x98bt\xf9X\x91\xc8\xc2/\xfdO\x99\xfc\x0e\xa8\x9a\x86\xce\x1c{\x8b\xb3x\xab4t\xd3\xd4Z\xff\xb2\xcf\xb9\xad\xa1\x89\xfc\xaf\x08:\xa7\xbc0\xc7i\xcc\xaeuB2\x83q\xefY\xb1\xcbw\x1c\xe9\x83,V\xbf7-\xee\x89m\x1d\xceI!\x92\xb6\xfae\xbf~\x92\xebk\x8c\xb9\xd4\xfa\xa6S\xa7\xb7\xc5\xe6f\xf0\xd6G\x04(\xbb\xc6\xf0\x81\xa6\xd6\xd9\xdaI\x9f8\xfef\x95\x8b\xe9\x98ZQ\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> sandia_gov_mx_wire = '\x96G\x84\x00\x00\x01\x00\x03\x00\x00\x00\x01\x06sandia\x03gov\x00\x00\x0f\x00\x01\xc0\x0c\x00\x0f\x00\x01\x00\x008@\x00\x0f\x00\n\nsmtp02asnl\xc0\x0c\xc0\x0c\x00\x0f\x00\x01\x00\x008@\x00\x0f\x00\n\nsmtp01asnl\xc0\x0c\xc0\x0c\x00.\x00\x01\x00\x008@\x00\x9e\x00\x0f\x07\x02\x00\x008@SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\x8d\xb1hBc\x10[\xe7\x9e\'\xcau\x0c\x0e\xd0&\x98\xa4r\xc9\xb8~\xdeu\xe7\xdd\x8d{\xd2\xa3\xf0\x1cdM3-\x93\xe5y@\x1a\x97"\xead\xa4\xd1\x15\xbd\xbe\xa2\x13\xe3\x11\x081\xdf?\xa6\xef\\R\xd5\x14k\xdb\x80 \xe2\xa6\x0fpl\xc4\xe0\xcbc\x81\x1e\x0e\x9c\x98\xf3i\xfd\\/j \xd3S\xb9\xc5\xf5\xdea\x8d\x87\x15\xeb~\x88w\xe8\x9fv{v\x00K\x8d\x82\x8f\xc4\x15|\xbe\xcb\xd5\xb5\xb1c\x05\xf09/\xec:\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> sandia_gov_a_wire = "\xba\xd0\x84\x00\x00\x01\x00\x02\x00\x00\x00\x01\x06sandia\x03gov\x00\x00\x01\x00\x01\xc0\x0c\x00\x01\x00\x01\x00\x008@\x00\x04\x84\xafQ\x04\xc0\x0c\x00.\x00\x01\x00\x008@\x00\x9e\x00\x01\x07\x02\x00\x008@SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\xc0\xd5\xb1A\xcf \x01\xd68\xaf\x8a\xb3c\x15.G\xe4W\x05\xd8\xaa\xdb\xecIUG2o\xcdY\xfetjy+\x1doT\x12x\xa1\x0c\xbf\xed'Y2\xc4\x99Ms\xc2$D\xfd\xab/\x88\x80\xf6\x0f\x14\xb7v\x114\x83u\xafG\xef\x93]\x08\xab\xd5F\xec!\xf9\x11\xeb\x80dJ~+\xc2II@\xf9\x1e\xd6@\x02~\xc0\xd3\xffWb\x86\xb6\xa7i*NU\xa7\xab\xe3~~|\xbc\xaa\x97Y\xb7z\xc9I\x96\xec\xee\x03@\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00"
+>>> sandia_gov_aaaa_wire = '\xba\x99\x84\x00\x00\x01\x00\x00\x00\x04\x00\x01\x06sandia\x03gov\x00\x00\x1c\x00\x01\xc0\x0c\x00\x06\x00\x01\x00\x00\x0e\x10\x00(\x06taurus\xc0\x0c\x08dnsadmin\xc0\x0c\x00\x06\xf6\x01\x00\x00\x07\x08\x00\x00\x03\x84\x00\t:\x80\x00\x00\x0e\x10\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x00\x06\x07\x02\x00\x01Q\x80S[\xa0\xeeS4\x05\xde\x1a\x8d\x06sandia\x03gov\x00\xa9\xbc\x8f@%\x88\xb6\xe8\x8c\x13e\x04+\xeb\xee\xea\xa1^^\xf2\xee\xc0Q&\xda\xb4\xdfz\xdf\x1d6cR\xc2f\x0c\x9fy\xf9\xbd\x11O\\A\x05H\xaa|\x1aO\x170\x84\xc2\xc3\xa0\xaf\x95\xcd\x10\x81\x86\xae3\x9e\x04;\xa0M\xf0\x1c\xcc\xa6I=\x9b\x1d\x82\xb5\x89Mg\x94_c\xb5\x02\xa1\xe6\x8a\xce\x15@\x1d\r\xef\xc95\xbb\xca\xe5d\xa2H\x11*y\xbb\xa7$p$\xdc\xe3V\xba\x8c\xf0c\xeb \xa4\x1c\xeb3\x97\xa0\xf8 QHBCC5406IQDQOMI3S9HSS6RTPKALKIT\xc0\x0c\x002\x00\x01\x00\x00\x0e\x10\x00&\x01\x00\x00\x02\x03\xf8\x1a\xba\x14\xd4[? \x97\xcbL5\x05\xc2agf\x8a\x11\xbdE([\xf3\x00\x07b\x01\x80\x00\x00\x02\x90\xc0\xfa\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x002\x07\x03\x00\x00\x0e\x10SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\xce\xa7\x1b0V\xd1\xdd1\xf6\xdf\x920r\xde\xdd\x86\xb8\x9c\xe8\xf5*\xf4\x8d\x06\x86\r\xbd|\xca\xff\xb7qJ\xc7n\x83\xb0\xdc\xa2\xfe\xaf\x10?\xdb\xf9\x08v\x84\xf6\xf8B\xdb\xde\x1d\xf4y{\t-G\xd4\x07\xb5\r\x94\xfa\xed\xdd\xd6h\xbd>\xe0pK\x9f\x830m\x95jh\xcb\x19aB\x98,\xba\xfa\xfa\xf8k\x19\xe5\xca\xba\x9a\x94\xa7\xea\xa8)l\x1ef"\xfe\xf5_\xaa\x96c\x9fR\x10\x10=\x99\xc6R\x98_h\xb4\x8d\xbbH\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> sandia_gov_nxdomain_wire = '\x0c\x9a\x85\x03\x00\x01\x00\x00\x00\x08\x00\x01\x13non-existent-foobar\x06sandia\x03gov\x00\x00\x01\x00\x01\xc0 \x00\x06\x00\x01\x00\x00\x0e\x10\x00(\x06taurus\xc0 \x08dnsadmin\xc0 \x00\x06\xf5\xee\x00\x00\x07\x08\x00\x00\x03\x84\x00\t:\x80\x00\x00\x0e\x10\xc0 \x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x00\x06\x07\x02\x00\x01Q\x80SY\x97rS1\xfcb\x1a\x8d\x06sandia\x03gov\x00i~\xcc\x84\xf5\x1c\xc2\x03u\xec\x8f\xf8\x98bt\xf9X\x91\xc8\xc2/\xfdO\x99\xfc\x0e\xa8\x9a\x86\xce\x1c{\x8b\xb3x\xab4t\xd3\xd4Z\xff\xb2\xcf\xb9\xad\xa1\x89\xfc\xaf\x08:\xa7\xbc0\xc7i\xcc\xaeuB2\x83q\xefY\xb1\xcbw\x1c\xe9\x83,V\xbf7-\xee\x89m\x1d\xceI!\x92\xb6\xfae\xbf~\x92\xebk\x8c\xb9\xd4\xfa\xa6S\xa7\xb7\xc5\xe6f\xf0\xd6G\x04(\xbb\xc6\xf0\x81\xa6\xd6\xd9\xdaI\x9f8\xfef\x95\x8b\xe9\x98ZQ QHBCC5406IQDQOMI3S9HSS6RTPKALKIT\xc0 \x002\x00\x01\x00\x00\x0e\x10\x00&\x01\x00\x00\x02\x03\xf8\x1a\xba\x14\xd4[? \x97\xcbL5\x05\xc2agf\x8a\x11\xbdE([\xf3\x00\x07b\x01\x80\x00\x00\x02\x90\xc1\x0e\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x002\x07\x03\x00\x00\x0e\x10SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\xce\xa7\x1b0V\xd1\xdd1\xf6\xdf\x920r\xde\xdd\x86\xb8\x9c\xe8\xf5*\xf4\x8d\x06\x86\r\xbd|\xca\xff\xb7qJ\xc7n\x83\xb0\xdc\xa2\xfe\xaf\x10?\xdb\xf9\x08v\x84\xf6\xf8B\xdb\xde\x1d\xf4y{\t-G\xd4\x07\xb5\r\x94\xfa\xed\xdd\xd6h\xbd>\xe0pK\x9f\x830m\x95jh\xcb\x19aB\x98,\xba\xfa\xfa\xf8k\x19\xe5\xca\xba\x9a\x94\xa7\xea\xa8)l\x1ef"\xfe\xf5_\xaa\x96c\x9fR\x10\x10=\x99\xc6R\x98_h\xb4\x8d\xbbH K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2\xc0 \x002\x00\x01\x00\x00\x0e\x10\x00%\x01\x00\x00\x02\x03\xf8\x1a\xba\x14\xa2+\x04\xa6\xdc\x8d\xae\xc4\xaeCK,\x7f\xd0e\x93$q\xc2\x98\x00\x06@\x00\x00\x00\x00\x02\xc2\x0b\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x002\x07\x03\x00\x00\x0e\x10SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\x14;\xbeF\xd3\xfe\xb9\x02\x11{\xcb \xb2\xa1\xa8\xebh/\x13R\xfeb^\xd5\x1d}\xe5\xa4V\x9b7\xaf\xc9HZ\x9de\xa99\x1dn\x88{\xa6\x93\x0e*\xb8O\x8a\x18\x11dUR@Y/\xab\xbb\xef)\xb2\x81\xe4=\x9cW\x1a\x03\x99\xb3\x0c\x01\x1eR5o\xd4\x82r\xc0\tN \xd7\xb4v\xf8y\xce\x878p\x9d\x05H\xa6q"\xbe\xf1\xd2\x16.\xd4\xfd\xa1\xae\x99RA\xe3\x19\xd73t\x0e=SpK\x9aML\xa5\x82\' DLFD9C6KFPQKA5N96VEGN3974VEPPULI\xc0 \x002\x00\x01\x00\x00\x0e\x10\x00%\x01\x00\x00\x02\x03\xf8\x1a\xba\x14mg\x0c\xf6R\xf0\xd4\xa8\xd3e\x07_\xc4\x87\x8e;\x9e\x08\xb8\xc1\x00\x06@\x00\x00\x00\x00\x02\xc3\x07\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x002\x07\x03\x00\x00\x0e\x10SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\xb5\xc7\xa0\xc8\x02\xeci\x93~2\x93h\x98\xd0\xf0\x14\x85[\x9eY&\xa7\xea\x82~\xe0\x88B8\x97\x02\xdb\xf8>\x0f\x9a\xadk\x82;\xc0\x07\xfd\x89\x18n_\xc8ugb\x94\x94\x94B(\xc6\x04\xb2iK\xc7{alg\xdf\x90\xc2\xfa.\xfdG\x89\x82i21@\xa8\xcf\xc5\x83\x9c\x01\x189\xd6\xcd\xdf6h_\xab\xf9+Jk\x91\xa5q\x11\xe1w,w/O\x843\xf6;Z,\x7f\'\x80D\xd9.\x01\xbc\xfe\xd5\xedk\xad\xc9\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> sandia_gov_nxdomain_nodnssec_wire = '\x1b*\x84\x03\x00\x01\x00\x00\x00\x01\x00\x00\x13non-existent-foobar\x06sandia\x03gov\x00\x00\x01\x00\x01\xc0 \x00\x06\x00\x01\x00\x00\x0e\x10\x00(\x06taurus\xc0 \x08dnsadmin\xc0 \x00\x06\xf5\xee\x00\x00\x07\x08\x00\x00\x03\x84\x00\t:\x80\x00\x00\x0e\x10'
+>>> tcp_sandia_gov_nxrrset_not_delegated_wire = '?\xd4\x84\x00\x00\x01\x00\x00\x00\x04\x00\x01\x04_tcp\x06sandia\x03gov\x00\x00\x01\x00\x01\xc0\x11\x00\x06\x00\x01\x00\x00\x0e\x10\x00(\x06taurus\xc0\x11\x08dnsadmin\xc0\x11\x00\x06\xf5\xad\x00\x00\x07\x08\x00\x00\x03\x84\x00\t:\x80\x00\x00\x0e\x10\xc0\x11\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x00\x06\x07\x02\x00\x01Q\x80SN\x9c\x1eS\'\x01\x0eg\xeb\x06sandia\x03gov\x00\xae\x0b\xc9u\xd9Ka\x19\x95\xa4\xf1C\xcc\r\x9d`q\x89\xc9\xeeS\xdd<\xb3\xca\x10\xe8W\xca\x92\x9d\xff\x1f\xa5\xect>g\x88\x06\x87\x15\xed";\xb5\x85>G\xfb.$d\x90\xb5c\x86n{\xf8\x1b\xbb\n\x80\x81u\xdb\x98R\x93\xc6\xafyj\xa8\xac\x8c\xc03a\xa1\xec\xa5\x81]FU\xbfE\xc4\xeb\xc8\x0c\xfe!Z\x16\t;\x83?.\xef\xe7\x9cC\x84\xad[9Or\n\x08\xd9\x19p\xbcSk?J\xceox\xb4\xb4\x1e GVQ3VAJOVUF11N6E0P15IR7LL0LKOSP9\xc0\x11\x002\x00\x01\x00\x00\x0e\x10\x00\x1d\x01\x00\x00\x02\x03\xf4\xeb\x84\x14\x88\x06*\x98\xd7>\x82\x04>e\xa6\xf3\xbd\x81\xd7\x97\x06ru\x03\xc0\xff\x00.\x00\x01\x00\x00\x0e\x10\x00\x9e\x002\x07\x03\x00\x00\x0e\x10SL\xf5\x99S%h\x99g\xeb\x06sandia\x03gov\x00H\xe9\x80\xfe\xe0M\xc3\xa4\xe6E\xca\xeb\xb7+\xef\xee\x10\x05\x86\'\xe4\xe2{\xcau\xee\x02\xf9\xee\xb5y\xa1\xb1\xb1\x19\\\xb6\xf5\xab\xe4_3J\xa33\xc5d\x15\x949\x8e<\xf0\xf5\xbb\xcc2(\xff\xa2AT\x87i\xbc\xc5e\xa3\x9e\x88T\x17\x0b\xf6\x08\xbf\x99\xf0]\xf8\x95\x1f\x82\x18\xc5\xcb\xc6\xf2\xa9\xa2\x01\xcf\xca\xf3\xcbQ\xcfV\xce\xaf\xffIQ\x14v\x01Hp\xc5\xc0sh\x93\x992\xdae}m7\xf8\xf6\x14H\x10^:\x95\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> foobar_example_wire = '\xaa\xf8\x84\x03\x00\x01\x00\x00\x00\x04\x00\x01\x06foobar\x07example\x03com\x00\x00\x01\x00\x01\xc0\x13\x00\x06\x00\x01\x00\x00\x0e\x10\x00-\x03sns\x03dns\x05icann\x03org\x00\x03noc\xc04w\xfd\x856\x00\x00\x1c \x00\x00\x0e\x10\x00\x12u\x00\x00\x00\x0e\x10\xc0\x13\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00\x06\x08\x02\x00\x00\x0e\x10SFZ\xb0S<\xb8\xc5\x19\'\x07example\x03com\x00\x8dn\xc6\xfa\x89#5],I\x00\xa9\x9fp3l\xed\xf4\x8c=\xf5\t%\xd8\x07\x86\xbf\x05\xa4\x90\x07\x12\x8c\xe0\xac,"\xf4\xec\xd8P\xd8u\xd7\x9c\xcf\xd4\xbb\xeb\x92\xe3\x92\xfd\x1d\xb15\xc7\xc1\x1d\xf9\x1b$\x1b\x19EnE%\x14\x94\x0e\xa47\xab\xd6-\xd26\x83xS\xe6F\x83\x88\xef\x17\xcfS\x0c\xaa\xd1K\xaeaX\x91\xe4\x0cE\x80\xdc\xce\xb7UX\xe5\'\xb9\xed\xa3,\x89 \x0ek]X\xbd\x01x6\xbb\xd5\xd4\x00u6\xc0\x13\x00/\x00\x01\x00\x00\x0e\x10\x00\x1a\x03www\x07example\x03com\x00\x00\x07b\x00\x80\x08\x00\x03\x80\xc0\x13\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00/\x08\x02\x00\x00\x0e\x10SF\t\x91S<\xb8\xc5\x19\'\x07example\x03com\x00<\xf6*Esy\xc2Y\x9d\xaa\xac\xb5\xae\xce\xa6\xa2\xe5P\xd9w\xb4tj=\xd8\xb04\x1e\xb5_\x819\x1c]\xc4\xf0\x9c)\xd7s\x87\xb8H\x8a\x9b\x85\xf7\xe7\xcbD\xd1\xc1\xd8:\xb06{\x14=A\xcb\xcf\x06\\\xb6\xa98\x12\x9f\xbd\xd5\xa8O\x9a{p\x1b\x15\xdc\x0c[\xd55p\x04D\xee\xc5\x94e2$mF\x9c^\xff\xe6\xa8\xd6Z\x15z/\x18\x1d\xf2\x15\x9d\xff\xcc\x93\xba0\xe8\xf9\xa1\x17j\t\xe2\x8c|\xd2\xbd\x85h\xc3\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> z_example_wire = '\n\xa3\x84\x03\x00\x01\x00\x00\x00\x06\x00\x01\x01z\x07example\x03com\x00\x00\x01\x00\x01\xc0\x0e\x00\x06\x00\x01\x00\x00\x0e\x10\x00-\x03sns\x03dns\x05icann\x03org\x00\x03noc\xc0/w\xfd\x856\x00\x00\x1c \x00\x00\x0e\x10\x00\x12u\x00\x00\x00\x0e\x10\xc0\x0e\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00\x06\x08\x02\x00\x00\x0e\x10SFZ\xb0S<\xb8\xc5\x19\'\x07example\x03com\x00\x8dn\xc6\xfa\x89#5],I\x00\xa9\x9fp3l\xed\xf4\x8c=\xf5\t%\xd8\x07\x86\xbf\x05\xa4\x90\x07\x12\x8c\xe0\xac,"\xf4\xec\xd8P\xd8u\xd7\x9c\xcf\xd4\xbb\xeb\x92\xe3\x92\xfd\x1d\xb15\xc7\xc1\x1d\xf9\x1b$\x1b\x19EnE%\x14\x94\x0e\xa47\xab\xd6-\xd26\x83xS\xe6F\x83\x88\xef\x17\xcfS\x0c\xaa\xd1K\xaeaX\x91\xe4\x0cE\x80\xdc\xce\xb7UX\xe5\'\xb9\xed\xa3,\x89 \x0ek]X\xbd\x01x6\xbb\xd5\xd4\x00u6\xc0\x0e\x00/\x00\x01\x00\x00\x0e\x10\x00\x1a\x03www\x07example\x03com\x00\x00\x07b\x00\x80\x08\x00\x03\x80\xc0\x0e\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00/\x08\x02\x00\x00\x0e\x10SF\t\x91S<\xb8\xc5\x19\'\x07example\x03com\x00<\xf6*Esy\xc2Y\x9d\xaa\xac\xb5\xae\xce\xa6\xa2\xe5P\xd9w\xb4tj=\xd8\xb04\x1e\xb5_\x819\x1c]\xc4\xf0\x9c)\xd7s\x87\xb8H\x8a\x9b\x85\xf7\xe7\xcbD\xd1\xc1\xd8:\xb06{\x14=A\xcb\xcf\x06\\\xb6\xa98\x12\x9f\xbd\xd5\xa8O\x9a{p\x1b\x15\xdc\x0c[\xd55p\x04D\xee\xc5\x94e2$mF\x9c^\xff\xe6\xa8\xd6Z\x15z/\x18\x1d\xf2\x15\x9d\xff\xcc\x93\xba0\xe8\xf9\xa1\x17j\t\xe2\x8c|\xd2\xbd\x85h\xc3\x03www\xc0\x0e\x00/\x00\x01\x00\x00\x0e\x10\x00\x15\x07example\x03com\x00\x00\x06@\x00\x80\x08\x00\x03\xc1\xd4\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00/\x08\x03\x00\x00\x0e\x10SFTeS<\xb8\xc5\x19\'\x07example\x03com\x00\x1a\x07\x84\xc9\nb_\x06\xde\xdcl\x1a\x0e\x179\x9c[\x97\x07t\xe43\x99\xd1\x0e\xb4\x97\xc74;\x86`\xa5\x9eK\n\xc1\xa8\xbb\x0c\x8f#\x15e\x95g\x86\x8a\xec\xb9\xe6\x0e\xdf\xee\xeb\xfd\xcag\xb9d\xb0M\xd6\xe7F\xcd\xa4\x18\xf3\xa1\x05\x8e\xd5\x9f\xbew(\xa5K\xddS\xf4\x00\xee;\xcd\xcd}\xf5L\t\xd02\xd5\xf7\x88\xc7\xec\xea-\x81\xd6<\x7f\xe1\xca\x95\x93|\xe5\x8c\x1a\xfb\x83g\xd6\xda|F\xe5\xdd \x8585&\r\xd4\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+>>> example_mx_wire = '\x03\xea\x84\x00\x00\x01\x00\x00\x00\x04\x00\x01\x07example\x03com\x00\x00\x0f\x00\x01\xc0\x0c\x00\x06\x00\x01\x00\x00\x0e\x10\x00-\x03sns\x03dns\x05icann\x03org\x00\x03noc\xc0-w\xfd\x856\x00\x00\x1c \x00\x00\x0e\x10\x00\x12u\x00\x00\x00\x0e\x10\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00\x06\x08\x02\x00\x00\x0e\x10SFZ\xb0S<\xb8\xc5\x19\'\x07example\x03com\x00\x8dn\xc6\xfa\x89#5],I\x00\xa9\x9fp3l\xed\xf4\x8c=\xf5\t%\xd8\x07\x86\xbf\x05\xa4\x90\x07\x12\x8c\xe0\xac,"\xf4\xec\xd8P\xd8u\xd7\x9c\xcf\xd4\xbb\xeb\x92\xe3\x92\xfd\x1d\xb15\xc7\xc1\x1d\xf9\x1b$\x1b\x19EnE%\x14\x94\x0e\xa47\xab\xd6-\xd26\x83xS\xe6F\x83\x88\xef\x17\xcfS\x0c\xaa\xd1K\xaeaX\x91\xe4\x0cE\x80\xdc\xce\xb7UX\xe5\'\xb9\xed\xa3,\x89 \x0ek]X\xbd\x01x6\xbb\xd5\xd4\x00u6\xc0\x0c\x00/\x00\x01\x00\x00\x0e\x10\x00\x1a\x03www\x07example\x03com\x00\x00\x07b\x00\x80\x08\x00\x03\x80\xc0\x0c\x00.\x00\x01\x00\x00\x0e\x10\x00\x9f\x00/\x08\x02\x00\x00\x0e\x10SF\t\x91S<\xb8\xc5\x19\'\x07example\x03com\x00<\xf6*Esy\xc2Y\x9d\xaa\xac\xb5\xae\xce\xa6\xa2\xe5P\xd9w\xb4tj=\xd8\xb04\x1e\xb5_\x819\x1c]\xc4\xf0\x9c)\xd7s\x87\xb8H\x8a\x9b\x85\xf7\xe7\xcbD\xd1\xc1\xd8:\xb06{\x14=A\xcb\xcf\x06\\\xb6\xa98\x12\x9f\xbd\xd5\xa8O\x9a{p\x1b\x15\xdc\x0c[\xd55p\x04D\xee\xc5\x94e2$mF\x9c^\xff\xe6\xa8\xd6Z\x15z/\x18\x1d\xf2\x15\x9d\xff\xcc\x93\xba0\xe8\xf9\xa1\x17j\t\xe2\x8c|\xd2\xbd\x85h\xc3\x00\x00)\x10\x00\x00\x00\x80\x00\x00\x00'
+
+>>> gov_dnskey_response = DNSResponse(dns.message.from_wire(gov_dnskey_wire), None, None, (), 0.05, False)
+>>> sandia_gov_referral_response = DNSResponse(dns.message.from_wire(sandia_gov_referral_wire), None, None, (), 0.05, False)
+>>> sandia_gov_ds_response = DNSResponse(dns.message.from_wire(sandia_gov_ds_wire), None, None, (), 0.05, False)
+>>> sandia_gov_ns_auth_response = DNSResponse(dns.message.from_wire(sandia_gov_ns_auth_wire), None, None, (), 0.05, False)
+>>> sandia_gov_ns_auth_tcp_response = DNSResponse(dns.message.from_wire(sandia_gov_ns_auth_wire), None, None, (), 0.05, True)
+>>> sandia_gov_dnskey_response = DNSResponse(dns.message.from_wire(sandia_gov_dnskey_wire), None, None, (), 0.05, False)
+>>> sandia_gov_dnskey_reduce_payload_response = DNSResponse(dns.message.from_wire(sandia_gov_dnskey_wire), None, None, (DNSQueryRetryAttempt(3.0, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, 512), DNSQueryRetryAttempt(0.05, RETRY_CAUSE_TC_SET, 512, RETRY_ACTION_USE_TCP, None)), 0.05, False)
+>>> sandia_gov_soa_response = DNSResponse(dns.message.from_wire(sandia_gov_soa_wire), None, None, (), 0.05, False)
+>>> sandia_gov_mx_response = DNSResponse(dns.message.from_wire(sandia_gov_mx_wire), None, None, (), 0.05, False)
+>>> sandia_gov_a_response = DNSResponse(dns.message.from_wire(sandia_gov_a_wire), None, None, (), 0.05, False)
+>>> sandia_gov_aaaa_response = DNSResponse(dns.message.from_wire(sandia_gov_aaaa_wire), None, None, (), 0.05, False)
+>>> sandia_gov_nxdomain_response = DNSResponse(dns.message.from_wire(sandia_gov_nxdomain_wire), None, None, (), 0.05, False)
+>>> sandia_gov_nxdomain_nodnssec_response = DNSResponse(dns.message.from_wire(sandia_gov_nxdomain_nodnssec_wire), None, None, (DNSQueryRetryAttempt(3.0, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, 512), DNSQueryRetryAttempt(3.0, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_DISABLE_EDNS, None)), 0.05, False)
+>>> timeout_response = DNSResponse(None, RESPONSE_ERROR_TIMEOUT, None, (DNSQueryRetryAttempt(3.00, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_NO_CHANGE, 0),), 3.0, False)
+>>> tcp_sandia_gov_nxrrset_not_delegated_response = DNSResponse(dns.message.from_wire(tcp_sandia_gov_nxrrset_not_delegated_wire), None, None, (), 0.05, False)
+>>> foobar_example_response = DNSResponse(dns.message.from_wire(foobar_example_wire), None, None, (), 0.05, False)
+>>> z_example_response = DNSResponse(dns.message.from_wire(z_example_wire), None, None, (), 0.05, False)
+>>> example_mx_response = DNSResponse(dns.message.from_wire(example_mx_wire), None, None, (), 0.05, False)
+
+>>> gov_name = dns.name.from_text('gov')
+>>> sandia_gov_name = dns.name.from_text('sandia.gov')
+>>> tcp_sandia_gov_name = dns.name.from_text('_tcp.sandia.gov')
+>>> example_com_name = dns.name.from_text('example.com')
+>>> foobar_example_com_name = dns.name.from_text('foobar.example.com')
+>>> www_example_com_name = dns.name.from_text('www.example.com')
+>>> z_example_com_name = dns.name.from_text('z.example.com')
+
+>>> gov_dnskey_query = AnalysisQuery(gov_name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, ('198.41.0.4'))
+>>> gov_dnskey_query.add_response('198.41.0.4', '192.0.2.1', gov_dnskey_response)
+>>> sandia_gov_referral_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.NS, dns.rdataclass.IN, ('69.36.157.30', '2001:500:4431::2:30'))
+>>> sandia_gov_referral_query._executed
+False
+>>> sandia_gov_referral_query.add_response('69.36.157.30', '192.0.2.1', sandia_gov_referral_response)
+>>> sandia_gov_referral_query._executed
+False
+>>> # make the referral look like .gov is authoritative for sandia.gov for testing purposes
+>>> sandia_gov_referral_query.add_response('2001:500:4431::2:30', '2001:db8::1', sandia_gov_ns_auth_response)
+>>> sandia_gov_referral_query._executed
+True
+>>> sandia_gov_ds_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.DS, dns.rdataclass.IN, ('69.36.157.30', '2001:500:4431::2:30'))
+>>> sandia_gov_ds_query.add_response('69.36.157.30', '192.0.2.1', sandia_gov_ds_response)
+>>> sandia_gov_ds_query.add_response('2001:500:4431::2:30', '2001:db8::1', sandia_gov_ds_response)
+>>> sandia_gov_ns_auth_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.NS, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_ns_auth_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_ns_auth_response)
+>>> sandia_gov_ns_auth_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_ns_auth_response)
+>>> sandia_gov_ns_auth_query.add_response('198.206.219.66', '192.0.2.1', sandia_gov_ns_auth_tcp_response)
+>>> sandia_gov_ns_auth_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_dnskey_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_dnskey_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_dnskey_response)
+>>> sandia_gov_dnskey_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_dnskey_reduce_payload_response)
+>>> sandia_gov_dnskey_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_dnskey_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_soa_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.SOA, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_soa_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_soa_response)
+>>> sandia_gov_soa_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_soa_response)
+>>> sandia_gov_soa_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_soa_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_mx_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.MX, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_mx_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_mx_response)
+>>> sandia_gov_mx_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_mx_response)
+>>> sandia_gov_mx_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_mx_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_a_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.A, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_a_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_a_response)
+>>> sandia_gov_a_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_a_response)
+>>> sandia_gov_a_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_a_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_aaaa_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.AAAA, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_aaaa_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_aaaa_response)
+>>> sandia_gov_aaaa_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_aaaa_response)
+>>> sandia_gov_aaaa_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_aaaa_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_nxdomain_query = AnalysisQuery(dns.name.from_text('non-existent-foobar.sandia.gov'), dns.rdatatype.A, dns.rdataclass.IN, ('198.206.219.65', '2620:106:6000:40::65', '198.206.219.66', '2620:106:6000:40::66'))
+>>> sandia_gov_nxdomain_query.add_response('198.206.219.65', '192.0.2.1', sandia_gov_nxdomain_nodnssec_response)
+>>> sandia_gov_nxdomain_query.add_response('2620:106:6000:40::65', '2001:db8::1', sandia_gov_nxdomain_response)
+>>> sandia_gov_nxdomain_query.add_response('198.206.219.66', '192.0.2.1', timeout_response)
+>>> sandia_gov_nxdomain_query.add_response('2620:106:6000:40::66', '2001:db8::1', timeout_response)
+>>> sandia_gov_nxdomain_query.add_response('2001:500:4431::2:30', '2001:db8::1', sandia_gov_nxdomain_response)
+>>> foobar_example_query = AnalysisQuery(foobar_example_com_name, dns.rdatatype.A, dns.rdataclass.IN, ('199.43.132.53'))
+>>> foobar_example_query.add_response('199.43.132.53', '192.0.2.1', foobar_example_response)
+>>> z_example_query = AnalysisQuery(z_example_com_name, dns.rdatatype.A, dns.rdataclass.IN, ('199.43.132.53'))
+>>> z_example_query.add_response('199.43.132.53', '192.0.2.1', z_example_response)
+>>> example_mx_query = AnalysisQuery(example_com_name, dns.rdatatype.MX, dns.rdataclass.IN, ('199.43.132.53'))
+>>> example_mx_query.add_response('199.43.132.53', '192.0.2.1', example_mx_response)
+
+>>> sandia_gov_ns_auth_query.to_json()
+'{"qname": "sandia.gov.", "qclass": 1, "qtype": 2, "flags": 0, "edns_version": 0, "edns_max_udp_payload": 4096, "edns_flags": 32768, "edns_options": [], "responses": {"198.206.219.65": {"192.0.2.1": {"message": "j3eFAAABAAUAAAABBnNhbmRpYQNnb3YAAAIAAcAMAAIAAQABUYAACQNuczECY2HADMAMAAIAAQABUYAABgNuczLALMAMAAIAAQABUYAABgNucznADMAMAAIAAQABUYAABgNuczjADMAMAC4AAQABUYAAngACBwIAAVGAU1eCGVMv9RkajQZzYW5kaWEDZ292AKiSC7g9kw8dK4CzciclJvhYcY1aSQxJ10atPfHl1tzOmDVJ47GLI3MIbdLkT4l/zFy+Gb2z0Xo9U2TjtC6+e7tuWze6Kd2P3RcQQeAcXaRbEw+CtF+GOQEHjIfcxoeXQCuKEjLFYSVALP7skvONormM30CD1f0lSfcBveN9+rNeAAApEAAAAIAAAAA=", "tcp_first": false, "response_time": 0.05, "history": []}}, "198.206.219.66": {"192.0.2.1": {"message": "j3eFAAABAAUAAAABBnNhbmRpYQNnb3YAAAIAAcAMAAIAAQABUYAACQNuczICY2HADMAMAAIAAQABUYAABgNucznADMAMAAIAAQABUYAABgNuczHALMAMAAIAAQABUYAABgNuczjADMAMAC4AAQABUYAAngACBwIAAVGAU1eCGVMv9RkajQZzYW5kaWEDZ292AKiSC7g9kw8dK4CzciclJvhYcY1aSQxJ10atPfHl1tzOmDVJ47GLI3MIbdLkT4l/zFy+Gb2z0Xo9U2TjtC6+e7tuWze6Kd2P3RcQQeAcXaRbEw+CtF+GOQEHjIfcxoeXQCuKEjLFYSVALP7skvONormM30CD1f0lSfcBveN9+rNeAAApEAAAAIAAAAA=", "tcp_first": true, "response_time": 0.05, "history": []}}, "2620:106:6000:40::65": {"2001:db8::1": {"message": "j3eFAAABAAUAAAABBnNhbmRpYQNnb3YAAAIAAcAMAAIAAQABUYAACQNuczICY2HADMAMAAIAAQABUYAABgNuczjADMAMAAIAAQABUYAABgNucznADMAMAAIAAQABUYAABgNuczHALMAMAC4AAQABUYAAngACBwIAAVGAU1eCGVMv9RkajQZzYW5kaWEDZ292AKiSC7g9kw8dK4CzciclJvhYcY1aSQxJ10atPfHl1tzOmDVJ47GLI3MIbdLkT4l/zFy+Gb2z0Xo9U2TjtC6+e7tuWze6Kd2P3RcQQeAcXaRbEw+CtF+GOQEHjIfcxoeXQCuKEjLFYSVALP7skvONormM30CD1f0lSfcBveN9+rNeAAApEAAAAIAAAAA=", "tcp_first": false, "response_time": 0.05, "history": []}}, "2620:106:6000:40::66": {"2001:db8::1": {"message": null, "error": "TIMEOUT", "tcp_first": false, "response_time": 3.0, "history": [{"response_time": 3.0, "cause": "TIMEOUT", "cause_arg": null, "action": "NO_CHANGE", "action_arg": 0}]}}}}'
+
+>>> set(sandia_gov_ns_auth_query.rdata_answer_info)
+set([<DNS IN NS rdata: ns9.sandia.gov.>, <DNS IN NS rdata: ns8.sandia.gov.>, <DNS IN NS rdata: ns2.ca.sandia.gov.>, <DNS IN NS rdata: ns1.ca.sandia.gov.>])
+>>> sandia_gov_ns_auth_query.rdata_answer_info
+{<DNS IN NS rdata: ns9.sandia.gov.>: set([<RRsetInfo: "<DNS sandia.gov. IN NS RRset>">]), <DNS IN NS rdata: ns8.sandia.gov.>: set([<RRsetInfo: "<DNS sandia.gov. IN NS RRset>">]), <DNS IN NS rdata: ns2.ca.sandia.gov.>: set([<RRsetInfo: "<DNS sandia.gov. IN NS RRset>">]), <DNS IN NS rdata: ns1.ca.sandia.gov.>: set([<RRsetInfo: "<DNS sandia.gov. IN NS RRset>">])}
+>>> for info in sandia_gov_ns_auth_query.rrset_answer_info:
+...     print info.rrset
+...     for (rrsig, meta) in info.rrsig_info.items():
+...         print '    %s, TTL %d, returned by %s' % (rrsig, meta.ttl, meta.servers_clients)
+sandia.gov. 86400 IN NS ns1.ca.sandia.gov.
+sandia.gov. 86400 IN NS ns2.ca.sandia.gov.
+sandia.gov. 86400 IN NS ns9.sandia.gov.
+sandia.gov. 86400 IN NS ns8.sandia.gov.
+    NS 7 2 86400 20140423090425 20140324090425 6797 sandia.gov. qJILuD2TDx0rgLNyJyUm+FhxjVpJDEnX Rq098eXW3M6YNUnjsYsjcwht0uRPiX/M XL4ZvbPRej1TZOO0Lr57u25bN7op3Y/d FxBB4BxdpFsTD4K0X4Y5AQeMh9zGh5dA K4oSMsVhJUAs/uyS842iuYzfQIPV/SVJ 9wG94336s14=, TTL 86400, returned by set([('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.66', '192.0.2.1'), ('198.206.219.65', '192.0.2.1')])
+
+>>> set(sandia_gov_a_query.rdata_answer_info)
+set([<DNS IN A rdata: 132.175.81.4>])
+>>> sandia_gov_a_query.rdata_answer_info
+{<DNS IN A rdata: 132.175.81.4>: set([<RRsetInfo: "<DNS sandia.gov. IN A RRset>">])}
+>>> for info in sandia_gov_a_query.rrset_answer_info:
+...     print info.rrset
+...     for (rrsig, meta) in info.rrsig_info.items():
+...         print '    %s, TTL %d, returned by %s' % (rrsig, meta.ttl, meta.servers_clients)
+sandia.gov. 14400 IN A 132.175.81.4
+    A 7 2 14400 20140423090425 20140324090425 6797 sandia.gov. wNWxQc8gAdY4r4qzYxUuR+RXBdiq2+xJ VUcyb81Z/nRqeSsdb1QSeKEMv+0nWTLE mU1zwiRE/asviID2DxS3dhE0g3WvR++T XQir1UbsIfkR64BkSn4rwklJQPke1kAC fsDT/1dihranaSpOVaer435+fLyql1m3 eslJluzuA0A=, TTL 14400, returned by set([('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.65', '192.0.2.1')])
+
+>>> for info in sandia_gov_nxdomain_query.nsec_set_info:
+...     print 'Returned by %s:' % (info.servers_clients)
+...     for name in info.rrsets:
+...         print '  %s, TTL %d:\n    %s' % (name, info.rrsets[name].rrset.ttl, info.rrsets[name].rrset)
+...         for (rrsig, meta) in info.rrsets[name].rrsig_info.items():
+...             print '      %s (TTL %d), returned by %s' % (rrsig, meta.ttl, meta.servers_clients)
+Returned by set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1')]):
+  K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov., TTL 3600:
+    K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov. 3600 IN NSEC3 1 0 2 f81aba k8lg99mshmnc9bi39cm7vk35ici73gko A RRSIG
+      NSEC3 7 3 3600 20140423090425 20140324090425 6797 sandia.gov. FDu+RtP+uQIRe8sgsqGo62gvE1L+Yl7V HX3lpFabN6/JSFqdZak5HW6Ie6aTDiq4 T4oYEWRVUkBZL6u77ymygeQ9nFcaA5mz DAEeUjVv1IJywAlOINe0dvh5zoc4cJ0F SKZxIr7x0hYu1P2hrplSQeMZ1zN0Dj1T cEuaTUylgic= (TTL 3600), returned by set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1')])
+  QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov., TTL 3600:
+    QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov. 3600 IN NSEC3 1 0 2 f81aba qhdju84npd63a1e2c5jmd2ghnl2igmvj A NS SOA MX TXT RRSIG DNSKEY NSEC3PARAM
+      NSEC3 7 3 3600 20140423090425 20140324090425 6797 sandia.gov. zqcbMFbR3TH235Iwct7dhric6PUq9I0G hg29fMr/t3FKx26DsNyi/q8QP9v5CHaE 9vhC294d9Hl7CS1H1Ae1DZT67d3WaL0+ 4HBLn4MwbZVqaMsZYUKYLLr6+vhrGeXK upqUp+qoKWweZiL+9V+qlmOfUhAQPZnG UphfaLSNu0g= (TTL 3600), returned by set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1')])
+  DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov., TTL 3600:
+    DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov. 3600 IN NSEC3 1 0 2 f81aba dljgptiiu3aahkr50tfs91se7ef0he61 A RRSIG
+      NSEC3 7 3 3600 20140423090425 20140324090425 6797 sandia.gov. tcegyALsaZN+MpNomNDwFIVbnlkmp+qC fuCIQjiXAtv4Pg+arWuCO8AH/YkYbl/I dWdilJSUQijGBLJpS8d7YWxn35DC+i79 R4mCaTIxQKjPxYOcARg51s3fNmhfq/kr SmuRpXER4Xcsdy9PhDP2O1osfyeARNku Abz+1e1rrck= (TTL 3600), returned by set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1')])
+
+>>> sandia_gov_nxdomain_query.wildcard_info
+{}
+>>> sandia_gov_nxdomain_query.nsec_set_info_by_server
+{('2001:500:4431::2:30', '2001:db8::1'): [<NSECSet>], ('2620:106:6000:40::65', '2001:db8::1'): [<NSECSet>], ('198.206.219.65', '192.0.2.1'): []}
+>>> servers_without_nsec = [k for k, v in sandia_gov_nxdomain_query.nsec_set_info_by_server.items() if not v]
+>>> servers_without_nsec
+[('198.206.219.65', '192.0.2.1')]
+>>> set(sandia_gov_nxdomain_query.nsec_set_info_by_server).difference(sandia_gov_nxdomain_query.nxdomain_info)
+set([])
+
+>>> sandia_gov_aaaa_query.rrset_noanswer_info[sandia_gov_name]
+{<DNS name sandia.gov.>: set([('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.65', '192.0.2.1')])}
+>>> servers_with_nsec = [k for k, v in sandia_gov_aaaa_query.nsec_set_info_by_server.items() if v]
+>>> servers_with_nsec
+[('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.65', '192.0.2.1')]
+
+>>> sandia_gov_ns_auth_query.rrset_answer_info[0].message_for_rrsig(sandia_gov_ns_auth_query.rrset_answer_info[0].rrsig_info.items()[0][0])
+'\x00\x02\x07\x02\x00\x01Q\x80SW\x82\x19S/\xf5\x19\x1a\x8d\x06sandia\x03gov\x00\x06sandia\x03gov\x00\x00\x02\x00\x01\x00\x01Q\x80\x00\x13\x03ns1\x02ca\x06sandia\x03gov\x00\x06sandia\x03gov\x00\x00\x02\x00\x01\x00\x01Q\x80\x00\x13\x03ns2\x02ca\x06sandia\x03gov\x00\x06sandia\x03gov\x00\x00\x02\x00\x01\x00\x01Q\x80\x00\x10\x03ns8\x06sandia\x03gov\x00\x06sandia\x03gov\x00\x00\x02\x00\x01\x00\x01Q\x80\x00\x10\x03ns9\x06sandia\x03gov\x00'
+
+Responsiveness
+>>> sandia_gov_ns_auth_tcp_response.udp_used()
+False
+>>> sandia_gov_referral_response.udp_used()
+True
+>>> sandia_gov_ns_auth_tcp_response.tcp_used()
+True
+>>> sandia_gov_ns_auth_response.tcp_used()
+False
+>>> sandia_gov_dnskey_reduce_payload_response.tcp_used()
+True
+
+Response validity, completeness, authoritativeness
+>>> sandia_gov_referral_response.is_valid_response()
+True
+>>> sandia_gov_referral_response.is_complete_response()
+True
+>>> sandia_gov_referral_response.is_authoritative()
+False
+>>> sandia_gov_ns_auth_response.is_authoritative()
+True
+
+Response contents - referral, answer, nxdomain, nxrrset
+>>> sandia_gov_referral_response.is_referral(sandia_gov_name)
+True
+>>> sandia_gov_ns_auth_response.is_referral(sandia_gov_name)
+False
+>>> sandia_gov_referral_response.is_answer(sandia_gov_name, dns.rdatatype.NS)
+False
+>>> sandia_gov_ns_auth_response.is_answer(sandia_gov_name, dns.rdatatype.NS)
+True
+>>> sandia_gov_referral_response.is_nxdomain()
+False
+>>> sandia_gov_nxdomain_response.is_nxdomain()
+True
+>>> sandia_gov_nxdomain_response.is_nxrrset_not_delegated(sandia_gov_name)
+True
+>>> sandia_gov_aaaa_response.is_nxrrset_not_delegated(sandia_gov_name)
+False
+>>> tcp_sandia_gov_nxrrset_not_delegated_response.is_nxrrset_not_delegated(tcp_sandia_gov_name)
+True
+
+Extract information from the response
+>>> sandia_gov_referral_response.ns_ip_mapping_from_additional(sandia_gov_name)
+{<DNS name ns1.ca.sandia.gov.>: set(['198.206.219.65', '2620:106:6000:40::65']), <DNS name ns2.ca.sandia.gov.>: set(['2620:106:6000:40::66', '198.206.219.66']), <DNS name ns8.sandia.gov.>: set(['132.175.7.209', '2620:106:6008:7::209']), <DNS name ns9.sandia.gov.>: set(['2620:106:6008:7::210', '132.175.7.210'])}
+>>> sandia_gov_ns_auth_response.ns_ip_mapping_from_additional(sandia_gov_name)
+{<DNS name ns1.ca.sandia.gov.>: set([]), <DNS name ns2.ca.sandia.gov.>: set([]), <DNS name ns8.sandia.gov.>: set([]), <DNS name ns9.sandia.gov.>: set([])}
+
+>>> sandia_gov_dnskey_reduce_payload_response.to_json()
+'{"message": "iIGEAAABAAUAAAABBnNhbmRpYQNnb3YAADAAAcAMADAAAQABUYAAiAEAAwcDAQAB1fzd5TzbehZNk1F9BmCqaaJPib386c2fN92q7L8hKjzEreGtYusTeQyUkp13LQCbNFwUOny8yzcGMevzt1T1n/0BpRicNSl2rWIVCbo1c1icRq5bejP/oKFCh/l3XVvFNsVVSksKBtXkKVsgEThM+k9/Phs8PEP9Xgu6c0VSMxHADAAwAAEAAVGAAQgBAQMHAwEAAeWCWZhMfUwZSU+3Sqqk3OvDCDPw9sBWL7HioNjo8FI90QdbNYRh6z9Ks2fEoguMRHlTobVbptJ2wlRQPWTyC8qlaWnT82hdj5tpOzNlfuWywRu7Yw+DOBJUT1d1ygwGVl9YbNl2gw4JCbVjqyZl2SogXAXWJecQKrJZgToYW/hkoTUWEnW80j60wwXyeBR6TExVNTsuimV4vNas1nDqKd3jf8fSpszH5CFR/Ytw29f4qaZRxGfgtQf05AwMLrKNfiHXjRnhQ/Wc4irjW4o6J07xJumdVm2edvevOwPc5HvoTcHKueBn+8cyq7FDc0pwutB190FV8WU6XTTQMJQpOAHADAAwAAEAAVGAAQgBAQMHAwEAAb80HHQXbrsrmm8L5T1V3QDoXEEDJpts4S6ttkFVOa+fb4anMU3B7KNK4jgg8sDXMhDfgTWHOc9EEAuy3Obv/6ArD4+385P+EuH5NGLd5f/lWl8GC9S24mDTpe2sNKi4AHJQxnREuI8Oxr/Mh92W5+HWDdIBt5IKH/nu9Wlf76Yg3x8jHZYgxVBMgPGF+UYUMQLKAjtJ/XFRObLLL+RQNdNkBqrQLDkPBxbG1m8rDNa+uCbBiOWGBjZxrjEyQCA/2ZAKQ9lhVFZWuxb8DA3meiu8sfhWb3tbuZHhCb2HniV43oPKICN4GdIDrHQkZCUOzEMKLSyX98VWQoHdaaOT1ivADAAuAAEAAVGAAR4AMAcCAAFRgFNXghlTL/UZUQMGc2FuZGlhA2dvdgAMTfb08Ob+GexTDZ2s2UKGJvkdhHUh6NnTdUDLvkuAGHMhkRKNK4WyJz+Z6g6rQ5EgMkBNq/yh9K4GJd64QQttZVgbUApuMMkpiei8MLpuy1WLClxMS/8C3N4dzFBVnwFqe8Lm30aHaofbL7l7/vdCbWPoQh6Ja3ovNy8E4v/O/qKu/XwisA1s2XPV0YuXvIAlNJMWLjlnzj/TQy20FwpruenATIJjELBL2tMVMXBsb8ZNVsRCNBTKwpuG2C4r2u95lBsZ3W7AhhXrGIFnLou47jOwR73P4+bDvPTT2eXqOw7k/A4Q3Ea+rrLBBmnGTzOtDq1E+aZAVi5KpN3SBJukwAwALgABAAFRgAEeADAHAgABUYBTV4IZUy/1GYzBBnNhbmRpYQNnb3YAVjbVcuOfunZ9UvpRDSNJ8IZ9owl3Txnfgnf9f6PXkE/aaAi0jh86Sthh7/GOTzH40y4+lAcQYepK6ChZ7Cw3/71qbAjpz8M8ms4M+/bhILYkzrMgd8ah937HMPYWo2ky/sOeWszPv42uL28LaldffWgG6DAsmRsmLYfE2jxWHJEyDwlr7vRFdXmFqF29hdSCY4XHJLyNTGGbhSSitlb91P7FmHBG1iqnk6QmY3dN7CMc8Tr+Bjg8LhR5pMmjZ9qrFRfox4jLx6Cs3KVZdy9QOEPoVOBSr+x3D+pxN9UwXbBWK9BgXgCWsFInXOElxe5nE/H2vcn3MaGv0PEJoQhuBwAAKRAAAACAAAAA", "tcp_first": false, "response_time": 0.05, "history": [{"response_time": 3.0, "cause": "TIMEOUT", "cause_args": null, "action": "CHANGE_UDP_MAX_PAYLOAD", "action_args": 512}, {"response_time": 0.05, "cause": "TC", "cause_args": 512, "action": "USE_TCP", "action_args": null}]}'
+
+Cloning, projection, and joining
+>>> sandia_gov_referral_query1 = sandia_gov_referral_query.clone()
+>>> sandia_gov_referral_query1 is sandia_gov_referral_query
+False
+>>> sandia_gov_referral_query1.responses is sandia_gov_referral_query.responses
+False
+>>> sandia_gov_referral_query1.responses == sandia_gov_referral_query.responses
+True
+>>> sandia_gov_referral_query1 = sandia_gov_referral_query.project(set(['69.36.157.30']))
+>>> sandia_gov_referral_query1.responses
+{'69.36.157.30': {'192.0.2.1': <DNSResponse: "<DNS message, ID 31997>">}}
+>>> sandia_gov_referral_query1.responses is sandia_gov_referral_query.responses
+False
+>>> sandia_gov_referral_query1.responses == sandia_gov_referral_query.responses
+False
+>>> sandia_gov_referral_answer_combined = sandia_gov_referral_query.join(sandia_gov_ns_auth_query)
+>>> sandia_gov_referral_answer_combined.responses
+{'2620:106:6000:40::66': {'2001:db8::1': <DNSResponse: "TIMEOUT">}, '2620:106:6000:40::65': {'2001:db8::1': <DNSResponse: "<DNS message, ID 36727>">}, '198.206.219.66': {'192.0.2.1': <DNSResponse: "<DNS message, ID 36727>">}, '198.206.219.65': {'192.0.2.1': <DNSResponse: "<DNS message, ID 36727>">}, '69.36.157.30': {'192.0.2.1': <DNSResponse: "<DNS message, ID 31997>">}, '2001:500:4431::2:30': {'2001:db8::1': <DNSResponse: "<DNS message, ID 36727>">}}
+>>> sandia_gov_referral_query.join(sandia_gov_nxdomain_query)
+Traceback (most recent call last):
+    ...
+ValueError: DNS query parameters for DNSQuery instances being joined must be the same.
+>>> sandia_gov_referral_query.join(sandia_gov_referral_query1)
+Traceback (most recent call last):
+    ...
+ValueError: Response from server 69.36.157.30 to client 192.0.2.1 already exists.
+>>> sandia_gov_referral_query1 = sandia_gov_referral_query.project(set(['192.0.2.2']))
+Traceback (most recent call last):
+    ...
+ValueError: A DNSQuery can only project responses from servers that have been queried.
+>>> blank_query = AnalysisQuery(sandia_gov_name, dns.rdatatype.A, dns.rdataclass.IN, ('192.0.2.1',))
+>>> blank_query.project(set(['192.0.2.1']))
+Traceback (most recent call last):
+    ...
+AssertionError: ExecutableDNSQuery has not been executed.
+
+Analysis
+========
+
+>>> # create analysis of parent zone
+>>> parent_obj = DomainNameAnalysis(gov_name)
+>>> parent_obj.analysis_end = 1396298108.844445
+>>> # manually set "has_ns" attribute, so we don't have to import all the responses
+>>> parent_obj.has_ns = True
+>>> # similarly, create some mappings
+>>> parent_obj._ns_names_in_child.add(dns.name.from_text('a.gov-servers.net'))
+>>> parent_obj.add_auth_ns_ip_mappings((dns.name.from_text('a.gov-servers.net'), '69.36.157.30'), (dns.name.from_text('a.gov-servers.net'), '2001:500:4431::2:30'))
+>>> parent_obj.add_query(gov_dnskey_query)
+>>> parent_obj.populate_rrsig_status()
+>>> #parent_obj.populate_ds_status()
+
+>>> # create analysis of child zone
+>>> name_obj = DomainNameAnalysis(sandia_gov_name, dns.name.from_text('dlv.isc.org'))
+>>> # assign the parent and other attributes manually
+>>> name_obj.parent = parent_obj
+>>> name_obj.analysis_end = 1396298108.844445
+>>> name_obj.referral_rdtype = dns.rdatatype.NS
+>>> name_obj.nxdomain_name = dns.name.from_text('non-existent-foobar.sandia.gov')
+>>> name_obj.nxdomain_rdtype = dns.rdatatype.A
+>>> name_obj.nxrrset_name = dns.name.from_text('non-existent-foobar.sandia.gov')
+>>> name_obj.nxrrset_rdtype = dns.rdatatype.AAAA
+>>> # add queries (with responses)
+>>> name_obj.add_query(sandia_gov_referral_query)
+>>> name_obj.add_query(sandia_gov_ds_query)
+>>> name_obj.add_query(sandia_gov_ns_auth_query)
+>>> name_obj.add_query(sandia_gov_dnskey_query)
+>>> name_obj.add_query(sandia_gov_soa_query)
+>>> name_obj.add_query(sandia_gov_mx_query)
+>>> name_obj.add_query(sandia_gov_a_query)
+>>> name_obj.add_query(sandia_gov_aaaa_query)
+>>> name_obj.add_query(sandia_gov_nxdomain_query)
+>>> name_obj.populate_rrsig_status()
+>>> name_obj.populate_ds_status()
+>>> name_obj.populate_nsec_status()
+
+DomainNameAnalysis attributes
+>>> name_obj.clients_ipv4
+set(['192.0.2.1'])
+>>> name_obj.clients_ipv6
+set(['2001:db8::1'])
+>>> name_obj.has_soa
+True
+>>> name_obj.has_ns
+True
+>>> name_obj.signed
+True
+>>> name_obj.nxdomain
+False
+>>> name_obj.cname_targets
+set([])
+>>> name_obj.mx_targets
+set([<DNS name smtp01asnl.sandia.gov.>, <DNS name smtp02asnl.sandia.gov.>])
+>>> name_obj.ptr_targets
+set([])
+>>> name_obj.external_signers
+set([])
+>>> name_obj.ttl_mapping
+{1: 14400, 2: 86400, 6: 86400, 43: 3600, 15: 14400, 48: 86400, -2: 86400}
+>>> name_obj.nsec_rdtypes
+set([50])
+>>> name_obj.serial
+456174
+>>> name_obj.rname
+<DNS name dnsadmin.sandia.gov.>
+>>> name_obj.mname
+<DNS name taurus.sandia.gov.>
+>>> name_obj.dnssec_algorithms_in_dnskey
+set([7])
+>>> name_obj.dnssec_algorithms_in_ds
+set([7])
+>>> name_obj.dnssec_algorithms_digest_in_ds
+set([(7, 2), (7, 1)])
+
+>>> name_obj._glue_ip_mapping
+{<DNS name ns1.ca.sandia.gov.>: set(['198.206.219.65', '2620:106:6000:40::65']), <DNS name ns2.ca.sandia.gov.>: set(['2620:106:6000:40::66', '198.206.219.66']), <DNS name ns8.sandia.gov.>: set(['132.175.7.209', '2620:106:6008:7::209']), <DNS name ns9.sandia.gov.>: set(['2620:106:6008:7::210', '132.175.7.210'])}
+>>> name_obj._ns_names_in_child
+set([<DNS name ns1.ca.sandia.gov.>, <DNS name ns2.ca.sandia.gov.>, <DNS name ns8.sandia.gov.>, <DNS name ns9.sandia.gov.>])
+>>> name_obj._all_servers_queried
+set(['2620:106:6000:40::66', '2620:106:6000:40::65', '198.206.219.66', '198.206.219.65', '69.36.157.30', '2001:500:4431::2:30'])
+>>> name_obj._all_servers_clients_queried
+set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1'), ('69.36.157.30', '192.0.2.1'), ('198.206.219.66', '192.0.2.1'), ('2620:106:6000:40::66', '2001:db8::1'), ('198.206.219.65', '192.0.2.1')])
+>>> name_obj._responsive_servers_clients_udp
+set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1'), ('69.36.157.30', '192.0.2.1'), ('198.206.219.65', '192.0.2.1')])
+>>> name_obj._responsive_servers_clients_tcp
+set([('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.66', '192.0.2.1')])
+>>> name_obj._auth_servers_clients
+set([('2001:500:4431::2:30', '2001:db8::1'), ('2620:106:6000:40::65', '2001:db8::1'), ('198.206.219.66', '192.0.2.1'), ('198.206.219.65', '192.0.2.1')])
+
+>>> name_obj
+<DomainNameAnalysis sandia.gov.>
+>>> unicode(name_obj)
+u'sandia.gov.'
+>>> str(name_obj)
+'sandia.gov.'
+>>> name_obj.parent_name()
+<DNS name gov.>
+>>> name_obj.dlv_name()
+<DNS name sandia.gov.dlv.isc.org.>
+>>> name_obj.zone
+<DomainNameAnalysis sandia.gov.>
+
+>>> # glue mapping - this is extracted from the referral and should be accurate
+>>> name_obj.get_glue_ip_mapping()
+{<DNS name ns1.ca.sandia.gov.>: set(['198.206.219.65', '2620:106:6000:40::65']), <DNS name ns2.ca.sandia.gov.>: set(['2620:106:6000:40::66', '198.206.219.66']), <DNS name ns8.sandia.gov.>: set(['132.175.7.209', '2620:106:6008:7::209']), <DNS name ns9.sandia.gov.>: set(['2620:106:6008:7::210', '132.175.7.210'])}
+
+>>> # Now mess with the ns mappings a bit to create more extensive tests
+>>> # Deliberately extra names in parent:
+>>> #     ns-extra-in-parent.sandia.gov -> 192.0.2.4 (glue and authoritative IP)
+>>> #     ns-extra-in-parent.some-other.gov -> 192.0.2.5 (sibling glue), 192.0.2.7 (authoritative IP)
+>>> #     ns-extra-in-parent.out-of-bailiwick.net (no glue and authoritative IP unresolvable)
+>>> # Deliberately extra names in child:
+>>> #     ns-extra-in-child.sandia.gov -> 192.0.2.6 (authoritative IP)
+>>> # Deliberately extra authoritative IPs:
+>>> #     ns1.ca.sandia.gov -> 192.0.2.3
+>>> #     ns1.ca.sandia.gov -> 2001:db8::3 
+>>> #     ns2.ca.sandia.gov -> 192.0.2.4
+>>> #     ns2.ca.sandia.gov -> 2001:db8::4
+>>> # Deliberately missing authoritative IPs (but still show up in glue):
+>>> #     ns1.ca.sandia.gov -> 198.206.219.65
+>>> #     ns2.ca.sandia.gov -> 198.206.219.66
+>>> #     ns2.ca.sandia.gov -> 2620:106:6000:40::66
+>>> # Resulting servers extra in parent:
+>>> #     192.0.2.5
+>>> #     198.206.219.65
+>>> #     198.206.219.66
+>>> #     2620:106:6000:40::66
+>>> # Resulting servers extra in child:
+>>> #     192.0.2.6
+>>> #     2001:db8::4
+>>> #     192.0.2.3
+>>> #     2001:db8::3
+>>> # Resulting servers not in parent or child:
+>>> #     192.0.2.7
+>>> name_obj._glue_ip_mapping[dns.name.from_text('ns-extra-in-parent.sandia.gov')] = set(['192.0.2.4'])
+>>> name_obj._glue_ip_mapping[dns.name.from_text('ns-extra-in-parent.some-other.gov')] = set(['192.0.2.5'])
+>>> name_obj._glue_ip_mapping[dns.name.from_text('ns-extra-in-parent.out-of-bailiwick.net')] = set([])
+>>> name_obj._ns_names_in_child.add(dns.name.from_text('ns-extra-in-child.sandia.gov'))
+>>> name_obj.add_auth_ns_ip_mappings(
+...    (dns.name.from_text('ns1.ca.sandia.gov'), '192.0.2.3'),
+...    (dns.name.from_text('ns1.ca.sandia.gov'), '2001:db8::3'),
+...    (dns.name.from_text('ns1.ca.sandia.gov'), '2620:106:6000:40::65'),
+...    (dns.name.from_text('ns2.ca.sandia.gov'), '192.0.2.4'),
+...    (dns.name.from_text('ns2.ca.sandia.gov'), '2001:db8::4'),
+...    (dns.name.from_text('ns8.sandia.gov'), '132.175.7.209'),
+...    (dns.name.from_text('ns8.sandia.gov'), '2620:106:6008:7::209'),
+...    (dns.name.from_text('ns9.sandia.gov'), '132.175.7.210'),
+...    (dns.name.from_text('ns9.sandia.gov'), '2620:106:6008:7::210'),
+...    (dns.name.from_text('ns-extra-in-parent.sandia.gov'), '192.0.2.4'),
+...    (dns.name.from_text('ns-extra-in-parent.some-other.gov'), '192.0.2.7'),
+...    (dns.name.from_text('ns-extra-in-child.sandia.gov'), '192.0.2.6'))
+
+>>> # auth NS IP mapping - we set this ourselves
+>>> name_obj.get_auth_ns_ip_mapping()
+{<DNS name ns2.ca.sandia.gov.>: set(['192.0.2.4', '2001:db8::4']), <DNS name ns1.ca.sandia.gov.>: set(['2001:db8::3', '2620:106:6000:40::65', '192.0.2.3']), <DNS name ns8.sandia.gov.>: set(['132.175.7.209', '2620:106:6008:7::209']), <DNS name ns-extra-in-parent.some-other.gov.>: set(['192.0.2.7']), <DNS name ns9.sandia.gov.>: set(['2620:106:6008:7::210', '132.175.7.210']), <DNS name ns-extra-in-parent.sandia.gov.>: set(['192.0.2.4']), <DNS name ns-extra-in-child.sandia.gov.>: set(['192.0.2.6'])}
+
+>>> name_obj.get_ns_names_in_parent()
+set([<DNS name ns2.ca.sandia.gov.>, <DNS name ns9.sandia.gov.>, <DNS name ns-extra-in-parent.out-of-bailiwick.net.>, <DNS name ns1.ca.sandia.gov.>, <DNS name ns-extra-in-parent.sandia.gov.>, <DNS name ns8.sandia.gov.>, <DNS name ns-extra-in-parent.some-other.gov.>])
+>>> name_obj.get_ns_names_in_child()
+set([<DNS name ns1.ca.sandia.gov.>, <DNS name ns2.ca.sandia.gov.>, <DNS name ns8.sandia.gov.>, <DNS name ns9.sandia.gov.>, <DNS name ns-extra-in-child.sandia.gov.>])
+>>> name_obj.get_ns_names()
+set([<DNS name ns2.ca.sandia.gov.>, <DNS name ns1.ca.sandia.gov.>, <DNS name ns8.sandia.gov.>, <DNS name ns-extra-in-parent.some-other.gov.>, <DNS name ns9.sandia.gov.>, <DNS name ns-extra-in-parent.out-of-bailiwick.net.>, <DNS name ns-extra-in-parent.sandia.gov.>, <DNS name ns-extra-in-child.sandia.gov.>])
+>>> # names unresolvable
+>>> name_obj.get_ns_names().difference(name_obj.get_auth_ns_ip_mapping())
+set([<DNS name ns-extra-in-parent.out-of-bailiwick.net.>])
+>>> # names with negative answers
+>>> #XXX need better example
+>>> set([name for name, ips in name_obj.get_auth_ns_ip_mapping().items() if not ips])
+set([])
+>>> name_obj.get_servers_in_parent()
+set(['192.0.2.5', '198.206.219.65', '198.206.219.66', '192.0.2.4', '132.175.7.210', '2620:106:6008:7::210', '2620:106:6000:40::66', '2620:106:6000:40::65', '132.175.7.209', '2620:106:6008:7::209'])
+>>> name_obj.get_servers_in_child()
+set(['2001:db8::3', '2620:106:6008:7::210', '132.175.7.210', '192.0.2.3', '2001:db8::4', '192.0.2.4', '2620:106:6000:40::65', '132.175.7.209', '192.0.2.6', '2620:106:6008:7::209'])
+>>> name_obj.get_servers_in_parent().difference(name_obj.get_servers_in_child())
+set(['192.0.2.5', '198.206.219.65', '198.206.219.66', '2620:106:6000:40::66'])
+>>> name_obj.get_servers_in_child().difference(name_obj.get_servers_in_parent())
+set(['2001:db8::3', '192.0.2.6', '2001:db8::4', '192.0.2.3'])
+>>> name_obj.get_servers_in_child().intersection(name_obj.get_servers_in_parent())
+set(['192.0.2.4', '132.175.7.210', '2620:106:6000:40::65', '132.175.7.209', '2620:106:6008:7::210', '2620:106:6008:7::209'])
+>>> name_obj.get_designated_servers()
+set(['192.0.2.5', '192.0.2.4', '192.0.2.7', '2620:106:6008:7::210', '132.175.7.210', '192.0.2.3', '198.206.219.65', '2620:106:6000:40::66', '2620:106:6000:40::65', '132.175.7.209', '2001:db8::3', '198.206.219.66', '192.0.2.6', '2001:db8::4', '2620:106:6008:7::209'])
+>>> # there is one server that shows up in neither parent nor child
+>>> name_obj.get_designated_servers().difference(name_obj.get_servers_in_child().union(name_obj.get_servers_in_parent()))
+set(['192.0.2.7'])
+>>> name_obj.get_auth_or_designated_servers()
+set(['2620:106:6008:7::210', '2620:106:6008:7::209', '192.0.2.5', '192.0.2.4', '192.0.2.7', '192.0.2.6', '192.0.2.3', '132.175.7.210', '2001:db8::3', '2620:106:6000:40::66', '2620:106:6000:40::65', '132.175.7.209', '198.206.219.65', '198.206.219.66', '2001:db8::4', '2001:500:4431::2:30'])
+>>> # there is one server that wasn't designated as authoritative but answers authoritatively (shown in "get_stealth_servers()" below)
+>>> name_obj.get_auth_or_designated_servers().difference(name_obj.get_designated_servers())
+set(['2001:500:4431::2:30'])
+>>> name_obj.get_responsive_servers_udp()
+set(['2001:500:4431::2:30', '198.206.219.65', '2620:106:6000:40::65', '69.36.157.30'])
+>>> name_obj.get_responsive_servers_tcp()
+set(['2620:106:6000:40::65', '198.206.219.66'])
+>>> name_obj.get_responsive_auth_or_designated_servers()
+set(['2001:500:4431::2:30', '198.206.219.65', '2620:106:6000:40::65'])
+>>> name_obj.get_stealth_servers()
+set(['2001:500:4431::2:30'])
+>>> name_obj.get_ip_ns_name_mapping()
+{'192.0.2.5': [<DNS name ns-extra-in-parent.some-other.gov.>], '192.0.2.4': [<DNS name ns2.ca.sandia.gov.>, <DNS name ns-extra-in-parent.sandia.gov.>], '192.0.2.7': [<DNS name ns-extra-in-parent.some-other.gov.>], '192.0.2.6': [<DNS name ns-extra-in-child.sandia.gov.>], '132.175.7.210': [<DNS name ns9.sandia.gov.>], '192.0.2.3': [<DNS name ns1.ca.sandia.gov.>], '2620:106:6008:7::210': [<DNS name ns9.sandia.gov.>], '2620:106:6000:40::66': [<DNS name ns2.ca.sandia.gov.>], '2620:106:6000:40::65': [<DNS name ns1.ca.sandia.gov.>], '132.175.7.209': [<DNS name ns8.sandia.gov.>], '2001:db8::3': [<DNS name ns1.ca.sandia.gov.>], '198.206.219.66': [<DNS name ns2.ca.sandia.gov.>], '2001:db8::4': [<DNS name ns2.ca.sandia.gov.>], '198.206.219.65': [<DNS name ns1.ca.sandia.gov.>], '2620:106:6008:7::209': [<DNS name ns8.sandia.gov.>]}
+>>> set(name_obj.get_ip_ns_name_mapping()) == name_obj.get_designated_servers()
+True
+>>> name_obj.get_ns_name_for_ip('192.0.2.4')
+([<DNS name ns2.ca.sandia.gov.>, <DNS name ns-extra-in-parent.sandia.gov.>], <DNS name sandia.gov.>)
+>>> name_obj.get_ns_name_for_ip('198.206.219.65')
+([<DNS name ns1.ca.sandia.gov.>], <DNS name sandia.gov.>)
+>>> name_obj.get_ns_name_for_ip('2001:500:4431::2:30')
+([<DNS name a.gov-servers.net.>], <DNS name gov.>)
+
+#TODO diverse answers from different servers/clients
+
+>>> rrset_info_list = [(info.rrset, info) for info in name_obj.rrsig_status.keys()]
+>>> rrset_info_list.sort()
+>>> for rrset, rrset_info in rrset_info_list:
+...     for rrsig in name_obj.rrsig_status[rrset_info]:
+...         for dnskey in name_obj.rrsig_status[rrset_info][rrsig]:
+...             status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
+...             print '%s/%s RRSIG alg=%d, key_tag=%d %s' % (rrset_info.rrset.name, dns.rdatatype.to_text(rrsig.covers()), rrsig.algorithm, rrsig.key_tag, status.validation_status)
+sandia.gov./DS RRSIG alg=8, key_tag=51929 1
+sandia.gov./NS RRSIG alg=7, key_tag=6797 1
+sandia.gov./DNSKEY RRSIG alg=7, key_tag=20739 1
+sandia.gov./DNSKEY RRSIG alg=7, key_tag=36033 1
+sandia.gov./SOA RRSIG alg=7, key_tag=6797 1
+sandia.gov./MX RRSIG alg=7, key_tag=6797 1
+sandia.gov./A RRSIG alg=7, key_tag=6797 1
+QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov./NSEC3 RRSIG alg=7, key_tag=6797 1
+QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov./NSEC3 RRSIG alg=7, key_tag=6797 1
+K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov./NSEC3 RRSIG alg=7, key_tag=6797 1
+DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov./NSEC3 RRSIG alg=7, key_tag=6797 1
+
+#TODO tests for individual methods/functions; wildcards
+
+>>> ds_rdata_list = name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
+>>> ds_rdata_list.sort()
+>>> for ds_rdata in ds_rdata_list:
+...     for dnskey in name_obj.ds_status_by_ds[dns.rdatatype.DS][ds_rdata]:
+...         status = name_obj.ds_status_by_ds[dns.rdatatype.DS][ds_rdata][dnskey]
+...         print '%s alg=%d, key_tag=%d %s' % (name_obj.name, ds_rdata.algorithm, ds_rdata.key_tag, status.validation_status)
+sandia.gov. alg=7, key_tag=20739 1
+sandia.gov. alg=7, key_tag=20739 1
+sandia.gov. alg=7, key_tag=36033 1
+sandia.gov. alg=7, key_tag=36033 1
+
+>>> nsec_set_info_f = foobar_example_query.nsec_set_info[0]
+>>> nsec_set_info_z = z_example_query.nsec_set_info[0]
+>>> nsec_set_info_mx = example_mx_query.nsec_set_info[0]
+>>> nsec_set_info_mx.rdtype_exists_in_bitmap(example_com_name, dns.rdatatype.A)
+True
+>>> nsec_set_info_mx.rdtype_exists_in_bitmap(example_com_name, dns.rdatatype.MX)
+False
+>>> nsec_set_info_mx.rdtype_exists_in_bitmap(example_com_name, dns.rdatatype.AAAA)
+True
+>>> nsec_set_info_mx.rdtype_exists_in_bitmap(example_com_name, dns.rdatatype.SOA)
+True
+>>> nsec_set_info_f._nsec_covers_name(foobar_example_com_name, example_com_name)
+True
+>>> nsec_set_info_f._nsec_covers_name(example_com_name, example_com_name)
+False
+>>> nsec_set_info_f._nsec_covers_name(z_example_com_name, example_com_name)
+False
+>>> nsec_set_info_z._nsec_covers_name(z_example_com_name, www_example_com_name)
+True
+>>> nsec_set_info_z._nsec_covers_name(foobar_example_com_name, www_example_com_name)
+False
+>>> nsec_set_info_f.nsec_covering_name(foobar_example_com_name)
+set([<DNS name example.com.>])
+>>> nsec_set_info_f.nsec_covering_name(example_com_name)
+set([])
+>>> nsec_set_info_f.nsec_covering_name(z_example_com_name)
+set([])
+>>> nsec_set_info_z.nsec_covering_name(z_example_com_name)
+set([<DNS name www.example.com.>])
+>>> nsec_set_info_z.nsec_covering_name(foobar_example_com_name)
+set([<DNS name example.com.>])
+
+>>> name_obj.wildcard_status
+{}
+>>> name_obj.nxdomain_status
+{<DNS name non-existent-foobar.sandia.gov.>: set([None, <NSEC3StatusNXDOMAIN: non-existent-foobar.sandia.gov.>])}
+>>> name_obj.noanswer_status
+{(<DNS name sandia.gov.>, 28): set([<NSEC3StatusNoAnswer: "sandia.gov.">])}
+
+#TODO delegation, DS, and wildcard examples
+
+>>> nsec_set_info_s = sandia_gov_nxdomain_query.nsec_set_info[0]
+>>> nsec_set_info_a = sandia_gov_aaaa_query.nsec_set_info[0]
+>>> nsec_set_info_s.get_digest_name_for_nsec3(dns.name.from_text('non-existent-foobar.sandia.gov'), sandia_gov_name, struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+<DNS name K8EG5QA9RB7NVTSPK7HA1J8OPB9CHV34.sandia.gov.>
+>>> nsec_set_info_s.get_digest_name_for_nsec3(dns.name.from_text('*.sandia.gov'), sandia_gov_name, struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+<DNS name DLG8HOJ9BIDMAF3LJ4P6LLQNSR6N562H.sandia.gov.>
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('K8EG5QA9RB7NVTSPK7HA1J8OPB9CHV34.sandia.gov.'), dns.name.from_text('K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov.'))
+True
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('K8EG5QA9RB7NVTSPK7HA1J8OPB9CHV34.sandia.gov.'), dns.name.from_text('QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov.'))
+False
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('K8EG5QA9RB7NVTSPK7HA1J8OPB9CHV34.sandia.gov.'), dns.name.from_text('DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov.'))
+False
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('DLG8HOJ9BIDMAF3LJ4P6LLQNSR6N562H.sandia.gov.'), dns.name.from_text('K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov.'))
+False
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('DLG8HOJ9BIDMAF3LJ4P6LLQNSR6N562H.sandia.gov.'), dns.name.from_text('QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov.'))
+False
+>>> nsec_set_info_s._nsec_covers_name(dns.name.from_text('DLG8HOJ9BIDMAF3LJ4P6LLQNSR6N562H.sandia.gov.'), dns.name.from_text('DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov.'))
+True
+>>> nsec_set_info_s.nsec3_covering_name(dns.name.from_text('K8EG5QA9RB7NVTSPK7HA1J8OPB9CHV34.sandia.gov'), struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+set([<DNS name K87TTSDM38DHOR9PSKFOJ7ONQ09T18J2.sandia.gov.>])
+>>> nsec_set_info_s.nsec3_covering_name(dns.name.from_text('DLG8HOJ9BIDMAF3LJ4P6LLQNSR6N562H.sandia.gov'), struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+set([<DNS name DLFD9C6KFPQKA5N96VEGN3974VEPPULI.sandia.gov.>])
+
+>>> nsec_set_info_s._find_potential_closest_enclosers(dns.name.from_text('non-existent-foobar.sandia.gov'), sandia_gov_name, struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+{<DNS name sandia.gov.>: set([<DNS name QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov.>])}
+>>> nsec_set_info_a._find_potential_closest_enclosers(sandia_gov_name, sandia_gov_name, struct.pack('!I', 0xF81ABA)[1:], 1, 2)
+{}
+>>> nsec_set_info_s.check_closest_encloser(sandia_gov_name, dns.name.from_text('QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov'), sandia_gov_name)
+True
+>>> nsec_set_info_s.check_closest_encloser(sandia_gov_name, dns.name.from_text('QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov'), example_com_name)
+False
+>>> nsec_set_info_s.get_closest_encloser(dns.name.from_text('non-existent-foobar.sandia.gov'), sandia_gov_name)
+{<DNS name sandia.gov.>: set([<DNS name QHBCC5406IQDQOMI3S9HSS6RTPKALKIT.sandia.gov.>])}
+>>> nsec_set_info_a.get_closest_encloser(sandia_gov_name, sandia_gov_name)
+{}
+
+#TODO test with opt-out, referrals, wildcard

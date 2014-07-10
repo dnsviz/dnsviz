@@ -1,0 +1,6 @@
+digraph {
+	graph [rankdir="BT"]
+	b [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=5, id=12345</FONT>>, penwidth="1.5"]
+	c [label="example.com/SOA", fontsize="10", shape="rectangle", style="rounded", penwidth="1.5"]
+  c -> b [color="#be1515", style="dashed", dir="back"]
+}

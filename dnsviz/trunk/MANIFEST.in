@@ -1,0 +1,4 @@
+include dnsviz/viz/dnssec.py.in
+include bin/dnsviz.in
+recursive-include contrib *
+recursive-include debian *

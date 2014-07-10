@@ -1,0 +1,16 @@
+digraph {
+	graph [rankdir="BT"]
+	subgraph "cluster_a" {
+		graph [label=<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">com</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10">(2010-10-28 12:15:00 UTC)</FONT></TD></TR></TABLE>>, labeljust="l", penwidth="0.5"]
+		a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DS</FONT><BR/><FONT POINT-SIZE="10">digest algs=1,2</FONT>>, penwidth="1.5"]
+		a_top [style="invis",shape="point"]
+		a -> a_top [style="invis",minlen="0"]
+	}
+	subgraph "cluster_b" {
+		graph [label=<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">example.com</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10">(2010-10-28 12:15:00 UTC)</FONT></TD></TR></TABLE>>, labeljust="l", penwidth="0.5"]
+		b [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=5, id=12345</FONT>>, style="filled", fillcolor="#fffa8f", penwidth="1.5"]
+		b_top [style="invis",shape="point"]
+		b -> b_top [style="invis",minlen="0"]
+	}
+  b -> a [color="#f4b800", dir="back", style="dashed"]
+}

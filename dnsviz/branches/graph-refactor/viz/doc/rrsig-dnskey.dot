@@ -1,0 +1,8 @@
+digraph {
+	graph [rankdir="BT"]
+	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=5, id=12345</FONT>>, style="filled", fillcolor="lightgray", penwidth="1.5"]
+	b [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=5, id=54321</FONT>>, penwidth="1.5"]
+  b -> a [color="#0a879a", dir="back"]
+  b -> b [color="#0a879a", dir="back"]
+  a -> a [color="#0a879a", dir="back"]
+}

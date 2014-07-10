@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+
+import collections
+import getopt
+import json
+import logging
+import re
+import sys
+
+import dns.message, dns.name 
+
+from dnsviz.analysis import DomainNameAnalysis
+from dnsviz import format as fmt
+
+ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
+BLANK_LINES_RE = re.compile(r'\n\s*\n')
+
+#TODO - move this function to library
+def get_trusted_keys(filename):
+    trusted_keys = []
+
+    tk_str = open(filename, 'r').read()
+    tk_str = ZONE_COMMENTS_RE.sub('', tk_str)
+    tk_str = BLANK_LINES_RE.sub(r'\n', tk_str)
+    tk_str = tk_str.strip()
+    m = dns.message.from_text(str(';ANSWER\n'+tk_str))
+    for rrset in m.answer:
+        if rrset.rdtype != dns.rdatatype.DNSKEY:
+            pass
+        for dnskey in rrset:
+            if dnskey.flags & fmt.DNSKEY_FLAGS['revoke']:
+                pass
+            trusted_keys.append((rrset.name,dnskey))
+
+    return trusted_keys
+
+def usage():
+    sys.stderr.write( '''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
+
+Options:
+    -f <filename>  - read names from a file (one name per line), instead of from command line
+    -r <filename>  - read analysis from a file, instead of from stdin
+    -y             - read in yaml, instead of json
+    -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
+    -Y             - write in yaml, instead of json
+    -o <filename>  - save the output to filename instead of to stdout
+    -l <loglevel>  - set log level to one of: error, warning, info, debug
+''' % sys.argv[0])
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Yo:l:')
+    except getopt.GetoptError:
+        usage()
+        sys.exit(1)
+
+    opts = dict(opts)
+    if ('-f' in opts and args) or not ('-f' in opts or args):
+        usage()
+        sys.exit(1)
+
+    if '-l' in opts:
+        if opts['-l'] == 'error':
+            loglevel = logging.ERROR
+        elif opts['-l'] == 'warning':
+            loglevel = logging.WARNING
+        elif opts['-l'] == 'info':
+            loglevel = logging.INFO
+        elif opts['-l'] == 'debug':
+            loglevel = logging.DEBUG
+        else:
+            usage()
+            sys.exit(1)
+    else:
+        loglevel = logging.DEBUG
+
+    #TODO: support unicode
+    if '-f' in opts:
+        names = []
+        with open(opts['-f']) as f:
+            for line in f:
+                names.append(dns.name.from_text(line.strip()))
+    else:
+        names = map(dns.name.from_text, args)
+
+    if '-r' not in opts or opts['-r'] == '-':
+        analysis_str = sys.stdin.read()
+    else:
+        analysis_str = open(opts['-r']).read()
+    if '-y' in opts:
+        import yaml
+        analysis_structured = yaml.load(analysis_str)
+    else:
+        analysis_structured = json.loads(analysis_str)
+
+    if '-t' in opts:
+        trusted_keys = get_trusted_keys(opts['-t'])
+    else:
+        trusted_keys = ()
+
+    name_objs = []
+    for name in names:
+        name_objs.append(DomainNameAnalysis.deserialize(name, analysis_structured))
+
+    d = collections.OrderedDict()
+    for name_obj in name_objs:
+        name_obj.populate_status(trusted_keys)
+        name_obj.serialize_status(d, loglevel=loglevel)
+
+    if '-o' not in opts or opts['-o'] == '-':
+        fh = sys.stdout
+    else:
+        fh = open(opts['-o'], 'w')
+
+    if d:
+        kwargs = { 'indent': 4, 'separators': (',', ': ') }
+        if '-Y' in opts:
+            import yaml
+            fh.write(yaml.dump(d))
+        else:
+            fh.write(json.dumps(d, **kwargs))
+
+if __name__ == "__main__":
+    main()

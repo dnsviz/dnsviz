@@ -1,0 +1,9 @@
+digraph {
+	graph [rankdir="BT"]
+	subgraph "cluster_a" {
+		graph [label=<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">example.com</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10">(2010-10-28 12:15:00 UTC)</FONT></TD></TR></TABLE>>, labeljust="l", penwidth="0.5"]
+		n [shape="point",style="invis"]
+		n_top [shape="point",style="invis"]
+		n -> n_top [style="invis", minlen="0"]
+	}
+}

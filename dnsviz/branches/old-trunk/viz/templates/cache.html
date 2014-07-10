@@ -1,0 +1,8 @@
+{% extends "dnssec.html" %}
+
+{% block page_info %}
+	<div id="page-info">
+		DNS cache analyzed: <strong>{{ analyzed_name_obj.server }}</strong><br />
+		Analysis time: <strong><a href="{{ analyzed_name_obj.base_url_with_timestamp }}{{ url_subdir }}">{{ analyzed_name_obj.updated_utc|date }} UTC</a></strong> (<abbr class="timeago" title="{{ analyzed_name_obj.updated_utc|date:"c" }}">{{ analyzed_name_obj.updated_ago_str }} ago</abbr>)
+	</div>
+{% endblock %}
