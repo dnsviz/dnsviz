@@ -131,7 +131,7 @@ _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.Simpl
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
 class DomainNameAnalysis(object):
-    def __init__(self, name, dlv_domain=None):
+    def __init__(self, name, dlv_domain=None, stub=False):
 
         ##################################################
         # General attributes
@@ -139,6 +139,7 @@ class DomainNameAnalysis(object):
 
         # The name that is the focus of the analysis (serialized).
         self.name = name
+        self.stub = stub
 
         # Analysis start and end (serialized).
         self.analysis_start = None
@@ -267,7 +268,9 @@ class DomainNameAnalysis(object):
         return self._dlv_name
 
     def is_zone(self):
-        return self.has_ns or self.name == dns.name.root
+        #print self.name
+        #print bool(self.has_ns or self.name == dns.name.root or self.stub)
+        return self.has_ns or self.name == dns.name.root or self.stub
 
     def _get_zone(self):
         if self.is_zone():
@@ -600,11 +603,19 @@ class DomainNameAnalysis(object):
             servers = set()
             glue_ips = self.get_glue_ip_mapping()
             auth_ips = self.get_auth_ns_ip_mapping()
-            for name in self.get_ns_names():
-                if name in glue_ips:
-                    servers.update(glue_ips[name])
-                if name in auth_ips:
-                    servers.update(auth_ips[name])
+            #XXX the logic here needs to be double checked
+            #XXX why not just this...
+            for name in glue_ips:
+                servers.update(glue_ips[name])
+            for name in auth_ips:
+                servers.update(auth_ips[name])
+            #XXX instead of this?
+            #for name in self.get_ns_names():
+            #    if name in glue_ips:
+            #        servers.update(glue_ips[name])
+            #    if name in auth_ips:
+            #        servers.update(auth_ips[name])
+            #XXX note that this change makes stubs easier
             if no_cache:
                 return servers
             self._designated_servers = servers
@@ -749,6 +760,9 @@ class DomainNameAnalysis(object):
         if self.rrsig_status is not None:
             return
 
+        if self.stub:
+            return
+
         if supported_algs is not None:
             supported_algs.intersection_update(crypto._supported_algs)
         else:
@@ -857,6 +871,10 @@ class DomainNameAnalysis(object):
                     self.rrsig_status[rrset_info][rrsig] = {}
 
                     signer = self.get_name(rrsig.signer)
+
+                    if signer.stub:
+                        continue
+
                     for server_client in rrset_info.rrsig_info[rrsig].servers_clients.intersection(algs_signing_rrset):
                         algs_signing_rrset[server_client].add(rrsig.algorithm)
                         if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[server_client]) and \
@@ -1032,7 +1050,7 @@ class DomainNameAnalysis(object):
     def _populate_ds_status(self, supported_algs, supported_digest_algs, rdtype=dns.rdatatype.DS):
         if rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
             raise ValueError('Type can only be DS or DLV.')
-        if self.name == dns.name.root:
+        if self.parent is None:
             return
         if rdtype == dns.rdatatype.DLV:
             name = self.dlv_name()
@@ -1458,37 +1476,39 @@ class DomainNameAnalysis(object):
         if d is None:
             d = collections.OrderedDict()
 
+        name_str = self.name.canonicalize().to_text()
+        if name_str in d:
+            return d
+
         if self.parent is not None:
             self.parent.serialize(d)
         if self.dlv_parent is not None:
             self.dlv_parent.serialize(d)
 
-        name_str = self.name.canonicalize().to_text()
-        if name_str in d:
-            return d
-
         clients_ipv4 = list(self.clients_ipv4)
         clients_ipv4.sort()
         clients_ipv6 = list(self.clients_ipv6)
         clients_ipv6.sort()
-        d[name_str] = collections.OrderedDict((
-            ('analysis_start', fmt.datetime_to_str(self.analysis_start)),
-            ('analysis_end', fmt.datetime_to_str(self.analysis_end)),
-            ('clients_ipv4', clients_ipv4),
-            ('clients_ipv6', clients_ipv6),
-        ))
 
-        if self.parent is not None:
-            d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
-        if self.dlv_parent is not None:
-            d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
-        d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
-        if self.nxdomain_name is not None:
-            d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
-            d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
-        if self.nxrrset_name is not None:
-            d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
-            d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
+        d[name_str] = collections.OrderedDict()
+        d[name_str]['stub'] = self.stub
+        if not self.stub:
+            d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
+            d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
+            d[name_str]['clients_ipv4'] = clients_ipv4
+            d[name_str]['clients_ipv6'] = clients_ipv6
+
+            if self.parent is not None:
+                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
+            if self.dlv_parent is not None:
+                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+            d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
+            if self.nxdomain_name is not None:
+                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
+                d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
+            if self.nxrrset_name is not None:
+                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
+                d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
         if self._auth_ns_ip_mapping:
             d[name_str]['auth_ns_ip_mapping'] = collections.OrderedDict()
             ns_names = self._auth_ns_ip_mapping.keys()
@@ -1497,6 +1517,9 @@ class DomainNameAnalysis(object):
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
                 d[name_str]['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+
+        if self.stub:
+            return d
 
         d[name_str]['queries'] = collections.OrderedDict()
         query_keys = self.queries.keys()
@@ -1594,14 +1617,17 @@ class DomainNameAnalysis(object):
         if d is None:
             d = collections.OrderedDict()
 
-        if self.parent is not None:
-            self.parent.serialize_status(d, loglevel=loglevel)
-        if self.dlv_parent is not None:
-            self.dlv_parent.serialize_status(d, loglevel=loglevel)
+        if self.stub:
+            return d
 
         name_str = self.name.canonicalize().to_text()
         if name_str in d:
             return d
+
+        if self.parent is not None:
+            self.parent.serialize_status(d, loglevel=loglevel)
+        if self.dlv_parent is not None:
+            self.dlv_parent.serialize_status(d, loglevel=loglevel)
 
         consolidate_clients = self.single_client()
 
@@ -1635,7 +1661,7 @@ class DomainNameAnalysis(object):
             if not d[name_str]['dnskeys']:
                 del d[name_str]['dnskeys']
 
-        if self.is_zone() and self.name != dns.name.root:
+        if self.is_zone() and self.parent is not None:
             d[name_str]['delegation'] = collections.OrderedDict()
             if (self.name, dns.rdatatype.DS) in self.queries:
                 if self.ds_status_by_ds[dns.rdatatype.DS]:
@@ -1862,8 +1888,10 @@ class DomainNameAnalysis(object):
 
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
+        stub = d['stub']
+
         dlv_parent_name = None
-        if name != dns.name.root:
+        if name != dns.name.root and not stub:
             parent_name = dns.name.from_text(d['parent'])
             parent = cls.deserialize(parent_name, d1)
 
@@ -1873,26 +1901,30 @@ class DomainNameAnalysis(object):
 
         logger.info('Loading %s' % fmt.humanize_name(name))
 
-        a = cls(name, dlv_parent_name)
-        a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
-        a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
+        a = cls(name, dlv_parent_name, stub=stub)
+        if not stub:
+            a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
+            a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
 
-        if name != dns.name.root:
-            a.parent = parent
-            if dlv_parent_name is not None:
-                a.dlv_parent = dlv_parent
+            if name != dns.name.root:
+                a.parent = parent
+                if dlv_parent_name is not None:
+                    a.dlv_parent = dlv_parent
 
-        a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
-        if 'nxdomain_name' in d:
-            a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
-            a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
-        if 'nxrrset_name' in d:
-            a.nxrrset_name = dns.name.from_text(d['nxrrset_name'])
-            a.nxrrset_rdtype = dns.rdatatype.from_text(d['nxrrset_rdtype'])
+            a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
+            if 'nxdomain_name' in d:
+                a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
+                a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
+            if 'nxrrset_name' in d:
+                a.nxrrset_name = dns.name.from_text(d['nxrrset_name'])
+                a.nxrrset_rdtype = dns.rdatatype.from_text(d['nxrrset_rdtype'])
+
         if 'auth_ns_ip_mapping' in d:
             for target in d['auth_ns_ip_mapping']:
                 for addr in d['auth_ns_ip_mapping'][target]:
                     a.add_auth_ns_ip_mappings((dns.name.from_text(target), addr))
+        if stub:
+            return a
 
         # import delegation NS queries first
         delegation_types = set([dns.rdatatype.NS])
@@ -1943,12 +1975,13 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    def __init__(self, name, client_ipv4=None, client_ipv6=None, force_dnskey=False,
+    def __init__(self, name, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
              trace=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
+        self.ceiling = ceiling
         if self.client_ipv4 is None and self.client_ipv6 is None:
             self.client_ipv4, self.client_ipv6 = get_client_addresses()
         if client_ipv4 is None and client_ipv6 is None:
@@ -1968,6 +2001,12 @@ class Analyst(object):
             self._analysis_cache_lock = threading.Lock()
         else:
             self._analysis_cache_lock = analysis_cache_lock
+
+        if self.ceiling is not None and self.ceiling != dns.name.root:
+            try:
+                _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            except dns.resolver.NoAnswer:
+                self.ceiling = self.ceiling.parent()
 
     def _is_referral_of_type(self, rdtype):
         '''Return True if analysis of this name was invoked as a dependency (specified by
@@ -2043,18 +2082,49 @@ class Analyst(object):
 
         if not do_analysis:
             name_obj.complete.wait()
-            #XXX re-do analyses if force_dnskey is True and dnskey hasn't been queried
+            #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
         return name_obj
 
     def analyze(self):
         return self._analyze(self.name)
 
-    def _analyze(self, name):
+    def _analyze(self, name, ns_only=False):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
 
+        if ns_only:
+            logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
+            try:
+                ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
+                name_obj = self.analysis_model(name, stub=True)
+
+                # resolve every name in the NS RRset
+                query_tuples = []
+                for rr in ans.rrset:
+                    query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
+                answer_map = _resolver.query_multiple(*query_tuples)
+                for query_tuple in answer_map:
+                    a = answer_map[query_tuple]
+                    if isinstance(a, Resolver.DNSAnswer):
+                        for a_rr in a.rrset:
+                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
+                return name_obj
+
+            except dns.resolver.NoAnswer:
+                #XXX what if this is the root name?
+                return self._analyze(name.parent(), ns_only=True)
+            #XXX handle the other cases
+            #except dns.resolver.NXDOMAIN:
+            #    pass
+            #except dns.exception.DNSException:
+            #    pass
+
+        # only analyze the parent if the name is not root and if there is no
+        # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
+        elif name == self.ceiling:
+            parent_obj = self._analyze(name.parent(), ns_only=True)
         else:
             parent_obj = self._analyze(name.parent())
 
@@ -2093,7 +2163,10 @@ class Analyst(object):
         if name_obj.referral_error() or name_obj.queries[(name_obj.name, name_obj.referral_rdtype)].is_nxdomain_all():
             return name_obj
 
-        servers = name_obj.zone.get_responsive_auth_or_designated_servers()
+        if name_obj.zone.stub:
+            servers = name_obj.zone.get_auth_or_designated_servers()
+        else:
+            servers = name_obj.zone.get_responsive_auth_or_designated_servers()
         servers = self._filter_servers(servers)
         exclude_no_answer = set()
         queries = {}
@@ -2130,13 +2203,17 @@ class Analyst(object):
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
             if name_obj.parent is not None:
-                parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
+                if name_obj.zone.parent.stub:
+                    parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
+                else:
+                    parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
                 logger.debug('Querying %s/DS...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, self.client_ipv4, self.client_ipv6)
 
                 if name_obj.dlv_parent is not None:
+                    #XXX fix this for stub
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name()
@@ -2169,6 +2246,8 @@ class Analyst(object):
     def _analyze_delegation(self, name_obj):
         if name_obj.parent is None:
             parent_auth_servers = ROOT_NS_IPS
+        elif name_obj.parent.stub:
+            parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         else:
             parent_auth_servers = name_obj.parent.get_responsive_auth_or_designated_servers()
         parent_auth_servers = set(self._filter_servers(parent_auth_servers))
@@ -2260,17 +2339,45 @@ class Analyst(object):
 
     def _analyze_dependencies(self, name_obj):
         for cname in name_obj.cname_targets:
-            a = self.__class__(cname, self.client_ipv4, self.client_ipv6, False, self.trace + [(name_obj.name, dns.rdatatype.CNAME)], self._analysis_cache, self._analysis_cache_lock)
+            if self.ceiling is not None:
+                if cname.is_subdomain(self.ceiling):
+                    ceiling = self.ceiling
+                else:
+                    ceiling = cname
+            else:
+                ceiling = None
+            a = self.__class__(cname, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.CNAME)], self._analysis_cache, self._analysis_cache_lock)
             name_obj.cname_targets[cname] = a.analyze()
         for dname in name_obj.dname_targets:
-            a = self.__class__(dname, self.client_ipv4, self.client_ipv6, False, self.trace + [(name_obj.name, dns.rdatatype.DNAME)], self._analysis_cache, self._analysis_cache_lock)
+            if self.ceiling is not None:
+                if dname.is_subdomain(self.ceiling):
+                    ceiling = self.ceiling
+                else:
+                    ceiling = dname
+            else:
+                ceiling = None
+            a = self.__class__(dname, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.DNAME)], self._analysis_cache, self._analysis_cache_lock)
             name_obj.dname_targets[dname] = a.analyze()
         for signer in name_obj.external_signers:
-            a = self.__class__(signer, self.client_ipv4, self.client_ipv6, True, self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], self._analysis_cache, self._analysis_cache_lock)
+            if self.ceiling is not None:
+                if signer.is_subdomain(self.ceiling):
+                    ceiling = self.ceiling
+                else:
+                    ceiling = signer
+            else:
+                ceiling = None
+            a = self.__class__(signer, self.client_ipv4, self.client_ipv6, ceiling, True, self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], self._analysis_cache, self._analysis_cache_lock)
             name_obj.external_signers[signer] = a.analyze()
         if name_obj.is_zone() and name_obj.parent is not None:
             #for ns in name_obj.get_ns_dependencies():
-            #    a = self.__class__(ns, self.client_ipv4, self.client_ipv6, False, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
+            #    if self.ceiling is not None:
+            #        if ns.is_subdomain(self.ceiling):
+            #            ceiling = self.ceiling
+            #        else:
+            #            ceiling = ns
+            #    else:
+            #        ceiling = None
+            #    a = self.__class__(ns, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
             #    name_obj.ns_targets[ns] = a.analyze()
             pass
         #TODO MX targets

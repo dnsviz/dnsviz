@@ -8,7 +8,7 @@ import sys
 
 import dns.name
 
-from dnsviz.analysis import Analyst, DomainNameAnalysis, get_client_addresses, NetworkConnectivityException
+from dnsviz.analysis import Analyst, DomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
 import dnsviz.format as fmt
 
 logger = logging.getLogger('dnsviz.analysis')
@@ -20,6 +20,7 @@ Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
     -d <level>     - set debug level to a value from 0 to 3, with increasing verbosity (default: 1 or WARNING)
     -r <filename>  - read analysis from a file, instead of querying servers (use "-" for stdin)
+    -a <ancestor>  - analyze ancestry of name through ancestor, instead of just name itself (use "-a ." or full ancestral analysis) (default: analyze only the name itself)
     -p             - make json output pretty instead of minimal
     -y             - read in yaml, instead of json
     -Y             - write in yaml, instead of json
@@ -28,7 +29,7 @@ Options:
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:d:r:pyYo:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:d:r:pyYo:a:')
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -37,6 +38,11 @@ def main():
     if ('-f' in opts and args) or not ('-f' in opts or args):
         usage()
         sys.exit(1)
+
+    if '-a' in opts:
+        ceiling = dns.name.from_text(opts['-a'])
+    else:
+        ceiling = None
 
     try:
         val = int(opts.get('-d', 1))
@@ -89,7 +95,11 @@ def main():
             raise NetworkConnectivityException('No network interfaces available for analysis!')
         cache = {}
         for name in names:
-            a = Analyst(name, client_ipv4=client_ipv4, client_ipv6=client_ipv6, analysis_cache=cache)
+            if ceiling is not None and name.is_subdomain(ceiling):
+                c = ceiling
+            else:
+                c = name
+            a = Analyst(name, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, analysis_cache=cache)
             name_objs.append(a.analyze())
 
     d = collections.OrderedDict()
