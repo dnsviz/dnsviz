@@ -603,19 +603,10 @@ class DomainNameAnalysis(object):
             servers = set()
             glue_ips = self.get_glue_ip_mapping()
             auth_ips = self.get_auth_ns_ip_mapping()
-            #XXX the logic here needs to be double checked
-            #XXX why not just this...
             for name in glue_ips:
                 servers.update(glue_ips[name])
             for name in auth_ips:
                 servers.update(auth_ips[name])
-            #XXX instead of this?
-            #for name in self.get_ns_names():
-            #    if name in glue_ips:
-            #        servers.update(glue_ips[name])
-            #    if name in auth_ips:
-            #        servers.update(auth_ips[name])
-            #XXX note that this change makes stubs easier
             if no_cache:
                 return servers
             self._designated_servers = servers
@@ -683,7 +674,12 @@ class DomainNameAnalysis(object):
             self._ip_ns_name_mapping = {}
             glue_ips = self.get_glue_ip_mapping()
             auth_ips = self.get_auth_ns_ip_mapping()
-            for name in self.get_ns_names():
+            if self.stub:
+                auth_names = set(auth_ips)
+            else:
+                auth_names = self.get_ns_names()
+
+            for name in auth_names:
                 if name in auth_ips:
                     for ip in auth_ips[name]:
                         if ip not in self._ip_ns_name_mapping:
