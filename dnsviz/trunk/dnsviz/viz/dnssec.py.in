@@ -564,8 +564,12 @@ class DNSAuthGraph:
 
         S = self.G.get_subgraph(node_str)
         if S is None:
-            label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
-                    (12, zone_obj, 10, fmt.datetime_to_str(zone_obj.analysis_end))
+            if zone_obj.analysis_end is not None:
+                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
+                        (12, zone_obj, 10, fmt.datetime_to_str(zone_obj.analysis_end))
+            else:
+                label_str = u'<<FONT POINT-SIZE="%d">%s</FONT>>' % \
+                        (12, zone_obj)
             S = self.G.add_subgraph(name=node_str, label=label_str, labeljust='l', penwidth='0.5')
             S.add_node(top_name, shape='point', style='invis')
             S.add_node(bottom_name, shape='point', style='invis')
@@ -575,7 +579,7 @@ class DNSAuthGraph:
 
     def add_rrsig(self, rrsig_status, name_obj, signer_obj, signed_node, combine_edge_id=None):
         if rrsig_status.dnskey is None:
-            dnskey_node = self.add_dnskey_non_existent(signer_obj.name, signer_obj.zone.name, rrsig_status.rrsig.algorithm, False, rrsig_status.rrsig.key_tag)
+            dnskey_node = self.add_dnskey_non_existent(signer_obj.name, signer_obj.zone.name, rrsig_status.rrsig.algorithm, rrsig_status.rrsig.key_tag)
         else:
             dnskey_node = self.get_dnskey(self.id_for_dnskey(signer_obj.name, rrsig_status.dnskey.rdata), signer_obj.name, rrsig_status.dnskey.rdata.algorithm, rrsig_status.dnskey.key_tag)
 
@@ -988,6 +992,9 @@ class DNSAuthGraph:
 
         zone_obj = name_obj.zone
         S, zone_graph_name, zone_bottom, zone_top = self.add_zone(zone_obj)
+
+        if zone_obj.stub:
+            return
 
         #######################################
         # DNSKEY roles, based on what they sign
