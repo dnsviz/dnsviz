@@ -2011,7 +2011,9 @@ class Analyst(object):
                     ans.response.find_rrset(ans.response.answer, self.ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 except KeyError:
                     self.ceiling = self.ceiling.parent()
-            except dns.resolver.NoAnswer:
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                self.ceiling = self.ceiling.parent()
+            except dns.exception.DNSException:
                 self.ceiling = self.ceiling.parent()
 
     def _is_referral_of_type(self, rdtype):
@@ -2121,14 +2123,10 @@ class Analyst(object):
                     for a_rr in a.rrset:
                         name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
             return name_obj
-        except dns.resolver.NoAnswer:
-            #XXX what if this is the root name?
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             return self._analyze(name.parent(), ns_only=True)
-        #XXX handle the other cases
-        #except dns.resolver.NXDOMAIN:
-        #    pass
-        #except dns.exception.DNSException:
-        #    pass
+        except dns.exception.DNSException:
+            return self._analyze(name.parent(), ns_only=True)
 
     def analyze(self):
         return self._analyze(self.name)
