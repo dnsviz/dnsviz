@@ -2002,7 +2002,11 @@ class Analyst(object):
 
         if self.ceiling is not None and self.ceiling != dns.name.root:
             try:
-                _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+                ans = _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+                try:
+                    ans.response.find_rrset(ans.response.answer, self.ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
+                except KeyError:
+                    self.ceiling = self.ceiling.parent()
             except dns.resolver.NoAnswer:
                 self.ceiling = self.ceiling.parent()
 
