@@ -194,37 +194,18 @@ class DNSResponse:
 
         return False
 
-    def is_nxrrset_not_delegated(self, qname, rdtype):
-        '''Return True if this response is authoritative and indicates that no
-        record exists with owner name of qname and that the namespace has not
-        been delegated.  This might be because qname itself doesn't exist
-        (i.e., NXDOMAIN) or because there simply is no record of the type
-        requested for the name.  In the case of the latter, there also be no
-        indicators in the response that the authority is the name in
-        question (i.e., as indicated by NS and SOA records).'''
+    def is_delegation(self, qname, rdtype):
+        '''Return True if this response (from a request to a server
+        authoritative for the immediate parent) yields NS records for the name 
+        or provides a referral or NXDOMAIN or no data response.'''
 
-        # if response is not valid, complete, and authoritative, then we don't count it
-        if not (self.is_valid_response() and self.is_complete_response() and self.is_authoritative()):
-            return False
+        # if NS or SOA records were found in the answer or authority section
+        return self.message.get_rrset(self.message.answer, qname, dns.rdataclass.IN, dns.rdatatype.NS) is not None or \
+                self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS) is not None or \
+                self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA) is not None
 
-        # if there's something in the answer, then the name exists
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
-            return False
-
-        # if the response code is NXDOMAIN, then the name doesn't exist
-        if self.message.rcode() == dns.rcode.NXDOMAIN:
-            return True
-
-        # there should be no SOA RRs in the authority section owned by the qname
-        if self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA) is not None:
-            return False
-
-        # there should be no NS RRs in the authority section owned by the qname (indicating a referral)
-        #XXX does the authoritative check above account for this?
-        if self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS) is not None:
-            return False
-
-        return True
+    def not_delegation(self, qname, rdtype):
+        return not self.is_delegation(qname, rdtype)
 
     def ns_ip_mapping_from_additional(self, qname, bailiwick=None):
         ip_mapping = {}
