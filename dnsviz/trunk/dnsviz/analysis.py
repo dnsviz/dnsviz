@@ -1352,15 +1352,19 @@ class DomainNameAnalysis(object):
 
                     if qname_sought == qname or query.flags & dns.flags.RD:
                         if soa_owner_name is None:
-                            if qname_sought == qname:
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_clients.copy()
-                            else:
-                                servers_affected = set()
-                                for server_client in servers_clients:
-                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
-                                        servers_affected.add(server_client)
-                                if servers_affected:
-                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_affected
+                            # check for an upward referral
+                            servers_missing_soa = set()
+                            servers_upward_referral = set()
+                            for server_client in servers_clients:
+                                if qname_sought == qname or query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                                    if qname_obj is not None and query.responses[server_client[0]][server_client[1]].is_upward_referral(qname_obj.zone.name):
+                                        servers_upward_referral.add(server_client)
+                                    else:
+                                        servers_missing_soa.add(server_client)
+                            if servers_missing_soa:
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_missing_soa
+                            if servers_upward_referral:
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UPWARD_REFERRAL] = servers_upward_referral
                         elif not qname_sought.is_subdomain(soa_owner_name):
                             if qname_sought == qname:
                                 if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
