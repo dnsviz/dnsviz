@@ -866,13 +866,13 @@ class DNSQuery(object):
             val = False
         return val
 
-    def is_nxrrset_not_delegated_all(self):
+    def is_not_delegation_all(self):
         val = None
         for server in self.responses:
             for response in self.responses[server].values():
                 if not (response.is_valid_response() and response.is_complete_response()):
                     continue
-                if response.is_nxrrset_not_delegated(self.qname, self.rdtype):
+                if response.not_delegation(self.qname, self.rdtype):
                     if val is None:
                         val = True
                 else:
@@ -1127,7 +1127,7 @@ class ExecutableDNSQuery(DNSQuery):
     project = require_executed(DNSQuery.project)
     is_authoritative_answer_all = require_executed(DNSQuery.is_authoritative_answer_all)
     is_nxdomain_all = require_executed(DNSQuery.is_nxdomain_all)
-    is_nxrrset_not_delegated_all = require_executed(DNSQuery.is_nxrrset_not_delegated_all)
+    is_not_delegation_all = require_executed(DNSQuery.is_not_delegation_all)
     is_nxdomain_any = require_executed(DNSQuery.is_nxdomain_any)
 
 class DNSQueryFactory(object):

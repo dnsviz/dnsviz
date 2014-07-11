@@ -77,8 +77,9 @@ ROOT_NS_IPS = set([
 ROOT_NS_IPS_6 = set(filter(lambda x: ':' in x, ROOT_NS_IPS))
 ROOT_NS_IPS_4 = ROOT_NS_IPS.difference(ROOT_NS_IPS_6)
 
-IP6_ARPA_NAME = dns.name.from_text('ip6.arpa')
-INADDR_ARPA_NAME = dns.name.from_text('in-addr.arpa')
+ARPA_NAME = dns.name.from_text('arpa')
+IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
+INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
 
 LOOPBACK_IP_RE = re.compile(r'^(127\.|::1$)')
 RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
@@ -268,8 +269,6 @@ class DomainNameAnalysis(object):
         return self._dlv_name
 
     def is_zone(self):
-        #print self.name
-        #print bool(self.has_ns or self.name == dns.name.root or self.stub)
         return self.has_ns or self.name == dns.name.root or self.stub
 
     def _get_zone(self):
@@ -1498,7 +1497,8 @@ class DomainNameAnalysis(object):
                 d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
             if self.dlv_parent is not None:
                 d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
-            d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
+            if self.referral_rdtype is not None:
+                d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             if self.nxdomain_name is not None:
                 d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
@@ -1907,7 +1907,8 @@ class DomainNameAnalysis(object):
                 if dlv_parent_name is not None:
                     a.dlv_parent = dlv_parent
 
-            a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
+            if 'referral_rdtype' in d:
+                a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
             if 'nxdomain_name' in d:
                 a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
                 a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
@@ -1928,8 +1929,9 @@ class DomainNameAnalysis(object):
             delegation_types.add(a.referral_rdtype)
         for rdtype in delegation_types:
             query_str = '%s/%s/%s' % (name_str, dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
-            a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
+            if query_str in d['queries']:
+                logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
+                a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
 
         for query_str in d['queries']:
             qname, rdclass, rdtype = query_str.split('/')
@@ -2155,8 +2157,9 @@ class Analyst(object):
     def _analyze_name(self, name_obj):
         logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
 
-        self._analyze_delegation(name_obj)
-        if name_obj.referral_error() or name_obj.queries[(name_obj.name, name_obj.referral_rdtype)].is_nxdomain_all():
+        # analyze delegation, and return if 
+        yxdomain = self._analyze_delegation(name_obj)
+        if not yxdomain:
             return name_obj
 
         if name_obj.zone.stub:
@@ -2249,7 +2252,7 @@ class Analyst(object):
         parent_auth_servers = set(self._filter_servers(parent_auth_servers))
 
         if not parent_auth_servers:
-            return
+            return False
 
         servers_queried = { dns.rdatatype.NS: set(), dns.rdatatype.A: set() }
 
@@ -2274,15 +2277,64 @@ class Analyst(object):
             if query.is_valid_complete_response_any():
                 break
 
-            # we only go a second time through the loop with an A query if 1)
-            # there was NXDOMAIN or 2) there were no valid responses.  In either
-            # case the A record becomes the referral rdtype.
+            if name_obj.name.is_subdomain(ARPA_NAME):
+                break
 
-        # if we didn't receive any valid responses, then return
-        if query.is_nxrrset_not_delegated_all() or not query.is_valid_complete_response_any():
-            return
+            # we only go a second time through the loop with an A query if the name
+            # is not under .arpa and if 1) there was NXDOMAIN or 2) there were
+            # no valid responses  In either case the A record becomes the
+            # referral rdtype.
 
-        #TODO figure out how to most efficiently save queries here
+        # if the name is not a delegation, or if we received not valid and
+        # complete response, then move along
+        if query.is_not_delegation_all() or not query.is_valid_complete_response_any():
+            # We only keep the referral response if:
+            #   1) there was an error getting a referral response;
+            #   2) there was a discrepancy between NXDOMAIN and YXDOMAIN; or
+            #   3) this is the name in question and the response was NXDOMAIN,
+            #      in which case we use this to show the NXDOMAIN (empty answers
+            #      will be asked later by better queries)
+            # And in the case of a referral type of A, we only keep the NS
+            # referral if there was a discrepancy between NXDOMAIN and YXDOMAIN.
+
+            is_nxdomain = query.is_nxdomain_all()
+            is_valid = query.is_valid_complete_response_any()
+            if name_obj.referral_rdtype == dns.rdatatype.NS:
+                # if rdtype is NS name is not under .arpa, then there was no error,
+                # and no NXDOMAIN, so there is no need to save the referral.
+                # delete it
+                if not name_obj.name.is_subdomain(ARPA_NAME):
+                    name_obj.referral_rdtype = None
+                    del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+
+                # name was under .arpa, so we only performed one referral query
+                # (NS).  save the rerferral if there was an error of if NXDOMAIN
+                # and the name matches this name.  Return positive response only
+                # if not NXDOMAIN
+                else:
+                    if not is_valid or (name_obj.name == self.name and is_nxdomain):
+                        pass
+                    else:
+                        name_obj.referral_rdtype = None
+                        del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+            else: # (referral type is A)
+                #XXX double check any/all logic
+                # don't remove either record if there's not an NXDOMAIN/YXDOMAIN mismatch
+                if name_obj.queries[(name_obj.name, dns.rdatatype.NS)].is_nxdomain_all() and \
+                        is_valid and not is_nxdomain:
+                    pass
+                else:
+                    # if no mismatch, then always delete the NS record
+                    del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+                    # also, delete the A record query if the name doesn't match or is not NXDOMAIN
+                    if not is_valid or (name_obj.name == self.name and is_nxdomain):
+                        pass
+                    else:
+                        name_obj.referral_rdtype = None
+                        del name_obj.queries[(name_obj.name, dns.rdatatype.A)]
+
+            # return a positive response only if not nxdomain
+            return not is_nxdomain
 
         names_resolved = set()
         names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
@@ -2332,6 +2384,8 @@ class Analyst(object):
                 name_obj.add_query(query)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
+
+        return True
 
     def _analyze_dependencies(self, name_obj):
         for cname in name_obj.cname_targets:
