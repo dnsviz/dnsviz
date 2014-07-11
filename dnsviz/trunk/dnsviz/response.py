@@ -167,6 +167,15 @@ class DNSResponse:
         return not self.is_authoritative() and \
                 self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS) is not None
 
+    def is_upward_referral(self, qname):
+        '''Return True if this response yields an upward referral (i.e., a name
+        that is a supedomain of qname).'''
+
+        if not (self.is_valid_response() and self.is_complete_response()):
+            return False
+        return not self.is_authoritative() and \
+                filter(lambda x: x.name != qname and qname.is_subdomain(x.name), self.message.authority)
+
     def is_answer(self, qname, rdtype):
         '''Return True if this response yields an answer for the queried name
         and type in the answer section.'''
