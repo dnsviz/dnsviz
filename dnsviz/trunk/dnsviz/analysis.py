@@ -2077,23 +2077,58 @@ class Analyst(object):
             servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
         return servers
 
-    def _get_name_for_analysis(self, name):
+    def _get_name_for_analysis(self, name, stub=False):
         with self._analysis_cache_lock:
             try:
                 name_obj = self._analysis_cache[name]
-                do_analysis = False
+                wait_for_analysis = True
             except KeyError:
-                name_obj = self._analysis_cache[name] = self.analysis_model(name)
-                do_analysis = True
+                if stub:
+                    name_obj = self._analysis_cache[name] = self._create_stub_analysis(name)
+                else:
+                    name_obj = self._analysis_cache[name] = self.analysis_model(name)
+                wait_for_analysis = False
 
-        if not do_analysis:
-            if hasattr(name_obj, 'complete'):
+        if wait_for_analysis:
+            # stubs are created in a single shot, so no need to wait
+            if name_obj.stub:
+                pass
+            # if there is a complete event, then wait on it
+            elif hasattr(name_obj, 'complete'):
                 name_obj.complete.wait()
+            # otherwise, loop and wait for analysis to be completed
             else:
                 while name_obj.analysis_end is None:
                     time.sleep(1)
             #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
+            #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
+
+    def _create_stub_analysis(self, name):
+        logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
+        try:
+            ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
+            name_obj = self.analysis_model(name, stub=True)
+
+            # resolve every name in the NS RRset
+            query_tuples = []
+            for rr in ans.rrset:
+                query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
+            answer_map = _resolver.query_multiple(*query_tuples)
+            for query_tuple in answer_map:
+                a = answer_map[query_tuple]
+                if isinstance(a, Resolver.DNSAnswer):
+                    for a_rr in a.rrset:
+                        name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
+            return name_obj
+        except dns.resolver.NoAnswer:
+            #XXX what if this is the root name?
+            return self._analyze(name.parent(), ns_only=True)
+        #XXX handle the other cases
+        #except dns.resolver.NXDOMAIN:
+        #    pass
+        #except dns.exception.DNSException:
+        #    pass
 
     def analyze(self):
         return self._analyze(self.name)
@@ -2103,31 +2138,7 @@ class Analyst(object):
         queries.'''
 
         if ns_only:
-            logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
-            try:
-                ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
-                name_obj = self.analysis_model(name, stub=True)
-
-                # resolve every name in the NS RRset
-                query_tuples = []
-                for rr in ans.rrset:
-                    query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-                answer_map = _resolver.query_multiple(*query_tuples)
-                for query_tuple in answer_map:
-                    a = answer_map[query_tuple]
-                    if isinstance(a, Resolver.DNSAnswer):
-                        for a_rr in a.rrset:
-                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
-                return name_obj
-
-            except dns.resolver.NoAnswer:
-                #XXX what if this is the root name?
-                return self._analyze(name.parent(), ns_only=True)
-            #XXX handle the other cases
-            #except dns.resolver.NXDOMAIN:
-            #    pass
-            #except dns.exception.DNSException:
-            #    pass
+            return self._get_name_for_analysis(name, stub=True)
 
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
