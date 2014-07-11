@@ -2083,7 +2083,11 @@ class Analyst(object):
                 do_analysis = True
 
         if not do_analysis:
-            name_obj.complete.wait()
+            if hasattr(name_obj, 'complete'):
+                name_obj.complete.wait()
+            else:
+                while name_obj.analysis_end is None:
+                    time.sleep(1)
             #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
         return name_obj
 
@@ -2151,7 +2155,8 @@ class Analyst(object):
         try:
             self._analyze_name(name_obj)
         finally:
-            name_obj.complete.set()
+            if hasattr(name_obj, 'complete'):
+                name_obj.complete.set()
         name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
         self._check_connectivity(name_obj)
         self._analyze_dependencies(name_obj)
