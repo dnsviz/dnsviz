@@ -1223,17 +1223,16 @@ class DiagnosticQuery(DNSSECQuery):
             [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
-            ChangeTimeoutOnTimeoutHandler(3.0, 3),
+            ChangeTimeoutOnTimeoutHandler(2.0, 3),
             ChangeTimeoutOnTimeoutHandler(1.0, 4), 
-            ChangeTimeoutOnTimeoutHandler(3.0, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
     # For timeouts:
     #  1 - no change
     #  2 - no change
-    #  3 - change timeout to 3 seconds
+    #  3 - change timeout to 2 seconds
     #  4 - reduce udp max payload to 512; change timeout to 1 second
-    #  5 - change timeout to 3 seconds
-    #  6 - clear DO flag; change timeout to 2 seconds
+    #  5 - change timeout to 2 seconds
+    #  6 - clear DO flag
     #  7 - disable EDNS
     #  8 - return
 
@@ -1249,17 +1248,16 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
             [DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
-            ChangeTimeoutOnTimeoutHandler(3.0, 3),
+            ChangeTimeoutOnTimeoutHandler(2.0, 3),
             ChangeTimeoutOnTimeoutHandler(1.0, 4), 
-            ChangeTimeoutOnTimeoutHandler(3.0, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
     # For timeouts:
     #  1 - no change
     #  2 - no change
-    #  3 - change timeout to 3 seconds
+    #  3 - change timeout to 2 seconds
     #  4 - reduce udp max payload to 512; change timeout to 1 second
-    #  5 - change timeout to 3 seconds
-    #  6 - clear DO flag; change timeout to 2 seconds
+    #  5 - change timeout to 2 seconds
+    #  6 - clear DO flag
     #  7 - disable EDNS
     #  8 - return
 
@@ -1278,18 +1276,17 @@ class TCPDiagnosticQuery(DNSSECQuery):
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
             DisableEDNSOnTimeoutHandler(8),
             ChangeTimeoutOnTimeoutHandler(1.0, 1),
-            ChangeTimeoutOnTimeoutHandler(3.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 4),
             ChangeTimeoutOnTimeoutHandler(1.0, 5), 
-            ChangeTimeoutOnTimeoutHandler(3.0, 6),
-            ChangeTimeoutOnTimeoutHandler(2.0, 7)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
     # For timeouts:
     #  1 - Change to UDP
     #  2 - no change
     #  3 - no change
-    #  4 - change timeout to 3 seconds
+    #  4 - change timeout to 2 seconds
     #  5 - reduce udp max payload to 512; change timeout to 1 second
-    #  6 - change timeout to 3 seconds
-    #  7 - clear DO flag; change timeout to 2 seconds
+    #  6 - change timeout to 2 seconds
+    #  7 - clear DO flag
     #  8 - disable EDNS
     #  9 - return
 
@@ -1308,18 +1305,17 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
             DisableEDNSOnTimeoutHandler(8),
             ChangeTimeoutOnTimeoutHandler(1.0, 1),
-            ChangeTimeoutOnTimeoutHandler(3.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 4),
             ChangeTimeoutOnTimeoutHandler(1.0, 5), 
-            ChangeTimeoutOnTimeoutHandler(3.0, 6),
-            ChangeTimeoutOnTimeoutHandler(2.0, 7)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
     # For timeouts:
     #  1 - Change to UDP
     #  2 - no change
     #  3 - no change
-    #  4 - change timeout to 3 seconds
+    #  4 - change timeout to 2 seconds
     #  5 - reduce udp max payload to 512; change timeout to 1 second
-    #  6 - change timeout to 3 seconds
-    #  7 - clear DO flag; change timeout to 2 seconds
+    #  6 - change timeout to 2 seconds
+    #  7 - clear DO flag
     #  8 - disable EDNS
     #  9 - return
 
@@ -1332,10 +1328,9 @@ class PMTUDiagnosticQuery(DNSSECQuery):
     response_handlers = [PMTUBoundingHandler(512, 4, 1.0,
             (MaxTimeoutsHandler(8),
                 LifetimeHandler(15.0),
-                ChangeTimeoutOnTimeoutHandler(3.0, 3),
+                ChangeTimeoutOnTimeoutHandler(2.0, 3),
                 ChangeTimeoutOnTimeoutHandler(1.0, 4), 
-                ChangeTimeoutOnTimeoutHandler(3.0, 5),
-                ChangeTimeoutOnTimeoutHandler(2.0, 6))),
+                ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
@@ -1348,10 +1343,9 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
     response_handlers = [PMTUBoundingHandler(512, 4, 1.0,
             (MaxTimeoutsHandler(8),
                 LifetimeHandler(15.0),
-                ChangeTimeoutOnTimeoutHandler(3.0, 3),
+                ChangeTimeoutOnTimeoutHandler(2.0, 3),
                 ChangeTimeoutOnTimeoutHandler(1.0, 4), 
-                ChangeTimeoutOnTimeoutHandler(3.0, 5),
-                ChangeTimeoutOnTimeoutHandler(2.0, 6))),
+                ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
