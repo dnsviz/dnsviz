@@ -1491,9 +1491,9 @@ class DomainNameAnalysis(object):
 
         d[name_str] = collections.OrderedDict()
         d[name_str]['stub'] = self.stub
+        d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
+        d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
-            d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
-            d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
             d[name_str]['clients_ipv4'] = clients_ipv4
             d[name_str]['clients_ipv6'] = clients_ipv6
 
@@ -1902,10 +1902,9 @@ class DomainNameAnalysis(object):
         logger.info('Loading %s' % fmt.humanize_name(name))
 
         a = cls(name, dlv_parent_name, stub=stub)
+        a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
+        a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
         if not stub:
-            a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
-            a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
-
             if name != dns.name.root:
                 a.parent = parent
                 if dlv_parent_name is not None:
@@ -2111,6 +2110,7 @@ class Analyst(object):
         try:
             ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
             name_obj = self.analysis_model(name, stub=True)
+            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
             # resolve every name in the NS RRset
             query_tuples = []
@@ -2122,6 +2122,7 @@ class Analyst(object):
                 if isinstance(a, Resolver.DNSAnswer):
                     for a_rr in a.rrset:
                         name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
             return name_obj
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             return self._analyze(name.parent(), ns_only=True)
