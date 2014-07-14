@@ -434,6 +434,7 @@ class DomainNameAnalysis(object):
                         elif rrsig.signer == self.zone.name:
                             pass
                         else:
+                            print rrsig.signer, rrsig.covers(), self.parent_name()
                             self.external_signers[rrsig.signer] = None
                 except KeyError:
                     pass
