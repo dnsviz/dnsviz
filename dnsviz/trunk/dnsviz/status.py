@@ -621,7 +621,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
         d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel)
         try:
             del d['meta']['wildcard']
