@@ -2132,9 +2132,9 @@ class Analyst(object):
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
         finally:
+            name_obj._analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
-            name_obj._analysis_cache[name] = name_obj
 
         return name_obj
 
@@ -2174,10 +2174,12 @@ class Analyst(object):
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
             self._check_connectivity(name_obj)
         finally:
+            self._analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
-            self._analysis_cache[name] = name_obj
+
         self._analyze_dependencies(name_obj)
+        self._analysis_cache[name] = name_obj
 
         return name_obj
 
