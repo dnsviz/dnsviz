@@ -722,17 +722,20 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_rrset_non_existent(self, name_obj, name, rdtype, nxdomain, servers_clients):
+    def add_rrset_non_existent(self, name_obj, name, rdtype, nxdomain, wildcard, servers_clients):
         zone_obj = name_obj.zone
         node_str = self.rrset_node_str(name, rdtype, -1)
 
         if not self.G.has_node(node_str):
-            if nxdomain:
-                warnings_map = name_obj.nxdomain_warnings[(name,rdtype)]
-                errors_map = name_obj.nxdomain_errors[(name,rdtype)]
+            if wildcard:
+                warnings_map = errors_map = {}
             else:
-                warnings_map = name_obj.noanswer_warnings[(name,rdtype)]
-                errors_map = name_obj.noanswer_errors[(name,rdtype)]
+                if nxdomain:
+                    warnings_map = name_obj.nxdomain_warnings[(name,rdtype)]
+                    errors_map = name_obj.nxdomain_errors[(name,rdtype)]
+                else:
+                    warnings_map = name_obj.noanswer_warnings[(name,rdtype)]
+                    errors_map = name_obj.noanswer_errors[(name,rdtype)]
 
             img_str = ''
             if errors_map:
@@ -807,7 +810,7 @@ class DNSAuthGraph:
             line_style = 'solid'
 
         if dname_status.included_cname is None:
-            cname_node = self.add_rrset_non_existent(name_obj, dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, dname_status.synthesized_cname.servers_clients)
+            cname_node = self.add_rrset_non_existent(name_obj, dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, True, dname_status.synthesized_cname.servers_clients)
         else:
             cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, id)
 
@@ -883,9 +886,9 @@ class DNSAuthGraph:
     def add_wildcard(self, name_obj, rrset_info, nsec_status, id):
         zone_obj = name_obj.zone
 
-        wildcard_node = self.add_rrset(rrset_info, nsec_status.wildcard_name, zone_obj, id)
+        wildcard_node = self.add_rrset(rrset_info, nsec_status.wildcard_name, name_obj, id)
         self.add_rrsigs(name_obj, zone_obj, rrset_info, wildcard_node)
-        nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.rrset.name, rrset_info.rrset.rdtype, True, rrset_info.servers_clients)
+        nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.rrset.name, rrset_info.rrset.rdtype, True, True, rrset_info.servers_clients)
         nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, zone_obj, nxdomain_node)
         for rrset_info in nsec_status.nsec_set_info.rrsets.values():
             self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
@@ -966,7 +969,7 @@ class DNSAuthGraph:
                         self.add_alias(my_node, cname_node)
 
         if (name, rdtype) in name_obj.nxdomain_servers_clients:
-            nxdomain_node = self.add_rrset_non_existent(name_obj, name, rdtype, True, name_obj.nxdomain_servers_clients[(name,rdtype)])
+            nxdomain_node = self.add_rrset_non_existent(name_obj, name, rdtype, True, False, name_obj.nxdomain_servers_clients[(name,rdtype)])
             my_nodes_all.append(nxdomain_node)
             if (name, rdtype) in name_obj.nxdomain_status:
                 for nsec_status in name_obj.nxdomain_status[(name,rdtype)]:
@@ -975,7 +978,7 @@ class DNSAuthGraph:
                         self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
 
         if (name,rdtype) in name_obj.noanswer_servers_clients:
-            noanswer_node = self.add_rrset_non_existent(name_obj, name, rdtype, False, name_obj.noanswer_servers_clients[(name,rdtype)])
+            noanswer_node = self.add_rrset_non_existent(name_obj, name, rdtype, False, False, name_obj.noanswer_servers_clients[(name,rdtype)])
             my_nodes_all.append(noanswer_node)
             if (name,rdtype) in name_obj.noanswer_status:
                 for nsec_status in name_obj.noanswer_status[(name,rdtype)]:
