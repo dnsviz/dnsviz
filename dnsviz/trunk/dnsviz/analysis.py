@@ -31,6 +31,7 @@ import random
 import re
 import socket
 import threading
+import time
 
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
@@ -434,7 +435,6 @@ class DomainNameAnalysis(object):
                         elif rrsig.signer == self.zone.name:
                             pass
                         else:
-                            print rrsig.signer, rrsig.covers(), self.parent_name()
                             self.external_signers[rrsig.signer] = None
                 except KeyError:
                     pass
@@ -2094,6 +2094,7 @@ class Analyst(object):
             else:
                 while name_obj.analysis_end is None:
                     time.sleep(1)
+                    name_obj = self._analysis_cache[name]
             #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
             #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
@@ -2133,6 +2134,7 @@ class Analyst(object):
         finally:
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
+            name_obj._analysis_cache[name] = name_obj
 
         return name_obj
 
@@ -2174,6 +2176,7 @@ class Analyst(object):
         finally:
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
+            self._analysis_cache[name] = name_obj
         self._analyze_dependencies(name_obj)
 
         return name_obj
