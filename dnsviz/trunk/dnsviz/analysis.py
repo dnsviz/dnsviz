@@ -269,7 +269,7 @@ class DomainNameAnalysis(object):
         return self._dlv_name
 
     def is_zone(self):
-        return self.has_ns or self.name == dns.name.root or self.stub
+        return self.has_ns or self.name == dns.name.root or self._auth_ns_ip_mapping
 
     def _get_zone(self):
         if self.is_zone():
@@ -2004,16 +2004,19 @@ class Analyst(object):
         else:
             self._analysis_cache_lock = analysis_cache_lock
 
-        if self.ceiling is not None and self.ceiling != dns.name.root:
-            try:
-                ans = _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+        if self.ceiling is not None:
+            while self.ceiling != dns.name.root:
                 try:
-                    ans.response.find_rrset(ans.response.answer, self.ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
-                except KeyError:
-                    self.ceiling = self.ceiling.parent()
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                self.ceiling = self.ceiling.parent()
-            except dns.exception.DNSException:
+                    ans = _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+                    try:
+                        ans.response.find_rrset(ans.response.answer, self.ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
+                        break
+                    except KeyError:
+                        pass
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    pass
+                except dns.exception.DNSException:
+                    pass
                 self.ceiling = self.ceiling.parent()
 
     def _is_referral_of_type(self, rdtype):
@@ -2085,18 +2088,12 @@ class Analyst(object):
                 name_obj = self._analysis_cache[name]
                 wait_for_analysis = True
             except KeyError:
-                if stub:
-                    name_obj = self._analysis_cache[name] = self._create_stub_analysis(name)
-                else:
-                    name_obj = self._analysis_cache[name] = self.analysis_model(name)
+                name_obj = self._analysis_cache[name] = self.analysis_model(name, stub=stub)
                 wait_for_analysis = False
 
         if wait_for_analysis:
-            # stubs are created in a single shot, so no need to wait
-            if name_obj.stub:
-                pass
             # if there is a complete event, then wait on it
-            elif hasattr(name_obj, 'complete'):
+            if hasattr(name_obj, 'complete'):
                 name_obj.complete.wait()
             # otherwise, loop and wait for analysis to be completed
             else:
@@ -2106,46 +2103,54 @@ class Analyst(object):
             #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
 
-    def _create_stub_analysis(self, name):
-        logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
-        try:
-            ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
-            name_obj = self.analysis_model(name, stub=True)
-            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
-
-            # resolve every name in the NS RRset
-            query_tuples = []
-            for rr in ans.rrset:
-                query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-            answer_map = _resolver.query_multiple(*query_tuples)
-            for query_tuple in answer_map:
-                a = answer_map[query_tuple]
-                if isinstance(a, Resolver.DNSAnswer):
-                    for a_rr in a.rrset:
-                        name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
-            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
-            return name_obj
-        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-            return self._analyze(name.parent(), ns_only=True)
-        except dns.exception.DNSException:
-            return self._analyze(name.parent(), ns_only=True)
-
     def analyze(self):
         return self._analyze(self.name)
 
-    def _analyze(self, name, ns_only=False):
+    def _analyze_stub(self, name):
+        name_obj = self._get_name_for_analysis(name, stub=True)
+        if name_obj.analysis_end is not None:
+            return name_obj
+
+        try:
+            logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
+
+            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            try:
+                ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
+                
+                # resolve every name in the NS RRset
+                query_tuples = []
+                for rr in ans.rrset:
+                    query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
+                answer_map = _resolver.query_multiple(*query_tuples)
+                for query_tuple in answer_map:
+                    a = answer_map[query_tuple]
+                    if isinstance(a, Resolver.DNSAnswer):
+                        for a_rr in a.rrset:
+                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                name_obj.parent = self._analyze_stub(name.parent()).zone
+            except dns.exception.DNSException:
+                name_obj.parent = self._analyze_stub(name.parent()).zone
+
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+        finally:
+            if hasattr(name_obj, 'complete'):
+                name_obj.complete.set()
+
+        return name_obj
+
+    def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
-
-        if ns_only:
-            return self._get_name_for_analysis(name, stub=True)
 
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
         elif name == self.ceiling:
-            parent_obj = self._analyze(name.parent(), ns_only=True)
+            parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
 
@@ -2159,21 +2164,21 @@ class Analyst(object):
         if name_obj.analysis_end is not None:
             return name_obj
 
-        # if no referral was received for the parent, then we have no
-        # authoritative servers to try for the child, so just give up
-        if parent_obj is not None and parent_obj.referral_error():
-            return name_obj
-
-        name_obj.parent = parent_obj
-
-        name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
         try:
+            # if no referral was received for the parent, then we have no
+            # authoritative servers to try for the child, so just give up
+            if parent_obj is not None and parent_obj.referral_error():
+                return name_obj
+
+            name_obj.parent = parent_obj
+
+            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
             self._analyze_name(name_obj)
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            self._check_connectivity(name_obj)
         finally:
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
-        name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
-        self._check_connectivity(name_obj)
         self._analyze_dependencies(name_obj)
 
         return name_obj
