@@ -1879,13 +1879,12 @@ class DomainNameAnalysis(object):
         return d
 
     @classmethod
-    def deserialize(cls, name, d1, trace=None):
-        if trace is None:
-            trace = set()
+    def deserialize(cls, name, d1, cache=None):
+        if cache is None:
+            cache = {}
 
-        if name in trace:
-            return
-        trace.add(name)
+        if name in cache:
+            return cache[name]
 
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
@@ -1894,15 +1893,15 @@ class DomainNameAnalysis(object):
         dlv_parent_name = None
         if name != dns.name.root and not stub:
             parent_name = dns.name.from_text(d['parent'])
-            parent = cls.deserialize(parent_name, d1)
+            parent = cls.deserialize(parent_name, d1, cache=cache)
 
             if 'dlv_parent' in d:
                 dlv_parent_name = dns.name.from_text(d['dlv_parent'])
-                dlv_parent = cls.deserialize(dlv_parent_name, d1)
+                dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
 
         logger.info('Loading %s' % fmt.humanize_name(name))
 
-        a = cls(name, dlv_parent_name, stub=stub)
+        cache[name] = a = cls(name, dlv_parent_name, stub=stub)
         a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
         a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
         if not stub:
@@ -1953,13 +1952,13 @@ class DomainNameAnalysis(object):
             a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
 
         for cname in a.cname_targets:
-            a.cname_targets[cname] = cls.deserialize(cname, d1, trace)
+            a.cname_targets[cname] = cls.deserialize(cname, d1, cache=cache)
         for dname in a.dname_targets:
-            a.dname_targets[dname] = cls.deserialize(dname, d1, trace)
+            a.dname_targets[dname] = cls.deserialize(dname, d1, cache=cache)
         for signer in a.external_signers:
-            a.external_signers[signer] = cls.deserialize(signer, d1, trace)
+            a.external_signers[signer] = cls.deserialize(signer, d1, cache=cache)
         #for target in a.get_ns_dependencies():
-        #    a.ns_targets[target] = cls.deserialize(target, d1, trace)
+        #    a.ns_targets[target] = cls.deserialize(target, d1, cache=cache)
 
         return a
 
