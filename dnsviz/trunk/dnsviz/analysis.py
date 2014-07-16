@@ -2137,7 +2137,7 @@ class Analyst(object):
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
         finally:
-            name_obj._analysis_cache[name] = name_obj
+            self._analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
 
