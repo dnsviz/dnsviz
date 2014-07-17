@@ -2174,16 +2174,30 @@ class Analyst(object):
             name_obj.parent = parent_obj
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+            # perform the actual analysis on this name
             self._analyze_name(name_obj)
-            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+            # store the end time until we've analyzed dependencies
+            #XXX (This isn't necessary except in multiprocessing because the
+            # proxy object won't get updated with the new values from the
+            # dependencies otherwise.)
+            end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+            # sanity check - if we weren't able to get responses from any
+            # servers, check that we actually have connectivity
             self._check_connectivity(name_obj)
+
+            # analyze dependencies
+            self._analyze_dependencies(name_obj)
+
+            # now set analysis_end
+            name_obj.analysis_end = end
+
         finally:
             self._analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
-
-        self._analyze_dependencies(name_obj)
-        self._analysis_cache[name] = name_obj
 
         return name_obj
 
