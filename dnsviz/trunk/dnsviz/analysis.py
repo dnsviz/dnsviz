@@ -180,7 +180,7 @@ class DomainNameAnalysis(object):
         self.has_ns = False
         self.cname_targets = {}
         self.dname_targets = {}
-        self.ns_targets = {}
+        self.ns_dependencies = {}
         self.mx_targets = {}
         self.ptr_targets = {}
         self.external_signers = {}
@@ -295,8 +295,8 @@ class DomainNameAnalysis(object):
             return self.parent
         elif name in self.external_signers:
             return self.external_signers[name]
-        elif name in self.ns_targets:
-            return self.ns_targets[name]
+        elif name in self.ns_dependencies:
+            return self.ns_dependencies[name]
         else:
             for cname in self.cname_targets:
                 ref = self.cname_targets[cname].get_name(name)
@@ -317,6 +317,10 @@ class DomainNameAnalysis(object):
             if name not in self._glue_ip_mapping:
                 self._glue_ip_mapping[name] =  set()
             self._glue_ip_mapping[name].update(ip_set)
+
+            out_of_bailwick = not name.is_subdomain(self.parent_name())
+            if out_of_bailwick or not ip_set:
+                self.ns_dependencies[name] = None
 
     def _handle_soa_response(self, rrset):
         '''Indicate that there exists an SOA record for the name which is the
@@ -544,13 +548,6 @@ class DomainNameAnalysis(object):
         '''Return the comprehensive set of names corresponding to NS targets.'''
 
         return self.get_ns_names_in_parent().union(self.get_ns_names_in_child())
-
-    def get_ns_dependencies(self):
-        if self.parent is None:
-            return set()
-        ns_names_without_glue = set([x for x, y in self._glue_ip_mapping.items() if not bool(y)])
-        out_of_bailwick_ns_names = set(filter(lambda x: not x.is_subdomain(self.parent.name), self.get_ns_names()))
-        return ns_names_without_glue.union(out_of_bailwick_ns_names)
 
     def get_servers_in_parent(self):
         '''Return the IP addresses of servers corresponding to names in the
@@ -786,7 +783,7 @@ class DomainNameAnalysis(object):
             dname_obj.populate_status(trusted_keys)
         for signer, signer_obj in self.external_signers.items():
             signer_obj.populate_status(trusted_keys)
-        for target, ns_obj in self.ns_targets.items():
+        for target, ns_obj in self.ns_dependencies.items():
             ns_obj.populate_status(trusted_keys)
 
     def _populate_rrsig_status(self, supported_algs):
@@ -1536,7 +1533,7 @@ class DomainNameAnalysis(object):
             dname_obj.serialize(d)
         for signer, signer_obj in self.external_signers.items():
             signer_obj.serialize(d)
-        for target, ns_obj in self.ns_targets.items():
+        for target, ns_obj in self.ns_dependencies.items():
             ns_obj.serialize(d)
 
         return d
@@ -1874,7 +1871,7 @@ class DomainNameAnalysis(object):
             dname_obj.serialize_status(d, loglevel=loglevel)
         for signer, signer_obj in self.external_signers.items():
             signer_obj.serialize_status(d, loglevel=loglevel)
-        for target, ns_obj in self.ns_targets.items():
+        for target, ns_obj in self.ns_dependencies.items():
             ns_obj.serialize_status(d, loglevel=loglevel)
 
         return d
@@ -1958,8 +1955,8 @@ class DomainNameAnalysis(object):
             a.dname_targets[dname] = cls.deserialize(dname, d1, cache=cache)
         for signer in a.external_signers:
             a.external_signers[signer] = cls.deserialize(signer, d1, cache=cache)
-        #for target in a.get_ns_dependencies():
-        #    a.ns_targets[target] = cls.deserialize(target, d1, cache=cache)
+        for target in a.get_ns_dependencies():
+            a.ns_dependencies[target] = cls.deserialize(target, d1, cache=cache)
 
         return a
 
@@ -2105,7 +2102,57 @@ class Analyst(object):
         return name_obj
 
     def analyze(self):
-        return self._analyze(self.name)
+        name_obj = self._analyze(self.name)
+        if not self.trace:
+            self.refresh_dependencies(name_obj)
+        return name_obj
+
+
+    def refresh_dependencies(self, name_obj, trace=None):
+        if trace is None:
+            trace = []
+
+        if name_obj.name in trace:
+            return
+
+        if name_obj.parent is not None:
+            self.refresh_dependencies(name_obj.parent, trace+[name_obj.name])
+        if name_obj.dlv_parent is not None:
+            self.refresh_dependencies(name_obj.dlv_parent, trace+[name_obj.name])
+
+        # loop until all deps have been added
+        for cname in name_obj.cname_targets:
+            while name_obj.cname_targets[cname] is None:
+                time.sleep(1)
+                try:
+                    name_obj.cname_targets[cname] = self._analysis_cache[cname]
+                except KeyError:
+                    pass
+            self.refresh_dependencies(name_obj.cname_targets[cname], trace+[name_obj.name])
+        for dname in name_obj.dname_targets:
+            while name_obj.dname_targets[dname] is None:
+                time.sleep(1)
+                try:
+                    name_obj.dname_targets[dname] = self._analysis_cache[dname]
+                except KeyError:
+                    pass
+            self.refresh_dependencies(name_obj.dname_targets[dname], trace+[name_obj.name])
+        for signer in name_obj.external_signers:
+            while name_obj.external_signers[signer] is None:
+                time.sleep(1)
+                try:
+                    name_obj.external_signers[signer] = self._analysis_cache[signer]
+                except KeyError:
+                    pass
+            self.refresh_dependencies(name_obj.external_signers[signer], trace+[name_obj.name])
+        for ns in name_obj.ns_dependencies:
+            while name_obj.ns_dependencies[ns] is None:
+                time.sleep(1)
+                try:
+                    name_obj.ns_dependencies[ns] = self._analysis_cache[ns]
+                except KeyError:
+                    pass
+            self.refresh_dependencies(name_obj.ns_dependencies[ns], trace+[name_obj.name])
 
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
@@ -2478,19 +2525,18 @@ class Analyst(object):
             t.start()
             threads.append(t)
 
-        if name_obj.is_zone() and name_obj.parent is not None:
-            #for ns in name_obj.get_ns_dependencies():
-            #    if self.ceiling is not None:
-            #        if ns.is_subdomain(self.ceiling):
-            #            ceiling = self.ceiling
-            #        else:
-            #            ceiling = ns
-            #    else:
-            #        ceiling = None
-            #    a = self.__class__(ns, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
-            #    t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_targets, ns, errors))
-            #    t.start()
-            #    threads.append(t)
+        for ns in name_obj.ns_dependencies:
+            if self.ceiling is not None:
+                if ns.is_subdomain(self.ceiling):
+                    ceiling = self.ceiling
+                else:
+                    ceiling = ns
+            else:
+                ceiling = None
+            a = self.__class__(ns, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
+            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_dependencies, ns, errors))
+            t.start()
+            threads.append(t)
             pass
         #TODO MX targets
 
