@@ -1960,7 +1960,7 @@ class DomainNameAnalysis(object):
             a.external_signers[signer] = cls.deserialize(signer, d1, cache=cache)
         for target in a.ns_dependencies:
             if target.canonicalize().to_text() in d1:
-                a.ns_dependencies[target] = cls.deserialize(target, d1, cache=cache, required=False)
+                a.ns_dependencies[target] = cls.deserialize(target, d1, cache=cache)
 
         return a
 
