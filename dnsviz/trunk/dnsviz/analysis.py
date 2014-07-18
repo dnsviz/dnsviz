@@ -30,6 +30,7 @@ import logging
 import random
 import re
 import socket
+import sys
 import threading
 import time
 
@@ -2178,26 +2179,21 @@ class Analyst(object):
             # perform the actual analysis on this name
             self._analyze_name(name_obj)
 
-            # store the end time until we've analyzed dependencies
-            #XXX (This isn't necessary except in multiprocessing because the
-            # proxy object won't get updated with the new values from the
-            # dependencies otherwise.)
-            end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            # set analysis_end
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
             # sanity check - if we weren't able to get responses from any
             # servers, check that we actually have connectivity
             self._check_connectivity(name_obj)
 
-            # analyze dependencies
-            self._analyze_dependencies(name_obj)
-
-            # now set analysis_end
-            name_obj.analysis_end = end
-
         finally:
             self._analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
+
+        # analyze dependencies
+        self._analyze_dependencies(name_obj)
+        self._analysis_cache[name] = name_obj
 
         return name_obj
 
@@ -2434,7 +2430,15 @@ class Analyst(object):
 
         return True
 
+    def _analyze_dependency(self, analyst, result_map, result_key, errors):
+        try:
+            result_map[result_key] = analyst.analyze()
+        except:
+            errors.append((result_key, sys.exc_info()))
+
     def _analyze_dependencies(self, name_obj):
+        threads = []
+        errors = []
         for cname in name_obj.cname_targets:
             if self.ceiling is not None:
                 if cname.is_subdomain(self.ceiling):
@@ -2444,7 +2448,10 @@ class Analyst(object):
             else:
                 ceiling = None
             a = self.__class__(cname, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.CNAME)], self._analysis_cache, self._analysis_cache_lock)
-            name_obj.cname_targets[cname] = a.analyze()
+            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets, cname, errors))
+            t.start()
+            threads.append(t)
+
         for dname in name_obj.dname_targets:
             if self.ceiling is not None:
                 if dname.is_subdomain(self.ceiling):
@@ -2454,7 +2461,10 @@ class Analyst(object):
             else:
                 ceiling = None
             a = self.__class__(dname, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.DNAME)], self._analysis_cache, self._analysis_cache_lock)
-            name_obj.dname_targets[dname] = a.analyze()
+            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
+            t.start()
+            threads.append(t)
+
         for signer in name_obj.external_signers:
             if self.ceiling is not None:
                 if signer.is_subdomain(self.ceiling):
@@ -2464,7 +2474,10 @@ class Analyst(object):
             else:
                 ceiling = None
             a = self.__class__(signer, self.client_ipv4, self.client_ipv6, ceiling, True, self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], self._analysis_cache, self._analysis_cache_lock)
-            name_obj.external_signers[signer] = a.analyze()
+            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.external_signers, signer, errors))
+            t.start()
+            threads.append(t)
+
         if name_obj.is_zone() and name_obj.parent is not None:
             #for ns in name_obj.get_ns_dependencies():
             #    if self.ceiling is not None:
@@ -2475,9 +2488,18 @@ class Analyst(object):
             #    else:
             #        ceiling = None
             #    a = self.__class__(ns, self.client_ipv4, self.client_ipv6, ceiling, False, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
-            #    name_obj.ns_targets[ns] = a.analyze()
+            #    t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_targets, ns, errors))
+            #    t.start()
+            #    threads.append(t)
             pass
         #TODO MX targets
+
+        for t in threads:
+            t.join()
+        if errors:
+            for name, exc_info in errors[1:]:
+                logger.debug('Error analyzing %s' % name, exc_info=exc_info)
+            raise errors[0][1][0], None, errors[0][1][2]
 
     def _set_negative_queries(self, name_obj):
         random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
