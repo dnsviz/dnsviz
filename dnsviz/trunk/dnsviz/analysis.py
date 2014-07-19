@@ -1978,6 +1978,8 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
+    clone_attrnames = ['client_ipv4', 'client_ipv6', 'follow_ns', 'analysis_cache', 'analysis_cache_lock']
+
     def __init__(self, name, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
              follow_ns=False, trace=None, analysis_cache=None, analysis_cache_lock=None):
 
@@ -1998,13 +2000,13 @@ class Analyst(object):
         else:
             self.trace = trace
         if analysis_cache is None:
-            self._analysis_cache = {}
+            self.analysis_cache = {}
         else:
-            self._analysis_cache = analysis_cache
+            self.analysis_cache = analysis_cache
         if analysis_cache_lock is None:
-            self._analysis_cache_lock = threading.Lock()
+            self.analysis_cache_lock = threading.Lock()
         else:
-            self._analysis_cache_lock = analysis_cache_lock
+            self.analysis_cache_lock = analysis_cache_lock
 
         if self.ceiling is not None:
             while self.ceiling != dns.name.root:
@@ -2085,12 +2087,12 @@ class Analyst(object):
         return servers
 
     def _get_name_for_analysis(self, name, stub=False):
-        with self._analysis_cache_lock:
+        with self.analysis_cache_lock:
             try:
-                name_obj = self._analysis_cache[name]
+                name_obj = self.analysis_cache[name]
                 wait_for_analysis = True
             except KeyError:
-                name_obj = self._analysis_cache[name] = self.analysis_model(name, stub=stub)
+                name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub)
                 wait_for_analysis = False
 
         if wait_for_analysis:
@@ -2101,7 +2103,7 @@ class Analyst(object):
             else:
                 while name_obj.analysis_end is None:
                     time.sleep(1)
-                    name_obj = self._analysis_cache[name]
+                    name_obj = self.analysis_cache[name]
             #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
             #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
@@ -2130,7 +2132,7 @@ class Analyst(object):
             while name_obj.cname_targets[cname] is None:
                 time.sleep(1)
                 try:
-                    name_obj.cname_targets[cname] = self._analysis_cache[cname]
+                    name_obj.cname_targets[cname] = self.analysis_cache[cname]
                 except KeyError:
                     pass
             self.refresh_dependencies(name_obj.cname_targets[cname], trace+[name_obj.name])
@@ -2138,7 +2140,7 @@ class Analyst(object):
             while name_obj.dname_targets[dname] is None:
                 time.sleep(1)
                 try:
-                    name_obj.dname_targets[dname] = self._analysis_cache[dname]
+                    name_obj.dname_targets[dname] = self.analysis_cache[dname]
                 except KeyError:
                     pass
             self.refresh_dependencies(name_obj.dname_targets[dname], trace+[name_obj.name])
@@ -2146,7 +2148,7 @@ class Analyst(object):
             while name_obj.external_signers[signer] is None:
                 time.sleep(1)
                 try:
-                    name_obj.external_signers[signer] = self._analysis_cache[signer]
+                    name_obj.external_signers[signer] = self.analysis_cache[signer]
                 except KeyError:
                     pass
             self.refresh_dependencies(name_obj.external_signers[signer], trace+[name_obj.name])
@@ -2155,7 +2157,7 @@ class Analyst(object):
                 while name_obj.ns_dependencies[ns] is None:
                     time.sleep(1)
                     try:
-                        name_obj.ns_dependencies[ns] = self._analysis_cache[ns]
+                        name_obj.ns_dependencies[ns] = self.analysis_cache[ns]
                     except KeyError:
                         pass
                 self.refresh_dependencies(name_obj.ns_dependencies[ns], trace+[name_obj.name])
@@ -2190,7 +2192,7 @@ class Analyst(object):
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
         finally:
-            self._analysis_cache[name] = name_obj
+            self.analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
 
@@ -2240,13 +2242,13 @@ class Analyst(object):
             self._check_connectivity(name_obj)
 
         finally:
-            self._analysis_cache[name] = name_obj
+            self.analysis_cache[name] = name_obj
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
 
         # analyze dependencies
         self._analyze_dependencies(name_obj)
-        self._analysis_cache[name] = name_obj
+        self.analysis_cache[name] = name_obj
 
         return name_obj
 
@@ -2492,6 +2494,8 @@ class Analyst(object):
     def _analyze_dependencies(self, name_obj):
         threads = []
         errors = []
+
+        kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
             if self.ceiling is not None:
                 if cname.is_subdomain(self.ceiling):
@@ -2500,7 +2504,7 @@ class Analyst(object):
                     ceiling = cname
             else:
                 ceiling = None
-            a = self.__class__(cname, self.client_ipv4, self.client_ipv6, ceiling, False, self.follow_ns, self.trace + [(name_obj.name, dns.rdatatype.CNAME)], self._analysis_cache, self._analysis_cache_lock)
+            a = self.__class__(cname, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets, cname, errors))
             t.start()
             threads.append(t)
@@ -2513,7 +2517,7 @@ class Analyst(object):
                     ceiling = dname
             else:
                 ceiling = None
-            a = self.__class__(dname, self.client_ipv4, self.client_ipv6, ceiling, False, self.follow_ns, self.trace + [(name_obj.name, dns.rdatatype.DNAME)], self._analysis_cache, self._analysis_cache_lock)
+            a = self.__class__(cname, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
             t.start()
             threads.append(t)
@@ -2526,7 +2530,7 @@ class Analyst(object):
                     ceiling = signer
             else:
                 ceiling = None
-            a = self.__class__(signer, self.client_ipv4, self.client_ipv6, ceiling, True, self.follow_ns, self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], self._analysis_cache, self._analysis_cache_lock)
+            a = self.__class__(signer, ceiling=ceiling, force_dnskey=True, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.external_signers, signer, errors))
             t.start()
             threads.append(t)
@@ -2540,7 +2544,7 @@ class Analyst(object):
                         ceiling = ns
                 else:
                     ceiling = None
-                a = self.__class__(ns, self.client_ipv4, self.client_ipv6, ceiling, False, self.follow_ns, self.trace + [(name_obj.name, dns.rdatatype.NS)], self._analysis_cache, self._analysis_cache_lock)
+                a = self.__class__(ns, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_dependencies, ns, errors))
                 t.start()
                 threads.append(t)
