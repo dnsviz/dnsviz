@@ -1918,7 +1918,7 @@ class DomainNameAnalysis(object):
         if not stub:
             if 'referral_rdtype' in d:
                 a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
-            a.explicit_delegation = dns.rdatatype.from_text(d['explicit_delegation'])
+            a.explicit_delegation = d['explicit_delegation']
             if 'nxdomain_name' in d:
                 a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
                 a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
