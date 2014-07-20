@@ -151,6 +151,7 @@ class DomainNameAnalysis(object):
         # The record type queried with the name when eliciting a referral.
         # (serialized).
         self.referral_rdtype = None
+        self.explicit_delegation = False
 
         # The queries issued to and corresponding responses received from the
         # servers (serialized).
@@ -1503,6 +1504,7 @@ class DomainNameAnalysis(object):
                 d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
+            d[name_str]['explicit_delegation'] = self.explicit_delegation
             if self.nxdomain_name is not None:
                 d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
@@ -1890,29 +1892,33 @@ class DomainNameAnalysis(object):
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
         stub = d['stub']
-
-        dlv_parent_name = None
-        if name != dns.name.root and not stub:
+        
+        if 'parent' in d:
             parent_name = dns.name.from_text(d['parent'])
             parent = cls.deserialize(parent_name, d1, cache=cache)
+        else:
+            parent = None
 
-            if 'dlv_parent' in d:
-                dlv_parent_name = dns.name.from_text(d['dlv_parent'])
-                dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
+        if name != dns.name.root and 'dlv_parent' in d:
+            dlv_parent_name = dns.name.from_text(d['dlv_parent'])
+            dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
+        else:
+            dlv_parent_name = None
+            dlv_parent = None
 
         logger.info('Loading %s' % fmt.humanize_name(name))
 
         cache[name] = a = cls(name, dlv_parent_name, stub=stub)
+        a.parent = parent
+        if dlv_parent is not None:
+            a.dlv_parent = dlv_parent
         a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
         a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
-        if not stub:
-            if name != dns.name.root:
-                a.parent = parent
-                if dlv_parent_name is not None:
-                    a.dlv_parent = dlv_parent
 
+        if not stub:
             if 'referral_rdtype' in d:
                 a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
+            a.explicit_delegation = dns.rdatatype.from_text(d['explicit_delegation'])
             if 'nxdomain_name' in d:
                 a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
                 a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
@@ -1924,6 +1930,7 @@ class DomainNameAnalysis(object):
             for target in d['auth_ns_ip_mapping']:
                 for addr in d['auth_ns_ip_mapping'][target]:
                     a.add_auth_ns_ip_mappings((dns.name.from_text(target), addr))
+
         if stub:
             return a
 
@@ -1978,10 +1985,10 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    clone_attrnames = ['client_ipv4', 'client_ipv6', 'follow_ns', 'analysis_cache', 'analysis_cache_lock']
+    clone_attrnames = ['client_ipv4', 'client_ipv6', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
     def __init__(self, name, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
-             follow_ns=False, trace=None, analysis_cache=None, analysis_cache_lock=None):
+             follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
         self.client_ipv4 = client_ipv4
@@ -1999,6 +2006,10 @@ class Analyst(object):
             self.trace = []
         else:
             self.trace = trace
+        if explicit_delegations is None:
+            self.explicit_delegations = {}
+        else:
+            self.explicit_delegations = explicit_delegations
         if analysis_cache is None:
             self.analysis_cache = {}
         else:
@@ -2206,6 +2217,8 @@ class Analyst(object):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
+        elif name in self.explicit_delegations:
+            parent_obj = None
         elif name == self.ceiling:
             parent_obj = self._analyze_stub(name.parent())
         else:
@@ -2260,7 +2273,7 @@ class Analyst(object):
         if not yxdomain:
             return name_obj
 
-        if name_obj.zone.stub:
+        if not name_obj._all_servers_queried:
             servers = name_obj.zone.get_auth_or_designated_servers()
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
@@ -2278,6 +2291,11 @@ class Analyst(object):
                 logger.debug('Querying %s/AAAA...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone():
+                    # A query might already have been performed during
+                    # delegation analysis
+                    if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
+                        logger.debug('Querying %s/NS...' % fmt.humanize_name(name_obj.name))
+                        queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                     logger.debug('Querying %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                     queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
@@ -2341,7 +2359,11 @@ class Analyst(object):
                 name_obj.add_query(query)
 
     def _analyze_delegation(self, name_obj):
-        if name_obj.parent is None:
+        if name_obj.name in self.explicit_delegations:
+            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[name_obj.name])
+            name_obj.explicit_delegation = True
+            return True
+        elif name_obj.parent is None:
             parent_auth_servers = ROOT_NS_IPS
         elif name_obj.parent.stub:
             parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
