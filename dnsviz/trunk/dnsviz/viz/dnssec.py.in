@@ -1087,7 +1087,7 @@ class DNSAuthGraph:
             elif name_obj.delegation_status == Status.DELEGATION_STATUS_INSECURE:
                 line_color = COLORS['insecure']
                 line_style = 'solid'
-            elif name_obj.delegation_status == Status.DELEGATION_STATUS_INCOMPLETE:
+            elif name_obj.delegation_status in (Status.DELEGATION_STATUS_INCOMPLETE, Status.DELEGATION_STATUS_LAME):
                 line_color = COLORS['warnings']
                 line_style = 'dashed'
             elif name_obj.delegation_status == Status.DELEGATION_STATUS_BOGUS:
