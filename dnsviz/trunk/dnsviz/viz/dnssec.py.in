@@ -45,7 +45,7 @@ COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',
         'expired': '#6131a3', 'expired_light': '#ad7fed',
         'misconfigured': '#f4b800', 'misconfigured_light': '#fffa8f',
         'warnings': '#f4b800', 'warnings_light': '#fffa8f',
-        'unknown': '#f4b800', 'unknown_light': '#fffa8f',
+        'unknown': '#000000', 'insecure_light': '#b7b7b7',
         'errors': '#be1515', 'errors_light': '#f17b7b' }
 
 ICON_PATH=os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz', 'icons')
@@ -391,8 +391,7 @@ class DNSAuthGraph:
             label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
                     (12, 'Helvetica', 10, algorithm, key_tag)
 
-            attr = {'style': 'filled', 'fillcolor': '#ffffff' }
-            attr['fillcolor'] = COLORS['warnings_light']
+            attr = {'style': 'filled,dashed', 'fillcolor': '#ffffff' }
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone)
             S.add_node(node_str, id=node_str, shape='ellipse', label=label_str, **attr)
@@ -752,8 +751,10 @@ class DNSAuthGraph:
 
             attr = {}
             attr['shape'] = 'rectangle'
-            attr['style'] = 'rounded,filled'
-            attr['fillcolor'] = COLORS['warnings_light']
+            attr['style'] = 'rounded,filled,dashed'
+            if nxdomain:
+                attr['style'] += ',diagonals'
+            attr['fillcolor'] = '#ffffff'
 
             node_id = node_str.replace('*', '_')
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
@@ -1315,7 +1316,6 @@ class DNSAuthGraph:
             ta_dnskeys = set()
             ksks = set()
             zsks = set()
-            published_dnskeys = set()
             revoked_dnskeys = set()
             non_existent_dnskeys = set()
             signing_keys_for_dnskey = {}
@@ -1339,8 +1339,6 @@ class DNSAuthGraph:
                     ksks.add(n)
                 if is_zsk:
                     zsks.add(n)
-                if not (is_ksk or is_zsk):
-                    published_dnskeys.add(n)
                 if n.attr['peripheries'] == '2':
                     ta_dnskeys.add(n)
                 if ds_edges:
@@ -1399,6 +1397,3 @@ class DNSAuthGraph:
                             except KeyError:
                                 pass
                             self.G.remove_edge(m, n)
-
-            for k in published_dnskeys.difference(non_existent_dnskeys):
-                k.attr['style'] += ',dashed'

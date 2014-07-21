@@ -15,9 +15,9 @@
 .dnsviz-lame { background-color: #fffa8f; }
  
 .dnsviz-valid { background-color: #8ffeff; }
-.dnsviz-indeterminate { background-color: #fffa8f; }
-.dnsviz-indeterminate-no-dnskey { background-color: #fffa8f; }
-.dnsviz-indeterminate-unknown-algorithm { background-color: #fffa8f; }
+.dnsviz-indeterminate { background-color: #b7b7b7; }
+.dnsviz-indeterminate-no-dnskey { background-color: #b7b7b7; }
+.dnsviz-indeterminate-unknown-algorithm { background-color: #b7b7b7; }
 .dnsviz-expired { background-color: #ad7fed; }
 .dnsviz-premature { background-color: #ad7fed; }
 .dnsviz-invalid-sig { background-color: #f17b7b; }
