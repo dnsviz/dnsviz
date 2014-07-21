@@ -2020,19 +2020,28 @@ class Analyst(object):
             self.analysis_cache_lock = analysis_cache_lock
 
         if self.ceiling is not None:
-            while self.ceiling != dns.name.root:
-                try:
-                    ans = _resolver.query(self.ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
-                    try:
-                        ans.response.find_rrset(ans.response.answer, self.ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
-                        break
-                    except KeyError:
-                        pass
-                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                    pass
-                except dns.exception.DNSException:
-                    pass
-                self.ceiling = self.ceiling.parent()
+            self.ceiling = self._detect_ceiling(self.ceiling)[0]
+
+    def _detect_ceiling(self, ceiling):
+        if ceiling == dns.name.root:
+            return ceiling
+
+        try:
+            ans = _resolver.query(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            try:
+                ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
+                return ceiling, False
+            except KeyError:
+                pass
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+            pass
+        except dns.exception.DNSException:
+            parent_ceiling, fail = self._detect_ceiling(ceiling.parent())
+            if fail:
+                return parent_ceiling, True
+            else:
+                return ceiling, True
+        return self._detect_ceiling(ceiling.parent())
 
     def _is_referral_of_type(self, rdtype):
         '''Return True if analysis of this name was invoked as a dependency (specified by
