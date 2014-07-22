@@ -515,11 +515,6 @@ class DomainNameAnalysis(object):
             elif rrset_info.dname_info is not None:
                 self._handle_dname_response(rrset_info.dname_info.rrset)
 
-    def referral_error(self):
-        return self.referral_rdtype is not None and \
-                (self.name, self.referral_rdtype) in self.queries and \
-                not self.queries[(self.name, self.referral_rdtype)].is_valid_complete_response_any()
-
     def get_glue_ip_mapping(self):
         '''Return a reference to the mapping of targets of delegation records
         (i.e., NS records in the parent zone) and their corresponding IPv4 or
@@ -2250,11 +2245,6 @@ class Analyst(object):
             return name_obj
 
         try:
-            # if no referral was received for the parent, then we have no
-            # authoritative servers to try for the child, so just give up
-            if parent_obj is not None and parent_obj.referral_error():
-                return name_obj
-
             name_obj.parent = parent_obj
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
@@ -2420,7 +2410,7 @@ class Analyst(object):
             # no valid responses  In either case the A record becomes the
             # referral rdtype.
 
-        # if the name is not a delegation, or if we received not valid and
+        # if the name is not a delegation, or if we received no valid and
         # complete response, then move along
         if query.is_not_delegation_all() or not query.is_valid_complete_response_any():
             # We only keep the referral response if:
@@ -2434,16 +2424,18 @@ class Analyst(object):
 
             is_nxdomain = query.is_nxdomain_all()
             is_valid = query.is_valid_complete_response_any()
+
+             # (referral type is A)
             if name_obj.referral_rdtype == dns.rdatatype.NS:
-                # if rdtype is NS name is not under .arpa, then there was no error,
-                # and no NXDOMAIN, so there is no need to save the referral.
-                # delete it
+                # if rdtype is NS and the name is not under .arpa, then there
+                # was no error, and no NXDOMAIN, so there is no need to save
+                # the referral.  Delete it.
                 if not name_obj.name.is_subdomain(ARPA_NAME):
                     name_obj.referral_rdtype = None
                     del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
 
-                # name was under .arpa, so we only performed one referral query
-                # (NS).  save the rerferral if there was an error of if NXDOMAIN
+                # if the name was under .arpa, we only performed one referral query
+                # (NS).  save the referral if there was an error or if NXDOMAIN
                 # and the name matches this name.  Return positive response only
                 # if not NXDOMAIN
                 else:
@@ -2452,8 +2444,9 @@ class Analyst(object):
                     else:
                         name_obj.referral_rdtype = None
                         del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
-            else: # (referral type is A)
-                #XXX double check any/all logic
+
+             # (referral type is A)
+            else:
                 # don't remove either record if there's not an NXDOMAIN/YXDOMAIN mismatch
                 if name_obj.queries[(name_obj.name, dns.rdatatype.NS)].is_nxdomain_all() and \
                         is_valid and not is_nxdomain:
