@@ -319,8 +319,11 @@ class DomainNameAnalysis(object):
                 self._glue_ip_mapping[name] =  set()
             self._glue_ip_mapping[name].update(ip_set)
 
-            out_of_bailwick = not name.is_subdomain(self.parent_name())
-            if out_of_bailwick or not ip_set:
+            # this includes both out-of-bailiwick names (because
+            # ns_ip_mapping_from_additional() is called with
+            # self.parent_name()) and those that have no IPs
+            # in the additional section.
+            if not ip_set:
                 self.ns_dependencies[name] = None
 
     def _handle_soa_response(self, rrset):
@@ -367,6 +370,14 @@ class DomainNameAnalysis(object):
         if is_authoritative:
             for ns in rrset:
                 self._ns_names_in_child.add(ns.target)
+
+    def set_ns_dependencies(self):
+        if self.parent is None:
+            return
+        for ns in self.get_ns_names_in_child().difference(self.get_ns_names_in_parent()):
+            # mark names that are not subdomains of this name as dependencies
+            if not ns.is_subdomain(self.name):
+                self.ns_dependencies[ns.target] = None
 
     def _handle_dnskey_response(self, rrset):
         for dnskey in rrset:
@@ -1952,6 +1963,9 @@ class DomainNameAnalysis(object):
             if query_str in d['queries']:
                 logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
                 a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
+        # set the NS dependencies for the name
+        if a.is_zone():
+            a.set_ns_dependencies()
 
         for query_str in d['queries']:
             qname, rdclass, rdtype = query_str.split('/')
@@ -2281,10 +2295,14 @@ class Analyst(object):
     def _analyze_name(self, name_obj):
         logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
 
-        # analyze delegation, and return if 
+        # analyze delegation, and return if name doesn't exist
         yxdomain = self._analyze_delegation(name_obj)
         if not yxdomain:
             return name_obj
+
+        # set the NS dependencies for the name
+        if name_obj.is_zone():
+            name_obj.set_ns_dependencies()
 
         if not name_obj.zone._all_servers_queried:
             servers = name_obj.zone.get_auth_or_designated_servers()
