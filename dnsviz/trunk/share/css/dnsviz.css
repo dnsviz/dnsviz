@@ -11,6 +11,7 @@
 .dnsviz-secure { background-color: #8ffeff; }
 .dnsviz-insecure { background-color: #b7b7b7; }
 .dnsviz-bogus { background-color: #f17b7b; }
+.dnsviz-non-existent { background-color: #b7b7b7; }
 .dnsviz-incomplete { background-color: #fffa8f; }
 .dnsviz-lame { background-color: #fffa8f; }
  

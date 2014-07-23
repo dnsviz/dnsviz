@@ -1097,6 +1097,7 @@ class DNSAuthGraph:
 
             consolidate_clients = name_obj.single_client()
             del_serialized = collections.OrderedDict()
+            del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
             del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status]
             if name_obj.delegation_warnings:
                 del_serialized['warnings'] = collections.OrderedDict()
@@ -1174,12 +1175,14 @@ class DNSAuthGraph:
             if n.attr['shape'] not in ('ellipse', 'diamond', 'rectangle'):
                 continue
 
+            style = n.attr['style'].split(',')
+
             if n.attr['color'] == COLORS['secure']:
                 status = Status.RRSET_STATUS_SECURE
             elif n.attr['color'] == COLORS['bogus']:
                 status = Status.RRSET_STATUS_BOGUS
-            #elif n.attr['fillcolor'] == COLORS['warnings_light']:
-            #    status = Status.RRSET_STATUS_NON_EXISTENT
+            elif 'dashed' in style:
+                status = Status.RRSET_STATUS_NON_EXISTENT
             else:
                 status = Status.RRSET_STATUS_INSECURE
 
@@ -1286,8 +1289,9 @@ class DNSAuthGraph:
 
         S = self.G.get_subgraph(subgraph_name)
         for n in S.nodes():
+            style = n.attr['style'].split(',')
             # if node is non-existent, then continue, unless we are talking about an RRset
-            if n.attr['fillcolor'] == COLORS['warnings_light'] and n.attr['shape'] != 'rectangle':
+            if 'dashed' in style and n.attr['shape'] != 'rectangle':
                 continue
 
             # if the name is already marked as trusted or bogus, then leave it alone
@@ -1333,7 +1337,8 @@ class DNSAuthGraph:
 
                 is_ksk = bool(filter(lambda x: x[0].startswith('DNSKEY-'), in_edges))
                 is_zsk = bool(filter(lambda x: not x[0].startswith('DNSKEY-'), in_edges))
-                non_existent = n.attr['fillcolor'] == COLORS['warnings_light']
+                style = n.attr['style'].split(',')
+                non_existent = 'dashed' in style
 
                 if is_ksk:
                     ksks.add(n)
