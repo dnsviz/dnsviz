@@ -2278,7 +2278,7 @@ class Analyst(object):
         if not yxdomain:
             return name_obj
 
-        if not name_obj._all_servers_queried:
+        if not name_obj.zone._all_servers_queried:
             servers = name_obj.zone.get_auth_or_designated_servers()
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
@@ -2323,7 +2323,7 @@ class Analyst(object):
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
             if name_obj.parent is not None:
-                if name_obj.zone.parent.stub:
+                if not name_obj.parent._all_servers_queried:
                     parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 else:
                     parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
@@ -2374,6 +2374,10 @@ class Analyst(object):
             parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         else:
             parent_auth_servers = name_obj.parent.get_responsive_auth_or_designated_servers()
+            # even if no servers are responsive, use all designated servers if this
+            # is the name in question, for completeness
+            if not parent_auth_servers and name_obj.name == self.name:
+                parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         parent_auth_servers = set(self._filter_servers(parent_auth_servers))
 
         if not parent_auth_servers:
