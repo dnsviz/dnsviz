@@ -1465,13 +1465,21 @@ class DomainNameAnalysis(object):
         except KeyError:
             return
 
-        trusted_keys = set([k for z, k in trusted_keys if z == self.name])
+        trusted_keys_rdata = set([k for z, k in trusted_keys if z == self.name])
+        trusted_keys_existing = set()
+        trusted_keys_not_self_signing = set()
 
         for dnskey in self.get_dnskeys():
-            if dnskey.rdata in trusted_keys and dnskey not in self.ksks:
-                dnskey.errors.append(Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING)
+            if dnskey.rdata in trusted_keys_rdata:
+                trusted_keys_existing.add(dnskey)
+                if dnskey not in self.ksks:
+                    trusted_keys_not_self_signing.add(dnskey)
             if dnskey in self.revoked_keys and dnskey not in self.ksks:
                 dnskey.errors.append(Status.DNSKEY_ERROR_REVOKED_NOT_SIGNING)
+
+        if not trusted_keys_existing.difference(trusted_keys_not_self_signing):
+            for dnskey in trusted_keys_not_self_signing:
+                dnskey.errors.append(Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING)
 
     def serialize(self, d=None):
         if d is None:
