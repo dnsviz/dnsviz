@@ -375,9 +375,7 @@ class DomainNameAnalysis(object):
         if self.parent is None:
             return
         for ns in self.get_ns_names_in_child().difference(self.get_ns_names_in_parent()):
-            # mark names that are not subdomains of this name as dependencies
-            if not ns.is_subdomain(self.name):
-                self.ns_dependencies[ns.target] = None
+            self.ns_dependencies[ns.target] = None
 
     def _handle_dnskey_response(self, rrset):
         for dnskey in rrset:
