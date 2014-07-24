@@ -2152,11 +2152,11 @@ class Analyst(object):
     def analyze(self):
         name_obj = self._analyze(self.name)
         if not self.trace:
-            self.refresh_dependencies(name_obj)
+            self.refresh_dependency_references(name_obj)
         return name_obj
 
 
-    def refresh_dependencies(self, name_obj, trace=None):
+    def refresh_dependency_references(self, name_obj, trace=None):
         if trace is None:
             trace = []
 
@@ -2164,9 +2164,9 @@ class Analyst(object):
             return
 
         if name_obj.parent is not None:
-            self.refresh_dependencies(name_obj.parent, trace+[name_obj.name])
+            self.refresh_dependency_references(name_obj.parent, trace+[name_obj.name])
         if name_obj.dlv_parent is not None:
-            self.refresh_dependencies(name_obj.dlv_parent, trace+[name_obj.name])
+            self.refresh_dependency_references(name_obj.dlv_parent, trace+[name_obj.name])
 
         # loop until all deps have been added
         for cname in name_obj.cname_targets:
@@ -2176,7 +2176,7 @@ class Analyst(object):
                     name_obj.cname_targets[cname] = self.analysis_cache[cname]
                 except KeyError:
                     pass
-            self.refresh_dependencies(name_obj.cname_targets[cname], trace+[name_obj.name])
+            self.refresh_dependency_references(name_obj.cname_targets[cname], trace+[name_obj.name])
         for dname in name_obj.dname_targets:
             while name_obj.dname_targets[dname] is None:
                 time.sleep(1)
@@ -2184,7 +2184,7 @@ class Analyst(object):
                     name_obj.dname_targets[dname] = self.analysis_cache[dname]
                 except KeyError:
                     pass
-            self.refresh_dependencies(name_obj.dname_targets[dname], trace+[name_obj.name])
+            self.refresh_dependency_references(name_obj.dname_targets[dname], trace+[name_obj.name])
         for signer in name_obj.external_signers:
             while name_obj.external_signers[signer] is None:
                 time.sleep(1)
@@ -2192,7 +2192,7 @@ class Analyst(object):
                     name_obj.external_signers[signer] = self.analysis_cache[signer]
                 except KeyError:
                     pass
-            self.refresh_dependencies(name_obj.external_signers[signer], trace+[name_obj.name])
+            self.refresh_dependency_references(name_obj.external_signers[signer], trace+[name_obj.name])
         if self.follow_ns:
             for ns in name_obj.ns_dependencies:
                 while name_obj.ns_dependencies[ns] is None:
@@ -2201,7 +2201,7 @@ class Analyst(object):
                         name_obj.ns_dependencies[ns] = self.analysis_cache[ns]
                     except KeyError:
                         pass
-                self.refresh_dependencies(name_obj.ns_dependencies[ns], trace+[name_obj.name])
+                self.refresh_dependency_references(name_obj.ns_dependencies[ns], trace+[name_obj.name])
 
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
