@@ -2171,36 +2171,32 @@ class Analyst(object):
         # loop until all deps have been added
         for cname in name_obj.cname_targets:
             while name_obj.cname_targets[cname] is None:
-                time.sleep(1)
                 try:
                     name_obj.cname_targets[cname] = self.analysis_cache[cname]
                 except KeyError:
-                    pass
+                    time.sleep(1)
             self.refresh_dependency_references(name_obj.cname_targets[cname], trace+[name_obj.name])
         for dname in name_obj.dname_targets:
             while name_obj.dname_targets[dname] is None:
-                time.sleep(1)
                 try:
                     name_obj.dname_targets[dname] = self.analysis_cache[dname]
                 except KeyError:
-                    pass
+                    time.sleep(1)
             self.refresh_dependency_references(name_obj.dname_targets[dname], trace+[name_obj.name])
         for signer in name_obj.external_signers:
             while name_obj.external_signers[signer] is None:
-                time.sleep(1)
                 try:
                     name_obj.external_signers[signer] = self.analysis_cache[signer]
                 except KeyError:
-                    pass
+                    time.sleep(1)
             self.refresh_dependency_references(name_obj.external_signers[signer], trace+[name_obj.name])
         if self.follow_ns:
             for ns in name_obj.ns_dependencies:
                 while name_obj.ns_dependencies[ns] is None:
-                    time.sleep(1)
                     try:
                         name_obj.ns_dependencies[ns] = self.analysis_cache[ns]
                     except KeyError:
-                        pass
+                        time.sleep(1)
                 self.refresh_dependency_references(name_obj.ns_dependencies[ns], trace+[name_obj.name])
 
     def _analyze_stub(self, name):
