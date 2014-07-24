@@ -2296,7 +2296,7 @@ class Analyst(object):
         # analyze delegation, and return if name doesn't exist
         yxdomain = self._analyze_delegation(name_obj)
         if not yxdomain:
-            return name_obj
+            return
 
         # set the NS dependencies for the name
         if name_obj.is_zone():
