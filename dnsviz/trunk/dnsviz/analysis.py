@@ -2006,15 +2006,15 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    clone_attrnames = ['client_ipv4', 'client_ipv6', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
+    clone_attrnames = ['client_ipv4', 'client_ipv6', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
     def __init__(self, name, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
              follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
+        self.ceiling = self._detect_ceiling(ceiling)[0]
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
-        self.ceiling = ceiling
         if self.client_ipv4 is None and self.client_ipv6 is None:
             self.client_ipv4, self.client_ipv6 = get_client_addresses()
         if client_ipv4 is None and client_ipv6 is None:
@@ -2040,12 +2040,14 @@ class Analyst(object):
         else:
             self.analysis_cache_lock = analysis_cache_lock
 
-        if self.ceiling is not None:
-            self.ceiling = self._detect_ceiling(self.ceiling)[0]
-
     def _detect_ceiling(self, ceiling):
-        if ceiling == dns.name.root:
-            return ceiling
+        if ceiling == dns.name.root or ceiling is None:
+            return ceiling, None
+
+        # if there is a celing, but the name is not a subdomain
+        # of the celing, then use the name itself as a base
+        if not self.name.is_subdomain(ceiling):
+            ceiling = self.name
 
         try:
             ans = _resolver.query(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
@@ -2507,54 +2509,26 @@ class Analyst(object):
 
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
-            if self.ceiling is not None:
-                if cname.is_subdomain(self.ceiling):
-                    ceiling = self.ceiling
-                else:
-                    ceiling = cname
-            else:
-                ceiling = None
-            a = self.__class__(cname, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
+            a = self.__class__(cname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets, cname, errors))
             t.start()
             threads.append(t)
 
         for dname in name_obj.dname_targets:
-            if self.ceiling is not None:
-                if dname.is_subdomain(self.ceiling):
-                    ceiling = self.ceiling
-                else:
-                    ceiling = dname
-            else:
-                ceiling = None
-            a = self.__class__(cname, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
+            a = self.__class__(cname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
             t.start()
             threads.append(t)
 
         for signer in name_obj.external_signers:
-            if self.ceiling is not None:
-                if signer.is_subdomain(self.ceiling):
-                    ceiling = self.ceiling
-                else:
-                    ceiling = signer
-            else:
-                ceiling = None
-            a = self.__class__(signer, ceiling=ceiling, force_dnskey=True, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
+            a = self.__class__(signer, force_dnskey=True, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.external_signers, signer, errors))
             t.start()
             threads.append(t)
 
         if self.follow_ns:
             for ns in name_obj.ns_dependencies:
-                if self.ceiling is not None:
-                    if ns.is_subdomain(self.ceiling):
-                        ceiling = self.ceiling
-                    else:
-                        ceiling = ns
-                else:
-                    ceiling = None
-                a = self.__class__(ns, ceiling=ceiling, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
+                a = self.__class__(ns, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_dependencies, ns, errors))
                 t.start()
                 threads.append(t)
