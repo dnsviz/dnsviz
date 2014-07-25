@@ -820,7 +820,13 @@ class DNSAuthGraph:
         try:
             edge = self.G.get_edge(cname_node, dname_node, edge_key)
         except KeyError:
-            self.G.add_edge(cname_node, dname_node, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
+            edge_label = ''
+            if dname_status.errors:
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+            elif dname_status.warnings:
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+
+            self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
             self.node_info[edge_id] = [dname_status.serialize()]
 
         self.add_rrsigs(name_obj, zone_obj, dname_rrset_info, dname_node)
