@@ -938,6 +938,8 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
         if not self.closest_encloser:
             self.closest_encloser = { wildcard_name.parent(): set([None]) }
+            # fill in a dummy value for wildcard_name_digest_map
+            self.wildcard_name_digest_map[self.wildcard_name] = { None: self.wildcard_name }
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)
@@ -973,7 +975,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         except KeyError:
             pass
         if loglevel <= logging.DEBUG:
-            if None in self.closest_encloser.values():
+            if None in self.closest_encloser.values()[0]:
                 d['meta']['closest_encloser']['inferred_from_wildcard'] = True
             else:
                 d['meta']['closest_encloser']['inferred_from_wildcard'] = False
