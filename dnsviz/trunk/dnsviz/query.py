@@ -425,7 +425,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     self._params['timeout'] = self._bounding_timeout
                     self._params['tcp'] = True
                     self._state = self.USE_TCP
-                    if (response_wire is not None and ord(response_wire[2]) & 0x02):
+                    if response_wire is not None and ord(response_wire[2]) & 0x02:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                     else:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None)
@@ -434,9 +434,10 @@ class PMTUBoundingHandler(DNSResponseHandler):
             if not is_timeout and is_valid:
                 #XXX this is cheating because we're not reporting the change to UDP
                 self._params['tcp'] = False
-                self._request.payload = len(response_wire) - 1
+                payload = len(response_wire) - 1
+                self._request.payload = payload
                 self._state = self.TCP_MINUS_ONE
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._upper_bound - 1)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
@@ -446,16 +447,27 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._state = self.PICKLE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
-            elif len(response_wire) < self._water_mark:
+            elif response_wire is not None and len(response_wire) < self._water_mark:
                 self._params['wait'] = 1.0
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_NO_CHANGE, None)
+            # if the response was truncated, then the size of the payload
+            # received via TCP is the largest we can receive
+            elif response_wire is not None and ord(response_wire[2]) & 0x02:
+                self._params['tcp'] = True
+                self._state = self.TCP_FINAL
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
         elif self._state == self.PICKLE:
             if self._upper_bound - self._lower_bound <= 1:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
-            if is_timeout:
+                if response_wire is not None and ord(response_wire[2]) & 0x02:
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
+                elif is_timeout:
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None)
+                elif not is_valid:
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
+            elif is_timeout:
                 self._upper_bound = self._request.payload - 1
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
                 self._request.payload = payload
