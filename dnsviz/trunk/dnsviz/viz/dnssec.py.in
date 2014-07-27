@@ -723,7 +723,10 @@ class DNSAuthGraph:
 
     def add_rrset_non_existent(self, name_obj, name, rdtype, nxdomain, wildcard, servers_clients):
         zone_obj = name_obj.zone
-        node_str = self.rrset_node_str(name, rdtype, -1)
+        if nxdomain:
+            node_str = self.rrset_node_str(name, rdtype, -1)
+        else:
+            node_str = self.rrset_node_str(name, rdtype, -2)
 
         if not self.G.has_node(node_str):
             if wildcard:
