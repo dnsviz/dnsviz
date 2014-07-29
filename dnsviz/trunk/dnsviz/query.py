@@ -607,23 +607,8 @@ class DNSQueryHandler:
         except AcceptResponse:
             return response
 
-class DNSQuery(object):
-    '''An simple DNS Query and its responses.'''
-
-    def __init__(self, qname, rdtype, rdclass,
-            flags, edns, edns_max_udp_payload, edns_flags, edns_options):
-
-        self.qname = qname
-        self.rdtype = rdtype
-        self.rdclass = rdclass
-        self.flags = flags
-        self.edns = edns
-        self.edns_max_udp_payload = edns_max_udp_payload
-        self.edns_flags = edns_flags
-        self.edns_options = edns_options
-
-        self.responses = {}
-
+class AggregateDNSResponse(object):
+    def __init__(self):
         self.rdata_answer_info = {}
         self.cname_answer_info = {}
         self.rrset_answer_info = []
@@ -634,54 +619,20 @@ class DNSQuery(object):
         self.error_rcode = {}
         self.error = {}
 
-    def copy(self, with_responses=True):
-        '''Return a clone of the current DNSQuery instance.  Parameters are
-        passed by reference rather than copied.  Note: if it turns out that
-        these member variables might be modified somehow by other instances in
-        future use, then these will need to be copies.'''
+    def _aggregate_response(self, server, client, response, qname, rdtype):
+        if response.is_valid_response():
+            if response.is_complete_response():
+                self._aggregate_answer(server, client, response.message, response.is_referral(qname), qname, rdtype)
+                self._aggregate_nsec(server, client, response.message, response.is_referral(qname))
+        else:
+            self._aggregate_error(server, client, response)
 
-        clone = DNSQuery(self.qname, self.rdtype, self.rdclass,
-                self.flags, self.edns, self.edns_max_udp_payload, self.edns_flags, self.edns_options)
-
-        if with_responses:
-            for server in self.responses:
-                for client, response in self.responses[server].items():
-                    clone.add_response(server, client, response.copy())
-
-        return clone
-
-    def join(self, query):
-        if not (isinstance(query, DNSQuery)):
-            raise ValueError('A DNSQuery instance can only be joined with another DNSQuery instance.')
-
-        if not (self.qname == query.qname and self.rdtype == query.rdtype and \
-                self.rdclass == query.rdclass and self.flags == query.flags and \
-                self.edns == query.edns and self.edns_max_udp_payload == query.edns_max_udp_payload and \
-                self.edns_flags == query.edns_flags and self.edns_options == query.edns_options):
-            raise ValueError('DNS query parameters for DNSQuery instances being joined must be the same.')
-
-        clone = self.copy()
-        for server in query.responses:
-            for client, response in query.responses[server].items():
-                clone.add_response(server, client, response.copy())
-        return clone
-
-    def project(self, servers):
-        if servers.difference(self.responses):
-            raise ValueError('A DNSQuery can only project responses from servers that have been queried.')
-
-        clone = self.copy(with_responses=False)
-        for server in servers:
-            for client, response in self.responses[server].items():
-                clone.add_response(server, client, response.copy())
-        return clone
-
-    def _index_answer(self, server, client, response, referral):
+    def _aggregate_answer(self, server, client, response, referral, qname, rdtype):
         # sort with the most specific DNAME infos first
         dname_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.DNAME, response.answer)
         dname_rrsets.sort(reverse=True)
 
-        qname_sought = self.qname
+        qname_sought = qname
         try:
             i = 0
             while i < MAX_CNAME_REDIRECTION:
@@ -694,7 +645,7 @@ class DNSQuery(object):
                         break
 
                 try:
-                    rrset_info = self._index_answer_rrset(server, client, response, qname_sought, self.rdtype)
+                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype)
 
                     # if there was a synthesized CNAME, add it to the rrset_info
                     if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and synthesized_cname_info is not None:
@@ -746,7 +697,7 @@ class DNSQuery(object):
         except KeyError:
             pass
 
-    def _index_answer_rrset(self, server, client, response, qname, rdtype):
+    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype):
         try:
             rrset = response.find_rrset(response.answer, qname, dns.rdataclass.IN, rdtype)
             answer_info = self.rdata_answer_info
@@ -777,7 +728,7 @@ class DNSQuery(object):
 
         return rrset_info
 
-    def _index_nsec(self, server, client, response, referral):
+    def _aggregate_nsec(self, server, client, response, referral):
         self.nsec_set_info_by_server[(server, client)] = []
         for rdtype in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
             nsec_rrsets = filter(lambda x: x.rdtype == rdtype, response.authority)
@@ -798,7 +749,7 @@ class DNSQuery(object):
 
             self.nsec_set_info_by_server[(server, client)].append(nsec_set_info)
 
-    def _index_error(self, server, client, response):
+    def _aggregate_error(self, server, client, response):
         if response.message is None:
             if (response.error, response.errno) not in self.error:
                 self.error[(response.error, response.errno)] = set()
@@ -807,6 +758,67 @@ class DNSQuery(object):
             if response.message.rcode() not in self.error_rcode:
                 self.error_rcode[response.message.rcode()] = set()
             self.error_rcode[response.message.rcode()].add((server, client))
+
+class DNSQuery(AggregateDNSResponse):
+    '''An simple DNS Query and its responses.'''
+
+    def __init__(self, qname, rdtype, rdclass,
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options):
+
+        super(DNSQuery, self).__init__()
+
+        self.qname = qname
+        self.rdtype = rdtype
+        self.rdclass = rdclass
+        self.flags = flags
+        self.edns = edns
+        self.edns_max_udp_payload = edns_max_udp_payload
+        self.edns_flags = edns_flags
+        self.edns_options = edns_options
+
+        self.responses = {}
+
+    def copy(self, with_responses=True):
+        '''Return a clone of the current DNSQuery instance.  Parameters are
+        passed by reference rather than copied.  Note: if it turns out that
+        these member variables might be modified somehow by other instances in
+        future use, then these will need to be copies.'''
+
+        clone = DNSQuery(self.qname, self.rdtype, self.rdclass,
+                self.flags, self.edns, self.edns_max_udp_payload, self.edns_flags, self.edns_options)
+
+        if with_responses:
+            for server in self.responses:
+                for client, response in self.responses[server].items():
+                    clone.add_response(server, client, response.copy())
+
+        return clone
+
+    def join(self, query):
+        if not (isinstance(query, DNSQuery)):
+            raise ValueError('A DNSQuery instance can only be joined with another DNSQuery instance.')
+
+        if not (self.qname == query.qname and self.rdtype == query.rdtype and \
+                self.rdclass == query.rdclass and self.flags == query.flags and \
+                self.edns == query.edns and self.edns_max_udp_payload == query.edns_max_udp_payload and \
+                self.edns_flags == query.edns_flags and self.edns_options == query.edns_options):
+            raise ValueError('DNS query parameters for DNSQuery instances being joined must be the same.')
+
+        clone = self.copy()
+        for server in query.responses:
+            for client, response in query.responses[server].items():
+                clone.add_response(server, client, response.copy())
+        return clone
+
+    def project(self, servers):
+        if servers.difference(self.responses):
+            raise ValueError('A DNSQuery can only project responses from servers that have been queried.')
+
+        clone = self.copy(with_responses=False)
+        for server in servers:
+            for client, response in self.responses[server].items():
+                clone.add_response(server, client, response.copy())
+        return clone
 
     def add_response(self, server, client, response):
         if server not in self.responses:
@@ -818,11 +830,7 @@ class DNSQuery(object):
         response.query = self
         self.responses[server][client] = response
 
-        if response.is_valid_response():
-            self._index_answer(server, client, response.message, response.is_referral(self.qname))
-            self._index_nsec(server, client, response.message, response.is_referral(self.qname))
-        else:
-            self._index_error(server, client, response)
+        self._aggregate_response(server, client, response, self.qname, self.rdtype)
 
         flags = self.flags
         edns = self.edns
