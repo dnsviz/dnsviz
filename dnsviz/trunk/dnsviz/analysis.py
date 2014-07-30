@@ -735,9 +735,9 @@ class DomainNameAnalysis(object):
         servers_responsive = self.queries[(self.name, dns.rdatatype.DNSKEY)].servers_with_valid_complete_response()
         for dnskey_rdata in self._dnskeys:
             dnskey = self._dnskeys[dnskey_rdata]
-            dnskey.servers_clients_without = servers_responsive.difference(dnskey.servers_clients)
-            if dnskey.servers_clients_without:
-                dnskey.errors.append(Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS)
+            servers_clients_without = servers_responsive.difference(dnskey.servers_clients)
+            if servers_clients_without:
+                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = servers_clients_without
 
     def get_dnskey_sets(self):
         if not hasattr(self, '_dnskey_sets') or self._dnskey_sets is None:
@@ -863,7 +863,7 @@ class DomainNameAnalysis(object):
 
                 algs_signing_rrset = {}
                 if dnssec_algorithms_in_dnskey or dnssec_algorithms_in_ds or dnssec_algorithms_in_dlv:
-                    for server_client in rrset_info.servers_clients.difference(has_dname):
+                    for server_client in set(rrset_info.servers_clients).difference(has_dname):
                         algs_signing_rrset[server_client] = set()
 
                 for rrsig in rrset_info.rrsig_info:
@@ -875,7 +875,7 @@ class DomainNameAnalysis(object):
                     if signer.stub:
                         continue
 
-                    for server_client in rrset_info.rrsig_info[rrsig].servers_clients.intersection(algs_signing_rrset):
+                    for server_client in set(rrset_info.rrsig_info[rrsig].servers_clients).intersection(algs_signing_rrset):
                         algs_signing_rrset[server_client].add(rrsig.algorithm)
                         if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[server_client]) and \
                                 not dnssec_algorithms_in_ds.difference(algs_signing_rrset[server_client]) and \

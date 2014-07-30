@@ -92,7 +92,7 @@ AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 				val = newval;
 			}
 			if (typeof val[0] in {'string':null,'number':null}) {
-				if (key.toLowerCase() in {'servers':null,'servers_without':null,'digest_type':null}) {
+				if (key.toLowerCase() in {'servers':null,'digest_type':null}) {
 					s += val.join(", ");
 				} else {
 					s += val.join("<br />");
