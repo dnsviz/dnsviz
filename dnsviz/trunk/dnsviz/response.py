@@ -35,7 +35,7 @@ import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrs
 
 import base32
 import crypto
-import status
+import status as Status
 import format as fmt
 
 def _rr_cmp(a, b):
@@ -296,7 +296,7 @@ class RDataMeta(object):
         self.ttl = ttl
         self.rdtype = rdtype
         self.rdata = rdata
-        self.servers_clients = set()
+        self.servers_clients = {}
         self.rrset_info = set()
     
 class DNSKEYMeta(object):
@@ -304,10 +304,10 @@ class DNSKEYMeta(object):
         self.name = name
         self.rdata = rdata
         self.ttl = ttl
-        self.servers_clients = set()
-        self.servers_clients_without = set()
-        self.warnings = []
-        self.errors = []
+        self.servers_clients = {}
+        self.servers_clients_without = {}
+        self.warnings = {}
+        self.errors = {}
         self.rrset_info = []
 
         self.key_tag = self.calc_key_tag(rdata)
@@ -439,25 +439,33 @@ class DNSKEYMeta(object):
                 servers.sort()
             d['servers'] = servers
 
-            if self.servers_clients_without:
-                servers = tuple_to_dict(self.servers_clients_without)
+        if self.warnings and loglevel <= logging.WARNING:
+            d['warnings'] = collections.OrderedDict()
+            warnings = self.warnings.keys()
+            warnings.sort()
+            for warning in warnings:
+                servers = tuple_to_dict(self.warnings[warning])
                 if consolidate_clients:
                     servers = list(servers)
                     servers.sort()
-                d['servers_without'] = servers
-
-        if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [status.dnskey_error_mapping[e] for e in self.warnings]
+                d['warnings'][Status.dnskey_error_mapping[warning]] = servers
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [status.dnskey_error_mapping[e] for e in self.errors]
-
+            d['errors'] = collections.OrderedDict()
+            errors = self.errors.keys()
+            errors.sort()
+            for error in errors:
+                servers = tuple_to_dict(self.errors[error])
+                if consolidate_clients:
+                    servers = list(servers)
+                    servers.sort()
+                d['errors'][Status.dnskey_error_mapping[error]] = servers
         return d
 
 class RRsetInfo(object):
     def __init__(self, rrset, dname_info=None):
         self.rrset = rrset
         self.rrsig_info = {}
-        self.servers_clients = set()
+        self.servers_clients = {}
         self.wildcard_info = {}
 
         self.dname_info = dname_info
@@ -478,21 +486,25 @@ class RRsetInfo(object):
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
 
-    def create_or_update_rrsig_info(self, rrsig, ttl, server, client):
+    def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response):
         try:
             rrsig_info = self.get_rrsig_info(rrsig)
         except KeyError:
             rrsig_info = self.rrsig_info[rrsig] = RDataMeta(self.rrset.name, ttl, dns.rdatatype.RRSIG, rrsig)
-        rrsig_info.servers_clients.add((server, client))
+        if (server, client) not in rrsig_info.servers_clients:
+            rrsig_info.servers_clients[(server, client)] = []
+        rrsig_info.servers_clients[(server, client)].append(response)
         self.set_wildcard_info(rrsig, server, client)
 
-    def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client):
+    def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response):
         try:
             index = self.cname_info_from_dname.index(synthesized_cname_info)
             synthesized_cname_info = self.cname_info_from_dname[index]
         except ValueError:
             self.cname_info_from_dname.append(synthesized_cname_info)
-        synthesized_cname_info.servers_clients.add((server, client))
+        if (server, client) not in synthesized_cname_info.servers_clients:
+            synthesized_cname_info.servers_clients[(server, client)] = []
+        synthesized_cname_info.servers_clients[(server, client)].append(response)
         return synthesized_cname_info
 
     def is_wildcard(self, rrsig):
@@ -594,7 +606,7 @@ class NSECSet(object):
                 if key not in self.nsec3_params:
                     self.nsec3_params[key] = set()
                 self.nsec3_params[key].add(rrset.name)
-        self.servers_clients = set()
+        self.servers_clients = {}
 
     def __eq__(self, other):
         return self.rrsets == other.rrsets
@@ -619,13 +631,17 @@ class NSECSet(object):
         obj.servers_clients = self.servers_clients.copy()
         return obj
 
-    def add_server_client(self, server, client):
+    def add_server_client(self, server, client, response):
         for name, rrset_info in self.rrsets.items():
-            rrset_info.servers_clients.add((server, client))
-        self.servers_clients.add((server, client))
+            if (server, client) not in rrset_info.servers_clients:
+                rrset_info.servers_clients[(server, client)] = []
+            rrset_info.servers_clients[(server, client)].append(response)
+        if (server, client) not in self.servers_clients:
+            self.servers_clients[(server, client)] = []
+        self.servers_clients[(server, client)].append(response)
 
-    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client):
-        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client)
+    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response):
+        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response)
 
     def rdtype_exists_in_bitmap(self, nsec_name, rdtype):
         '''Return True if the rdtype exists in the bitmap of the NSEC(3) record
