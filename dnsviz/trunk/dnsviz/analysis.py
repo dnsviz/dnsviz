@@ -1249,7 +1249,12 @@ class DomainNameAnalysis(object):
         for (qname, rdtype), query in self.queries.items():
             for rrset_info in query.rrset_answer_info:
                 yxdomain.add(rrset_info.rrset.name)
-            yxdomain.update(query.rrset_noanswer_info)
+            for qname_sought in query.rrset_noanswer_info:
+                for soa_owner_name in query.rrset_noanswer_info[qname_sought]:
+                    for (server,client) in query.rrset_noanswer_info[qname_sought][soa_owner_name]:
+                        for response in query.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)]:
+                            if response.is_authoritative() or response.recursion_desired_and_available():
+                                yxdomain.update(qname_sought)
 
         logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         for (qname, rdtype), query in self.queries.items():
