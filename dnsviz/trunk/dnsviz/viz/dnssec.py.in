@@ -1091,6 +1091,12 @@ class DNSAuthGraph:
 
                 edge_id += 1
 
+            edge_label = ''
+            if name_obj.delegation_errors:
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+            elif name_obj.delegation_warnings:
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+
             if name_obj.delegation_status == Status.DELEGATION_STATUS_SECURE:
                 line_color = COLORS['secure']
                 line_style = 'solid'
@@ -1132,7 +1138,7 @@ class DNSAuthGraph:
 
             edge_id = 'del-%s--%s' % (zone_top, parent_bottom)
             self.node_info[edge_id] = [del_serialized]
-            self.G.add_edge(zone_top, parent_bottom, id=edge_id, color=line_color, penwidth='5.0', ltail=zone_graph_name, lhead=parent_graph_name, style=line_style, minlen='2', dir='back')
+            self.G.add_edge(zone_top, parent_bottom, label=edge_label, id=edge_id, color=line_color, penwidth='5.0', ltail=zone_graph_name, lhead=parent_graph_name, style=line_style, minlen='2', dir='back')
 
     #XXX add in true DLV support
     #def add_trust(self, dlv_domain):
