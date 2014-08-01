@@ -1387,7 +1387,7 @@ class DomainNameAnalysis(object):
                         servers_upward_referral = set()
                         for server_client in servers_clients:
                             for response in servers_clients[server_client]:
-                                if qname_sought == qname or response.recursion_desired_and_available():
+                                if (qname_sought == qname and response.is_authoritative()) or response.recursion_desired_and_available():
                                     if qname_obj is not None and response.is_upward_referral(qname_obj.zone.name):
                                         servers_upward_referral.add(server_client)
                                     else:
