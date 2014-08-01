@@ -1071,6 +1071,10 @@ class DomainNameAnalysis(object):
         secure_path = False
         self.delegation_status = None
 
+        if not self.get_responsive_auth_or_designated_servers():
+            self.delegation_status = Status.DELEGATION_STATUS_LAME
+            return
+
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
         # there is at least one match
