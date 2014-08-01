@@ -1112,18 +1112,11 @@ class DomainNameAnalysis(object):
 
             for ds_rdata in ds_rrset_info.rrset:
                 self.ds_status_by_ds[rdtype][ds_rdata] = {}
-                checked_keys = set()
 
                 for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
                     validation_status_mapping = { True: set(), False: set(), None: set() }
                     for dnskey_rdata in dnskey_info.rrset:
                         dnskey = self._dnskeys[dnskey_rdata]
-
-                        # if we've already checked this key (i.e., in
-                        # another DNSKEY RRset) then continue
-                        if dnskey in checked_keys:
-                            continue
-                        checked_keys.add(dnskey)
 
                         if dnskey not in self.ds_status_by_dnskey[rdtype]:
                             self.ds_status_by_dnskey[rdtype][dnskey] = {}
@@ -1151,7 +1144,6 @@ class DomainNameAnalysis(object):
 
                             for (server,client) in dnskey_info.rrsig_info[rrsig].servers_clients:
                                 for response in dnskey_info.rrsig_info[rrsig].servers_clients[(server,client)]:
-                                    # already passed the test
                                     if (server,client,response) in algs_signing_sep:
                                         # note that this algorithm is part of a self-signing DNSKEY
                                         algs_signing_sep[(server,client,response)].add(rrsig.algorithm)
@@ -2411,6 +2403,7 @@ class Analyst(object):
             return False
 
         servers_queried = { dns.rdatatype.NS: set(), dns.rdatatype.A: set() }
+        referral_queries = {}
 
         # elicit a referral from parent servers by querying first for NS, then for A as a fallback
         for rdtype in (dns.rdatatype.NS, dns.rdatatype.A):
@@ -2422,7 +2415,7 @@ class Analyst(object):
             logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
             query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, self.client_ipv4, self.client_ipv6)
             query.execute()
-            name_obj.add_query(query)
+            referral_queries[rdtype] = query
 
             # if NXDOMAIN was received, then double-check with A, as some servers
             # (mostly load balancers) don't respond well to NS queries
@@ -2463,7 +2456,7 @@ class Analyst(object):
                 # the referral.  Delete it.
                 if not name_obj.name.is_subdomain(ARPA_NAME):
                     name_obj.referral_rdtype = None
-                    del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+                    del referral_queries[dns.rdatatype.NS]
 
                 # if the name was under .arpa, we only performed one referral query
                 # (NS).  save the referral if there was an error or if NXDOMAIN
@@ -2474,7 +2467,7 @@ class Analyst(object):
                         pass
                     else:
                         name_obj.referral_rdtype = None
-                        del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+                        del referral_queries[dns.rdatatype.NS]
 
              # (referral type is A)
             else:
@@ -2484,16 +2477,24 @@ class Analyst(object):
                     pass
                 else:
                     # if no mismatch, then always delete the NS record
-                    del name_obj.queries[(name_obj.name, dns.rdatatype.NS)]
+                    del referral_queries[dns.rdatatype.NS]
                     # also, delete the A record query if the name doesn't match or is not NXDOMAIN
                     if not is_valid or (name_obj.name == self.name and is_nxdomain):
                         pass
                     else:
                         name_obj.referral_rdtype = None
-                        del name_obj.queries[(name_obj.name, dns.rdatatype.A)]
+                        del referral_queries[dns.rdatatype.A]
+
+            # add remaining queries
+            for query in referral_queries.values():
+                name_obj.add_query(query)
 
             # return a positive response only if not nxdomain
             return not is_nxdomain
+
+        # add any queries made
+        for query in referral_queries.values():
+            name_obj.add_query(query)
 
         names_resolved = set()
         names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
