@@ -1222,12 +1222,14 @@ class DomainNameAnalysis(object):
                     self.delegation_status = Status.DELEGATION_STATUS_BOGUS
                 else:
                     self.delegation_status = Status.DELEGATION_STATUS_INSECURE
-            else:
+            elif self.parent.signed:
                 self.delegation_status = Status.DELEGATION_STATUS_BOGUS
                 for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
                         self.delegation_status = Status.DELEGATION_STATUS_INSECURE
                         break
+            else:
+                self.delegation_status = Status.DELEGATION_STATUS_INSECURE
 
         if (self.name, dns.rdatatype.DS) in self.nxdomain_servers_clients:
             self.delegation_errors[Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
