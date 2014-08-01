@@ -715,7 +715,6 @@ class DomainNameAnalysis(object):
         self._dnskeys = {}
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
             return
-        servers_clients = {}
         for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
             # there are CNAMEs that show up here...
             if dnskey_info.rrset.rdtype != dns.rdatatype.DNSKEY:
@@ -724,34 +723,11 @@ class DomainNameAnalysis(object):
             for dnskey_rdata in dnskey_info.rrset:
                 if dnskey_rdata not in self._dnskeys:
                     self._dnskeys[dnskey_rdata] = Response.DNSKEYMeta(dnskey_info.rrset.name, dnskey_rdata, dnskey_info.rrset.ttl)
-                    if not self.is_zone():
-                        # this error points to its own servers_clients value
-                        self._dnskeys[dnskey_rdata].errors[Status.DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX] = self._dnskeys[dnskey_rdata].servers_clients
                 self._dnskeys[dnskey_rdata].rrset_info.append(dnskey_info)
                 self._dnskeys[dnskey_rdata].servers_clients.update(dnskey_info.servers_clients)
                 dnskey_set.add(self._dnskeys[dnskey_rdata])
 
-                if dnskey_rdata not in servers_clients:
-                    servers_clients[dnskey_rdata] = set()
-                for (server,client) in dnskey_info.servers_clients:
-                    for response in dnskey_info.servers_clients[(server,client)]:
-                        servers_clients[dnskey_rdata].add((server,client,response.query))
-
             self._dnskey_sets.append((dnskey_set, dnskey_info))
-
-        servers_responsive = set()
-        for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
-            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response()])
-
-        for dnskey_rdata in self._dnskeys:
-            dnskey = self._dnskeys[dnskey_rdata]
-
-            # if there were servers responsive for the query but that didn't return the dnskey
-            servers_clients_without = servers_responsive.difference(servers_clients[dnskey_rdata])
-            if servers_clients_without:
-                if Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS not in dnskey.errors:
-                    dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = set()
-                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS].update([(server,client) for (server,client,response) in servers_clients_without])
 
     def get_dnskey_sets(self):
         if not hasattr(self, '_dnskey_sets') or self._dnskey_sets is None:
@@ -1517,26 +1493,41 @@ class DomainNameAnalysis(object):
                             errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
 
     def _populate_dnskey_status(self, trusted_keys):
-        try:
-            dnskey_query = self.queries[(self.name, dns.rdatatype.DNSKEY)]
-        except KeyError:
+        if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
             return
 
         trusted_keys_rdata = set([k for z, k in trusted_keys if z == self.name])
         trusted_keys_existing = set()
         trusted_keys_not_self_signing = set()
 
+        # buid a list of responsive servers
+        servers_responsive = set()
+        for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
+            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response()])
+
+        # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():
             if dnskey.rdata in trusted_keys_rdata:
                 trusted_keys_existing.add(dnskey)
                 if dnskey not in self.ksks:
                     trusted_keys_not_self_signing.add(dnskey)
             if dnskey in self.revoked_keys and dnskey not in self.ksks:
-                dnskey.errors.append(Status.DNSKEY_ERROR_REVOKED_NOT_SIGNING)
+                dnskey.errors[Status.DNSKEY_ERROR_REVOKED_NOT_SIGNING] = dnskey.servers_clients
+            if not self.is_zone():
+                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX] = dnskey.servers_clients
+
+            # if there were servers responsive for the query but that didn't return the dnskey
+            servers_with_dnskey = set()
+            for (server,client) in dnskey.servers_clients:
+                for response in dnskey.servers_clients[(server,client)]:
+                    servers_with_dnskey.add((server,client,response.query))
+            servers_clients_without = servers_responsive.difference(servers_with_dnskey)
+            if servers_clients_without:
+                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = [(server,client) for (server,client,response) in servers_clients_without]
 
         if not trusted_keys_existing.difference(trusted_keys_not_self_signing):
             for dnskey in trusted_keys_not_self_signing:
-                dnskey.errors.append(Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING)
+                dnskey.errors[Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING] = dnskey.servers_clients
 
     def serialize(self, d=None):
         if d is None:
