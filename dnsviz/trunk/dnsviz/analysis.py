@@ -2052,6 +2052,7 @@ class Analyst(object):
     diagnostic_query = Q.DiagnosticQuery
     tcp_diagnostic_query = Q.TCPDiagnosticQuery
     pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
+    truncation_diagnostic_query = Q.TruncationDiagnosticQuery
     allow_loopback_query = False
     allow_private_query = False
     qname_only = True
@@ -2349,6 +2350,7 @@ class Analyst(object):
                 logger.debug('Querying %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
             if name_obj.parent is not None:
                 if not name_obj.parent._all_servers_queried:
