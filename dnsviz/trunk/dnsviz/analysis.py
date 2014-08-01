@@ -190,7 +190,6 @@ class DomainNameAnalysis(object):
         # dependencies
         self.ttl_mapping = {}
 
-        self.rrset_algs = None
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
@@ -495,10 +494,9 @@ class DomainNameAnalysis(object):
         variables appropriately, and calling helper methods as necessary.'''
 
         key = (query.qname, query.rdtype)
-        if key in self.queries:
-            self.queries[key] = self.queries[key].join(query)
-        else:
-            self.queries[key] = query
+        if key not in self.queries:
+            self.queries[key] = Q.MultiQuery(query.qname, query.rdtype, query.rdclass)
+        self.queries[key].add_query(query)
 
         for server in query.responses:
             # note the fact that servers were queried
@@ -717,6 +715,7 @@ class DomainNameAnalysis(object):
         self._dnskeys = {}
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
             return
+        servers_clients = {}
         for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
             # there are CNAMEs that show up here...
             if dnskey_info.rrset.rdtype != dns.rdatatype.DNSKEY:
@@ -726,18 +725,33 @@ class DomainNameAnalysis(object):
                 if dnskey_rdata not in self._dnskeys:
                     self._dnskeys[dnskey_rdata] = Response.DNSKEYMeta(dnskey_info.rrset.name, dnskey_rdata, dnskey_info.rrset.ttl)
                     if not self.is_zone():
-                        self._dnskeys[dnskey_rdata].errors.append(Status.DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX)
+                        # this error points to its own servers_clients value
+                        self._dnskeys[dnskey_rdata].errors[Status.DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX] = self._dnskeys[dnskey_rdata].servers_clients
                 self._dnskeys[dnskey_rdata].rrset_info.append(dnskey_info)
                 self._dnskeys[dnskey_rdata].servers_clients.update(dnskey_info.servers_clients)
                 dnskey_set.add(self._dnskeys[dnskey_rdata])
+
+                if dnskey_rdata not in servers_clients:
+                    servers_clients[dnskey_rdata] = set()
+                for (server,client) in dnskey_info.servers_clients:
+                    for response in dnskey_info.servers_clients[(server,client)]:
+                        servers_clients[dnskey_rdata].add((server,client,response.query))
+
             self._dnskey_sets.append((dnskey_set, dnskey_info))
 
-        servers_responsive = self.queries[(self.name, dns.rdatatype.DNSKEY)].servers_with_valid_complete_response()
+        servers_responsive = set()
+        for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
+            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response()])
+
         for dnskey_rdata in self._dnskeys:
             dnskey = self._dnskeys[dnskey_rdata]
-            servers_clients_without = servers_responsive.difference(dnskey.servers_clients)
+
+            # if there were servers responsive for the query but that didn't return the dnskey
+            servers_clients_without = servers_responsive.difference(servers_clients[dnskey_rdata])
             if servers_clients_without:
-                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = servers_clients_without
+                if Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS not in dnskey.errors:
+                    dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = set()
+                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS].update([(server,client) for (server,client,response) in servers_clients_without])
 
     def get_dnskey_sets(self):
         if not hasattr(self, '_dnskey_sets') or self._dnskey_sets is None:
@@ -793,7 +807,6 @@ class DomainNameAnalysis(object):
                 ns_obj.populate_status(trusted_keys)
 
     def _populate_rrsig_status(self, supported_algs):
-        self.rrset_algs = {}
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -822,16 +835,15 @@ class DomainNameAnalysis(object):
                 items_to_validate += nsec_set_info.rrsets.values()
 
             for rrset_info in items_to_validate:
-                self.rrset_algs[rrset_info] = set()
                 self.rrset_warnings[rrset_info] = {}
                 self.rrset_errors[rrset_info] = {}
                 self.rrsig_status[rrset_info] = {}
 
-                if rrset_info.rrset.rdtype == dns.rdatatype.DLV:
+                if rdtype == dns.rdatatype.DLV:
                     dnssec_algorithms_in_dnskey = self.dlv.dnssec_algorithms_in_dnskey
                     dnssec_algorithms_in_ds = self.dlv.dnssec_algorithms_in_ds
                     dnssec_algorithms_in_dlv = set()
-                elif rrset_info.rrset.rdtype == dns.rdatatype.DS:
+                elif rdtype == dns.rdatatype.DS:
                     dnssec_algorithms_in_dnskey = self.parent.dnssec_algorithms_in_dnskey
                     dnssec_algorithms_in_ds = self.parent.dnssec_algorithms_in_ds
                     dnssec_algorithms_in_dlv = self.parent.dnssec_algorithms_in_dlv
@@ -855,7 +867,8 @@ class DomainNameAnalysis(object):
 
                     if dname_info_list:
                         for dname_info in dname_info_list:
-                            has_dname.update(dname_info.servers_clients)
+                            for server, client in dname_info.servers_clients:
+                                has_dname.update([(server,client,response) for response in dname_info.servers_clients[(server,client)]])
 
                         if rrset_info.rrset.name not in self.dname_status:
                             self.dname_status[rrset_info] = []
@@ -863,11 +876,12 @@ class DomainNameAnalysis(object):
 
                 algs_signing_rrset = {}
                 if dnssec_algorithms_in_dnskey or dnssec_algorithms_in_ds or dnssec_algorithms_in_dlv:
-                    for server_client in set(rrset_info.servers_clients).difference(has_dname):
-                        algs_signing_rrset[server_client] = set()
+                    for server, client in rrset_info.servers_clients:
+                        for response in rrset_info.servers_clients[(server, client)]:
+                            if (server, client, response) not in has_dname:
+                                algs_signing_rrset[(server, client, response)] = set()
 
                 for rrsig in rrset_info.rrsig_info:
-                    self.rrset_algs[rrset_info].add(rrsig.algorithm)
                     self.rrsig_status[rrset_info][rrsig] = {}
 
                     signer = self.get_name(rrsig.signer)
@@ -875,12 +889,15 @@ class DomainNameAnalysis(object):
                     if signer.stub:
                         continue
 
-                    for server_client in set(rrset_info.rrsig_info[rrsig].servers_clients).intersection(algs_signing_rrset):
-                        algs_signing_rrset[server_client].add(rrsig.algorithm)
-                        if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[server_client]) and \
-                                not dnssec_algorithms_in_ds.difference(algs_signing_rrset[server_client]) and \
-                                not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[server_client]):
-                            del algs_signing_rrset[server_client]
+                    for server, client in rrset_info.rrsig_info[rrsig].servers_clients:
+                        for response in rrset_info.rrsig_info[rrsig].servers_clients[(server,client)]:
+                            if (server,client,response) not in algs_signing_rrset:
+                                continue
+                            algs_signing_rrset[(server,client,response)].add(rrsig.algorithm)
+                            if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]) and \
+                                    not dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]) and \
+                                    not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
+                                del algs_signing_rrset[(server,client,response)]
 
                     # define self-signature
                     self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
@@ -938,58 +955,59 @@ class DomainNameAnalysis(object):
                         self.rrsig_status_by_status[rrsig_status.validation_status][(rrsig_status.rrset, rrsig_status.rrsig)] = set([rrsig_status])
 
                 # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
-                for server_client in algs_signing_rrset:
+                for server,client,response in algs_signing_rrset:
                     errors = self.rrset_errors[rrset_info]
                     # report an error if all RRSIGs are missing
-                    if not algs_signing_rrset[server_client]:
-                        if query.responses[server_client[0]][server_client[1]].dnssec_requested():
+                    if not algs_signing_rrset[(server,client,response)]:
+                        if response.dnssec_requested():
                             if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add(server_client)
+                            errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
                     else:
                         # report an error if RRSIGs for one or more algorithms are missing
-                        if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[server_client]):
+                        if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY].add(server_client)
-                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[server_client]):
+                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY].add((server,client))
+                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add(server_client)
-                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[server_client]):
+                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add((server,client))
+                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add(server_client)
+                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
 
                 for wildcard_name in rrset_info.wildcard_info:
                     statuses = []
-                    for server_client in rrset_info.wildcard_info[wildcard_name]:
-                        nsec_info_list = query.nsec_set_info_by_server[server_client]
-                        status = None
-                        for nsec_set_info in nsec_info_list:
-                            if nsec_set_info.use_nsec3:
-                                status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, nsec_set_info)
-                            else:
-                                status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, nsec_set_info)
-                            if status.validation_status == Status.STATUS_VALID:
-                                break
+                    for server, client in rrset_info.wildcard_info[wildcard_name]:
+                        for response in rrset_info.wildcard_info[wildcard_name][(server,client)]:
+                            nsec_info_list = query.nsec_set_info_by_server[response]
+                            status = None
+                            for nsec_set_info in nsec_info_list:
+                                if nsec_set_info.use_nsec3:
+                                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, nsec_set_info)
+                                else:
+                                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, nsec_set_info)
+                                if status.validation_status == Status.STATUS_VALID:
+                                    break
 
-                        # report that no NSEC(3) records were returned
-                        if status is None:
-                            # by definition, DNSSEC was requested (otherwise we
-                            # wouldn't know this was a wildcard), so no need to
-                            # check for DO bit in request
-                            if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
-                                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
-                            self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add(server_client)
+                            # report that no NSEC(3) records were returned
+                            if status is None:
+                                # by definition, DNSSEC was requested (otherwise we
+                                # wouldn't know this was a wildcard), so no need to
+                                # check for DO bit in request
+                                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
+                                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
+                                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
 
-                        # add status to list, if an equivalent one not already added
-                        elif status not in statuses:
-                            statuses.append(status)
-                            validation_status = status.validation_status
-                            if validation_status not in self.wildcard_status_by_status:
-                                self.wildcard_status_by_status[validation_status] = set()
-                            self.wildcard_status_by_status[validation_status].add(status)
+                            # add status to list, if an equivalent one not already added
+                            elif status not in statuses:
+                                statuses.append(status)
+                                validation_status = status.validation_status
+                                if validation_status not in self.wildcard_status_by_status:
+                                    self.wildcard_status_by_status[validation_status] = set()
+                                self.wildcard_status_by_status[validation_status].add(status)
 
                     if statuses:
                         if rrset_info.rrset.name not in self.wildcard_status:
@@ -997,44 +1015,43 @@ class DomainNameAnalysis(object):
                         if wildcard_name not in self.wildcard_status[rrset_info.rrset.name]:
                             self.wildcard_status[rrset_info.rrset.name][wildcard_name] = set(statuses)
 
-            for rrset_info in query.rrset_answer_info:
                 qname_obj = self.get_name(rrset_info.rrset.name)
                 if rrset_info.rrset.rdtype == dns.rdatatype.DS:
                     qname_obj = qname_obj.parent
-                for server_client in rrset_info.servers_clients:
-                    errors = self.rrset_errors[rrset_info]
-                    warnings = self.rrset_warnings[rrset_info]
-                    server, client = server_client
-                    if query.responses[server][client].message.edns < 0:
-                        ##TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                        #if query.responses[server][client].effective_edns < 0:
-                        #    pass
-                        #else:
-                        #    pass
-                        if qname_obj is not None and qname_obj.signed:
-                            if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                    elif not query.responses[server][client].effective_edns_flags & dns.flags.DO:
-                        if qname_obj is not None and qname_obj.signed:
-                            if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                    if not query.responses[server][client].is_authoritative() and \
-                            not query.responses[server][client].recursion_desired_and_available():
-                        if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                        errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
+                for server,client in rrset_info.servers_clients:
+                    for response in rrset_info.servers_clients[(server,client)]:
+                        errors = self.rrset_errors[rrset_info]
+                        warnings = self.rrset_warnings[rrset_info]
+                        if response.message.edns < 0:
+                            ##TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
+                            #if query.responses[server][client].effective_edns < 0:
+                            #    pass
+                            #else:
+                            #    pass
+                            if qname_obj is not None and qname_obj.signed:
+                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
+                        elif not response.effective_edns_flags & dns.flags.DO:
+                            if qname_obj is not None and qname_obj.signed:
+                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
+                        if not response.is_authoritative() and \
+                                not response.recursion_desired_and_available():
+                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
+                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
             self.response_errors_rcode[(qname, rdtype)] = {}
             for rcode in query.error_rcode:
@@ -1067,7 +1084,7 @@ class DomainNameAnalysis(object):
         self.delegation_warnings = {}
 
         try:
-            ds_rrset_info_list = self.queries[(name, rdtype)].rrset_answer_info
+            ds_rrset_answer_info = self.queries[(name, rdtype)].rrset_answer_info
         except KeyError:
             # zones should have DS queries
             if self.is_zone():
@@ -1078,7 +1095,18 @@ class DomainNameAnalysis(object):
         secure_path = False
         self.delegation_status = None
 
-        for ds_rrset_info in ds_rrset_info_list:
+        # populate all the servers queried for DNSKEYs to determine
+        # what problems there were with regard to DS records and if
+        # there is at least one match
+        dnskey_server_client_responses = set()
+        for dnskey_query in self.queries[(name, dns.rdatatype.DNSKEY)].queries.values():
+            for server in dnskey_query.responses:
+                for client in dnskey_query.responses[server]:
+                    response = dnskey_query.responses[server][client]
+                    if response.is_valid_response() and response.is_complete_response():
+                        dnskey_server_client_responses.add((server,client,response))
+
+        for ds_rrset_info in ds_rrset_answer_info:
             # for each set of DS records provided by one or more servers,
             # identify the set of DNSSEC algorithms and the set of digest
             # algorithms per algorithm/key tag combination
@@ -1096,57 +1124,73 @@ class DomainNameAnalysis(object):
             if supported_ds_algs:
                 secure_path = True
 
-            servers_clients_queried_for_dnskey = set()
-            algs_validating_sep = {}
             algs_signing_sep = {}
-            for server in self.queries[(name, dns.rdatatype.DNSKEY)].responses:
-                for client in self.queries[(name, dns.rdatatype.DNSKEY)].responses[server]:
-                    if self.queries[(name, dns.rdatatype.DNSKEY)].responses[server][client].is_complete_response():
-                        servers_clients_queried_for_dnskey.add((server, client))
-                        algs_validating_sep[(server, client)] = set()
-                        algs_signing_sep[(server, client)] = set()
+            algs_validating_sep = {}
+            for server,client,response in dnskey_server_client_responses:
+                algs_signing_sep[(server,client,response)] = set()
+                algs_validating_sep[(server,client,response)] = set()
 
             for ds_rdata in ds_rrset_info.rrset:
                 self.ds_status_by_ds[rdtype][ds_rdata] = {}
                 checked_keys = set()
 
-                for dnskey_set, dnskey_info in self.get_dnskey_sets():
+                for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
                     validation_status_mapping = { True: set(), False: set(), None: set() }
-                    for dnskey in dnskey_set:
+                    for dnskey_rdata in dnskey_info.rrset:
+                        dnskey = self._dnskeys[dnskey_rdata]
+
                         # if we've already checked this key (i.e., in
                         # another DNSKEY RRset) then continue
                         if dnskey in checked_keys:
                             continue
                         checked_keys.add(dnskey)
+
                         if dnskey not in self.ds_status_by_dnskey[rdtype]:
                             self.ds_status_by_dnskey[rdtype][dnskey] = {}
+
+                        # if the key tag doesn't match, then go any farther
                         if not (ds_rdata.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
                                 ds_rdata.algorithm == dnskey.rdata.algorithm):
                             continue
+
+                        # check if the digest is a match
                         ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, digest_algorithm_unknown=ds_rdata.digest_type not in supported_digest_algs)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
 
-                        if ds_status.validation_status == Status.DS_STATUS_VALID:
-                            # if this is digest type 1, and digest type 2 exists, then use that one instead
-                            if ds_rdata.digest_type == 1 and 2 in digest_algs[(ds_rdata.algorithm, ds_rdata.key_tag)] and 2 in supported_digest_algs:
+                        # ignore DS algorithm 1 if algorithm 2 exists
+                        ignore_ds_alg = (ds_rdata.digest_type == 1) and (2 in digest_algs[(ds_rdata.algorithm, ds_rdata.key_tag)]) and (2 in supported_digest_algs)
+
+                        for rrsig in dnskey_info.rrsig_info:
+                            # move along if DNSKEY is not self-signing
+                            if dnskey not in self.rrsig_status[dnskey_info][rrsig]:
                                 continue
-                            rrsigs = self.rrsig_status[dnskey_info].keys()
-                            for rrsig in rrsigs:
-                                if dnskey not in self.rrsig_status[dnskey_info][rrsig]:
-                                    continue
+                            
+                            # move along if key tag is not the same (i.e., revoke)
+                            if dnskey.key_tag != rrsig.key_tag:
+                                continue
 
-                                if dnskey.key_tag == rrsig.key_tag:
-                                    for server_client in servers_clients_queried_for_dnskey.intersection(algs_signing_sep):
-                                        algs_signing_sep[server_client].add(rrsig.algorithm)
-                                        if not ds_algs.difference(algs_signing_sep[server_client]):
-                                            del algs_signing_sep[server_client]
+                            for (server,client) in dnskey_info.rrsig_info[rrsig].servers_clients:
+                                for response in dnskey_info.rrsig_info[rrsig].servers_clients[(server,client)]:
+                                    # already passed the test
+                                    if (server,client,response) in algs_signing_sep:
+                                        # note that this algorithm is part of a self-signing DNSKEY
+                                        algs_signing_sep[(server,client,response)].add(rrsig.algorithm)
+                                        if not ds_algs.difference(algs_signing_sep[(server,client,response)]):
+                                            del algs_signing_sep[(server,client,response)]
 
-                                rrsig_status = self.rrsig_status[dnskey_info][rrsig][dnskey]
-                                if rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
-                                    for server_client in servers_clients_queried_for_dnskey.intersection(algs_validating_sep):
-                                        algs_validating_sep[server_client].add(rrsig.algorithm)
-                                        if not ds_algs.difference(algs_validating_sep[server_client]):
-                                            del algs_validating_sep[server_client]
+                                    if (server,client,response) in algs_validating_sep:
+                                        # retrieve the status of the DNSKEY RRSIG
+                                        rrsig_status = self.rrsig_status[dnskey_info][rrsig][dnskey]
+
+                                        # if the DS digest and the RRSIG are both valid, and the digest algorithm
+                                        # is not deprecated then mark it as a SEP
+                                        if ds_status.validation_status == Status.DS_STATUS_VALID and \
+                                                rrsig_status.validation_status == Status.RRSIG_STATUS_VALID and \
+                                                not ignore_ds_alg:
+                                            # note that this algorithm is part of a successful self-signing DNSKEY
+                                            algs_validating_sep[(server,client,response)].add(rrsig.algorithm)
+                                            if not ds_algs.difference(algs_validating_sep[(server,client,response)]):
+                                                del algs_validating_sep[(server,client,response)]
 
                     # if we got results for multiple keys, then just select the one that validates
                     for status in True, False, None:
@@ -1177,34 +1221,33 @@ class DomainNameAnalysis(object):
             if not algs_validating_sep:
                 self.delegation_status = Status.DELEGATION_STATUS_SECURE
             else:
-                for server_client in algs_validating_sep:
-                    if supported_ds_algs.intersection(algs_validating_sep[server_client]):
+                for server,client,response in dnskey_server_client_responses:
+                    if (server,client,response) not in algs_validating_sep or \
+                            supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
                         self.delegation_status = Status.DELEGATION_STATUS_SECURE
                     elif supported_ds_algs:
                         if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors:
                             self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP] = set()
-                        self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP].add(server_client)
+                        self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP].add((server,client))
 
             # report an error if one or more algorithms are incorrectly validated
-            for server_client in algs_signing_sep:
+            for (server,client,response) in algs_signing_sep:
                 if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors:
                     self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
-                self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add(server_client)
+                self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
 
         if self.delegation_status is None:
-            if ds_rrset_info_list:
+            if ds_rrset_answer_info:
                 if secure_path:
                     self.delegation_status = Status.DELEGATION_STATUS_BOGUS
                 else:
                     self.delegation_status = Status.DELEGATION_STATUS_INSECURE
-            elif self.parent.signed:
+            else:
                 self.delegation_status = Status.DELEGATION_STATUS_BOGUS
                 for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
                         self.delegation_status = Status.DELEGATION_STATUS_INSECURE
                         break
-            else:
-                self.delegation_status = Status.DELEGATION_STATUS_INSECURE
 
         if (self.name, dns.rdatatype.DS) in self.nxdomain_servers_clients:
             self.delegation_errors[Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
@@ -1233,6 +1276,7 @@ class DomainNameAnalysis(object):
             for rrset_info in query.rrset_answer_info:
                 yxdomain.add(rrset_info.rrset.name)
             yxdomain.update(query.rrset_noanswer_info)
+
         logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         for (qname, rdtype), query in self.queries.items():
             for qname_sought in query.nxdomain_info:
@@ -1242,35 +1286,37 @@ class DomainNameAnalysis(object):
                 statuses = []
                 self.nxdomain_warnings[(qname_sought, rdtype)] = {}
                 self.nxdomain_errors[(qname_sought, rdtype)] = {}
-                self.nxdomain_servers_clients[(qname_sought, rdtype)] = set()
+                self.nxdomain_servers_clients[(qname_sought, rdtype)] = {}
                 for soa_owner_name, servers_clients in query.nxdomain_info[qname_sought].items():
                     self.nxdomain_servers_clients[(qname_sought, rdtype)].update(servers_clients)
 
-                    if qname_sought == qname or query.flags & dns.flags.RD:
-                        if soa_owner_name is None:
-                            if qname_sought == qname:
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
-                            else:
-                                servers_affected = set()
-                                for server_client in servers_clients:
-                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                    if soa_owner_name is None:
+                        if qname_sought == qname:
+                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
+                        else:
+                            servers_affected = set()
+                            for server_client in servers_clients:
+                                for response in servers_clients[server_client]:
+                                    if response.recursion_desired_and_available():
                                         servers_affected.add(server_client)
-                                if servers_affected:
-                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_affected
-                        elif not qname_sought.is_subdomain(soa_owner_name):
-                            if qname_sought == qname:
-                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_clients)
-                            else:
-                                servers_affected = set()
-                                for server_client in servers_clients:
-                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                            if servers_affected:
+                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_affected
+                    elif not qname_sought.is_subdomain(soa_owner_name):
+                        if qname_sought == qname:
+                            if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
+                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_clients)
+                        else:
+                            servers_affected = set()
+                            for server_client in servers_clients:
+                                for response in servers_clients[server_client]:
+                                    if response.recursion_desired_and_available():
                                         servers_affected.add(server_client)
+                            if servers_affected:
                                 if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
                                     self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
                                 self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_affected)
-                            soa_owner_name = None
+                        soa_owner_name = None
 
                     if soa_owner_name is None:
                         if qname_obj is not None:
@@ -1282,31 +1328,31 @@ class DomainNameAnalysis(object):
                             soa_owner_name = qname_sought.parent()
 
                     for server_client in servers_clients:
-                        nsec_info_list = query.nsec_set_info_by_server[server_client]
-                        status = None
-                        for nsec_set_info in nsec_info_list:
-                            if nsec_set_info.use_nsec3:
-                                status = Status.NSEC3StatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
-                            else:
-                                status = Status.NSECStatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
-                            if status.validation_status == Status.STATUS_VALID:
-                                break
+                        for response in servers_clients[server_client]:
+                            nsec_info_list = query.nsec_set_info_by_server[response]
+                            status = None
+                            for nsec_set_info in nsec_info_list:
+                                if nsec_set_info.use_nsec3:
+                                    status = Status.NSEC3StatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
+                                else:
+                                    status = Status.NSECStatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
+                                if status.validation_status == Status.STATUS_VALID:
+                                    break
 
-                        # report that no NSEC(3) records were returned
-                        if status is None:
-                            if qname_obj is not None and qname_obj.zone.signed and \
-                                    query.responses[server_client[0]][server_client[1]].dnssec_requested() and \
-                                    (qname_sought == qname or query.responses[server_client[0]][server_client[1]].recursion_desired_and_available()):
-                                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN].add(server_client)
+                            # report that no NSEC(3) records were returned
+                            if status is None:
+                                if qname_obj is not None and qname_obj.zone.signed and response.dnssec_requested() and \
+                                        (qname_sought == qname or response.recursion_desired_and_available()):
+                                    if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
+                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN].add(server_client)
 
-                        elif status not in statuses:
-                            statuses.append(status)
-                            validation_status = status.validation_status
-                            if validation_status not in self.nxdomain_status_by_status:
-                                self.nxdomain_status_by_status[validation_status] = set()
-                            self.nxdomain_status_by_status[validation_status].add(status)
+                            elif status not in statuses:
+                                statuses.append(status)
+                                validation_status = status.validation_status
+                                if validation_status not in self.nxdomain_status_by_status:
+                                    self.nxdomain_status_by_status[validation_status] = set()
+                                self.nxdomain_status_by_status[validation_status].add(status)
 
                 if statuses:
                     self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
@@ -1317,37 +1363,37 @@ class DomainNameAnalysis(object):
                 errors = self.nxdomain_errors[(qname_sought, rdtype)]
                 warnings = self.nxdomain_warnings[(qname_sought, rdtype)]
                 for server_client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
-                    server, client = server_client
-                    if query.responses[server][client].message.edns < 0:
-                        #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                        #if query.responses[server][client].effective_edns < 0:
-                        #    pass
-                        #else:
-                        #    pass
-                        if qname_obj is not None and qname_obj.zone.signed:
-                            if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                    elif not query.responses[server][client].effective_edns_flags & dns.flags.DO:
-                        if qname_obj is not None and qname_obj.zone.signed:
-                            if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                    if not query.responses[server][client].is_authoritative() and \
-                            not query.responses[server][client].recursion_desired_and_available():
-                        if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                        errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
+                    for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server_client]:
+                        if response.message.edns < 0:
+                            #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
+                            #if query.responses[server][client].effective_edns < 0:
+                            #    pass
+                            #else:
+                            #    pass
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                        elif not response.effective_edns_flags & dns.flags.DO:
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                        if not response.is_authoritative() and \
+                                not response.recursion_desired_and_available():
+                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
+                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
 
             # no answer
             for qname_sought in query.rrset_noanswer_info:
@@ -1357,39 +1403,41 @@ class DomainNameAnalysis(object):
                 statuses = []
                 self.noanswer_warnings[(qname_sought, rdtype)] = {}
                 self.noanswer_errors[(qname_sought, rdtype)] = {}
-                self.noanswer_servers_clients[(qname_sought, rdtype)] = set()
+                self.noanswer_servers_clients[(qname_sought, rdtype)] = {}
                 for soa_owner_name, servers_clients in query.rrset_noanswer_info[qname_sought].items():
                     self.noanswer_servers_clients[(qname_sought, rdtype)].update(servers_clients)
 
-                    if qname_sought == qname or query.flags & dns.flags.RD:
-                        if soa_owner_name is None:
-                            # check for an upward referral
-                            servers_missing_soa = set()
-                            servers_upward_referral = set()
-                            for server_client in servers_clients:
-                                if qname_sought == qname or query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
-                                    if qname_obj is not None and query.responses[server_client[0]][server_client[1]].is_upward_referral(qname_obj.zone.name):
+                    if soa_owner_name is None:
+                        # check for an upward referral
+                        servers_missing_soa = set()
+                        servers_upward_referral = set()
+                        for server_client in servers_clients:
+                            for response in servers_clients[server_client]:
+                                if qname_sought == qname or response.recursion_desired_and_available():
+                                    if qname_obj is not None and response.is_upward_referral(qname_obj.zone.name):
                                         servers_upward_referral.add(server_client)
                                     else:
                                         servers_missing_soa.add(server_client)
-                            if servers_missing_soa:
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_missing_soa
-                            if servers_upward_referral:
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UPWARD_REFERRAL] = servers_upward_referral
-                        elif not qname_sought.is_subdomain(soa_owner_name):
-                            if qname_sought == qname:
-                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
-                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_clients)
-                            else:
-                                servers_affected = set()
-                                for server_client in servers_clients:
-                                    if query.responses[server_client[0]][server_client[1]].recursion_desired_and_available():
+                        if servers_missing_soa:
+                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_missing_soa
+                        if servers_upward_referral:
+                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UPWARD_REFERRAL] = servers_upward_referral
+                    elif not qname_sought.is_subdomain(soa_owner_name):
+                        if qname_sought == qname:
+                            if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
+                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
+                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_clients)
+                        else:
+                            servers_affected = set()
+                            for server_client in servers_clients:
+                                for response in servers_clients[server_client]:
+                                    if response.recursion_desired_and_available():
                                         servers_affected.add(server_client)
+                            if servers_affected:
                                 if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
                                     self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
                                 self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_affected)
-                            soa_owner_name = None
+                        soa_owner_name = None
 
                     if soa_owner_name is None:
                         if qname_obj is not None:
@@ -1401,33 +1449,33 @@ class DomainNameAnalysis(object):
                             soa_owner_name = qname_sought.parent()
 
                     for server_client in servers_clients:
-                        nsec_info_list = query.nsec_set_info_by_server[server_client]
-                        status = None
-                        for nsec_set_info in nsec_info_list:
-                            if nsec_set_info.use_nsec3:
-                                status = Status.NSEC3StatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
-                            else:
-                                status = Status.NSECStatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
-                                # possible empty non-terminal
-                                if status.validation_status != Status.STATUS_VALID:
-                                    status = Status.NSECStatusEmptyNonTerminal(qname_sought, soa_owner_name, nsec_set_info)
-                            if status.validation_status == Status.STATUS_VALID:
-                                break
+                        for response in servers_clients[server_client]:
+                            nsec_info_list = query.nsec_set_info_by_server[response]
+                            status = None
+                            for nsec_set_info in nsec_info_list:
+                                if nsec_set_info.use_nsec3:
+                                    status = Status.NSEC3StatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
+                                else:
+                                    status = Status.NSECStatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
+                                    # possible empty non-terminal
+                                    if status.validation_status != Status.STATUS_VALID:
+                                        status = Status.NSECStatusEmptyNonTerminal(qname_sought, soa_owner_name, nsec_set_info)
+                                if status.validation_status == Status.STATUS_VALID:
+                                    break
 
-                        if status is None:
-                            if qname_obj is not None and qname_obj.zone.signed and \
-                                    query.responses[server_client[0]][server_client[1]].dnssec_requested() and \
-                                    (qname_sought == qname or query.responses[server_client[0]][server_client[1]].recursion_desired_and_available()):
-                                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
-                                    self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
-                                self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA].add(server_client)
+                            if status is None:
+                                if qname_obj is not None and qname_obj.zone.signed and response.dnssec_requested() and \
+                                        (qname_sought == qname or response.recursion_desired_and_available()):
+                                    if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
+                                        self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
+                                    self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA].add(server_client)
 
-                        elif status not in statuses:
-                            statuses.append(status)
-                            validation_status = status.validation_status
-                            if validation_status not in self.noanswer_status_by_status:
-                                self.noanswer_status_by_status[validation_status] = set()
-                            self.noanswer_status_by_status[validation_status].add((qname_sought, query.rdtype))
+                            elif status not in statuses:
+                                statuses.append(status)
+                                validation_status = status.validation_status
+                                if validation_status not in self.noanswer_status_by_status:
+                                    self.noanswer_status_by_status[validation_status] = set()
+                                self.noanswer_status_by_status[validation_status].add((qname_sought, query.rdtype))
 
                 if statuses:
                     if (qname_sought, rdtype) not in self.noanswer_status:
@@ -1436,37 +1484,37 @@ class DomainNameAnalysis(object):
                 errors = self.noanswer_errors[(qname_sought,rdtype)]
                 warnings = self.noanswer_warnings[(qname_sought,rdtype)]
                 for server_client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
-                    server, client = server_client
-                    if query.responses[server][client].message.edns < 0:
-                        #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                        #if query.responses[server][client].effective_edns < 0:
-                        #    pass
-                        #else:
-                        #    pass
-                        if qname_obj is not None and qname_obj.zone.signed:
-                            if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                    elif not query.responses[server][client].effective_edns_flags & dns.flags.DO:
-                        if qname_obj is not None and qname_obj.zone.signed:
-                            if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                        #TODO determine if the following is a warning or not
-                        #else:
-                        #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                        #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                        #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                    if not query.responses[server][client].is_authoritative() and \
-                            not query.responses[server][client].recursion_desired_and_available():
-                        if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                        errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
+                    for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server_client]:
+                        if response.message.edns < 0:
+                            #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
+                            #if query.responses[server][client].effective_edns < 0:
+                            #    pass
+                            #else:
+                            #    pass
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                        elif not response.effective_edns_flags & dns.flags.DO:
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
+                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                            #TODO determine if the following is a warning or not
+                            #else:
+                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                        if not response.is_authoritative() and \
+                                not response.recursion_desired_and_available():
+                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
+                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
 
     def _populate_dnskey_status(self, trusted_keys):
         try:
@@ -1546,7 +1594,9 @@ class DomainNameAnalysis(object):
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d[name_str]['queries'][qname_type_str] = self.queries[(qname, rdtype)].serialize()
+            d[name_str]['queries'][qname_type_str] = []
+            for query in self.queries[(qname, rdtype)].queries.values():
+                d[name_str]['queries'][qname_type_str].append(query.serialize())
 
         for cname, cname_obj in self.cname_targets.items():
             cname_obj.serialize(d)
@@ -1960,7 +2010,8 @@ class DomainNameAnalysis(object):
             query_str = '%s/%s/%s' % (name_str, dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             if query_str in d['queries']:
                 logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
-                a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
+                for query in d['queries'][query_str]:
+                    a.add_query(Q.DNSQuery.deserialize(query))
         # set the NS dependencies for the name
         if a.is_zone():
             a.set_ns_dependencies()
@@ -1978,7 +2029,8 @@ class DomainNameAnalysis(object):
             else:
                 extra = ''
             logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
-            a.add_query(Q.DNSQuery.deserialize(d['queries'][query_str]))
+            for query in d['queries'][query_str]:
+                a.add_query(Q.DNSQuery.deserialize(query))
 
         for cname in a.cname_targets:
             a.cname_targets[cname] = cls.deserialize(cname, d1, cache=cache)
