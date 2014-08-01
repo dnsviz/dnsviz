@@ -1423,6 +1423,38 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
     max_attempts = 30
     lifetime = None
 
+class TruncationDiagnosticQuery(DNSSECQuery):
+    '''A simple query to test the results of a query with capabilities of only
+    receiving back a small (512 byte) payload.'''
+
+    response_handlers = [ChangeTimeoutOnTimeoutHandler(2.0, 3)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 2 seconds
+
+    edns_max_udp_payload = 512
+
+    query_timeout = 1.0
+    max_attempts = 8
+    lifetime = 15.0
+
+class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
+    '''A simple recursive query to test the results of a query with
+    capabilities of only receiving back a small (512 byte) payload.'''
+
+    response_handlers = [ChangeTimeoutOnTimeoutHandler(2.0, 3)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 2 seconds
+
+    edns_max_udp_payload = 512
+
+    query_timeout = 1.0
+    max_attempts = 8
+    lifetime = 15.0
+
 def main():
     import json
     import sys
