@@ -305,7 +305,6 @@ class DNSKEYMeta(object):
         self.rdata = rdata
         self.ttl = ttl
         self.servers_clients = {}
-        self.servers_clients_without = {}
         self.warnings = {}
         self.errors = {}
         self.rrset_info = []
@@ -494,7 +493,7 @@ class RRsetInfo(object):
         if (server, client) not in rrsig_info.servers_clients:
             rrsig_info.servers_clients[(server, client)] = []
         rrsig_info.servers_clients[(server, client)].append(response)
-        self.set_wildcard_info(rrsig, server, client)
+        self.set_wildcard_info(rrsig, server, client, response)
 
     def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response):
         try:
@@ -517,12 +516,14 @@ class RRsetInfo(object):
             return dns.name.Name(('*',)+self.rrset.name.labels[-(rrsig.labels+1):])
         return self.rrset.name
 
-    def set_wildcard_info(self, rrsig, server, client):
+    def set_wildcard_info(self, rrsig, server, client, response):
         if self.is_wildcard(rrsig):
             wildcard_name = self.reduce_wildcard(rrsig)
             if wildcard_name not in self.wildcard_info:
-                self.wildcard_info[wildcard_name] = set()
-            self.wildcard_info[wildcard_name].add((server, client))
+                self.wildcard_info[wildcard_name] = {}
+            if (server, client) not in self.wildcard_info[wildcard_name]:
+                self.wildcard_info[wildcard_name][(server, client)] = []
+            self.wildcard_info[wildcard_name][(server, client)].append(response)
 
     def message_for_rrsig(self, rrsig):
         s = StringIO.StringIO()

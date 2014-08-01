@@ -682,14 +682,18 @@ class AggregateDNSResponse(object):
                 if qname_sought not in self.nxdomain_info:
                     self.nxdomain_info[qname_sought] = {}
                 if soa_owner_name not in self.nxdomain_info[qname_sought]:
-                    self.nxdomain_info[qname_sought][soa_owner_name] = set()
-                self.nxdomain_info[qname_sought][soa_owner_name].add((server, client))
+                    self.nxdomain_info[qname_sought][soa_owner_name] = {}
+                if (server,client) not in self.nxdomain_info[qname_sought][soa_owner_name]:
+                    self.nxdomain_info[qname_sought][soa_owner_name][(server,client)] = []
+                self.nxdomain_info[qname_sought][soa_owner_name][(server,client)].append(response)
             else:
                 if qname_sought not in self.rrset_noanswer_info:
                     self.rrset_noanswer_info[qname_sought] = {}
                 if soa_owner_name not in self.rrset_noanswer_info[qname_sought]:
-                    self.rrset_noanswer_info[qname_sought][soa_owner_name] = set()
-                self.rrset_noanswer_info[qname_sought][soa_owner_name].add((server, client))
+                    self.rrset_noanswer_info[qname_sought][soa_owner_name] = {}
+                if (server,client) not in self.rrset_noanswer_info[qname_sought][soa_owner_name]:
+                    self.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)] = []
+                self.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)].append(response)
 
     def _update_rrsig_info(self, server, client, response, section, rrset_info):
         msg = response.message
@@ -738,7 +742,7 @@ class AggregateDNSResponse(object):
     def _aggregate_nsec(self, server, client, response, referral):
         msg = response.message
 
-        self.nsec_set_info_by_server[(server, client)] = []
+        self.nsec_set_info_by_server[response] = []
         for rdtype in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
             nsec_rrsets = filter(lambda x: x.rdtype == rdtype, msg.authority)
 
@@ -756,7 +760,7 @@ class AggregateDNSResponse(object):
             for name in nsec_set_info.rrsets:
                 self._update_rrsig_info(server, client, response, msg.authority, nsec_set_info.rrsets[name])
 
-            self.nsec_set_info_by_server[(server, client)].append(nsec_set_info)
+            self.nsec_set_info_by_server[response].append(nsec_set_info)
 
     def _aggregate_error(self, server, client, response):
         msg = response.message
@@ -993,6 +997,42 @@ class DNSQuery(AggregateDNSResponse):
             for client in d['responses'][server]:
                 q.add_response(server, client, DNSResponse.deserialize(d['responses'][server][client]))
         return q
+
+class MultiQuery(AggregateDNSResponse):
+    '''An simple DNS Query and its responses.'''
+
+    def __init__(self, qname, rdtype, rdclass):
+        super(MultiQuery, self).__init__()
+        self.qname = qname
+        self.rdtype = rdtype
+        self.rdclass = rdclass
+
+        self.queries = {}
+
+    def add_query(self, query):
+        if not (self.qname == query.qname and self.rdtype == query.rdtype and self.rdclass == query.rdclass):
+            raise ValueError('DNS query information must be the same as that to which query is being joined.')
+
+        edns_options_str = ''
+        for o in query.edns_options:
+            s = StringIO.StringIO()
+            o.to_wire(s)
+            edns_options_str += o.getvalue()
+        params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str)
+        if params in self.queries:
+            self.queries[params] = self.queries[params].join(query)
+        else:
+            self.queries[params] = query
+        for server in query.responses:
+            for client, response in query.responses[server].items():
+                self._aggregate_response(server, client, response, self.qname, self.rdtype)
+
+    def project(self, servers):
+        query = MultiQuery(self.qname, self.rdtype, self.rdclass)
+
+        for params in self.queries:
+            query.add_query(self.queries[params].project(servers))
+        return query
 
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
