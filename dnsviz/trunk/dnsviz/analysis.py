@@ -1308,6 +1308,8 @@ class DomainNameAnalysis(object):
 
                     for server_client in servers_clients:
                         for response in servers_clients[server_client]:
+                            if not (qname_sought == qname or response.recursion_desired_and_available()):
+                                continue
                             nsec_info_list = query.nsec_set_info_by_server[response]
                             status = None
                             for nsec_set_info in nsec_info_list:
@@ -1429,6 +1431,8 @@ class DomainNameAnalysis(object):
 
                     for server_client in servers_clients:
                         for response in servers_clients[server_client]:
+                            if not (qname_sought == qname or response.recursion_desired_and_available()):
+                                continue
                             nsec_info_list = query.nsec_set_info_by_server[response]
                             status = None
                             for nsec_set_info in nsec_info_list:
