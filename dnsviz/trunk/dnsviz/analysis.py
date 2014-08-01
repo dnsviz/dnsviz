@@ -2472,7 +2472,7 @@ class Analyst(object):
              # (referral type is A)
             else:
                 # don't remove either record if there's not an NXDOMAIN/YXDOMAIN mismatch
-                if name_obj.queries[(name_obj.name, dns.rdatatype.NS)].is_nxdomain_all() and \
+                if referral_queries[dns.rdatatype.NS].is_nxdomain_all() and \
                         is_valid and not is_nxdomain:
                     pass
                 else:
@@ -2565,7 +2565,7 @@ class Analyst(object):
             threads.append(t)
 
         for dname in name_obj.dname_targets:
-            a = self.__class__(cname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
+            a = self.__class__(dname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
             t.start()
             threads.append(t)
