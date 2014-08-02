@@ -134,7 +134,7 @@ _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.Simpl
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
 class DomainNameAnalysis(object):
-    def __init__(self, name, dlv_domain=None, stub=False):
+    def __init__(self, name, stub=False):
 
         ##################################################
         # General attributes
@@ -160,16 +160,9 @@ class DomainNameAnalysis(object):
         # A reference to the analysis of the parent authority (and that of the
         # DLV parent, if any).
         self.parent = None
-        self.dlv_parent = None
-        self.related_analyses = {}
 
-        if dlv_domain is not None:
-            try:
-                self._dlv_name = dns.name.Name(self.name.labels[:-1] + dlv_domain.labels)
-            except dns.name.NameTooLong:
-                self._dlv_name = None
-        else:
-            self._dlv_name = None
+        self._dlv_parent = None
+        self._dlv_name = None
 
         # The clients used for queries (serialized - for convenience)
         self.clients_ipv4 = set() 
@@ -267,8 +260,29 @@ class DomainNameAnalysis(object):
             return self.parent.name
         return None
 
-    def dlv_name(self):
+    def dlv_parent_name(self):
+        if self.dlv_parent is not None:
+            return self.dlv_parent.name
+        return None
+
+    def _set_dlv_parent(self, dlv_parent):
+        self._dlv_parent = dlv_parent
+        if dlv_parent is None:
+            self._dlv_name = None
+        else:
+            try:
+                self._dlv_name = dns.name.Name(self.name.labels[:-1] + dlv_parent.name.labels)
+            except dns.name.NameTooLong:
+                self._dlv_parent = None
+                self._dlv_name = None
+
+    def _get_dlv_parent(self):
+        return self._dlv_parent
+    dlv_parent = property(_get_dlv_parent, _set_dlv_parent)
+
+    def _get_dlv_name(self):
         return self._dlv_name
+    dlv_name = property(_get_dlv_name)
 
     def is_zone(self):
         return self.has_ns or self.name == dns.name.root or self._auth_ns_ip_mapping
@@ -421,7 +435,7 @@ class DomainNameAnalysis(object):
 
         # in the case where a corresponding RRset is found, analyze it here
         if rrset is not None:
-            if query.qname in (self.name, self.dlv_name()):
+            if query.qname in (self.name, self.dlv_name):
                 if rrset.rdtype == dns.rdatatype.SOA:
                     self._handle_soa_response(rrset)
                 elif rrset.rdtype == dns.rdatatype.MX:
@@ -444,7 +458,7 @@ class DomainNameAnalysis(object):
                     for rrsig in rrsig_rrset:
                         if rrsig_rrset.covers == dns.rdatatype.DS and rrsig.signer == self.parent_name():
                             pass
-                        elif rrsig_rrset.covers == dns.rdatatype.DLV and rrsig.signer == self.dlv_name():
+                        elif rrsig_rrset.covers == dns.rdatatype.DLV and rrsig.signer == self.dlv_parent_name():
                             pass
                         elif rrsig.signer == self.zone.name:
                             pass
@@ -815,9 +829,9 @@ class DomainNameAnalysis(object):
                 self.rrset_errors[rrset_info] = {}
                 self.rrsig_status[rrset_info] = {}
 
-                if rdtype == dns.rdatatype.DLV:
-                    dnssec_algorithms_in_dnskey = self.dlv.dnssec_algorithms_in_dnskey
-                    dnssec_algorithms_in_ds = self.dlv.dnssec_algorithms_in_ds
+                if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
+                    dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
+                    dnssec_algorithms_in_ds = set()
                     dnssec_algorithms_in_dlv = set()
                 elif rdtype == dns.rdatatype.DS:
                     dnssec_algorithms_in_dnskey = self.parent.dnssec_algorithms_in_dnskey
@@ -1046,7 +1060,7 @@ class DomainNameAnalysis(object):
         if self.parent is None:
             return
         if rdtype == dns.rdatatype.DLV:
-            name = self.dlv_name()
+            name = self.dlv_name
             if name is None:
                 raise ValueError('No DLV specified for DomainNameAnalysis object.')
         else:
@@ -1974,7 +1988,7 @@ class DomainNameAnalysis(object):
 
         logger.info('Loading %s' % fmt.humanize_name(name))
 
-        cache[name] = a = cls(name, dlv_parent_name, stub=stub)
+        cache[name] = a = cls(name, stub=stub)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
@@ -2057,12 +2071,13 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    clone_attrnames = ['client_ipv4', 'client_ipv6', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
-    def __init__(self, name, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
+    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
              follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
+        self.dlv_domain = dlv_domain
         self.ceiling = self._detect_ceiling(ceiling)[0]
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
@@ -2162,6 +2177,8 @@ class Analyst(object):
             return False
         if self.qname_only and name != self.name:
             return False
+        if self.dlv_domain == self.name:
+            return False
         return True
 
     def _is_dkim(self, name):
@@ -2203,7 +2220,15 @@ class Analyst(object):
         return name_obj
 
     def analyze(self):
+        self._analyze_dlv()
         return self._analyze(self.name)
+
+    def _analyze_dlv(self):
+        if self.dlv_domain is not None and self.dlv_domain != self.name and self.dlv_domain not in self.analysis_cache:
+            kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
+            kwargs['ceiling'] = self.dlv_domain
+            a = self.__class__(self.dlv_domain, force_dnskey=False, **kwargs)
+            a.analyze()
 
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
@@ -2262,6 +2287,12 @@ class Analyst(object):
             # rather than the simply the domain formed by dropping its lower
             # leftmost label
             parent_obj = parent_obj.zone
+
+        # retrieve the dlv
+        if self.dlv_domain is not None and self.name != self.dlv_domain:
+            dlv_parent_obj = self.analysis_cache[self.dlv_domain]
+        else:
+            dlv_parent_obj = None
         
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
@@ -2269,6 +2300,7 @@ class Analyst(object):
 
         try:
             name_obj.parent = parent_obj
+            name_obj.dlv_parent = dlv_parent_obj
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
@@ -2277,6 +2309,11 @@ class Analyst(object):
 
             # set analysis_end
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+            # remove dlv_parent if there are no DLV queries associated with it
+            if name_obj.dlv_parent is not None and \
+                    (name_obj.dlv_name, dns.rdatatype.DLV) not in name_obj.queries:
+                name_obj.dlv_parent = None
 
             # sanity check - if we weren't able to get responses from any
             # servers, check that we actually have connectivity
@@ -2333,6 +2370,8 @@ class Analyst(object):
                     logger.debug('Querying %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                     queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    # we also do a query with small UDP payload to elicit and test a truncated response
+                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone() or self._is_dkim(name_obj.name):
                     logger.debug('Querying %s/TXT...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
@@ -2342,17 +2381,19 @@ class Analyst(object):
 
             if servers:
                 if (not self.qname_only) or self.name == name_obj.name:
-                    logger.debug('Querying %s/SOA...' % fmt.humanize_name(name_obj.name))
-                    # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
-                    # (the query falls back to UDP in case there are issues)
-                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    if self.dlv_domain != self.name:
+                        logger.debug('Querying %s/SOA...' % fmt.humanize_name(name_obj.name))
+                        # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
+                        # (the query falls back to UDP in case there are issues)
+                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
                 logger.debug('Querying %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                # we also do a query with small UDP payload to elicit and test a truncated response
                 queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
-            if name_obj.parent is not None:
+            if name_obj.parent is not None and self.dlv_domain != self.name:
                 if not name_obj.parent._all_servers_queried:
                     parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 else:
@@ -2363,16 +2404,15 @@ class Analyst(object):
                 queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, self.client_ipv4, self.client_ipv6)
 
                 if name_obj.dlv_parent is not None:
-                    #XXX fix this for stub
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
                     dlv_servers = self._filter_servers(dlv_servers)
-                    dlv_name = name_obj.dlv_name()
+                    dlv_name = name_obj.dlv_name
                     if dlv_servers:
                         logger.debug('Querying %s/DLV...' % fmt.humanize_name(dlv_name))
                         queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
-        if servers:
+        if servers and self.dlv_domain != self.name:
             if name_obj.is_zone() and \
                     ((not self.qname_only) or name_obj.name == self.name):
                 self._set_negative_queries(name_obj)
