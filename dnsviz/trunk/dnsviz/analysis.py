@@ -307,6 +307,8 @@ class DomainNameAnalysis(object):
             return self
         elif name == self.parent_name():
             return self.parent
+        elif name == self.dlv_parent_name():
+            return self.dlv_parent
         elif name in self.external_signers:
             return self.external_signers[name]
         elif name in self.ns_dependencies and self.ns_dependencies[name] is not None:
@@ -783,7 +785,9 @@ class DomainNameAnalysis(object):
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
         self._populate_nsec_status()
-        self._populate_ds_status(supported_algs, supported_digest_algs)
+        self._populate_delegation_status(supported_algs, supported_digest_algs)
+        if self.dlv_parent is not None:
+            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
         self._populate_dnskey_status(trusted_keys)
 
         for cname, cname_obj in self.cname_targets.items():
@@ -1054,7 +1058,19 @@ class DomainNameAnalysis(object):
             self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
             self.revoked_keys = set(filter(lambda x: x.rdata.flags & fmt.DNSKEY_FLAGS['revoke'], self.get_dnskeys()))
 
-    def _populate_ds_status(self, supported_algs, supported_digest_algs, rdtype=dns.rdatatype.DS):
+    def _populate_delegation_status(self, supported_algs, supported_digest_algs):
+        self.ds_status_by_ds = {}
+        self.ds_status_by_dnskey = {}
+        self.ds_status_by_status = {}
+        self.delegation_errors = {}
+        self.delegation_warnings = {}
+        self.delegation_status = {}
+
+        self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs)
+        if self.dlv_parent is not None:
+            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+
+    def _populate_ds_status(self, rdtype, supported_algs, supported_digest_algs):
         if rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
             raise ValueError('Type can only be DS or DLV.')
         if self.parent is None:
@@ -1067,11 +1083,12 @@ class DomainNameAnalysis(object):
             name = self.name
 
         logger.debug('Assessing delegation status of %s...' % (fmt.humanize_name(self.name)))
-        self.ds_status_by_ds = { dns.rdatatype.DS: {}, dns.rdatatype.DLV: {} }
-        self.ds_status_by_dnskey = { dns.rdatatype.DS: {}, dns.rdatatype.DLV: {} }
-        self.ds_status_by_status = {}
-        self.delegation_errors = {}
-        self.delegation_warnings = {}
+        self.ds_status_by_ds[rdtype] = {}
+        self.ds_status_by_dnskey[rdtype] = {}
+        self.ds_status_by_status[rdtype] = {}
+        self.delegation_warnings[rdtype] = {}
+        self.delegation_errors[rdtype] = {}
+        self.delegation_status[rdtype] = None
 
         try:
             ds_rrset_answer_info = self.queries[(name, rdtype)].rrset_answer_info
@@ -1083,17 +1100,16 @@ class DomainNameAnalysis(object):
                 return
 
         secure_path = False
-        self.delegation_status = None
 
         if not self.get_responsive_auth_or_designated_servers():
-            self.delegation_status = Status.DELEGATION_STATUS_LAME
+            self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
             return
 
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
         # there is at least one match
         dnskey_server_client_responses = set()
-        for dnskey_query in self.queries[(name, dns.rdatatype.DNSKEY)].queries.values():
+        for dnskey_query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
             for server in dnskey_query.responses:
                 for client in dnskey_query.responses[server]:
                     response = dnskey_query.responses[server][client]
@@ -1185,7 +1201,7 @@ class DomainNameAnalysis(object):
                                 self.ds_status_by_ds[rdtype][ds_status.ds][ds_status.dnskey] = ds_status
                                 self.ds_status_by_dnskey[rdtype][ds_status.dnskey][ds_status.ds] = ds_status
 
-                                if ds_status.validation_status not in self.ds_status_by_status:
+                                if ds_status.validation_status not in self.ds_status_by_status[rdtype]:
                                     self.ds_status_by_status[ds_status.validation_status] = {}
                                 key = rdtype, ds_status.ds
                                 if key not in self.ds_status_by_status[ds_status.validation_status]:
@@ -1205,47 +1221,48 @@ class DomainNameAnalysis(object):
                     self.ds_status_by_status[ds_status.validation_status][(rdtype, ds_rdata)] = set([ds_status])
 
             if not algs_validating_sep:
-                self.delegation_status = Status.DELEGATION_STATUS_SECURE
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
             else:
                 for server,client,response in dnskey_server_client_responses:
                     if (server,client,response) not in algs_validating_sep or \
                             supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
-                        self.delegation_status = Status.DELEGATION_STATUS_SECURE
+                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
                     elif supported_ds_algs:
-                        if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors:
-                            self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP] = set()
-                        self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP].add((server,client))
+                        if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors[rdtype]:
+                            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
+                        self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP].add((server,client))
 
             # report an error if one or more algorithms are incorrectly validated
             for (server,client,response) in algs_signing_sep:
-                if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors:
-                    self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
-                self.delegation_errors[Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
+                if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors[rdtype]:
+                    self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
 
-        if self.delegation_status is None:
+        if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:
                 if secure_path:
-                    self.delegation_status = Status.DELEGATION_STATUS_BOGUS
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
                 else:
-                    self.delegation_status = Status.DELEGATION_STATUS_INSECURE
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
             elif self.parent.signed:
-                self.delegation_status = Status.DELEGATION_STATUS_BOGUS
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
                 for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
-                        self.delegation_status = Status.DELEGATION_STATUS_INSECURE
+                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                         break
             else:
-                self.delegation_status = Status.DELEGATION_STATUS_INSECURE
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
 
-        if (self.name, dns.rdatatype.DS) in self.nxdomain_servers_clients:
-            self.delegation_errors[Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
-            if self.delegation_status == Status.DELEGATION_STATUS_INSECURE:
-                self.delegation_status = Status.DELEGATION_STATUS_INCOMPLETE
+        if rdtype == dns.rdatatype.DS:
+            if (name, rdtype) in self.nxdomain_servers_clients:
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
+                if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
-        #XXX this needs consideration for recursive
-        if self.delegation_status == Status.DELEGATION_STATUS_INSECURE:
-            if not self.get_responsive_servers_udp() or not self._auth_servers_clients:
-                self.delegation_status = Status.DELEGATION_STATUS_LAME
+            #XXX this needs consideration for recursive
+            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                if not self.get_responsive_servers_udp() or not self._auth_servers_clients:
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
     def _populate_nsec_status(self):
         self.nxdomain_status = {}
@@ -1744,60 +1761,116 @@ class DomainNameAnalysis(object):
             if not d[name_str]['dnskeys']:
                 del d[name_str]['dnskeys']
 
-        if self.is_zone() and self.parent is not None:
-            d[name_str]['delegation'] = collections.OrderedDict()
-            if (self.name, dns.rdatatype.DS) in self.queries:
-                if self.ds_status_by_ds[dns.rdatatype.DS]:
-                    d[name_str]['delegation']['ds'] = []
-                    dss = self.ds_status_by_ds[dns.rdatatype.DS].keys()
-                    dss.sort()
-                    for ds in dss:
-                        dnskeys = self.ds_status_by_ds[dns.rdatatype.DS][ds].keys()
-                        dnskeys.sort()
-                        for dnskey in dnskeys:
-                            ds_status = self.ds_status_by_ds[dns.rdatatype.DS][ds][dnskey]
-                            ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                            if ds_serialized:
-                                d[name_str]['delegation']['ds'].append(ds_serialized)
-                    if not d[name_str]['delegation']['ds']:
-                        del d[name_str]['delegation']['ds']
+        if self.is_zone():
+            if self.parent is not None:
+                d[name_str]['delegation'] = collections.OrderedDict()
+                if (self.name, dns.rdatatype.DS) in self.queries:
+                    if self.ds_status_by_ds[dns.rdatatype.DS]:
+                        d[name_str]['delegation']['ds'] = []
+                        dss = self.ds_status_by_ds[dns.rdatatype.DS].keys()
+                        dss.sort()
+                        for ds in dss:
+                            dnskeys = self.ds_status_by_ds[dns.rdatatype.DS][ds].keys()
+                            dnskeys.sort()
+                            for dnskey in dnskeys:
+                                ds_status = self.ds_status_by_ds[dns.rdatatype.DS][ds][dnskey]
+                                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                                if ds_serialized:
+                                    d[name_str]['delegation']['ds'].append(ds_serialized)
+                        if not d[name_str]['delegation']['ds']:
+                            del d[name_str]['delegation']['ds']
 
-                if self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
-                    d[name_str]['delegation']['insecurity_proof'] = []
-                    for nsec_status in self.noanswer_status[(self.name, dns.rdatatype.DS)]:
-                        nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                        if nsec_serialized:
-                            d[name_str]['delegation']['insecurity_proof'].append(nsec_serialized)
-                    if not d[name_str]['delegation']['insecurity_proof']:
-                        del d[name_str]['delegation']['insecurity_proof']
+                    if self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
+                        d[name_str]['delegation']['insecurity_proof'] = []
+                        for nsec_status in self.noanswer_status[(self.name, dns.rdatatype.DS)]:
+                            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                            if nsec_serialized:
+                                d[name_str]['delegation']['insecurity_proof'].append(nsec_serialized)
+                        if not d[name_str]['delegation']['insecurity_proof']:
+                            del d[name_str]['delegation']['insecurity_proof']
 
-            if loglevel <= logging.INFO or self.delegation_status not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
-                d[name_str]['delegation']['status'] = Status.delegation_status_mapping[self.delegation_status]
+                if loglevel <= logging.INFO or self.delegation_status[dns.rdatatype.DS] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
+                    d[name_str]['delegation']['status'] = Status.delegation_status_mapping[self.delegation_status[dns.rdatatype.DS]]
 
-            if self.delegation_warnings and loglevel <= logging.WARNING:
-                d[name_str]['delegation']['warnings'] = collections.OrderedDict()
-                warnings = self.delegation_warnings.keys()
-                warnings.sort()
-                for warning in warnings:
-                    servers = tuple_to_dict(self.delegation_warnings[warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[name_str]['delegation']['warnings'][Status.delegation_error_mapping[warning]] = servers
+                if self.delegation_warnings[dns.rdatatype.DS] and loglevel <= logging.WARNING:
+                    d[name_str]['delegation']['warnings'] = collections.OrderedDict()
+                    warnings = self.delegation_warnings[dns.rdatatype.DS].keys()
+                    warnings.sort()
+                    for warning in warnings:
+                        servers = tuple_to_dict(self.delegation_warnings[dns.rdatatype.DS][warning])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        d[name_str]['delegation']['warnings'][Status.delegation_error_mapping[warning]] = servers
 
-            if self.delegation_errors and loglevel <= logging.ERROR:
-                d[name_str]['delegation']['errors'] = collections.OrderedDict()
-                errors = self.delegation_errors.keys()
-                errors.sort()
-                for error in errors:
-                    servers = tuple_to_dict(self.delegation_errors[error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[name_str]['delegation']['errors'][Status.delegation_error_mapping[error]] = servers
+                if self.delegation_errors[dns.rdatatype.DS] and loglevel <= logging.ERROR:
+                    d[name_str]['delegation']['errors'] = collections.OrderedDict()
+                    errors = self.delegation_errors[dns.rdatatype.DS].keys()
+                    errors.sort()
+                    for error in errors:
+                        servers = tuple_to_dict(self.delegation_errors[dns.rdatatype.DS][error])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        d[name_str]['delegation']['errors'][Status.delegation_error_mapping[error]] = servers
 
-            if not d[name_str]['delegation']:
-                del d[name_str]['delegation']
+                if not d[name_str]['delegation']:
+                    del d[name_str]['delegation']
+
+            if self.dlv_parent is not None:
+                d[name_str]['dlv'] = collections.OrderedDict()
+                if (self.dlv_name, dns.rdatatype.DLV) in self.queries:
+                    if self.ds_status_by_ds[dns.rdatatype.DLV]:
+                        d[name_str]['dlv']['ds'] = []
+                        dss = self.ds_status_by_ds[dns.rdatatype.DLV].keys()
+                        dss.sort()
+                        for ds in dss:
+                            dnskeys = self.ds_status_by_ds[dns.rdatatype.DLV][ds].keys()
+                            dnskeys.sort()
+                            for dnskey in dnskeys:
+                                ds_status = self.ds_status_by_ds[dns.rdatatype.DLV][ds][dnskey]
+                                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                                if ds_serialized:
+                                    d[name_str]['dlv']['ds'].append(ds_serialized)
+                        if not d[name_str]['dlv']['ds']:
+                            del d[name_str]['dlv']['ds']
+
+                    if self.noanswer_status.get((self.dlv_name, dns.rdatatype.DLV), []):
+                        d[name_str]['dlv']['insecurity_proof'] = []
+                        for nsec_status in self.noanswer_status[(self.name, dns.rdatatype.DLV)]:
+                            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                            if nsec_serialized:
+                                d[name_str]['dlv']['insecurity_proof'].append(nsec_serialized)
+                        if not d[name_str]['dlv']['insecurity_proof']:
+                            del d[name_str]['dlv']['insecurity_proof']
+
+                if loglevel <= logging.INFO or self.delegation_status[dns.rdatatype.DLV] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
+                    d[name_str]['dlv']['status'] = Status.delegation_status_mapping[self.delegation_status[dns.rdatatype.DLV]]
+
+                if self.delegation_warnings[dns.rdatatype.DLV] and loglevel <= logging.WARNING:
+                    d[name_str]['dlv']['warnings'] = collections.OrderedDict()
+                    warnings = self.delegation_warnings[dns.rdatatype.DLV].keys()
+                    warnings.sort()
+                    for warning in warnings:
+                        servers = tuple_to_dict(self.delegation_warnings[dns.rdatatype.DLV][warning])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        d[name_str]['dlv']['warnings'][Status.delegation_error_mapping[warning]] = servers
+
+                if self.delegation_errors[dns.rdatatype.DLV] and loglevel <= logging.ERROR:
+                    d[name_str]['dlv']['errors'] = collections.OrderedDict()
+                    errors = self.delegation_errors[dns.rdatatype.DLV].keys()
+                    errors.sort()
+                    for error in errors:
+                        servers = tuple_to_dict(self.delegation_errors[dns.rdatatype.DLV][error])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        d[name_str]['dlv']['errors'][Status.delegation_error_mapping[error]] = servers
+
+                if not d[name_str]['dlv']:
+                    del d[name_str]['dlv']
 
         if self.nxdomain_servers_clients:
             d[name_str]['nxdomain'] = collections.OrderedDict()
@@ -2393,7 +2466,7 @@ class Analyst(object):
                 # we also do a query with small UDP payload to elicit and test a truncated response
                 queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
-            if name_obj.parent is not None and self.dlv_domain != self.name:
+            if name_obj.parent is not None:
                 if not name_obj.parent._all_servers_queried:
                     parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 else:
@@ -2403,7 +2476,7 @@ class Analyst(object):
                 logger.debug('Querying %s/DS...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, self.client_ipv4, self.client_ipv6)
 
-                if name_obj.dlv_parent is not None:
+                if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name
