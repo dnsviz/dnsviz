@@ -761,7 +761,7 @@ class DomainNameAnalysis(object):
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False):
         if self.rrsig_status is not None:
             return
 
@@ -780,12 +780,13 @@ class DomainNameAnalysis(object):
         if self.parent is not None:
             self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
-            self.dlv_parent.populate_status(trusted_keys)
+            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True)
         logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
         self._populate_nsec_status()
-        self._populate_delegation_status(supported_algs, supported_digest_algs)
+        if not is_dlv:
+            self._populate_delegation_status(supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
         self._populate_dnskey_status(trusted_keys)
