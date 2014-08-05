@@ -893,15 +893,17 @@ class DNSAuthGraph:
 
         return nsec_node
 
-    def add_wildcard(self, name_obj, rrset_info, nsec_status, id):
+    def add_wildcard(self, name_obj, rrset_info, nsec_status, wildcard_name, id):
         zone_obj = name_obj.zone
 
-        wildcard_node = self.add_rrset(rrset_info, nsec_status.wildcard_name, name_obj, id)
+        wildcard_node = self.add_rrset(rrset_info, wildcard_name, name_obj, id)
         self.add_rrsigs(name_obj, zone_obj, rrset_info, wildcard_node)
         nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.rrset.name, rrset_info.rrset.rdtype, True, True, rrset_info.servers_clients)
-        nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, zone_obj, nxdomain_node)
-        for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-            self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+
+        if nsec_status is not None:
+            nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, zone_obj, nxdomain_node)
+            for rrset_info in nsec_status.nsec_set_info.rrsets.values():
+                self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
 
         return wildcard_node
 
@@ -960,9 +962,13 @@ class DNSAuthGraph:
                     id += 1
             elif rrset_info.wildcard_info:
                 for wildcard_name in rrset_info.wildcard_info:
-                    for nsec_status in name_obj.wildcard_status[rrset_info.rrset.name][wildcard_name]:
-                        my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, id))
+                    if rrset_info.rrset.name not in name_obj.wildcard_status:
+                        my_nodes.append(self.add_wildcard(name_obj, rrset_info, None, wildcard_name, id))
                         id += 1
+                    else:
+                        for nsec_status in name_obj.wildcard_status[rrset_info.rrset.name][wildcard_name]:
+                            my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, nsec_status.wildcard_name, id))
+                            id += 1
             else:
                 rrset_node = self.add_rrset(rrset_info, None, name_obj, id)
                 self.add_rrsigs(name_obj, zone_obj, rrset_info, rrset_node)
