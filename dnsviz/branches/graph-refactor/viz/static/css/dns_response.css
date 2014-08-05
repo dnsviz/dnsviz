@@ -1,6 +1,0 @@
-#container { margin: 10px; }
-.dns-response { margin-top: 10px; padding: 5px; background-color: #ddd; }
-.dns-response .section { margin: 10px 0px 10px 0px; }
-.dns-response h3 { font-size: 100%; margin: 0; }
-.dns-response td { vertical-align: top; padding: 0px 15px 0px 0px; }
-.dns-response :target { background-color: rgba(255,215,0,0.5); }
