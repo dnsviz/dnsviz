@@ -1040,11 +1040,10 @@ class DNSAuthGraph:
         if name_obj.parent is None or is_dlv:
             return
 
-        #XXX add in true DLV support
         for dlv in False, True:
             if dlv:
                 parent_obj = name_obj.dlv_parent
-                ds_name = name_obj.dlv_name()
+                ds_name = name_obj.dlv_name
                 rdtype = dns.rdatatype.DLV
             else:
                 parent_obj = name_obj.parent
@@ -1056,7 +1055,7 @@ class DNSAuthGraph:
 
             # if this is a DLV parent, and either we're not showing
             # DLV, or there is no DLV information for this zone, move along
-            if dlv and (self.dlv_domain is None or (ds_name, rdtype) not in name_obj.queries):
+            if dlv and (ds_name, rdtype) not in name_obj.queries:
                 continue
 
             self.graph_zone_auth(parent_obj, dlv)
@@ -1092,45 +1091,45 @@ class DNSAuthGraph:
                 edge_id += 1
 
             edge_label = ''
-            if name_obj.delegation_errors:
+            if name_obj.delegation_errors[rdtype]:
                 edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
-            elif name_obj.delegation_warnings:
+            elif name_obj.delegation_warnings[rdtype]:
                 edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
-            if name_obj.delegation_status == Status.DELEGATION_STATUS_SECURE:
+            if name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_SECURE:
                 line_color = COLORS['secure']
                 line_style = 'solid'
-            elif name_obj.delegation_status == Status.DELEGATION_STATUS_INSECURE:
+            elif name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 line_color = COLORS['insecure']
                 line_style = 'solid'
-            elif name_obj.delegation_status in (Status.DELEGATION_STATUS_INCOMPLETE, Status.DELEGATION_STATUS_LAME):
+            elif name_obj.delegation_status[rdtype] in (Status.DELEGATION_STATUS_INCOMPLETE, Status.DELEGATION_STATUS_LAME):
                 line_color = COLORS['warnings']
                 line_style = 'dashed'
-            elif name_obj.delegation_status == Status.DELEGATION_STATUS_BOGUS:
+            elif name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_BOGUS:
                 line_color = COLORS['bogus']
                 line_style = 'dashed'
 
             consolidate_clients = name_obj.single_client()
             del_serialized = collections.OrderedDict()
             del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
-            del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status]
-            if name_obj.delegation_warnings:
+            del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status[rdtype]]
+            if name_obj.delegation_warnings[rdtype]:
                 del_serialized['warnings'] = collections.OrderedDict()
-                warnings = name_obj.delegation_warnings.keys()
+                warnings = name_obj.delegation_warnings[rdtype].keys()
                 warnings.sort()
                 for warning in warnings:
-                    servers = tuple_to_dict(name_obj.delegation_warnings[warning])
+                    servers = tuple_to_dict(name_obj.delegation_warnings[rdtype][warning])
                     if consolidate_clients:
                         servers = list(servers)
                         servers.sort()
                     del_serialized['warnings'][Status.delegation_error_mapping[warning]] = servers
 
-            if name_obj.delegation_errors:
+            if name_obj.delegation_errors[rdtype]:
                 del_serialized['errors'] = collections.OrderedDict()
-                errors = name_obj.delegation_errors.keys()
+                errors = name_obj.delegation_errors[rdtype].keys()
                 errors.sort()
                 for error in errors:
-                    servers = tuple_to_dict(name_obj.delegation_errors[error])
+                    servers = tuple_to_dict(name_obj.delegation_errors[rdtype][error])
                     if consolidate_clients:
                         servers = list(servers)
                         servers.sort()
@@ -1140,29 +1139,23 @@ class DNSAuthGraph:
             self.node_info[edge_id] = [del_serialized]
             self.G.add_edge(zone_top, parent_bottom, label=edge_label, id=edge_id, color=line_color, penwidth='5.0', ltail=zone_graph_name, lhead=parent_graph_name, style=line_style, minlen='2', dir='back')
 
-    #XXX add in true DLV support
-    #def add_trust(self, dlv_domain):
     def add_trust(self, trusted_keys, supported_algs=None):
-        #if dlv_domain in trusted_keys:
-        #    dlv_tuple_extension = [(dlv_domain, trusted_keys[dlv_domain])]
-        #    del trusted_keys[dlv_domain]
-        #else:
-        #    dlv_tuple_extension = []
-
         trusted_keys = tuple_to_dict(trusted_keys)
         if supported_algs is not None:
             supported_algs.intersection_update(crypto._supported_algs)
         else:
             supported_algs = crypto._supported_algs
 
+        dlv_nodes = []
         trusted_zone_top_names = set([self.get_zone(z)[3] for z in trusted_keys])
         for zone in trusted_keys:
-            try:
-                zone_top_name = self.get_zone(zone)[3]
-            except KeyError:
-                #XXX if the dnskey is not a zone, then throw an error
-                pass
+            zone_top_name = self.get_zone(zone)[3]
+            if not self.G.has_node(zone_top_name):
+                continue
 
+            # if at least one algorithm in trusted keys for the zone is
+            # supported, then give zone no initial marking; otherwise mark it
+            # as insecure
             algs = set([d.algorithm for d in trusted_keys[zone]])
             if algs.intersection(supported_algs):
                 self.G.get_node(zone_top_name).attr['color'] = ''
@@ -1174,17 +1167,31 @@ class DNSAuthGraph:
                     dnskey_node = self.get_dnskey(self.id_for_dnskey(zone, dnskey), zone, dnskey.algorithm, Response.DNSKEYMeta.calc_key_tag(dnskey))
                     dnskey_node.attr['peripheries'] = 2
                     if self.G.get_node(zone_top_name).attr['color'] == '':
-                        self._add_trust_to_nodes_in_chain(dnskey_node, trusted_zone_top_names, [])
+                        self._add_trust_to_nodes_in_chain(dnskey_node, trusted_zone_top_names, dlv_nodes, False, [])
                 except KeyError:
                     dnskey_node = self.add_dnskey_non_existent(zone, zone, dnskey.algorithm, Response.DNSKEYMeta.calc_key_tag(dnskey))
                     dnskey_node.attr['peripheries'] = 2
-                    if self.G.get_node(zone_top_name).attr['color'] == '':
-                        dnskey_node.attr['color'] = COLORS['bogus']
+
+        # determine DLV zones based on DLV nodes
+        dlv_trusted_zone_top_names = []
+        for dlv_node in dlv_nodes:
+            dlv_trusted_zone_top_names.append(self.node_subgraph_name[dlv_node])
 
         # now traverse clusters and mark insecure nodes in secure delegations as bad
         for zone in trusted_keys:
             if self.has_zone(zone):
-                self._add_trust_to_orphaned_nodes(self.zone_node_str(zone), [])
+                zone_node_str = self.zone_node_str(zone)
+                # don't yet mark subdomains of DLV zones, as we have yet
+                # to add trust to them
+                if '%s_top' % zone_node_str not in dlv_trusted_zone_top_names:
+                    self._add_trust_to_orphaned_nodes(zone_node_str, [])
+
+        # now that we can show which zones are provably insecure, we
+        # can apply trust from the DLV zones
+        for dlv_node in dlv_nodes:
+            self._add_trust_to_nodes_in_chain(dlv_node, trusted_zone_top_names, [], True, [])
+            node_str = self.node_subgraph_name[dlv_node][:-4]
+            self._add_trust_to_orphaned_nodes(node_str, [])
 
         for n in self.G.nodes():
             if n.attr['shape'] not in ('ellipse', 'diamond', 'rectangle'):
@@ -1205,17 +1212,19 @@ class DNSAuthGraph:
             for serialized in self.node_info[node_id]:
                 serialized['status'] = Status.rrset_status_mapping[status]
 
-    def _add_trust_to_nodes_in_chain(self, n, trusted_zones, trace):
-        #XXX if the parent is insecure, but the DLV is broken (i.e., expired RRSIGs), how do we solve that?
+    def _add_trust_to_nodes_in_chain(self, n, trusted_zones, dlv_nodes, force, trace):
         if n in trace:
             return
 
         is_ds = n.startswith('DS-') or n.startswith('DLV-')
-        #XXX
-        #is_dlv = n.startswith('DLV-')
+        is_dlv = n.startswith('DLV-')
         is_dnskey = n.startswith('DNSKEY-')
         is_nsec = n.startswith('NSEC')
         is_dname = n.endswith('-DNAME')
+
+        if is_dlv and not force:
+            dlv_nodes.append(n)
+            return
 
         # if n isn't a DNSKEY, DS/DLV, or NSEC record,
         # then don't follow back edges
@@ -1248,6 +1257,13 @@ class DNSAuthGraph:
         node_trusted = n.attr['color'] == COLORS['secure']
 
         if is_dnskey and not node_trusted:
+            # Here we are shortcutting the traversal because we are no longer
+            # propagating trust.  But we still need to learn of any DLV nodes.
+            if not force:
+                S = self.G.get_subgraph(top_name[:-4])
+                for n in S.nodes():
+                    if n.startswith('DLV-'):
+                        dlv_nodes.append(n)
             return
 
         for e in self.G.in_edges(n):
@@ -1259,6 +1275,8 @@ class DNSAuthGraph:
                 continue
 
             prev_top_name = self.G.get_node(self.node_subgraph_name[p])
+            # don't derive trust from parent if there is a trust anchor at the
+            # child
             if is_ds and prev_top_name in trusted_zones:
                 continue
 
@@ -1270,6 +1288,16 @@ class DNSAuthGraph:
             # If this is a SEP node, and the top_name hasn't been
             # marked as secure, then enter here
             if is_ds:
+
+                # if this is a DLV node, then the zone it covers must be marked
+                # as insecure through previous trust traversal (not because of
+                # a local trust anchor, which case is handled above)
+                if is_dlv and prev_top_name.attr['color'] != COLORS['insecure']:
+                    continue
+
+                if prev_top_name.attr['color'] != COLORS['secure']:
+                    prev_top_name.attr['color'] = ''
+
                 valid_self_loop = False
                 if self.G.has_edge(p,p):
                     for e1 in self.G.out_edges(p) + self.G.in_edges(p):
@@ -1283,14 +1311,11 @@ class DNSAuthGraph:
             if is_nsec:
                 if prev_node_trusted and p.attr['shape'] == 'rectangle':
                     p.attr['color'] = COLORS['secure']
-                    #XXX
-                    #    if not self.G.has_edge(prev_top_name, '%s_bottom' % (self.zone_node_str(dlv_domain))):
-                    #        p.attr['color'] = COLORS['insecure']
 
             elif prev_node_trusted:
                 p.attr['color'] = COLORS['secure']
 
-            self._add_trust_to_nodes_in_chain(p, trusted_zones, trace+[n])
+            self._add_trust_to_nodes_in_chain(p, trusted_zones, dlv_nodes, force, trace+[n])
 
     def _add_trust_to_orphaned_nodes(self, subgraph_name, trace):
         if subgraph_name in trace:
@@ -1306,7 +1331,10 @@ class DNSAuthGraph:
         for n in S.nodes():
             style = n.attr['style'].split(',')
             # if node is non-existent, then continue, unless we are talking about an RRset
-            if 'dashed' in style and n.attr['shape'] != 'rectangle':
+            # or a non-existent trust anchor; it doesn't make sense to mark other nodes
+            # as bogus
+            if 'dashed' in style and not (n.attr['shape'] == 'rectangle' or \
+                    n.attr['peripheries'] == 2):
                 continue
 
             # if the name is already marked as trusted or bogus, then leave it alone
