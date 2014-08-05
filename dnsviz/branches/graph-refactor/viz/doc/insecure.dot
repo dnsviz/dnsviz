@@ -1,6 +1,0 @@
-digraph {
-	graph [penwidth="1.5"]
-	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">      </FONT><BR/><FONT POINT-SIZE="10">               </FONT>>, color="#000000", penwidth="1.5"]
-	b [label=<<FONT POINT-SIZE="12" FACE="Helvetica">    </FONT>>, shape="diamond", color="#000000", penwidth="1.5"]
-	c [label="               ", fontsize="10", shape="rectangle", style="rounded", color="#000000", penwidth="1.5"]
-}
