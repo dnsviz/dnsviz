@@ -2294,7 +2294,7 @@ class Analyst(object):
 
     def analyze(self):
         self._analyze_dlv()
-        return self._analyze(self.name)
+        return self._analyze(self.name)[0]
 
     def _analyze_dlv(self):
         if self.dlv_domain is not None and self.dlv_domain != self.name and self.dlv_domain not in self.analysis_cache:
@@ -2306,7 +2306,7 @@ class Analyst(object):
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
         if name_obj.analysis_end is not None:
-            return name_obj
+            return name_obj, False
 
         try:
             logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
@@ -2326,9 +2326,9 @@ class Analyst(object):
                         for a_rr in a.rrset:
                             name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                name_obj.parent = self._analyze_stub(name.parent()).zone
+                name_obj.parent = self._analyze_stub(name.parent())[0].zone
             except dns.exception.DNSException:
-                name_obj.parent = self._analyze_stub(name.parent()).zone
+                name_obj.parent = self._analyze_stub(name.parent())[0].zone
 
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
@@ -2338,7 +2338,7 @@ class Analyst(object):
             if hasattr(name_obj, 'complete'):
                 name_obj.complete.set()
 
-        return name_obj
+        return name_obj, True
 
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
@@ -2351,9 +2351,9 @@ class Analyst(object):
         elif name in self.explicit_delegations:
             parent_obj = None
         elif name == self.ceiling:
-            parent_obj = self._analyze_stub(name.parent())
+            parent_obj = self._analyze_stub(name.parent())[0]
         else:
-            parent_obj = self._analyze(name.parent())
+            parent_obj = self._analyze(name.parent())[0]
 
         if parent_obj is not None:
             # for zones other than the root assign parent_obj to the zone apex,
@@ -2369,7 +2369,7 @@ class Analyst(object):
         
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
-            return name_obj
+            return name_obj, False
 
         try:
             name_obj.parent = parent_obj
@@ -2403,7 +2403,7 @@ class Analyst(object):
         #XXX need to move this line to parallel analyst
         self.analysis_cache[name] = name_obj
 
-        return name_obj
+        return name_obj, True
 
     def _analyze_name(self, name_obj):
         logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
