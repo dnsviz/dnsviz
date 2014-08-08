@@ -2271,13 +2271,17 @@ class Analyst(object):
             servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
         return servers
 
-    def _get_name_for_analysis(self, name, stub=False):
+    def _get_name_for_analysis(self, name, stub=False, lock=True):
         with self.analysis_cache_lock:
             try:
                 name_obj = self.analysis_cache[name]
             except KeyError:
-                name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub)
-                return name_obj
+                if lock:
+                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub)
+                    return name_obj
+                # if not locking, then return None
+                else:
+                    return None
 
         # if there is a complete event, then wait on it
         if hasattr(name_obj, 'complete'):
@@ -2343,6 +2347,11 @@ class Analyst(object):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
 
+        # determine immediately if we need to do anything
+        name_obj = self._get_name_for_analysis(name, lock=False)
+        if name_obj is not None and name_obj.analysis_end is not None:
+            return name_obj, False
+
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
@@ -2366,6 +2375,7 @@ class Analyst(object):
         else:
             dlv_parent_obj = None
         
+        # get or create the name
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
             return name_obj, False
