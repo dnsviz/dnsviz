@@ -285,7 +285,7 @@ class DomainNameAnalysis(object):
     dlv_name = property(_get_dlv_name)
 
     def is_zone(self):
-        return self.has_ns or self.name == dns.name.root or self._auth_ns_ip_mapping
+        return bool(self.has_ns or self.name == dns.name.root or self._auth_ns_ip_mapping)
 
     def _get_zone(self):
         if self.is_zone():
@@ -508,7 +508,7 @@ class DomainNameAnalysis(object):
     def add_query(self, query):
         '''Process a DNS query and its responses, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
-
+        
         key = (query.qname, query.rdtype)
         if key not in self.queries:
             self.queries[key] = Q.MultiQuery(query.qname, query.rdtype, query.rdclass)
@@ -2275,22 +2275,20 @@ class Analyst(object):
         with self.analysis_cache_lock:
             try:
                 name_obj = self.analysis_cache[name]
-                wait_for_analysis = True
             except KeyError:
                 name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub)
-                wait_for_analysis = False
+                return name_obj
 
-        if wait_for_analysis:
-            # if there is a complete event, then wait on it
-            if hasattr(name_obj, 'complete'):
-                name_obj.complete.wait()
-            # otherwise, loop and wait for analysis to be completed
-            else:
-                while name_obj.analysis_end is None:
-                    time.sleep(1)
-                    name_obj = self.analysis_cache[name]
-            #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
-            #TODO re-do anaysis if not stub requested but cache is stub?
+        # if there is a complete event, then wait on it
+        if hasattr(name_obj, 'complete'):
+            name_obj.complete.wait()
+        # otherwise, loop and wait for analysis to be completed
+        else:
+            while name_obj.analysis_end is None:
+                time.sleep(1)
+                name_obj = self.analysis_cache[name]
+        #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
+        #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
 
     def analyze(self):
