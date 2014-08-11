@@ -37,11 +37,12 @@ import time
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
 import crypto
+import format as fmt
 import query as Q
 import resolver as Resolver
 import response as Response
 import status as Status
-import format as fmt
+from util import tuple_to_dict
 
 logger = logging.getLogger('dnsviz.analysis')
 
@@ -89,14 +90,6 @@ LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
 UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
 
 MAX_TTL = 100000000
-
-def tuple_to_dict(t):
-    d = {}
-    for n, v in t:
-        if n not in t:
-            d[n] = []
-        d[n].append(v)
-    return d
 
 def _get_client_address(server):
     if ':' in server:
@@ -762,9 +755,11 @@ class DomainNameAnalysis(object):
         return self.ksks.difference(self.revoked_keys)
 
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False):
+        # status has already been populated
         if self.rrsig_status is not None:
             return
 
+        # if we're a stub, there's nothing to evaluate
         if self.stub:
             return
 
@@ -1714,7 +1709,7 @@ class DomainNameAnalysis(object):
 
         return d
 
-    def serialize_status(self, d=None, loglevel=logging.DEBUG):
+    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG):
         if d is None:
             d = collections.OrderedDict()
 
@@ -1728,7 +1723,7 @@ class DomainNameAnalysis(object):
         if self.parent is not None:
             self.parent.serialize_status(d, loglevel=loglevel)
         if self.dlv_parent is not None:
-            self.dlv_parent.serialize_status(d, loglevel=loglevel)
+            self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel)
 
         consolidate_clients = self.single_client()
 
@@ -1763,7 +1758,7 @@ class DomainNameAnalysis(object):
                 del d[name_str]['dnskeys']
 
         if self.is_zone():
-            if self.parent is not None:
+            if self.parent is not None and not is_dlv:
                 d[name_str]['delegation'] = collections.OrderedDict()
                 if (self.name, dns.rdatatype.DS) in self.queries:
                     if self.ds_status_by_ds[dns.rdatatype.DS]:

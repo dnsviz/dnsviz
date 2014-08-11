@@ -10,29 +10,7 @@ import sys
 import dns.message, dns.name 
 
 from dnsviz.analysis import DomainNameAnalysis
-from dnsviz import format as fmt
-
-ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
-BLANK_LINES_RE = re.compile(r'\n\s*\n')
-
-#TODO - move this function to library
-def get_trusted_keys(filename):
-    trusted_keys = []
-
-    tk_str = open(filename, 'r').read()
-    tk_str = ZONE_COMMENTS_RE.sub('', tk_str)
-    tk_str = BLANK_LINES_RE.sub(r'\n', tk_str)
-    tk_str = tk_str.strip()
-    m = dns.message.from_text(str(';ANSWER\n'+tk_str))
-    for rrset in m.answer:
-        if rrset.rdtype != dns.rdatatype.DNSKEY:
-            pass
-        for dnskey in rrset:
-            if dnskey.flags & fmt.DNSKEY_FLAGS['revoke']:
-                pass
-            trusted_keys.append((rrset.name,dnskey))
-
-    return trusted_keys
+from dnsviz.util import get_trusted_keys
 
 def usage():
     sys.stderr.write( '''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
@@ -94,7 +72,7 @@ def main():
         analysis_structured = json.loads(analysis_str)
 
     if '-t' in opts:
-        trusted_keys = get_trusted_keys(opts['-t'])
+        trusted_keys = get_trusted_keys(open(opts['-t']).read())
     else:
         trusted_keys = ()
 
