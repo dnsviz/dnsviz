@@ -35,8 +35,9 @@ import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrs
 
 import base32
 import crypto
-import status as Status
 import format as fmt
+import status as Status
+from util import tuple_to_dict
 
 def _rr_cmp(a, b):
     '''Compare the wire value of rdata a and rdata b.'''
@@ -51,14 +52,6 @@ def _rr_cmp(a, b):
         return 1
     else:
         return 0
-
-def tuple_to_dict(t):
-    d = {}
-    for n, v in t:
-        if n not in t:
-            d[n] = []
-        d[n].append(v)
-    return d
 
 class DNSResponse:
     '''A DNS response, including meta information'''

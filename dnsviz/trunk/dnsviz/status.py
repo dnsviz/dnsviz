@@ -32,6 +32,7 @@ import dns.name, dns.rdatatype
 
 import crypto
 import format as fmt
+from util import tuple_to_dict
 
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1
@@ -243,14 +244,6 @@ dnskey_error_mapping = {
     DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING: 'TRUST_ANCHOR_NOT_SIGNING',
     DNSKEY_ERROR_REVOKED_NOT_SIGNING: 'REVOKED_NOT_SIGNING',
 }
-
-def tuple_to_dict(t):
-    d = {}
-    for n, v in t:
-        if n not in t:
-            d[n] = []
-        d[n].append(v)
-    return d
 
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, algorithm_unknown=False):

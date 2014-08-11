@@ -38,6 +38,7 @@ from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz import response as Response
 from dnsviz import status as Status
+from dnsviz.util import tuple_to_dict
 
 COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',
         'bogus': '#be1515', 'bogus_light': '#f17b7b',
@@ -51,14 +52,6 @@ COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',
 ICON_PATH=os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz', 'icons')
 WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
 ERROR_ICON=os.path.join(ICON_PATH, 'error.png')
-
-def tuple_to_dict(t):
-    d = {}
-    for n, v in t:
-        if n not in t:
-            d[n] = []
-        d[n].append(v)
-    return d
 
 class DNSKEYNonExistent(object):
     def __init__(self, name, algorithm, key_tag):
