@@ -1,0 +1,2 @@
+import os
+DNSVIZ_SHARE_PATH = os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz')

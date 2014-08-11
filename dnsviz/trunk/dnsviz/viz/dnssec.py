@@ -34,6 +34,7 @@ import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 
 from pygraphviz import AGraph
 
+from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz import response as Response
@@ -49,7 +50,7 @@ COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',
         'unknown': '#000000', 'insecure_light': '#b7b7b7',
         'errors': '#be1515', 'errors_light': '#f17b7b' }
 
-ICON_PATH=os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz', 'icons')
+ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
 WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
 ERROR_ICON=os.path.join(ICON_PATH, 'error.png')
 
