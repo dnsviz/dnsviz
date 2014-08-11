@@ -41,9 +41,9 @@ def finish_graph(G, trusted_keys, fmt, filename):
         template_str = template_str.replace('MEDIA_URL', MEDIA_URL)
         template_str = template_str.replace('JS_CODE', js_img)
         if filename is None:
-             return template_str
+            return template_str
         else:
-             codecs.open(filename, 'w', 'utf-8').write(template_str)
+            codecs.open(filename, 'w', 'utf-8').write(template_str)
     else:
         if filename is None:
             return G.draw(fmt)
@@ -76,7 +76,6 @@ def main():
         usage()
         sys.exit(1)
 
-    #TODO: support unicode
     if '-f' in opts:
         names = []
         with codecs.open(opts['-f'], 'r', 'utf-8') as f:
