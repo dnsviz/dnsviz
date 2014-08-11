@@ -2148,12 +2148,13 @@ class Analyst(object):
         self.name = name
         self.dlv_domain = dlv_domain
         self.ceiling = self._detect_ceiling(ceiling)[0]
-        self.client_ipv4 = client_ipv4
-        self.client_ipv6 = client_ipv6
-        if self.client_ipv4 is None and self.client_ipv6 is None:
-            self.client_ipv4, self.client_ipv6 = get_client_addresses()
+
+        if client_ipv4 is None and client_ipv6 is None:
+            client_ipv4, client_ipv6 = get_client_addresses()
         if client_ipv4 is None and client_ipv6 is None:
             raise NetworkConnectivityException('No network interfaces available for analysis!')
+        self.client_ipv4 = client_ipv4
+        self.client_ipv6 = client_ipv6
 
         self.force_dnskey = force_dnskey
         self.follow_ns = follow_ns
