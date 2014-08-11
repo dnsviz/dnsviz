@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import codecs
 import collections
 import getopt
 import json
@@ -52,12 +53,11 @@ def main():
     else:
         loglevel = logging.DEBUG
 
-    #TODO: support unicode
     if '-f' in opts:
         names = []
-        with open(opts['-f']) as f:
+        with codecs.open(opts['-f'], 'r', 'utf-8') as f:
             for line in f:
-                names.append(dns.name.from_text(line.strip()))
+                names.append(dns.name.from_unicode(line.strip()))
     else:
         names = map(dns.name.from_text, args)
 
