@@ -9,11 +9,12 @@ import sys
 import dns.message, dns.name 
 
 from dnsviz.analysis import DomainNameAnalysis
+from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
 
-MEDIA_URL = 'file://' + os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz')
-DNSSEC_TEMPLATE_FILE = os.path.join('DNSVIZ_INSTALL_PREFIX', 'share', 'dnsviz', 'html', 'dnssec-template.html')
+MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
+DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
 def usage():
     sys.stderr.write('''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )

@@ -22,8 +22,7 @@ def apply_install_prefix(filename):
     in_fh.close()
     out_fh.close()
 
-apply_install_prefix(os.path.join('dnsviz','viz','dnssec.py.in'))
-apply_install_prefix(os.path.join('bin','dnsviz.in'))
+apply_install_prefix(os.path.join('dnsviz','config.py.in'))
 
 setup(name='dnsviz',
         version='0.1.0',
