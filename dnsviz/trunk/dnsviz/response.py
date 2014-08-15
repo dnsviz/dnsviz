@@ -56,8 +56,9 @@ def _rr_cmp(a, b):
 class DNSResponse:
     '''A DNS response, including meta information'''
 
-    def __init__(self, message, error, errno, history, response_time, tcp_first):
+    def __init__(self, message, msg_size, error, errno, history, response_time, tcp_first):
         self.message = message
+        self.msg_size = msg_size
         self.error = error
         self.errno = errno
         self.history = history
@@ -83,7 +84,7 @@ class DNSResponse:
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
     def copy(self):
-        clone = DNSResponse(self.message, self.error, self.errno, self.history, self.response_time, self.tcp_first)
+        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.tcp_first)
         clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options)
         return clone
 
@@ -251,6 +252,7 @@ class DNSResponse:
                 d['errno'] = self.errno
         else:
             d['message'] = base64.b64encode(self.message.to_wire())
+            d['msg_size'] = self.msg_size
         d['tcp_first'] = self.tcp_first
         d['response_time'] = self.response_time
         d['history'] = []
@@ -262,6 +264,10 @@ class DNSResponse:
     def deserialize(cls, d):
         import query
 
+        if 'msg_size' in d:
+            msg_size = int(d['msg_size'])
+        else:
+            msg_size = None
         if 'error' in d:
             error = query.response_error_codes[d['error']]
         else:
@@ -281,7 +287,7 @@ class DNSResponse:
         history = []
         for retry in d['history']:
             history.append(query.DNSQueryRetryAttempt.deserialize(retry))
-        return DNSResponse(message, error, errno, history, response_time, tcp_first)
+        return DNSResponse(message, msg_size, error, errno, history, response_time, tcp_first)
 
 class RDataMeta(object):
     def __init__(self, name, ttl, rdtype, rdata):
