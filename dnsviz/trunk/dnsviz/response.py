@@ -252,6 +252,7 @@ class DNSResponse:
                 d['errno'] = self.errno
         else:
             d['message'] = base64.b64encode(self.message.to_wire())
+        if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['tcp_first'] = self.tcp_first
         d['response_time'] = self.response_time
