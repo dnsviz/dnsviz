@@ -2,6 +2,7 @@
 
 import glob
 import os
+import stat
 import sys
 
 from distutils.core import setup
@@ -16,6 +17,10 @@ def apply_install_prefix(filename):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
 
     filename_out = filename[:-3]
+
+    if os.path.exists(filename_out) and os.path.getctime(filename_out) > os.path.getctime(filename):
+        return
+
     in_fh = open(filename, 'r')
     out_fh = open(filename_out, 'w')
     out_fh.write(in_fh.read().replace('DNSVIZ_INSTALL_PREFIX', INSTALL_DATA))
