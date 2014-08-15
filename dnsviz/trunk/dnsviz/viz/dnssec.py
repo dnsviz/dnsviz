@@ -288,7 +288,7 @@ class DNSAuthGraph:
         return id
 
     def dnskey_node_str(self, id, name, algorithm, key_tag):
-        return 'DNSKEY-%s-%s-%d-%d' % (id, fmt.humanize_name(name), algorithm, key_tag)
+        return 'DNSKEY-%s|%s|%d|%d' % (id, fmt.humanize_name(name), algorithm, key_tag)
 
     def has_dnskey(self, id, name, algorithm, key_tag):
         return self.G.has_node(self.dnskey_node_str(id, name, algorithm, key_tag))
@@ -401,7 +401,7 @@ class DNSAuthGraph:
         digest_types = [d.digest_type for d in ds]
         digest_types.sort()
         digest_str = '_'.join(map(str, digest_types))
-        return '%s-%s-%s-%d-%d-%s' % (dns.rdatatype.to_text(rdtype), id, fmt.humanize_name(name), ds[0].algorithm, ds[0].key_tag, digest_str)
+        return '%s-%s|%s|%d|%d|%s' % (dns.rdatatype.to_text(rdtype), id, fmt.humanize_name(name), ds[0].algorithm, ds[0].key_tag, digest_str)
 
     def has_ds(self, id, name, ds, rdtype):
         return self.G.has_node(self.ds_node_str(id, name, ds, rdtype))
@@ -528,7 +528,7 @@ class DNSAuthGraph:
         else:
             dnskey_node = self.get_dnskey(self.id_for_dnskey(zone_obj.name, ds_status.dnskey.rdata), zone_obj.name, ds_status.dnskey.rdata.algorithm, ds_status.ds.key_tag)
 
-        edge_id = 'digest-%s--%s--%s-%s' % (dnskey_node, ds_node, line_color.lstrip('#'), line_style)
+        edge_id = 'digest-%s|%s|%s|%s' % (dnskey_node, ds_node, line_color.lstrip('#'), line_style)
         self.G.add_edge(dnskey_node, ds_node, id=edge_id, color=line_color, style=line_style, dir='back')
 
         self.node_info[edge_id] = [self.node_info[ds_node][0].copy()]
@@ -613,7 +613,7 @@ class DNSAuthGraph:
         #    S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(signer_obj.name)
 
         if combine_edge_id is not None:
-            edge_id = 'RRSIG-%s--%s-%d-%s' % (signed_node.replace('*', '_'), dnskey_node, combine_edge_id, line_style)
+            edge_id = 'RRSIG-%s|%s|%d|%s' % (signed_node.replace('*', '_'), dnskey_node, combine_edge_id, line_style)
             edge_key = '%d-%s' % (combine_edge_id, line_style)
             try:
                 edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
@@ -622,7 +622,7 @@ class DNSAuthGraph:
             except KeyError:
                 self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
         else:
-            edge_id = 'RRSIG-%s--%s--%s-%s' % (signed_node.replace('*', '_'), dnskey_node, line_color.lstrip('#'), line_style)
+            edge_id = 'RRSIG-%s|%s|%s|%s' % (signed_node.replace('*', '_'), dnskey_node, line_color.lstrip('#'), line_style)
             edge_key = '%s-%s' % (line_color, line_style)
             try:
                 edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
@@ -638,7 +638,7 @@ class DNSAuthGraph:
             self.node_info[edge_id].append(rrsig_serialized)
 
     def rrset_node_str(self, name, rdtype, id):
-        return 'RRset-%d-%s-%s' % (id, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
+        return 'RRset-%d|%s|%s' % (id, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
 
     def has_rrset(self, name, rdtype, id):
         return self.G.has_node(self.rrset_node_str(name, rdtype, id))
@@ -812,7 +812,7 @@ class DNSAuthGraph:
         else:
             cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, id)
 
-        edge_id = 'dname-%s--%s--%s-%s' % (cname_node, dname_node, line_color.lstrip('#'), line_style)
+        edge_id = 'dname-%s|%s|%s|%s' % (cname_node, dname_node, line_color.lstrip('#'), line_style)
         edge_key = '%s-%s' % (line_color, line_style)
         try:
             edge = self.G.get_edge(cname_node, dname_node, edge_key)
@@ -831,7 +831,7 @@ class DNSAuthGraph:
         return cname_node
 
     def nsec_node_str(self, nsec_rdtype, id, name, rdtype):
-        return '%s-%d-%s-%s' % (dns.rdatatype.to_text(nsec_rdtype), id, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
+        return '%s-%d|%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), id, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
 
     def has_nsec(self, nsec_rdtype, id, name, rdtype):
         return self.G.has_node(self.nsec_node_str(nsec_rdtype, id, name, rdtype))
@@ -879,7 +879,7 @@ class DNSAuthGraph:
             line_style = 'solid'
 
         edge_label = ''
-        edge_id = '%s-%s--%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
+        edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
         self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
 
         self.node_info[edge_id] = [self.node_info[nsec_node][0].copy()]
@@ -1135,7 +1135,7 @@ class DNSAuthGraph:
                         servers.sort()
                     del_serialized['errors'][Status.delegation_error_mapping[error]] = servers
 
-            edge_id = 'del-%s--%s' % (zone_top, parent_bottom)
+            edge_id = 'del-%s|%s' % (fmt.humanize_name(zone_obj.name), fmt.humanize_name(parent_obj.name))
             self.node_info[edge_id] = [del_serialized]
             self.G.add_edge(zone_top, parent_bottom, label=edge_label, id=edge_id, color=line_color, penwidth='5.0', ltail=zone_graph_name, lhead=parent_graph_name, style=line_style, minlen='2', dir='back')
 
@@ -1220,7 +1220,7 @@ class DNSAuthGraph:
         is_dlv = n.startswith('DLV-')
         is_dnskey = n.startswith('DNSKEY-')
         is_nsec = n.startswith('NSEC')
-        is_dname = n.endswith('-DNAME')
+        is_dname = n.endswith('|DNAME')
 
         if is_dlv and not force:
             dlv_nodes.append(n)
