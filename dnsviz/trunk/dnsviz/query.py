@@ -1136,6 +1136,10 @@ class ExecutableDNSQuery(DNSQuery):
                         response = dns.message.from_wire(qtm.res)
                     except Exception, e:
                         response = e
+                if qtm.res:
+                    msg_size = len(qtm.res)
+                else:
+                    msg_size = None
                 response_time = round(qtm.end_time - qtm.start_time, 3)
                 response = qh.handle_response(qtm.res, response, response_time, qtm.sport)
 
@@ -1162,7 +1166,7 @@ class ExecutableDNSQuery(DNSQuery):
                             errno1 = response.errno
                         else:
                             errno1 = None
-                    response_obj = DNSResponse(msg, err, errno1, qh.history, response_time, qh.params['tcp'])
+                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, qh.params['tcp'])
                     query.add_response(qtm.dst, qtm.src, response_obj)
 
                     if not query.servers.difference(query.responses):
