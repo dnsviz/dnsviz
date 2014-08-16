@@ -111,9 +111,9 @@ class DNSAuthGraph:
         self.dnskey_ids = {}
         self.ds_ids = {}
         self.nsec_ids = {}
-        self.next_dnskey_id = 10
-        self.next_ds_id = 10
-        self.next_nsec_id = 10
+        self.next_dnskey_id = 0
+        self.next_ds_id = 0
+        self.next_nsec_id = 0
 
     def _raphael_unit_mapping_expression(self, val, unit):
         #XXX doesn't work properly
@@ -935,7 +935,7 @@ class DNSAuthGraph:
 
         S, zone_graph_name, zone_bottom, zone_top = self.add_zone(zone_obj)
 
-        id = 0
+        id = 10
         for rrset_info in name_obj.queries[(name, rdtype)].rrset_answer_info:
             my_nodes = []
             cnames = []
