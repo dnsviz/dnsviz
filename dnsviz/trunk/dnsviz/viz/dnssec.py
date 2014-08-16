@@ -111,9 +111,9 @@ class DNSAuthGraph:
         self.dnskey_ids = {}
         self.ds_ids = {}
         self.nsec_ids = {}
-        self.next_dnskey_id = 0
-        self.next_ds_id = 0
-        self.next_nsec_id = 0
+        self.next_dnskey_id = 10
+        self.next_ds_id = 10
+        self.next_nsec_id = 10
 
     def _raphael_unit_mapping_expression(self, val, unit):
         #XXX doesn't work properly
@@ -379,7 +379,7 @@ class DNSAuthGraph:
         return self.G.get_node(node_str)
 
     def add_dnskey_non_existent(self, name, zone, algorithm, key_tag):
-        node_str = self.dnskey_node_str('None', name, algorithm, key_tag)
+        node_str = self.dnskey_node_str(0, name, algorithm, key_tag)
 
         if not self.G.has_node(node_str):
             label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
@@ -718,9 +718,9 @@ class DNSAuthGraph:
     def add_rrset_non_existent(self, name_obj, name, rdtype, nxdomain, wildcard, servers_clients):
         zone_obj = name_obj.zone
         if nxdomain:
-            node_str = self.rrset_node_str(name, rdtype, -1)
+            node_str = self.rrset_node_str(name, rdtype, 0)
         else:
-            node_str = self.rrset_node_str(name, rdtype, -2)
+            node_str = self.rrset_node_str(name, rdtype, 1)
 
         if not self.G.has_node(node_str):
             if wildcard:
