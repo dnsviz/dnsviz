@@ -44,7 +44,7 @@ import response as Response
 import status as Status
 from util import tuple_to_dict
 
-logger = logging.getLogger('dnsviz.analysis')
+logger = logging.getLogger(__name__)
 
 class DomainNameAnalysisInterruption(Exception):
     pass
@@ -103,19 +103,27 @@ def _get_client_address(server):
         return None
     return s.getsockname()[0]
 
-def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True):
+def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, child_logger=None):
     client_ipv4 = _get_client_address(list(ROOT_NS_IPS_4)[0])
     client_ipv6 = _get_client_address(list(ROOT_NS_IPS_6)[0])
     if client_ipv4 is None:
         if require_ipv4:
             raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
         elif warn:
-            logger.warning('No IPv4 interfaces available for analysis!')
+            if child_logger is not None:
+                l = logger.getChild(child_logger)
+            else:
+                l = logger
+            l.warning('No IPv4 interfaces available for analysis!')
     if client_ipv6 is None:
         if require_ipv6:
             raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
         elif warn:
-            logger.warning('No IPv6 interfaces available for analysis!')
+            if child_logger is not None:
+                l = logger.getChild(child_logger)
+            else:
+                l = logger
+            l.warning('No IPv6 interfaces available for analysis!')
     return client_ipv4, client_ipv6
 
 # create a standard recurisve DNS query with checking disabled
@@ -2140,9 +2148,9 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'child_logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
-    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, ceiling=None, force_dnskey=False,
+    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, child_logger=None, ceiling=None, force_dnskey=False,
              follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
@@ -2150,11 +2158,17 @@ class Analyst(object):
         self.ceiling = self._detect_ceiling(ceiling)[0]
 
         if client_ipv4 is None and client_ipv6 is None:
-            client_ipv4, client_ipv6 = get_client_addresses()
+            client_ipv4, client_ipv6 = get_client_addresses(child_logger=child_logger)
         if client_ipv4 is None and client_ipv6 is None:
             raise NetworkConnectivityException('No network interfaces available for analysis!')
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
+
+        self.child_logger = child_logger
+        if child_logger is not None:
+            self.logger = logger.getChild(child_logger)
+        else:
+            self.logger = logger
 
         self.force_dnskey = force_dnskey
         self.follow_ns = follow_ns
@@ -2308,7 +2322,7 @@ class Analyst(object):
             return name_obj, False
 
         try:
-            logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
+            self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
             try:
@@ -2411,7 +2425,7 @@ class Analyst(object):
         return name_obj, True
 
     def _analyze_name(self, name_obj):
-        logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
+        self.logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
 
         # analyze delegation, and return if name doesn't exist
         yxdomain = self._analyze_delegation(name_obj)
@@ -2435,23 +2449,23 @@ class Analyst(object):
                 # A query might already have been performed during delegation
                 # analysis
                 if (name_obj.name, dns.rdatatype.A) not in name_obj.queries:
-                    logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
+                    self.logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.A)] = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
-                logger.debug('Querying %s/AAAA...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/AAAA...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone():
                     # A query might already have been performed during
                     # delegation analysis
                     if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
-                        logger.debug('Querying %s/NS...' % fmt.humanize_name(name_obj.name))
+                        self.logger.debug('Querying %s/NS...' % fmt.humanize_name(name_obj.name))
                         queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
-                    logger.debug('Querying %s/MX...' % fmt.humanize_name(name_obj.name))
+                    self.logger.debug('Querying %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                     queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                     # we also do a query with small UDP payload to elicit and test a truncated response
                     queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone() or self._is_dkim(name_obj.name):
-                    logger.debug('Querying %s/TXT...' % fmt.humanize_name(name_obj.name))
+                    self.logger.debug('Querying %s/TXT...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
         if name_obj.is_zone() or \
@@ -2460,12 +2474,12 @@ class Analyst(object):
             if servers:
                 if (not self.qname_only) or self.name == name_obj.name:
                     if self.dlv_domain != self.name:
-                        logger.debug('Querying %s/SOA...' % fmt.humanize_name(name_obj.name))
+                        self.logger.debug('Querying %s/SOA...' % fmt.humanize_name(name_obj.name))
                         # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
                         # (the query falls back to UDP in case there are issues)
                         queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
-                logger.debug('Querying %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 # we also do a query with small UDP payload to elicit and test a truncated response
@@ -2478,7 +2492,7 @@ class Analyst(object):
                     parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
-                logger.debug('Querying %s/DS...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/DS...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, self.client_ipv4, self.client_ipv6)
 
                 if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
@@ -2486,7 +2500,7 @@ class Analyst(object):
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name
                     if dlv_servers:
-                        logger.debug('Querying %s/DLV...' % fmt.humanize_name(dlv_name))
+                        self.logger.debug('Querying %s/DLV...' % fmt.humanize_name(dlv_name))
                         queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
@@ -2495,14 +2509,14 @@ class Analyst(object):
                     ((not self.qname_only) or name_obj.name == self.name):
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
-                    logger.debug('Querying %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
+                    self.logger.debug('Querying %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
                     queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
                 if name_obj.nxrrset_name is not None:
-                    logger.debug('Querying %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                    self.logger.debug('Querying %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
                     queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
             if self._ask_ptr_queries(name_obj.name):
-                logger.debug('Querying %s/PTR...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/PTR...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
         # actually execute the queries, then store the results
@@ -2541,7 +2555,7 @@ class Analyst(object):
 
             name_obj.referral_rdtype = rdtype
 
-            logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+            self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
             query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, self.client_ipv4, self.client_ipv6)
             query.execute()
             referral_queries[rdtype] = query
@@ -2655,7 +2669,7 @@ class Analyst(object):
             servers_queried[dns.rdatatype.NS].update(servers)
             servers = self._filter_servers(servers)
             if servers:
-                logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
                 queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6))
 
             # A query
@@ -2664,7 +2678,7 @@ class Analyst(object):
                 servers_queried[dns.rdatatype.A].update(servers)
                 servers = self._filter_servers(servers)
                 if servers:
-                    logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
+                    self.logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
                     queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6))
 
             # actually execute the queries, then store the results
@@ -2718,7 +2732,7 @@ class Analyst(object):
             t.join()
         if errors:
             for name, exc_info in errors[1:]:
-                logger.debug('Error analyzing %s' % name, exc_info=exc_info)
+                self.logger.debug('Error analyzing %s' % name, exc_info=exc_info)
             raise errors[0][1][0], None, errors[0][1][2]
 
     def _set_negative_queries(self, name_obj):
