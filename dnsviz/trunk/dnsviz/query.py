@@ -669,6 +669,11 @@ class AggregateDNSResponse(object):
             if referral:
                 return
 
+            # don't store no answer or NXDOMAIN info for names other than qname
+            # if recursion is not desired and available
+            if qname_sought != qname and not response.recursion_desired_and_available():
+                return
+
             try:
                 soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and qname_sought.is_subdomain(x.name), msg.authority)
                 if not soa_rrsets:
@@ -844,8 +849,6 @@ class DNSQuery(AggregateDNSResponse):
         response.query = self
         self.responses[server][client] = response
 
-        self._aggregate_response(server, client, response, self.qname, self.rdtype)
-
         flags = self.flags
         edns = self.edns
         edns_max_udp_payload = self.edns_max_udp_payload
@@ -868,6 +871,8 @@ class DNSQuery(AggregateDNSResponse):
             #XXX do the same with EDNS options
 
         response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options)
+
+        self._aggregate_response(server, client, response, self.qname, self.rdtype)
 
     def is_authoritative_answer_all(self):
         val = None
