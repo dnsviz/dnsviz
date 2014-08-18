@@ -42,7 +42,7 @@ import response as Response
 import status as Status
 from util import tuple_to_dict
 
-logger = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 class DomainNameAnalysisInterruption(Exception):
     pass
@@ -101,27 +101,19 @@ def _get_client_address(server):
         return None
     return s.getsockname()[0]
 
-def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, child_logger=None):
+def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logger=_logger):
     client_ipv4 = _get_client_address(list(ROOT_NS_IPS_4)[0])
     client_ipv6 = _get_client_address(list(ROOT_NS_IPS_6)[0])
     if client_ipv4 is None:
         if require_ipv4:
             raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
         elif warn:
-            if child_logger is not None:
-                l = logger.getChild(child_logger)
-            else:
-                l = logger
-            l.warning('No IPv4 interfaces available for analysis!')
+            logger.warning('No IPv4 interfaces available for analysis!')
     if client_ipv6 is None:
         if require_ipv6:
             raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
         elif warn:
-            if child_logger is not None:
-                l = logger.getChild(child_logger)
-            else:
-                l = logger
-            l.warning('No IPv6 interfaces available for analysis!')
+            logger.warning('No IPv6 interfaces available for analysis!')
     return client_ipv4, client_ipv6
 
 # create a standard recurisve DNS query with checking disabled
@@ -782,7 +774,7 @@ class DomainNameAnalysis(object):
             self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
             self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True)
-        logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
         self._populate_nsec_status()
@@ -817,7 +809,7 @@ class DomainNameAnalysis(object):
             self.zsks = set()
             self.ksks = set()
 
-        logger.debug('Assessing RRSIG status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing RRSIG status of %s...' % (fmt.humanize_name(self.name)))
         for (qname, rdtype), query in self.queries.items():
             items_to_validate = []
             for rrset_info in query.rrset_answer_info:
@@ -1084,7 +1076,7 @@ class DomainNameAnalysis(object):
         else:
             name = self.name
 
-        logger.debug('Assessing delegation status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing delegation status of %s...' % (fmt.humanize_name(self.name)))
         self.ds_status_by_ds[rdtype] = {}
         self.ds_status_by_dnskey[rdtype] = {}
         self.ds_status_by_status[rdtype] = {}
@@ -1289,7 +1281,7 @@ class DomainNameAnalysis(object):
                             if response.is_authoritative() or response.recursion_desired_and_available():
                                 yxdomain.update(qname_sought)
 
-        logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         for (qname, rdtype), query in self.queries.items():
             for qname_sought in query.nxdomain_info:
                 qname_obj = self.get_name(qname_sought)
@@ -2061,7 +2053,7 @@ class DomainNameAnalysis(object):
             dlv_parent_name = None
             dlv_parent = None
 
-        logger.info('Loading %s' % fmt.humanize_name(name))
+        _logger.info('Loading %s' % fmt.humanize_name(name))
 
         cache[name] = a = cls(name, stub=stub)
         a.parent = parent
@@ -2096,7 +2088,7 @@ class DomainNameAnalysis(object):
         for rdtype in delegation_types:
             query_str = '%s/%s/%s' % (name_str, dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             if query_str in d['queries']:
-                logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
+                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
                 for query in d['queries'][query_str]:
                     a.add_query(Q.DNSQuery.deserialize(query))
         # set the NS dependencies for the name
@@ -2115,7 +2107,7 @@ class DomainNameAnalysis(object):
                 extra = ' (No data)'
             else:
                 extra = ''
-            logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
+            _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in d['queries'][query_str]:
                 a.add_query(Q.DNSQuery.deserialize(query))
 
@@ -2146,9 +2138,9 @@ class Analyst(object):
     allow_private_query = False
     qname_only = True
 
-    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'child_logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
-    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, child_logger=None, ceiling=None, force_dnskey=False,
+    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, force_dnskey=False,
              follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
@@ -2156,17 +2148,13 @@ class Analyst(object):
         self.ceiling = self._detect_ceiling(ceiling)[0]
 
         if client_ipv4 is None and client_ipv6 is None:
-            client_ipv4, client_ipv6 = get_client_addresses(child_logger=child_logger)
+            client_ipv4, client_ipv6 = get_client_addresses(logger=logger)
         if client_ipv4 is None and client_ipv6 is None:
             raise NetworkConnectivityException('No network interfaces available for analysis!')
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
 
-        self.child_logger = child_logger
-        if child_logger is not None:
-            self.logger = logger.getChild(child_logger)
-        else:
-            self.logger = logger
+        self.logger = logger
 
         self.force_dnskey = force_dnskey
         self.follow_ns = follow_ns
@@ -2302,6 +2290,20 @@ class Analyst(object):
         #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
         #TODO re-do anaysis if not stub requested but cache is stub?
         return name_obj
+
+    def analyze_async(self, callback=None, exc_callback=None):
+        def _analyze():
+            try:
+                result = self.analyze()
+                if callback is not None:
+                    callback(result)
+            except:
+                if exc_callback is not None:
+                    print sys.exc_info()
+                    exc_callback(sys.exc_info())
+        t = threading.Thread(target=_analyze)
+        t.start()
+        return t
 
     def analyze(self):
         self._analyze_dlv()
@@ -2729,8 +2731,9 @@ class Analyst(object):
         for t in threads:
             t.join()
         if errors:
+            # raise only the first exception, but log all the ones beyond
             for name, exc_info in errors[1:]:
-                self.logger.debug('Error analyzing %s' % name, exc_info=exc_info)
+                self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
             raise errors[0][1][0], None, errors[0][1][2]
 
     def _set_negative_queries(self, name_obj):
