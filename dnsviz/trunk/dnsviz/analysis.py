@@ -367,13 +367,13 @@ class DomainNameAnalysis(object):
 
         self.ptr_targets[rrset[0].target] = None
 
-    def _handle_ns_response(self, rrset, is_authoritative):
+    def _handle_ns_response(self, rrset, update_ns_names):
         '''Indicate that there exist NS records for the name which is the
         subject of this analysis, and, if authoritative, save the NS
         targets.'''
 
         self.has_ns = True
-        if is_authoritative:
+        if update_ns_names:
             for ns in rrset:
                 self._ns_names_in_child.add(ns.target)
 
@@ -438,7 +438,7 @@ class DomainNameAnalysis(object):
                 elif rrset.rdtype == dns.rdatatype.PTR:
                     self._handle_ptr_response(rrset)
                 elif rrset.rdtype == dns.rdatatype.NS:
-                    self._handle_ns_response(rrset, is_authoritative)
+                    self._handle_ns_response(rrset, True)
                 elif rrset.rdtype == dns.rdatatype.DNSKEY:
                     self._handle_dnskey_response(rrset)
                 elif rrset.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
@@ -475,9 +475,9 @@ class DomainNameAnalysis(object):
             rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
             self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
             self._add_glue_ip_mapping(response)
-            self._handle_ns_response(rrset, is_authoritative)
+            self._handle_ns_response(rrset, False)
 
-        # if it is a non-referral that has authority information, then add it
+        # if it is an authoritative answer that has authority information, then add it
         else:
             try:
                 rrset = response.message.find_rrset(response.message.authority, query.qname, dns.rdataclass.IN, dns.rdatatype.NS)
