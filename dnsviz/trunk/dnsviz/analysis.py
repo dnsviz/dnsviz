@@ -2519,7 +2519,7 @@ class Analyst(object):
                 queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
 
         # actually execute the queries, then store the results
-        self.logger.debug('Issuing queries...' % fmt.humanize_name(name_obj.name))
+        self.logger.debug('Executing queries...')
         Q.ExecutableDNSQuery.execute_queries(*queries.values())
         for key, query in queries.items():
             if query.rrset_answer_info or key not in exclude_no_answer:
