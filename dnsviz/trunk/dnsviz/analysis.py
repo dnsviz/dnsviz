@@ -2299,7 +2299,6 @@ class Analyst(object):
                     callback(result)
             except:
                 if exc_callback is not None:
-                    print sys.exc_info()
                     exc_callback(sys.exc_info())
         t = threading.Thread(target=_analyze)
         t.start()
