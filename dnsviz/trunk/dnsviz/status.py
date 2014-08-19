@@ -273,8 +273,11 @@ class RRSIGStatus(object):
 
         if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
             self.warnings.append(RRSIG_ERROR_RRSET_TTL_MISMATCH)
-        if self.rrset.rrsig_info[self.rrsig].ttl != self.rrsig.original_ttl:
+        #XXX consider taking into consideration RD/RA bits in request/response
+        if self.rrset.rrsig_info[self.rrsig].ttl > self.rrsig.original_ttl:
             self.warnings.append(RRSIG_ERROR_ORIGINAL_TTL_MISMATCH)
+
+        min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
             
         #XXX get parent right for DS and related NSEC(3)
         #if self.rrsig.signer != zone_name:
@@ -294,7 +297,6 @@ class RRSIGStatus(object):
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INVALID
 
-        #TODO: RRSIG expiring in cache
         if self.reference_ts < self.rrsig.inception: 
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_PREMATURE
@@ -303,6 +305,9 @@ class RRSIGStatus(object):
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_EXPIRED
             self.errors.append(RRSIG_ERROR_EXPIRED)
+        elif self.reference_ts + min_ttl >= self.rrsig.expiration:
+            self.errors.append(RRSIG_ERROR_TTL_BEYOND_EXPIRY)
+
         if not self.algorithm_unknown and self.signature_valid == False:
             # only report this if we're not referring to a key revoked post-sign
             if self.dnskey.key_tag == self.rrsig.key_tag:
