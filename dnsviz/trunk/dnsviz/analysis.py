@@ -1567,7 +1567,7 @@ class DomainNameAnalysis(object):
 
         name_str = self.name.canonicalize().to_text()
         if name_str in d:
-            return d
+            return
 
         if self.parent is not None:
             self.parent.serialize(d)
@@ -1600,26 +1600,35 @@ class DomainNameAnalysis(object):
             if self.nxrrset_name is not None:
                 d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
+
+        self._serialize_related(d[name_str])
+        self._serialize_dependencies(d)
+
+    def _serialize_related(self, d):
         if self._auth_ns_ip_mapping:
-            d[name_str]['auth_ns_ip_mapping'] = collections.OrderedDict()
+            d['auth_ns_ip_mapping'] = collections.OrderedDict()
             ns_names = self._auth_ns_ip_mapping.keys()
             ns_names.sort()
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
-                d[name_str]['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
 
         if self.stub:
-            return d
+            return
 
-        d[name_str]['queries'] = collections.OrderedDict()
+        d['queries'] = collections.OrderedDict()
         query_keys = self.queries.keys()
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d[name_str]['queries'][qname_type_str] = []
+            d['queries'][qname_type_str] = []
             for query in self.queries[(qname, rdtype)].queries.values():
-                d[name_str]['queries'][qname_type_str].append(query.serialize())
+                d['queries'][qname_type_str].append(query.serialize())
+
+    def _serialize_dependencies(self, d):
+        if self.stub:
+            return
 
         for cname, cname_obj in self.cname_targets.items():
             cname_obj.serialize(d)
@@ -1630,8 +1639,6 @@ class DomainNameAnalysis(object):
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
                 ns_obj.serialize(d)
-
-        return d
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
@@ -2062,7 +2069,7 @@ class DomainNameAnalysis(object):
         a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
         a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
 
-        if not stub:
+        if not a.stub:
             if 'referral_rdtype' in d:
                 a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
             a.explicit_delegation = d['explicit_delegation']
@@ -2073,27 +2080,32 @@ class DomainNameAnalysis(object):
                 a.nxrrset_name = dns.name.from_text(d['nxrrset_name'])
                 a.nxrrset_rdtype = dns.rdatatype.from_text(d['nxrrset_rdtype'])
 
+        a._deserialize_related(d)
+        a._deserialize_dependencies(d1, cache)
+        return a
+
+    def _deserialize_related(self, d):
         if 'auth_ns_ip_mapping' in d:
             for target in d['auth_ns_ip_mapping']:
                 for addr in d['auth_ns_ip_mapping'][target]:
-                    a.add_auth_ns_ip_mappings((dns.name.from_text(target), addr))
+                    self.add_auth_ns_ip_mappings((dns.name.from_text(target), addr))
 
-        if stub:
-            return a
+        if self.stub:
+            return
 
         # import delegation NS queries first
         delegation_types = set([dns.rdatatype.NS])
-        if a.referral_rdtype is not None:
-            delegation_types.add(a.referral_rdtype)
+        if self.referral_rdtype is not None:
+            delegation_types.add(self.referral_rdtype)
         for rdtype in delegation_types:
-            query_str = '%s/%s/%s' % (name_str, dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+            query_str = '%s/%s/%s' % (self.name.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             if query_str in d['queries']:
-                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype)))
+                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
                 for query in d['queries'][query_str]:
-                    a.add_query(Q.DNSQuery.deserialize(query))
+                    self.add_query(Q.DNSQuery.deserialize(query))
         # set the NS dependencies for the name
-        if a.is_zone():
-            a.set_ns_dependencies()
+        if self.is_zone():
+            self.set_ns_dependencies()
 
         for query_str in d['queries']:
             qname, rdclass, rdtype = query_str.split('/')
@@ -2101,27 +2113,29 @@ class DomainNameAnalysis(object):
             rdtype = dns.rdatatype.from_text(rdtype)
             if rdtype in delegation_types:
                 continue
-            if (qname, rdtype) == (a.nxdomain_name, a.nxdomain_rdtype):
+            if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
                 extra = ' (NXDOMAIN)'
-            elif (qname, rdtype) == (a.nxrrset_name, a.nxrrset_rdtype):
+            elif (qname, rdtype) == (self.nxrrset_name, self.nxrrset_rdtype):
                 extra = ' (No data)'
             else:
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in d['queries'][query_str]:
-                a.add_query(Q.DNSQuery.deserialize(query))
+                self.add_query(Q.DNSQuery.deserialize(query))
 
-        for cname in a.cname_targets:
-            a.cname_targets[cname] = cls.deserialize(cname, d1, cache=cache)
-        for dname in a.dname_targets:
-            a.dname_targets[dname] = cls.deserialize(dname, d1, cache=cache)
-        for signer in a.external_signers:
-            a.external_signers[signer] = cls.deserialize(signer, d1, cache=cache)
-        for target in a.ns_dependencies:
-            if target.canonicalize().to_text() in d1:
-                a.ns_dependencies[target] = cls.deserialize(target, d1, cache=cache)
+    def _deserialize_dependencies(self, d, cache):
+        if self.stub:
+            return
 
-        return a
+        for cname in self.cname_targets:
+            self.cname_targets[cname] = self.__class__.deserialize(cname, d, cache=cache)
+        for dname in self.dname_targets:
+            self.dname_targets[dname] = self.__class__.deserialize(dname, d, cache=cache)
+        for signer in self.external_signers:
+            self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
+        for target in self.ns_dependencies:
+            if target.canonicalize().to_text() in d:
+                self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(DomainNameAnalysis):
     def __init__(self, *args, **kwargs):
