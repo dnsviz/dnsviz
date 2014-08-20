@@ -62,6 +62,8 @@ class UTC(datetime.tzinfo):
 
 utc = UTC()
 
+#################
+# IP conversions
 def ip_to_wire(ip):
     if is_ipv6(ip):
         return dns.ipv6.inet_aton(ip)
@@ -82,6 +84,8 @@ def fix_ipv6(ip):
 def is_ipv6(ip):
     return ':' in ip
 
+#################
+# Timestamp conversions
 def timestamp_to_datetime(timestamp, tz=utc):
     return datetime.datetime.fromtimestamp(timestamp, tz)
 
@@ -106,6 +110,8 @@ def datetime_to_str(dt):
 def timestamp_to_str(timestamp):
     return datetime_to_str(timestamp_to_datetime(timestamp))
 
+#################
+# Human representation of time
 def humanize_time(seconds, days=None):
     if days is None:
         days, remainder = divmod(seconds, 86400)
@@ -153,11 +159,13 @@ def format_diff(date_now, date_relative):
         suffix = 'in the future'
     return '%s %s' % (humanize_time(diff.seconds, diff.days), suffix)
 
+#################
+# Human representation of DNS names
 def format_nsec3_name(name):
     return dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text()
 
 def format_nsec3_rrset_text(nsec3_rrset_text):
-    return re.sub(r'((^| )[0-9a-zA-Z]{32,})', lambda x: x.group(1).upper(), nsec3_rrset_text)
+    return re.sub(r'((^| )[0-9a-zA-Z]{32,})', lambda x: x.group(1).upper(), nsec3_rrset_text).rstrip('.')
 
 def humanize_name(name, idn=False):
     if idn:
@@ -167,38 +175,3 @@ def humanize_name(name, idn=False):
     if name == '.':
         return name
     return name.rstrip('.')
-
-def humanize_rrset(rrset, idn=False):
-    return '%s/%s' % (humanize_name(rrset.name, idn), dns.rdatatype.to_text(rrset.rdtype))
-
-def humanize_dnskey(name, dnskey, idn=False):
-    return '%s/DNSKEY (alg %d, id %d)' % (humanize_name(name, idn), dnskey.algorithm, dnssec.key_tag(dnskey))
-
-def humanize_ds(name, ds, rdtype, idn=False):
-    digest_types = [d.digest_type for d in ds]
-    digest_types.sort()
-    digest_types_str = ','.join(map(str, digest_types))
-    if len(digest_types) != 1:
-        plural = 's'
-    else:
-        plural = ''
-    return '%s/%s (alg %d, id %d) digest alg%s=%s' % (humanize_name(name, idn), dns.rdatatype.to_text(rdtype), ds[0].algorithm, ds[0].key_tag, plural, digest_types_str)
-
-def humanize_non_existent_dnskey(name, algorithm, id, idn=False):
-    return '%s/DNSKEY (alg %d, id %d)' % (humanize_name(name, idn), algorithm, id)
-
-def humanize_rrsig(name, rrsig, idn=False):
-    try:
-        type_str = dns.rdatatype._by_value[rrsig.covers()]
-    except KeyError:
-        type_str = '[%d]' % rrsig.covers()
-
-    return 'RRSIG %s/%s by %s/DNSKEY alg %d, key %d' % (humanize_name(name, idn), type_str, humanize_name(rrsig.signer, idn), rrsig.algorithm, rrsig.key_tag)
-
-def humanize_non_existent_rrsig(name, covers, signer, algorithm, key_tag, idn=False):
-    try:
-        type_str = dns.rdatatype._by_value[covers]
-    except KeyError:
-        type_str = '[%d]' % covers
-
-    return 'RRSIG %s/%s by %s/DNSKEY alg %d, key %d' % (humanize_name(name, idn), type_str, humanize_name(signer, idn), algorithm, key_tag)
