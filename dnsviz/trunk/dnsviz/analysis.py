@@ -1769,7 +1769,8 @@ class DomainNameAnalysis(object):
         consolidate_clients = self.single_client()
 
         d[name_str] = collections.OrderedDict()
-        d[name_str]['status'] = Status.name_status_mapping[self.status]
+        if loglevel <= logging.INFO or self.status not in (Status.NAME_STATUS_YXDOMAIN, Status.NAME_STATUS_NXDOMAIN):
+            d[name_str]['status'] = Status.name_status_mapping[self.status]
         d[name_str]['answer'] = collections.OrderedDict()
 
         query_keys = self.queries.keys()
