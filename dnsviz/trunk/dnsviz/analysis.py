@@ -241,10 +241,10 @@ class DomainNameAnalysis(object):
         return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
 
     def __unicode__(self):
-        return self.name.to_text()
+        return fmt.humanize_name(self.name, True)
 
     def __str__(self):
-        return self.name.to_text()
+        return fmt.humanize_name(self.name)
 
     def parent_name(self):
         if self.parent is not None:
