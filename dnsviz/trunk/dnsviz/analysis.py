@@ -59,6 +59,9 @@ class IPv4ConnectivityException(NetworkConnectivityException):
 class IPv6ConnectivityException(NetworkConnectivityException):
     pass
 
+class FoundYXDOMAIN(Exception):
+    pass
+
 ROOT_NS_IPS = set([
         '198.41.0.4', '2001:503:ba3e::2:30',   # A
         '192.228.79.201',                      # B
@@ -174,6 +177,7 @@ class DomainNameAnalysis(object):
         # dependencies
         self.ttl_mapping = {}
 
+        self.status = None
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
@@ -775,6 +779,7 @@ class DomainNameAnalysis(object):
         if self.dlv_parent is not None:
             self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True)
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
+        self._populate_name_status()
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
         self._populate_nsec_status()
@@ -793,6 +798,47 @@ class DomainNameAnalysis(object):
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
                 ns_obj.populate_status(trusted_keys)
+
+    def _populate_name_status(self):
+        self.status = Status.NAME_STATUS_INDETERMINATE
+        self.yxdomain = set()
+
+        for (qname, rdtype), query in self.queries.items():
+            for rrset_info in query.rrset_answer_info:
+                self.yxdomain.add(rrset_info.rrset.name)
+            for qname_sought in query.rrset_noanswer_info:
+                try:
+                    for soa_owner_name in query.rrset_noanswer_info[qname_sought]:
+                        for (server,client) in query.rrset_noanswer_info[qname_sought][soa_owner_name]:
+                            for response in query.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)]:
+                                if qname_sought == qname or response.recursion_desired_and_available():
+                                    self.yxdomain.add(qname_sought)
+                                    raise FoundYXDOMAIN
+                except FoundYXDOMAIN:
+                    break
+
+            # now check referrals (if name hasn't already been identified as YXDOMAIN)
+            if self.name == qname and self.name not in self.yxdomain:
+                if rdtype not in (self.referral_rdtype, dns.rdatatype.NS):
+                    continue
+                try:
+                    for query1 in query.queries.values():
+                        for server in query1.responses:
+                            for client in query1.responses[server]:
+                                if query1.responses[server][client].is_referral(self.name):
+                                    self.yxdomain.add(self.name)
+                                    raise FoundYXDOMAIN
+                except FoundYXDOMAIN:
+                    pass
+
+        if self.name in self.yxdomain:
+            self.status = Status.NAME_STATUS_YXDOMAIN
+
+        for (qname, rdtype), query in self.queries.items():
+            if rdtype == dns.rdatatype.DS:
+                continue
+            if self.name in query.nxdomain_info and self.status == Status.NAME_STATUS_INDETERMINATE:
+                self.status = Status.NAME_STATUS_NXDOMAIN
 
     def _populate_rrsig_status(self, supported_algs):
         self.rrset_warnings = {}
@@ -1270,16 +1316,6 @@ class DomainNameAnalysis(object):
         self.noanswer_errors = {}
         self.noanswer_status_by_status = {}
 
-        yxdomain = set()
-        for (qname, rdtype), query in self.queries.items():
-            for rrset_info in query.rrset_answer_info:
-                yxdomain.add(rrset_info.rrset.name)
-            for qname_sought in query.rrset_noanswer_info:
-                for soa_owner_name in query.rrset_noanswer_info[qname_sought]:
-                    for (server,client) in query.rrset_noanswer_info[qname_sought][soa_owner_name]:
-                        for response in query.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)]:
-                            if response.is_authoritative() or response.recursion_desired_and_available():
-                                yxdomain.update(qname_sought)
 
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         for (qname, rdtype), query in self.queries.items():
@@ -1363,7 +1399,7 @@ class DomainNameAnalysis(object):
                 if statuses:
                     self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
 
-                if qname_sought in yxdomain and rdtype != dns.rdatatype.DS:
+                if qname_sought in self.yxdomain and rdtype != dns.rdatatype.DS:
                     self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
 
                 errors = self.nxdomain_errors[(qname_sought, rdtype)]
@@ -1733,6 +1769,7 @@ class DomainNameAnalysis(object):
         consolidate_clients = self.single_client()
 
         d[name_str] = collections.OrderedDict()
+        d[name_str]['status'] = Status.name_status_mapping[self.status]
         d[name_str]['answer'] = collections.OrderedDict()
 
         query_keys = self.queries.keys()
