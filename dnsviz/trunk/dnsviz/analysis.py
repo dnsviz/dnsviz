@@ -2340,8 +2340,28 @@ class Analyst(object):
             while name_obj.analysis_end is None:
                 time.sleep(1)
                 name_obj = self.analysis_cache[name]
-        #TODO re-do analyses if force_dnskey is True and dnskey hasn't been queried
-        #TODO re-do anaysis if not stub requested but cache is stub?
+
+        # check if this analysis needs to be re-done
+        if self.name == name:
+            redo_analysis = False
+            # re-do analysis if force_dnskey is True and dnskey hasn't been queried
+            if self.force_dnskey and (self.name, dns.rdatatype.DNSKEY) not in name_obj.queries:
+                redo_analysis = True
+
+            # re-do analysis if there were no queries (previously an
+            # "empty" non-terminal) but now it is the name in question
+            if not name_obj.queries:
+                redo_analysis = True
+
+            # if the previous analysis was a stub, but now we want the
+            # whole analysis
+            if name_obj.stub and not stub:
+                redo_analysis = True
+
+            if redo_analysis:
+                del self.analysis_cache[name]
+                return self._get_name_for_analysis(name, stub, lock)
+
         return name_obj
 
     def analyze_async(self, callback=None, exc_callback=None):
