@@ -475,19 +475,20 @@ class DomainNameAnalysis(object):
             pass
 
         # if it fits the description of a referral, also grab the referral information
-        if response.is_referral(query.qname):
-            rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
-            self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
-            self._add_glue_ip_mapping(response)
-            self._handle_ns_response(rrset, False)
+        if query.qname == self.name:
+            if response.is_referral(query.qname):
+                rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
+                self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
+                self._add_glue_ip_mapping(response)
+                self._handle_ns_response(rrset, False)
 
-        # if it is an authoritative answer that has authority information, then add it
-        else:
-            try:
-                rrset = response.message.find_rrset(response.message.authority, query.qname, dns.rdataclass.IN, dns.rdatatype.NS)
-                self._handle_ns_response(rrset, is_authoritative)
-            except KeyError:
-                pass
+            # if it is an authoritative answer that has authority information, then add it
+            else:
+                try:
+                    rrset = response.message.find_rrset(response.message.authority, query.qname, dns.rdataclass.IN, dns.rdatatype.NS)
+                    self._handle_ns_response(rrset, is_authoritative)
+                except KeyError:
+                    pass
 
     def add_auth_ns_ip_mappings(self, *mappings):
         '''Add one or more mappings from NS targets to IPv4 or IPv6 addresses,
