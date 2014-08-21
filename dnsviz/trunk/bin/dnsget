@@ -198,7 +198,12 @@ def main():
         names = []
         with codecs.open(opts['-f'], 'r', 'utf-8') as f:
             for line in f:
-                names.append(dns.name.from_unicode(line.strip()))
+                try:
+                    name = dns.name.from_unicode(line.strip())
+                except UnicodeDecodeError, e:
+                    logger.warning('%s: %s' % (line.strip(), e))
+                    continue
+                names.append(name)
     else:
         names = map(dns.name.from_text, args)
 
