@@ -1445,8 +1445,8 @@ class TruncationDiagnosticQuery(DNSSECQuery):
     edns_max_udp_payload = 512
 
     query_timeout = 1.0
-    max_attempts = 8
-    lifetime = 15.0
+    max_attempts = 4
+    lifetime = 5.0
 
 class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
     '''A simple recursive query to test the results of a query with
@@ -1461,8 +1461,8 @@ class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
     edns_max_udp_payload = 512
 
     query_timeout = 1.0
-    max_attempts = 8
-    lifetime = 15.0
+    max_attempts = 4
+    lifetime = 5.0
 
 def main():
     import json
