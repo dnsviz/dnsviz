@@ -55,6 +55,14 @@ class BulkAnalyst(object):
 class MultiProcessAnalyst(Analyst):
     analysis_model = DomainNameAnalysis
 
+    def _finalize_analysis_proper(self, name_obj):
+        self.analysis_cache[name_obj.name] = name_obj
+        super(MultiProcessAnalyst, self)._finalize_analysis_proper(name_obj)
+
+    def _finalize_analysis_all(self, name_obj):
+        self.analysis_cache[name_obj.name] = name_obj
+        super(MultiProcessAnalyst, self)._finalize_analysis_all(name_obj)
+
     def refresh_dependency_references(self, name_obj, trace=None):
         if trace is None:
             trace = []
