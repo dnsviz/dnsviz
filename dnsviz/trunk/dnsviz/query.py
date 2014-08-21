@@ -1171,7 +1171,7 @@ class ExecutableDNSQuery(DNSQuery):
                             errno1 = response.errno
                         else:
                             errno1 = None
-                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, qh.params['tcp'])
+                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query.tcp)
                     query.add_response(qtm.dst, qtm.src, response_obj)
 
                     if not query.servers.difference(query.responses):
