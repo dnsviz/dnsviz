@@ -2368,10 +2368,16 @@ class Analyst(object):
             a.analyze()
 
     def _finalize_analysis_proper(self, name_obj):
+        pass
+
+    def _finalize_analysis_all(self, name_obj):
+        pass
+
+    def _cleanup_analysis_proper(self, name_obj):
         if hasattr(name_obj, 'complete'):
             name_obj.complete.set()
 
-    def _finalize_analysis_all(self, name_obj):
+    def _cleanup_analysis_all(self, name_obj):
         pass
 
     def _analyze_stub(self, name):
@@ -2403,9 +2409,11 @@ class Analyst(object):
 
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
-        finally:
             self._finalize_analysis_proper(name_obj)
             self._finalize_analysis_all(name_obj)
+        finally:
+            self._cleanup_analysis_proper(name_obj)
+            self._cleanup_analysis_all(name_obj)
 
         return name_obj
 
@@ -2468,14 +2476,16 @@ class Analyst(object):
                 # servers, check that we actually have connectivity
                 self._check_connectivity(name_obj)
 
-            finally:
                 self._finalize_analysis_proper(name_obj)
+            finally:
+                self._cleanup_analysis_proper(name_obj)
 
             # analyze dependencies
             self._analyze_dependencies(name_obj)
 
-        finally:
             self._finalize_analysis_all(name_obj)
+        finally:
+            self._cleanup_analysis_all(name_obj)
 
         return name_obj
 
