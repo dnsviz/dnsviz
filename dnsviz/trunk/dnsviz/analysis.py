@@ -2367,6 +2367,13 @@ class Analyst(object):
             a = self.__class__(self.dlv_domain, force_dnskey=False, **kwargs)
             a.analyze()
 
+    def _finalize_analysis_proper(self, name_obj):
+        if hasattr(name_obj, 'complete'):
+            name_obj.complete.set()
+
+    def _finalize_analysis_all(self, name_obj):
+        pass
+
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
         if name_obj.analysis_end is not None:
@@ -2397,10 +2404,8 @@ class Analyst(object):
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
         finally:
-            #XXX need to move this line to parallel analyst
-            self.analysis_cache[name] = name_obj
-            if hasattr(name_obj, 'complete'):
-                name_obj.complete.set()
+            self._finalize_analysis_proper(name_obj)
+            self._finalize_analysis_all(name_obj)
 
         return name_obj, True
 
@@ -2463,15 +2468,12 @@ class Analyst(object):
             self._check_connectivity(name_obj)
 
         finally:
-            #XXX need to move this line to parallel analyst
-            self.analysis_cache[name] = name_obj
-            if hasattr(name_obj, 'complete'):
-                name_obj.complete.set()
+            self._finalize_analysis_proper(name_obj)
 
         # analyze dependencies
         self._analyze_dependencies(name_obj)
-        #XXX need to move this line to parallel analyst
-        self.analysis_cache[name] = name_obj
+
+        self._finalize_analysis_all(name_obj)
 
         return name_obj, True
 
