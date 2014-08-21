@@ -129,7 +129,7 @@ def usage():
 
 Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
-    -d <level>     - set debug level to a value from 0 to 3, with increasing verbosity (default: 1 or WARNING)
+    -d <level>     - set debug level to a value from 0 to 3, with increasing verbosity (default: 2 or INFO)
     -l <dlv>       - use dlv as a domain for DNSSEC look-aside validation
     -r <filename>  - read analysis from a file, instead of querying servers (use "-" for stdin)
     -t <threads>   - use multiple threads for analysis
@@ -172,7 +172,7 @@ def main():
         sys.exit(1)
 
     try:
-        val = int(opts.get('-d', 1))
+        val = int(opts.get('-d', 2))
     except ValueError:
         usage()
         sys.exit(1)
