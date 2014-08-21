@@ -2358,7 +2358,7 @@ class Analyst(object):
 
     def analyze(self):
         self._analyze_dlv()
-        return self._analyze(self.name)[0]
+        return self._analyze(self.name)
 
     def _analyze_dlv(self):
         if self.dlv_domain is not None and self.dlv_domain != self.name and self.dlv_domain not in self.analysis_cache:
@@ -2377,7 +2377,7 @@ class Analyst(object):
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
         if name_obj.analysis_end is not None:
-            return name_obj, False
+            return name_obj
 
         try:
             self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
@@ -2397,9 +2397,9 @@ class Analyst(object):
                         for a_rr in a.rrset:
                             name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                name_obj.parent = self._analyze_stub(name.parent())[0].zone
+                name_obj.parent = self._analyze_stub(name.parent()).zone
             except dns.exception.DNSException:
-                name_obj.parent = self._analyze_stub(name.parent())[0].zone
+                name_obj.parent = self._analyze_stub(name.parent()).zone
 
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
@@ -2407,7 +2407,7 @@ class Analyst(object):
             self._finalize_analysis_proper(name_obj)
             self._finalize_analysis_all(name_obj)
 
-        return name_obj, True
+        return name_obj
 
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
@@ -2416,7 +2416,7 @@ class Analyst(object):
         # determine immediately if we need to do anything
         name_obj = self._get_name_for_analysis(name, lock=False)
         if name_obj is not None and name_obj.analysis_end is not None:
-            return name_obj, False
+            return name_obj
 
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
@@ -2425,9 +2425,9 @@ class Analyst(object):
         elif name in self.explicit_delegations:
             parent_obj = None
         elif name == self.ceiling:
-            parent_obj = self._analyze_stub(name.parent())[0]
+            parent_obj = self._analyze_stub(name.parent())
         else:
-            parent_obj = self._analyze(name.parent())[0]
+            parent_obj = self._analyze(name.parent())
 
         if parent_obj is not None:
             # for zones other than the root assign parent_obj to the zone apex,
@@ -2444,38 +2444,40 @@ class Analyst(object):
         # get or create the name
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
-            return name_obj, False
+            return name_obj
 
         try:
-            name_obj.parent = parent_obj
-            name_obj.dlv_parent = dlv_parent_obj
+            try:
+                name_obj.parent = parent_obj
+                name_obj.dlv_parent = dlv_parent_obj
 
-            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+                name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
-            # perform the actual analysis on this name
-            self._analyze_name(name_obj)
+                # perform the actual analysis on this name
+                self._analyze_name(name_obj)
 
-            # set analysis_end
-            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+                # set analysis_end
+                name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
-            # remove dlv_parent if there are no DLV queries associated with it
-            if name_obj.dlv_parent is not None and \
-                    (name_obj.dlv_name, dns.rdatatype.DLV) not in name_obj.queries:
-                name_obj.dlv_parent = None
+                # remove dlv_parent if there are no DLV queries associated with it
+                if name_obj.dlv_parent is not None and \
+                        (name_obj.dlv_name, dns.rdatatype.DLV) not in name_obj.queries:
+                    name_obj.dlv_parent = None
 
-            # sanity check - if we weren't able to get responses from any
-            # servers, check that we actually have connectivity
-            self._check_connectivity(name_obj)
+                # sanity check - if we weren't able to get responses from any
+                # servers, check that we actually have connectivity
+                self._check_connectivity(name_obj)
+
+            finally:
+                self._finalize_analysis_proper(name_obj)
+
+            # analyze dependencies
+            self._analyze_dependencies(name_obj)
 
         finally:
-            self._finalize_analysis_proper(name_obj)
+            self._finalize_analysis_all(name_obj)
 
-        # analyze dependencies
-        self._analyze_dependencies(name_obj)
-
-        self._finalize_analysis_all(name_obj)
-
-        return name_obj, True
+        return name_obj
 
     def _analyze_name(self, name_obj):
         self.logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
