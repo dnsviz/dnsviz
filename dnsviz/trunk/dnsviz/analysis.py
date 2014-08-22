@@ -2153,9 +2153,9 @@ class DomainNameAnalysis(object):
             self.set_ns_dependencies()
 
         for query_str in d['queries']:
-            qname, rdclass, rdtype = query_str.split('/')
-            qname = dns.name.from_text(qname)
-            rdtype = dns.rdatatype.from_text(rdtype)
+            vals = query_str.split('/')
+            qname = dns.name.from_text('/'.join(vals[:-2]))
+            rdtype = dns.rdatatype.from_text(vals[-1])
             if rdtype in delegation_types:
                 continue
             if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
