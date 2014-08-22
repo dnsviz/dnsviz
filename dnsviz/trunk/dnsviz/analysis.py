@@ -474,15 +474,15 @@ class DomainNameAnalysis(object):
         except IndexError:
             pass
 
-        # if it fits the description of a referral, also grab the referral information
         if query.qname == self.name:
-            if response.is_referral(query.qname):
+            # if it fits the description of a referral, also grab the referral information
+            if self.parent is not None and server in self.parent.get_auth_or_designated_servers() and response.is_referral(query.qname):
                 rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
                 self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
                 self._add_glue_ip_mapping(response)
                 self._handle_ns_response(rrset, False)
 
-            # if it is an authoritative answer that has authority information, then add it
+            # if it is an (authoritative) answer that has authority information, then add it
             else:
                 try:
                     rrset = response.message.find_rrset(response.message.authority, query.qname, dns.rdataclass.IN, dns.rdatatype.NS)
@@ -653,13 +653,19 @@ class DomainNameAnalysis(object):
         '''Return the set of servers that either answered authoritatively
         or were explicitly designated by NS and glue or authoritative IP.'''
 
-        all_servers = set([x[0] for x in self._auth_servers_clients]).union(self.get_designated_servers(no_cache))
-        if proto == 4:
-            return set(filter(lambda x: ':' not in x, all_servers))
-        elif proto == 6:
-            return set(filter(lambda x: ':' in x, all_servers))
+        if not hasattr(self, '_auth_or_designated_servers') or self._auth_or_designated_servers is None:
+            servers = set([x[0] for x in self._auth_servers_clients]).union(self.get_designated_servers(no_cache))
+            if not no_cache:
+                self._auth_or_designated_servers = servers
         else:
-            return all_servers
+            servers = self._auth_or_designated_servers
+
+        if proto == 4:
+            return set(filter(lambda x: ':' not in x, servers))
+        elif proto == 6:
+            return set(filter(lambda x: ':' in x, servers))
+        else:
+            return servers
 
     def get_responsive_auth_or_designated_servers(self, proto=None, no_cache=False):
         '''Return the set of servers that either answered authoritatively
