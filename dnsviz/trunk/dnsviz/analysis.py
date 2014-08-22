@@ -2341,11 +2341,10 @@ class Analyst(object):
         # if there is a complete event, then wait on it
         if hasattr(name_obj, 'complete'):
             name_obj.complete.wait()
-        # otherwise, loop and wait for analysis to be completed
-        else:
-            while name_obj.analysis_end is None:
-                time.sleep(1)
-                name_obj = self.analysis_cache[name]
+        # loop and wait for analysis to be completed
+        while name_obj.analysis_end is None:
+            time.sleep(1)
+            name_obj = self.analysis_cache[name]
 
         # check if this analysis needs to be re-done
         if self.name == name:
@@ -2365,7 +2364,9 @@ class Analyst(object):
                 redo_analysis = True
 
             if redo_analysis:
-                del self.analysis_cache[name]
+                with self.analysis_cache_lock:
+                    if name_obj.analysis_end == self.analysis_cache[name].analysis_end:
+                        del self.analysis_cache[name]
                 return self._get_name_for_analysis(name, stub, lock)
 
         return name_obj
