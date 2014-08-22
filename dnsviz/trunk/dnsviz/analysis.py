@@ -2240,7 +2240,7 @@ class Analyst(object):
             return ceiling, None
 
         # if there is a celing, but the name is not a subdomain
-        # of the celing, then use the name itself as a base
+        # of the ceiling, then use the name itself as a base
         if not self.name.is_subdomain(ceiling):
             ceiling = self.name
 

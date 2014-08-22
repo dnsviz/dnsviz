@@ -36,6 +36,8 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, cache, c
         logger.exception('Error analyzing %s' % name.canonicalize().to_text())
 
 class BulkAnalyst(object):
+    analyst_cls = Analyst
+
     def __init__(self, ceiling, dlv_domain):
         self.client_ipv4, self.client_ipv6 = get_client_addresses()
         if self.client_ipv4 is None and self.client_ipv6 is None:
@@ -46,10 +48,14 @@ class BulkAnalyst(object):
         self.cache = {}
         self.cache_lock = threading.Lock()
 
+    def _name_to_args_iter(self, names):
+        for name in names:
+            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.cache, self.cache_lock)
+
     def analyze(self, names):
         name_objs = []
-        for name in names:
-            name_objs.append(_analyze((Analyst, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.cache, self.cache_lock)))
+        for args in self._name_to_args_iter(names):
+            name_objs.append(_analyze(args))
         return name_objs
 
 class MultiProcessAnalyst(Analyst):
@@ -113,6 +119,8 @@ class MultiProcessAnalyst(Analyst):
         return name_obj
 
 class ParallelAnalyst(BulkAnalyst):
+    analyst_cls = MultiProcessAnalyst
+
     def __init__(self, ceiling, dlv_domain, processes):
         super(ParallelAnalyst, self).__init__(ceiling, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
@@ -124,13 +132,18 @@ class ParallelAnalyst(BulkAnalyst):
         self.cache_lock = self.manager.Lock()
 
     def analyze(self, names):
+
         pool = multiprocessing.Pool(self.processes)
+        try:
+            return pool.map(_analyze, self._name_to_args_iter(names))
+        except KeyboardInterrupt:
+            pool.terminate()
+        else:
+            pool.close()
 
-        def _name_to_args_iter(names):
-            for name in names:
-                yield (MultiProcessAnalyst, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.cache, self.cache_lock)
+        pool.join()
 
-        return pool.map(_analyze, _name_to_args_iter(names))
+        return None
 
 def usage():
     sys.stderr.write('''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
@@ -234,6 +247,9 @@ def main():
         else:
             a = BulkAnalyst(ceiling, dlv_domain)
         name_objs = a.analyze(names)
+
+    if name_objs is None:
+        sys.exit(1)
 
     d = collections.OrderedDict()
     for name_obj in name_objs:
