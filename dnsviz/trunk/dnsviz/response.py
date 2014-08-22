@@ -158,8 +158,18 @@ class DNSResponse:
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
-        return not self.is_authoritative() and \
-                self.message.get_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS) is not None
+        if self.is_authoritative():
+            return False
+        try:
+            self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA)
+            return False
+        except KeyError:
+            pass
+        try:
+            self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS)
+            return True
+        except KeyError:
+            pass
 
     def is_upward_referral(self, qname):
         '''Return True if this response yields an upward referral (i.e., a name
