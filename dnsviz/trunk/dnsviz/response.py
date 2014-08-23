@@ -152,13 +152,17 @@ class DNSResponse:
 
         return self.message is not None and bool(self.message.flags & dns.flags.AA)
 
-    def is_referral(self, qname):
+    def is_referral(self, qname, rdtype, bailiwick):
         '''Return True if this response yields a referral for the queried
         name.'''
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
-        if self.is_authoritative():
+        if bailiwick is None:
+            return False
+        if not (qname != bailiwick and qname.is_subdomain(bailiwick)):
+            return False
+        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
             return False
         try:
             self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA)

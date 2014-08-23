@@ -319,6 +319,14 @@ class DomainNameAnalysis(object):
                     return ref
         return None
 
+    def get_bailiwick_mapping(self):
+        if not hasattr(self, '_bailiwick_mapping') or self._bailiwick_mapping is None:
+            if self.parent is None:
+                self._bailiwick_mapping = {}, self.name
+            else:
+                self._bailiwick_mapping = dict([(s,self.parent_name()) for s in self.parent.get_auth_or_designated_servers()]), self.name
+        return self._bailiwick_mapping
+
     def _add_glue_ip_mapping(self, response):
         '''Extract a mapping of NS targets to IP addresses from A and AAAA
         records in the additional section of a referral.'''
@@ -402,7 +410,7 @@ class DomainNameAnalysis(object):
             dnssec_algs.add(ds.algorithm)
             digest_algs.add((ds.algorithm, ds.digest_type))
 
-    def _process_response(self, response, server, client, query):
+    def _process_response(self, response, server, client, query, bailiwick):
         '''Process a DNS response from a query, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
 
@@ -476,7 +484,7 @@ class DomainNameAnalysis(object):
 
         if query.qname == self.name:
             # if it fits the description of a referral, also grab the referral information
-            if self.parent is not None and server in self.parent.get_auth_or_designated_servers() and response.is_referral(query.qname):
+            if response.is_referral(query.qname, query.rdtype, bailiwick):
                 rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
                 self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
                 self._add_glue_ip_mapping(response)
@@ -504,13 +512,17 @@ class DomainNameAnalysis(object):
     def add_query(self, query):
         '''Process a DNS query and its responses, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
-        
+
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+
         key = (query.qname, query.rdtype)
         if key not in self.queries:
             self.queries[key] = Q.MultiQuery(query.qname, query.rdtype, query.rdclass)
-        self.queries[key].add_query(query)
+        self.queries[key].add_query(query, bailiwick_map, default_bailiwick)
 
         for server in query.responses:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
+
             # note the fact that servers were queried
             self._all_servers_queried.add(server)
 
@@ -524,7 +536,7 @@ class DomainNameAnalysis(object):
                 else:
                     self.clients_ipv4.add(client)
 
-                self._process_response(query.responses[server][client], server, client, query)
+                self._process_response(query.responses[server][client], server, client, query, bailiwick)
 
         dname_rrset_info = filter(lambda x: x.dname_info is not None or x.cname_info_from_dname, query.rrset_answer_info)
         for rrset_info in dname_rrset_info:
@@ -810,6 +822,8 @@ class DomainNameAnalysis(object):
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
 
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+        
         for (qname, rdtype), query in self.queries.items():
             for rrset_info in query.rrset_answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
@@ -831,8 +845,9 @@ class DomainNameAnalysis(object):
                 try:
                     for query1 in query.queries.values():
                         for server in query1.responses:
+                            bailiwick = bailiwick_map.get(server, default_bailiwick)
                             for client in query1.responses[server]:
-                                if query1.responses[server][client].is_referral(self.name):
+                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick):
                                     self.yxdomain.add(self.name)
                                     raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
@@ -2138,6 +2153,8 @@ class DomainNameAnalysis(object):
         if self.stub:
             return
 
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+
         # import delegation NS queries first
         delegation_types = set([dns.rdatatype.NS])
         if self.referral_rdtype is not None:
@@ -2147,7 +2164,7 @@ class DomainNameAnalysis(object):
             if query_str in d['queries']:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
                 for query in d['queries'][query_str]:
-                    self.add_query(Q.DNSQuery.deserialize(query))
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
         # set the NS dependencies for the name
         if self.is_zone():
             self.set_ns_dependencies()
@@ -2166,7 +2183,7 @@ class DomainNameAnalysis(object):
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in d['queries'][query_str]:
-                self.add_query(Q.DNSQuery.deserialize(query))
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
 
     def _deserialize_dependencies(self, d, cache):
         if self.stub:
@@ -2529,6 +2546,8 @@ class Analyst(object):
         if name_obj.is_zone():
             name_obj.set_ns_dependencies()
 
+        bailiwick = name_obj.zone.name
+
         if not name_obj.zone._all_servers_queried:
             servers = name_obj.zone.get_auth_or_designated_servers()
         else:
@@ -2543,23 +2562,23 @@ class Analyst(object):
                 # analysis
                 if (name_obj.name, dns.rdatatype.A) not in name_obj.queries:
                     self.logger.debug('Preparing query %s/A...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.A)] = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.A)] = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 self.logger.debug('Preparing query %s/AAAA...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone():
                     # A query might already have been performed during
                     # delegation analysis
                     if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                         self.logger.debug('Preparing query %s/NS...' % fmt.humanize_name(name_obj.name))
-                        queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                        queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                     self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                     # we also do a query with small UDP payload to elicit and test a truncated response
-                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone() or self._is_dkim(name_obj.name):
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         if name_obj.is_zone() or \
                 (self.force_dnskey and self.name == name_obj.name):
@@ -2570,13 +2589,13 @@ class Analyst(object):
                         self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
                         # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
                         # (the query falls back to UDP in case there are issues)
-                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 # we also do a query with small UDP payload to elicit and test a truncated response
-                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
             if name_obj.parent is not None:
                 if not name_obj.parent._all_servers_queried:
@@ -2586,7 +2605,7 @@ class Analyst(object):
                 parent_servers = self._filter_servers(parent_servers)
 
                 self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
 
                 if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
@@ -2594,7 +2613,7 @@ class Analyst(object):
                     dlv_name = name_obj.dlv_name
                     if dlv_servers:
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
-                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, self.client_ipv4, self.client_ipv6)
+                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
         if servers and self.dlv_domain != self.name:
@@ -2603,14 +2622,14 @@ class Analyst(object):
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
                     self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
-                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 if name_obj.nxrrset_name is not None:
                     self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
             if self._ask_ptr_queries(name_obj.name):
                 self.logger.debug('Preparing query %s/PTR...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
@@ -2650,7 +2669,7 @@ class Analyst(object):
             name_obj.referral_rdtype = rdtype
 
             self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, self.client_ipv4, self.client_ipv6)
+            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
             query.execute()
             referral_queries[rdtype] = query
 
@@ -2764,7 +2783,7 @@ class Analyst(object):
             servers = self._filter_servers(servers)
             if servers:
                 self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
-                queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6))
+                queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
             # A query
             if self._ask_other_queries(name_obj.name):
@@ -2773,7 +2792,7 @@ class Analyst(object):
                 servers = self._filter_servers(servers)
                 if servers:
                     self.logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
-                    queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, self.client_ipv4, self.client_ipv6))
+                    queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries)
@@ -2781,6 +2800,10 @@ class Analyst(object):
                 name_obj.add_query(query)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
+
+        #TODO now go back and look at servers authoritative for both parent and
+        #child that have authoritative referrals and re-classify them as
+        #non-referrals (do this in deserialize (and dnsvizwww retrieve also)
 
         return True
 
