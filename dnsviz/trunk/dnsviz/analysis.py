@@ -178,6 +178,8 @@ class DomainNameAnalysis(object):
         self.ttl_mapping = {}
 
         self.status = None
+        self.yxdomain = None
+        self.yxrrset = None
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
@@ -863,6 +865,7 @@ class DomainNameAnalysis(object):
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
     def _populate_rrsig_status(self, supported_algs):
+        self.yxrrset = set()
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -881,12 +884,16 @@ class DomainNameAnalysis(object):
         for (qname, rdtype), query in self.queries.items():
             items_to_validate = []
             for rrset_info in query.rrset_answer_info:
+                self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
                 items_to_validate.append(rrset_info)
                 if rrset_info.dname_info is not None:
                     items_to_validate.append(rrset_info.dname_info)
+                    self.yxrrset.add((rrset_info.dname_info.rrset.name, rrset_info.dname_info.rrset.rdtype))
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
                     items_to_validate.append(cname_rrset_info.dname_info)
                     items_to_validate.append(cname_rrset_info)
+                    self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
+                    self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
             for nsec_set_info in query.nsec_set_info:
                 items_to_validate += nsec_set_info.rrsets.values()
 
