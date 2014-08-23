@@ -619,11 +619,11 @@ class AggregateDNSResponse(object):
         self.error_rcode = {}
         self.error = {}
 
-    def _aggregate_response(self, server, client, response, qname, rdtype):
+    def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
-                self._aggregate_answer(server, client, response, response.is_referral(qname), qname, rdtype)
-                self._aggregate_nsec(server, client, response, response.is_referral(qname))
+                self._aggregate_answer(server, client, response, response.is_referral(qname, rdtype, bailiwick), qname, rdtype)
+                self._aggregate_nsec(server, client, response, response.is_referral(qname, rdtype, bailiwick))
         else:
             self._aggregate_error(server, client, response)
 
@@ -797,7 +797,7 @@ class DNSQuery(AggregateDNSResponse):
 
         self.responses = {}
 
-    def copy(self, with_responses=True):
+    def copy(self, bailiwick_map, default_bailiwick, with_responses=True):
         '''Return a clone of the current DNSQuery instance.  Parameters are
         passed by reference rather than copied.  Note: if it turns out that
         these member variables might be modified somehow by other instances in
@@ -808,12 +808,13 @@ class DNSQuery(AggregateDNSResponse):
 
         if with_responses:
             for server in self.responses:
+                bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client, response in self.responses[server].items():
-                    clone.add_response(server, client, response.copy())
+                    clone.add_response(server, client, response.copy(), bailiwick)
 
         return clone
 
-    def join(self, query):
+    def join(self, query, bailiwick_map, default_bailiwick):
         if not (isinstance(query, DNSQuery)):
             raise ValueError('A DNSQuery instance can only be joined with another DNSQuery instance.')
 
@@ -823,23 +824,25 @@ class DNSQuery(AggregateDNSResponse):
                 self.edns_flags == query.edns_flags and self.edns_options == query.edns_options):
             raise ValueError('DNS query parameters for DNSQuery instances being joined must be the same.')
 
-        clone = self.copy()
+        clone = self.copy(bailiwick_map, default_bailiwick)
         for server in query.responses:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in query.responses[server].items():
-                clone.add_response(server, client, response.copy())
+                clone.add_response(server, client, response.copy(), bailiwick)
         return clone
 
-    def project(self, servers):
+    def project(self, servers, bailiwick_map, default_bailiwick):
         if servers.difference(self.responses):
             raise ValueError('A DNSQuery can only project responses from servers that have been queried.')
 
-        clone = self.copy(with_responses=False)
+        clone = self.copy(bailiwick_map, default_bailiwick, with_responses=False)
         for server in servers:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in self.responses[server].items():
-                clone.add_response(server, client, response.copy())
+                clone.add_response(server, client, response.copy(), bailiwick)
         return clone
 
-    def add_response(self, server, client, response):
+    def add_response(self, server, client, response, bailiwick):
         if server not in self.responses:
             self.responses[server] = {}
         if response.query is not None:
@@ -872,7 +875,7 @@ class DNSQuery(AggregateDNSResponse):
 
         response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options)
 
-        self._aggregate_response(server, client, response, self.qname, self.rdtype)
+        self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
     def is_authoritative_answer_all(self):
         val = None
@@ -975,7 +978,7 @@ class DNSQuery(AggregateDNSResponse):
         return d
 
     @classmethod
-    def deserialize(self, d):
+    def deserialize(self, d, bailiwick_map, default_bailiwick):
         qname = dns.name.from_text(d['qname'])
         rdclass = dns.rdataclass.from_text(d['qclass'])
         rdtype = dns.rdatatype.from_text(d['qtype'])
@@ -999,8 +1002,9 @@ class DNSQuery(AggregateDNSResponse):
                 flags, edns, edns_max_udp_payload, edns_flags, edns_options)
 
         for server in d['responses']:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client in d['responses'][server]:
-                q.add_response(server, client, DNSResponse.deserialize(d['responses'][server][client]))
+                q.add_response(server, client, DNSResponse.deserialize(d['responses'][server][client]), bailiwick)
         return q
 
 class MultiQuery(AggregateDNSResponse):
@@ -1014,7 +1018,7 @@ class MultiQuery(AggregateDNSResponse):
 
         self.queries = {}
 
-    def add_query(self, query):
+    def add_query(self, query, bailiwick_map, default_bailiwick):
         if not (self.qname == query.qname and self.rdtype == query.rdtype and self.rdclass == query.rdclass):
             raise ValueError('DNS query information must be the same as that to which query is being joined.')
 
@@ -1025,24 +1029,25 @@ class MultiQuery(AggregateDNSResponse):
             edns_options_str += o.getvalue()
         params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str)
         if params in self.queries:
-            self.queries[params] = self.queries[params].join(query)
+            self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
         else:
             self.queries[params] = query
         for server in query.responses:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in query.responses[server].items():
-                self._aggregate_response(server, client, response, self.qname, self.rdtype)
+                self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
-    def project(self, servers):
+    def project(self, servers, bailiwick_map, default_bailiwick):
         query = MultiQuery(self.qname, self.rdtype, self.rdclass)
 
         for params in self.queries:
-            query.add_query(self.queries[params].project(servers))
+            query.add_query(self.queries[params].project(servers, bailiwick_map, default_bailiwick))
         return query
 
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
 
-    def __init__(self, qname, rdtype, rdclass, servers,
+    def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
             client_ipv4, client_ipv6, port, tcp,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options,
             response_handlers, query_timeout, max_attempts, lifetime):
@@ -1058,6 +1063,7 @@ class ExecutableDNSQuery(DNSQuery):
         if not servers:
             raise ValueError("At least one server must be specified for an ExecutableDNSQuery")
         self.servers = servers
+        self.bailiwick = bailiwick
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
         self.port = port
@@ -1172,7 +1178,7 @@ class ExecutableDNSQuery(DNSQuery):
                         else:
                             errno1 = None
                     response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query.tcp)
-                    query.add_response(qtm.dst, qtm.src, response_obj)
+                    query.add_response(qtm.dst, qtm.src, response_obj, query.bailiwick)
 
                     if not query.servers.difference(query.responses):
                         queries_to_execute.remove(query)
@@ -1193,8 +1199,8 @@ class ExecutableDNSQuery(DNSQuery):
             return func(self, *args, **kwargs)
         return _func
 
-    def add_response(self, server, client, response):
-        super(ExecutableDNSQuery, self).add_response(server, client, response)
+    def add_response(self, server, client, response, bailiwick):
+        super(ExecutableDNSQuery, self).add_response(server, client, response, bailiwick)
         if not self.servers.difference(self.responses):
             self._executed = True
 
@@ -1226,7 +1232,7 @@ class DNSQueryFactory(object):
 
     response_handlers = []
 
-    def __new__(cls, qname, rdtype, rdclass, servers,
+    def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
             client_ipv4=None, client_ipv6=None, port=53, tcp=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
@@ -1241,7 +1247,7 @@ class DNSQueryFactory(object):
             lifetime = cls.lifetime
 
         if executable:
-            return ExecutableDNSQuery(qname, rdtype, rdclass, servers,
+            return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
                 client_ipv4, client_ipv6, port, tcp,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
