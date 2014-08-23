@@ -1174,15 +1174,18 @@ class DomainNameAnalysis(object):
             self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
             return
 
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
         # there is at least one match
         dnskey_server_client_responses = set()
         for dnskey_query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
             for server in dnskey_query.responses:
+                bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client in dnskey_query.responses[server]:
                     response = dnskey_query.responses[server][client]
-                    if response.is_valid_response() and response.is_complete_response():
+                    if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, bailiwick):
                         dnskey_server_client_responses.add((server,client,response))
 
         for ds_rrset_info in ds_rrset_answer_info:
@@ -1598,9 +1601,10 @@ class DomainNameAnalysis(object):
         trusted_keys_not_self_signing = set()
 
         # buid a list of responsive servers
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         servers_responsive = set()
         for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
-            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response()])
+            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick)])
 
         # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():

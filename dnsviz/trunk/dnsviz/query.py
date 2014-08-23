@@ -931,11 +931,12 @@ class DNSQuery(AggregateDNSResponse):
                     return True
         return False
     
-    def servers_with_valid_complete_response(self):
+    def servers_with_valid_complete_response(self, bailiwick_map, default_bailiwick):
         servers_clients = set()
         for server in self.responses:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in self.responses[server].items():
-                if response.is_valid_response() and response.is_complete_response():
+                if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.qname, self.rdtype, bailiwick):
                     servers_clients.add((server, client))
         return servers_clients
 
