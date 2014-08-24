@@ -448,8 +448,15 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
             elif response_wire is not None and len(response_wire) < self._water_mark:
-                self._params['wait'] = 1.0
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_NO_CHANGE, None)
+                # but if this isn't the first time, just quit.  it could be that
+                # the server simply has some wonky way of determining how/where to truncate.
+                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_NO_CHANGE:
+                    self._params['tcp'] = True
+                    self._state = self.TCP_FINAL
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
+                else:
+                    self._params['wait'] = 1.0
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_NO_CHANGE, None)
             # if the response was truncated, then the size of the payload
             # received via TCP is the largest we can receive
             elif response_wire is not None and ord(response_wire[2]) & 0x02:
@@ -474,8 +481,15 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
             elif len(response_wire) < self._water_mark:
-                self._params['wait'] = 1.0
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_NO_CHANGE, None)
+                # but if this isn't the first time, just quit.  it could be that
+                # the server simply has some wonky way of determining how/where to truncate.
+                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_NO_CHANGE:
+                    self._params['tcp'] = True
+                    self._state = self.TCP_FINAL
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
+                else:
+                    self._params['wait'] = 1.0
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_NO_CHANGE, None)
             elif is_valid:
                 self._lower_bound = self._request.payload
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
@@ -1421,8 +1435,8 @@ class PMTUDiagnosticQuery(DNSSECQuery):
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
     query_timeout = 1.0
-    max_attempts = 30
-    lifetime = None
+    max_attempts = 15
+    lifetime = 18.0
 
 class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
 
@@ -1436,8 +1450,8 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
     query_timeout = 1.0
-    max_attempts = 30
-    lifetime = None
+    max_attempts = 15
+    lifetime = 18.0
 
 class TruncationDiagnosticQuery(DNSSECQuery):
     '''A simple query to test the results of a query with capabilities of only
