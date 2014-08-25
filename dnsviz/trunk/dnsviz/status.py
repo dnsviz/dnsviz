@@ -1,11 +1,9 @@
 #
 # This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
 # analysis, and visualization.
-# Author: Casey Deccio (ctdecci@sandia.gov)
+# Author: Casey Deccio (casey@deccio.net)
 #
-# Copyright 2012-2013 Sandia Corporation. Under the terms of Contract
-# DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains certain
-# rights in this software.
+# Copyright 2014 Verisign, Inc.
 # 
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
