@@ -2,6 +2,7 @@ import random
 import time
 
 import query
+from ipaddr import IPAddr
 
 import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
 
@@ -74,11 +75,11 @@ class Resolver:
                     line = line.strip()
                     words = line.split()
                     if words[0] == 'nameserver':
-                        servers.append(words[1])
+                        servers.append(IPAddr(words[1]))
         except IOError:
             pass
         if not servers:
-            servers.append('127.0.0.1')
+            servers.append(IPAddr('127.0.0.1'))
         return Resolver(servers, query_cls)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN):
