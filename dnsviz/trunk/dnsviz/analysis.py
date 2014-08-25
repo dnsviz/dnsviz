@@ -36,6 +36,7 @@ import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
 import crypto
 import format as fmt
+from ipaddr import IPAddr
 import query as Q
 import resolver as Resolver
 import response as Response
@@ -63,19 +64,19 @@ class FoundYXDOMAIN(Exception):
     pass
 
 ROOT_NS_IPS = set([
-        '198.41.0.4', '2001:503:ba3e::2:30',   # A
-        '192.228.79.201',                      # B
-        '192.33.4.12',                         # C
-        '199.7.91.13', '2001:500:2d::d',       # D
-        '192.203.230.10',                      # E
-        '192.5.5.241', '2001:500:2f::f',       # F
-        '192.112.36.4',                        # G
-        '128.63.2.53', '2001:500:1::803f:235', # H
-        '192.36.148.17', '2001:7fe::53',       # I
-        '192.58.128.30', '2001:503:c27::2:30', # J
-        '193.0.14.129', '2001:7fd::1',         # K
-        '199.7.83.42', '2001:500:3::42',       # L
-        '202.12.27.33', '2001:dc3::35',        # M
+        IPAddr('198.41.0.4'), IPAddr('2001:503:ba3e::2:30'),   # A
+        IPAddr('192.228.79.201'),                              # B
+        IPAddr('192.33.4.12'),                                 # C
+        IPAddr('199.7.91.13'), IPAddr('2001:500:2d::d'),       # D
+        IPAddr('192.203.230.10'),                              # E
+        IPAddr('192.5.5.241'), IPAddr('2001:500:2f::f'),       # F
+        IPAddr('192.112.36.4'),                                # G
+        IPAddr('128.63.2.53'), IPAddr('2001:500:1::803f:235'), # H
+        IPAddr('192.36.148.17'), IPAddr('2001:7fe::53'),       # I
+        IPAddr('192.58.128.30'), IPAddr('2001:503:c27::2:30'), # J
+        IPAddr('193.0.14.129'), IPAddr('2001:7fd::1'),         # K
+        IPAddr('199.7.83.42'), IPAddr('2001:500:3::42'),       # L
+        IPAddr('202.12.27.33'), IPAddr('2001:dc3::35'),        # M
 ])
 
 ROOT_NS_IPS_6 = set(filter(lambda x: ':' in x, ROOT_NS_IPS))
@@ -2457,7 +2458,7 @@ class Analyst(object):
                     a = answer_map[query_tuple]
                     if isinstance(a, Resolver.DNSAnswer):
                         for a_rr in a.rrset:
-                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], a_rr.to_text()))
+                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], IPAddr(a_rr.to_text())))
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
                 name_obj.parent = self._analyze_stub(name.parent()).zone
             except dns.exception.DNSException:
@@ -2776,7 +2777,7 @@ class Analyst(object):
                 a = answer_map[query_tuple]
                 if isinstance(a, Resolver.DNSAnswer):
                     for a_rr in a.rrset:
-                        name_obj.add_auth_ns_ip_mappings((name, a_rr.to_text()))
+                        name_obj.add_auth_ns_ip_mappings((name, IPAddr(a_rr.to_text())))
                 # negative responses
                 elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
                     name_obj.add_auth_ns_ip_mappings((name, None))

@@ -27,7 +27,7 @@ import datetime
 import re
 import time
 
-import dns.ipv4, dns.ipv6, dns.name, dns.rdatatype
+import dns.name, dns.rdatatype
 
 DNSKEY_FLAGS = {'ZONE': 0x0100, 'SEP': 0x0001, 'revoke': 0x0080}
 DNSKEY_PROTOCOLS = { 'DNSSEC': 3 }
@@ -61,28 +61,6 @@ class UTC(datetime.tzinfo):
         return ZERO
 
 utc = UTC()
-
-#################
-# IP conversions
-def ip_to_wire(ip):
-    if is_ipv6(ip):
-        return dns.ipv6.inet_aton(ip)
-    else:
-        return dns.ipv4.inet_aton(ip)
-
-def ip_from_wire(ip):
-    if len(ip) == 4:
-        return dns.ipv4.inet_ntoa(ip)
-    else:
-        return fix_ipv6(dns.ipv6.inet_ntoa(ip))
-
-def fix_ipv6(ip):
-    if ip.endswith('::') and len(ip.split(':')) > 8:
-        ip = ip[:-1] + '0'
-    return ip
-
-def is_ipv6(ip):
-    return ':' in ip
 
 #################
 # Timestamp conversions

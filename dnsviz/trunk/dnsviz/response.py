@@ -36,6 +36,7 @@ import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrs
 import base32
 import crypto
 import format as fmt
+from ipaddr import IPAddr
 import status as Status
 from util import tuple_to_dict
 
@@ -251,7 +252,7 @@ class DNSResponse:
                 except KeyError:
                     continue
 
-                ip_mapping[ns_rr.target].update([a_rr.to_text() for a_rr in a_rrset])
+                ip_mapping[ns_rr.target].update([IPAddr(a_rr.to_text()) for a_rr in a_rrset])
 
         return ip_mapping
 
