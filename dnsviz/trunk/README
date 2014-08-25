@@ -10,8 +10,8 @@ related to the analysis of ``example.com`` and stores the responses in the file
 
     $ dnsget example.com > example.com.json
 
-The following command creates an image of the assessment of in a file
-called ``example.com.png''::
+The following command creates an image of the assessment of in a file called
+``example.com.png''::
 
     $ dnsviz -Tpng -O example.com < example.com.json
 
@@ -24,3 +24,5 @@ Finally, this command outputs any errors found in the analysis to standard
 output::
 
     $ dnsgrok -l error example.com < example.com.json
+
+Use the -h option with any of the command-line tools to print their full usage.
