@@ -28,7 +28,10 @@ class IPAddr(str):
             af = socket.AF_INET6
         else:
             af = socket.AF_INET
-        ipaddr_bytes = socket.inet_pton(af, string)
+        try:
+            ipaddr_bytes = socket.inet_pton(af, string)
+        except socket.error:
+            raise ValueError('Invalid value for IP address: %s' % string)
         obj = super(IPAddr, cls).__new__(cls, socket.inet_ntop(af, ipaddr_bytes))
         obj._ipaddr_bytes = ipaddr_bytes
         return obj
