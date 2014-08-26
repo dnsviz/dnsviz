@@ -2625,6 +2625,10 @@ class Analyst(object):
                     parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 else:
                     parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
+                    if not parent_servers:
+                        # while the parent servers might not be responsive for the parent name,
+                        # they must be responsive for the current name, or else we wouldn't be here.
+                        parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
                 self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
