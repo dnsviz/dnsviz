@@ -38,13 +38,15 @@ import transport
 RETRY_CAUSE_NETWORK_ERROR = RESPONSE_ERROR_NETWORK_ERROR = 1
 RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2
 RETRY_CAUSE_TIMEOUT = RESPONSE_ERROR_TIMEOUT = 3
-RETRY_CAUSE_TC_SET = 4
-RETRY_CAUSE_RCODE = 5
-RETRY_CAUSE_DIAGNOSTIC = 6
+RETRY_CAUSE_OTHER = RESPONSE_ERROR_OTHER = 4
+RETRY_CAUSE_TC_SET = 5
+RETRY_CAUSE_RCODE = 6
+RETRY_CAUSE_DIAGNOSTIC = 7
 retry_causes = {
         RETRY_CAUSE_NETWORK_ERROR: 'NETWORK_ERROR',
         RETRY_CAUSE_FORMERR: 'FORMERR',
         RETRY_CAUSE_TIMEOUT: 'TIMEOUT',
+        RETRY_CAUSE_OTHER: 'OTHER',
         RETRY_CAUSE_TC_SET: 'TC',
         RETRY_CAUSE_RCODE: 'INVALID_RCODE',
         RETRY_CAUSE_DIAGNOSTIC: 'DIAGNOSTIC'
@@ -53,6 +55,7 @@ retry_cause_codes = {
         'NETWORK_ERROR': RETRY_CAUSE_NETWORK_ERROR,
         'FORMERR': RETRY_CAUSE_FORMERR,
         'TIMEOUT': RETRY_CAUSE_TIMEOUT,
+        'OTHER': RETRY_CAUSE_OTHER,
         'TC': RETRY_CAUSE_TC_SET,
         'INVALID_RCODE': RETRY_CAUSE_RCODE,
         'DIAGNOSTIC': RETRY_CAUSE_DIAGNOSTIC,
@@ -60,12 +63,14 @@ retry_cause_codes = {
 response_errors = {
         RESPONSE_ERROR_NETWORK_ERROR: retry_causes[RETRY_CAUSE_NETWORK_ERROR],
         RESPONSE_ERROR_FORMERR: retry_causes[RETRY_CAUSE_FORMERR],
-        RESPONSE_ERROR_TIMEOUT: retry_causes[RETRY_CAUSE_TIMEOUT]
+        RESPONSE_ERROR_TIMEOUT: retry_causes[RETRY_CAUSE_TIMEOUT],
+        RESPONSE_ERROR_OTHER: retry_causes[RETRY_CAUSE_OTHER]
 }
 response_error_codes = {
         retry_causes[RETRY_CAUSE_NETWORK_ERROR]: RESPONSE_ERROR_NETWORK_ERROR,
         retry_causes[RETRY_CAUSE_FORMERR]: RESPONSE_ERROR_FORMERR,
-        retry_causes[RETRY_CAUSE_TIMEOUT]: RESPONSE_ERROR_TIMEOUT
+        retry_causes[RETRY_CAUSE_TIMEOUT]: RESPONSE_ERROR_TIMEOUT,
+        retry_causes[RETRY_CAUSE_OTHER]: RESPONSE_ERROR_OTHER
 }
 
 RETRY_ACTION_NO_CHANGE = 1
@@ -1210,6 +1215,11 @@ class ExecutableDNSQuery(DNSQuery):
                             err = RESPONSE_ERROR_NETWORK_ERROR
                         elif isinstance(response, (struct.error, dns.exception.FormError, dns.exception.SyntaxError)):
                             err = RESPONSE_ERROR_FORMERR
+                        #XXX need to determine how to handle non-parsing
+                        # validation errors with dnspython (e.g., signature with
+                        # no keyring)
+                        else:
+                            err = RESPONSE_ERROR_OTHER
                         if hasattr(response, 'errno'):
                             errno1 = response.errno
                         else:
