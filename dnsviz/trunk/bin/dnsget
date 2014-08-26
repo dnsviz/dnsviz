@@ -185,12 +185,17 @@ Options:
                      analysis) (default: analyze only the name itself).
     -x <domain>:<name>=<addr>(,<name>=<addr>[...])
                    - set explicit delegation for <domain>, using servers with
-                     specified names and addresses (may be used multiple
-                     times).
+                     specified names (<name>) and addresses (<addr>).  This option
+                     may be used multiple times for different domains or
+                     servers.  Note that the names are simply for
+                     identification, and it is not necessary for the names to
+                     resolve to the corresponding address (or resolve at all
+                     for that matter).
     -p             - make json output pretty instead of minimal.
     -y             - read in yaml, instead of json.
     -Y             - write in yaml, instead of json.
-    -o <filename>  - write the analysis to file instead of to stdout.
+    -o <filename>  - write the analysis to file <filename> instead of to
+                     stdout, which is the default.
 ''' % sys.argv[0])
 
 def main():

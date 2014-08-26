@@ -147,6 +147,10 @@ class DomainNameAnalysis(object):
         # The record type queried with the name when eliciting a referral.
         # (serialized).
         self.referral_rdtype = None
+
+        # Whether or not the delegation was specified explicitly or learned
+        # by delegation.  This is for informational purposes more than
+        # functional purposes.
         self.explicit_delegation = False
 
         # The queries issued to and corresponding responses received from the
