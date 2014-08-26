@@ -2438,6 +2438,11 @@ class Analyst(object):
     def _cleanup_analysis_all(self, name_obj):
         pass
 
+    def _handle_explicit_delegations(self, name_obj):
+        if name_obj.name in self.explicit_delegations:
+            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[name_obj.name])
+            name_obj.explicit_delegation = True
+
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
         if name_obj.analysis_end is not None:
@@ -2447,23 +2452,26 @@ class Analyst(object):
             self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
-            try:
-                ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
-                
-                # resolve every name in the NS RRset
-                query_tuples = []
-                for rr in ans.rrset:
-                    query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-                answer_map = _resolver.query_multiple(*query_tuples)
-                for query_tuple in answer_map:
-                    a = answer_map[query_tuple]
-                    if isinstance(a, Resolver.DNSAnswer):
-                        for a_rr in a.rrset:
-                            name_obj.add_auth_ns_ip_mappings((query_tuple[0], IPAddr(a_rr.to_text())))
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-                name_obj.parent = self._analyze_stub(name.parent()).zone
-            except dns.exception.DNSException:
-                name_obj.parent = self._analyze_stub(name.parent()).zone
+
+            self._handle_explicit_delegations(name_obj)
+            if not name_obj.explicit_delegation:
+                try:
+                    ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
+                    
+                    # resolve every name in the NS RRset
+                    query_tuples = []
+                    for rr in ans.rrset:
+                        query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
+                    answer_map = _resolver.query_multiple(*query_tuples)
+                    for query_tuple in answer_map:
+                        a = answer_map[query_tuple]
+                        if isinstance(a, Resolver.DNSAnswer):
+                            for a_rr in a.rrset:
+                                name_obj.add_auth_ns_ip_mappings((query_tuple[0], IPAddr(a_rr.to_text())))
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                    name_obj.parent = self._analyze_stub(name.parent()).zone
+                except dns.exception.DNSException:
+                    name_obj.parent = self._analyze_stub(name.parent()).zone
 
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
@@ -2550,10 +2558,12 @@ class Analyst(object):
     def _analyze_name(self, name_obj):
         self.logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
 
-        # analyze delegation, and return if name doesn't exist
-        yxdomain = self._analyze_delegation(name_obj)
-        if not yxdomain:
-            return
+        self._handle_explicit_delegations(name_obj)
+        if not name_obj.explicit_delegation:
+            # analyze delegation, and return if name doesn't exist
+            yxdomain = self._analyze_delegation(name_obj)
+            if not yxdomain:
+                return
 
         # set the NS dependencies for the name
         if name_obj.is_zone():
@@ -2652,11 +2662,7 @@ class Analyst(object):
                 name_obj.add_query(query)
 
     def _analyze_delegation(self, name_obj):
-        if name_obj.name in self.explicit_delegations:
-            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[name_obj.name])
-            name_obj.explicit_delegation = True
-            return True
-        elif name_obj.parent is None:
+        if name_obj.parent is None:
             parent_auth_servers = ROOT_NS_IPS
         elif name_obj.parent.stub:
             parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
