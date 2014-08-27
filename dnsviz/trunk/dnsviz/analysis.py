@@ -2238,7 +2238,7 @@ class Analyst(object):
 
     clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
-    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, force_dnskey=False,
+    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
              follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
@@ -2254,7 +2254,6 @@ class Analyst(object):
 
         self.logger = logger
 
-        self.force_dnskey = force_dnskey
         self.follow_ns = follow_ns
 
         if trace is None:
@@ -2316,6 +2315,9 @@ class Analyst(object):
                 return name
             name = self.trace[i][0]
         return name
+
+    def _force_dnskey_query(self, name):
+        return name == self.name and self._is_referral_of_type(dns.rdatatype.RRSIG)
 
     def _ask_ptr_queries(self, name):
         '''Return True if PTR queries should be asked for this name, as guessed by
@@ -2385,30 +2387,48 @@ class Analyst(object):
             time.sleep(1)
             name_obj = self.analysis_cache[name]
 
-        # check if this analysis needs to be re-done
-        if self.name == name:
-            redo_analysis = False
-            # re-do analysis if force_dnskey is True and dnskey hasn't been queried
-            if self.force_dnskey and (self.name, dns.rdatatype.DNSKEY) not in name_obj.queries:
-                redo_analysis = True
+        return name_obj 
+    def _get_name_for_extended_analysis(self, name_obj):
+        with self.analysis_cache_lock:
+            name_obj = self.analysis_cache[name_obj.name]
+            if name_obj.analysis_end is not None:
+                name_obj.analysis_end = None
+                #XXX this should be in ParallelAnalyst
+                self.analysis_cache[name_obj.name] = name_obj
+                return name_obj
 
-            # re-do analysis if there were no queries (previously an
-            # "empty" non-terminal) but now it is the name in question
-            if not name_obj.queries:
-                redo_analysis = True
-
-            # if the previous analysis was a stub, but now we want the
-            # whole analysis
-            if name_obj.stub and not stub:
-                redo_analysis = True
-
-            if redo_analysis:
-                with self.analysis_cache_lock:
-                    if name_obj.analysis_end == self.analysis_cache[name].analysis_end:
-                        del self.analysis_cache[name]
-                return self._get_name_for_analysis(name, stub, lock)
+        # loop and wait for analysis to be completed
+        while name_obj.analysis_end is None:
+            time.sleep(1)
+            name_obj = self.analysis_cache[name]
 
         return name_obj
+
+    def _extend_analysis(self, name_obj):
+        if self.name != name_obj.name:
+            return False
+
+        # extend analysis if force_dnskey is True and dnskey hasn't been queried
+        if self._force_dnskey_query(self.name) and (self.name, dns.rdatatype.DNSKEY) not in name_obj.queries:
+            return True
+
+        # extend analysis if there were no queries (previously an
+        # "empty" non-terminal) but now it is the name in question
+        if not name_obj.queries:
+            return True
+
+        # extend analysis if this name is referenced by an alias
+        # and previously the necessary queries weren't asked
+        if self._is_referral_of_type(dns.rdatatype.CNAME) and \
+                (self.name, dns.rdatatype.A) not in name_obj.queries:
+            return True
+
+        # if the previous analysis was a stub, but now we want the
+        # whole analysis
+        if name_obj.stub:
+            return True
+
+        return False
 
     def analyze_async(self, callback=None, exc_callback=None):
         def _analyze():
@@ -2431,7 +2451,7 @@ class Analyst(object):
         if self.dlv_domain is not None and self.dlv_domain != self.name and self.dlv_domain not in self.analysis_cache:
             kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
             kwargs['ceiling'] = self.dlv_domain
-            a = self.__class__(self.dlv_domain, force_dnskey=False, **kwargs)
+            a = self.__class__(self.dlv_domain, **kwargs)
             a.analyze()
 
     def _finalize_analysis_proper(self, name_obj):
@@ -2492,6 +2512,36 @@ class Analyst(object):
 
         return name_obj
 
+    def _handle_old_analysis(self, name_obj):
+        # if there's no need to extend the analysis, then return
+        if not self._extend_analysis(name_obj):
+            return name_obj
+
+        name_obj = self._get_name_for_extended_analysis(name_obj)
+        # if we lost the race, and someone else already extended it, then
+        # return
+        if name_obj.analysis_end is not None:
+            return name_obj
+
+        try:
+            # if this was a stub, and now we're doing a full analysis,
+            # then do the full analysis
+            if name_obj.stub:
+                self.logger.info('Upgrading analysis of %s' % fmt.humanize_name(name_obj.name))
+                parent_obj = self._analyze_stub(name_obj.name.parent())
+                name_obj.parent = parent_obj
+                self._analyze_name(name_obj)
+                name_obj.stub = False
+            # otherwise, just add the queries that we're missing
+            else:
+                self.logger.info('Extending analysis of %s' % fmt.humanize_name(name_obj.name))
+                self._analyze_queries(name_obj)
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            self._finalize_analysis_proper(name_obj)
+        finally:
+            self._cleanup_analysis_proper(name_obj)
+        return name_obj
+
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
@@ -2499,7 +2549,7 @@ class Analyst(object):
         # determine immediately if we need to do anything
         name_obj = self._get_name_for_analysis(name, lock=False)
         if name_obj is not None and name_obj.analysis_end is not None:
-            return name_obj
+            return self._handle_old_analysis(name_obj)
 
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
@@ -2507,7 +2557,7 @@ class Analyst(object):
             parent_obj = None
         elif name in self.explicit_delegations:
             parent_obj = None
-        elif name == self.ceiling:
+        elif self.ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
@@ -2578,6 +2628,9 @@ class Analyst(object):
         if name_obj.is_zone():
             name_obj.set_ns_dependencies()
 
+        self._analyze_queries(name_obj)
+
+    def _analyze_queries(self, name_obj):
         bailiwick = name_obj.zone.name
 
         if not name_obj.zone._all_servers_queried:
@@ -2595,39 +2648,42 @@ class Analyst(object):
                 if (name_obj.name, dns.rdatatype.A) not in name_obj.queries:
                     self.logger.debug('Preparing query %s/A...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.A)] = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                self.logger.debug('Preparing query %s/AAAA...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                if (name_obj.name, dns.rdatatype.AAAA) not in name_obj.queries:
+                    self.logger.debug('Preparing query %s/AAAA...' % fmt.humanize_name(name_obj.name))
+                    queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone():
                     # A query might already have been performed during
                     # delegation analysis
                     if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                         self.logger.debug('Preparing query %s/NS...' % fmt.humanize_name(name_obj.name))
                         queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                    self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
-                    # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                    # we also do a query with small UDP payload to elicit and test a truncated response
-                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    if (name_obj.name, dns.rdatatype.MX) not in name_obj.queries:
+                        self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
+                        # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
+                        queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                        # we also do a query with small UDP payload to elicit and test a truncated response
+                        queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                 if name_obj.is_zone() or self._is_dkim(name_obj.name):
-                    self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    if (name_obj.name, dns.rdatatype.TXT) not in name_obj.queries:
+                        self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
+                        queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-        if name_obj.is_zone() or \
-                (self.force_dnskey and self.name == name_obj.name):
+        if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
 
             if servers:
                 if (not self.qname_only) or self.name == name_obj.name:
-                    if self.dlv_domain != self.name:
+                    if self.dlv_domain != self.name and (name_obj.name, dns.rdatatype.SOA) not in name_obj.queries:
                         self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
                         # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
                         # (the query falls back to UDP in case there are issues)
                         queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-                self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
-                # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                # we also do a query with small UDP payload to elicit and test a truncated response
-                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                if (name_obj.name, dns.rdatatype.DNSKEY) not in name_obj.queries:
+                    self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
+                    # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
+                    queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    # we also do a query with small UDP payload to elicit and test a truncated response
+                    queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
             if name_obj.parent is not None:
                 if not name_obj.parent._all_servers_queried:
@@ -2640,14 +2696,15 @@ class Analyst(object):
                         parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
-                self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
+                if (name_obj.name, dns.rdatatype.DS) not in name_obj.queries:
+                    self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
+                    queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
 
                 if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name
-                    if dlv_servers:
+                    if dlv_servers and (dlv_name, dns.rdatatype.DLV) not in name_obj.queries:
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
                         queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
@@ -2655,15 +2712,16 @@ class Analyst(object):
         if servers and self.dlv_domain != self.name:
             if name_obj.is_zone() and \
                     ((not self.qname_only) or name_obj.name == self.name):
-                self._set_negative_queries(name_obj)
-                if name_obj.nxdomain_name is not None:
-                    self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
-                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                if name_obj.nxrrset_name is not None:
-                    self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                if name_obj.nxdomain_name is None or name_obj.nxrrset_name is None:
+                    self._set_negative_queries(name_obj)
+                    if name_obj.nxdomain_name is not None:
+                        self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
+                        queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    if name_obj.nxrrset_name is not None:
+                        self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                        queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-            if self._ask_ptr_queries(name_obj.name):
+            if self._ask_ptr_queries(name_obj.name) and (name_obj.name, dns.rdatatype.PTR) not in name_obj.queries:
                 self.logger.debug('Preparing query %s/PTR...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
@@ -2851,26 +2909,26 @@ class Analyst(object):
 
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
-            a = self.__class__(cname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
+            a = self.__class__(cname, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets, cname, errors))
             t.start()
             threads.append(t)
 
         for dname in name_obj.dname_targets:
-            a = self.__class__(dname, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
+            a = self.__class__(dname, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
             t.start()
             threads.append(t)
 
         for signer in name_obj.external_signers:
-            a = self.__class__(signer, force_dnskey=True, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
+            a = self.__class__(signer, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.external_signers, signer, errors))
             t.start()
             threads.append(t)
 
         if self.follow_ns:
             for ns in name_obj.ns_dependencies:
-                a = self.__class__(ns, force_dnskey=False, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
+                a = self.__class__(ns, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_dependencies, ns, errors))
                 t.start()
                 threads.append(t)
