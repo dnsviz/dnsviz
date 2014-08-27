@@ -1046,7 +1046,7 @@ class DNSQuery(AggregateDNSResponse):
         for server in d['responses']:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client in d['responses'][server]:
-                q.add_response(server, client, DNSResponse.deserialize(d['responses'][server][client]), bailiwick)
+                q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client]), bailiwick)
         return q
 
 class MultiQuery(AggregateDNSResponse):
