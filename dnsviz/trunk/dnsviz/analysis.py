@@ -2557,7 +2557,7 @@ class Analyst(object):
             parent_obj = None
         elif name in self.explicit_delegations:
             parent_obj = None
-        elif self.ceiling.is_subdomain(name):
+        elif self.ceiling is not None and self.ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
