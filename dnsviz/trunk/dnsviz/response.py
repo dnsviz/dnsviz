@@ -159,22 +159,30 @@ class DNSResponse:
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
+        # if no bailiwick is specified, then we cannot classify it as a
+        # referral
         if bailiwick is None:
             return False
+        # if the qname is not a proper subdomain of the bailiwick, then it
+        # is not a referral
         if not (qname != bailiwick and qname.is_subdomain(bailiwick)):
             return False
+        # if the name exists in the answer section with the requested rdtype or
+        # CNAME, then it can't be a referral
         if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
             return False
+        # if an SOA record with the given qname exists, then the server
+        # is authoritative for the name, so it is a referral
         try:
             self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA)
             return False
         except KeyError:
             pass
-        try:
-            self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.NS)
+        # if qname is a subdomain of an NS RRset in the authority, then it is a
+        # referral
+        if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
             return True
-        except KeyError:
-            pass
+        return False
 
     def is_upward_referral(self, qname):
         '''Return True if this response yields an upward referral (i.e., a name
