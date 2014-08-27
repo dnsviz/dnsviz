@@ -491,12 +491,17 @@ class DomainNameAnalysis(object):
             pass
 
         if query.qname == self.name:
-            # if it fits the description of a referral, also grab the referral information
+            # if this is a referral, also grab the referral information, if it
+            # pertains to this name (could alternatively be a parent)
             if response.is_referral(query.qname, query.rdtype, bailiwick):
-                rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
-                self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
-                self._add_glue_ip_mapping(response)
-                self._handle_ns_response(rrset, False)
+                try:
+                    rrset = response.message.find_rrset(response.message.authority, self.name, dns.rdataclass.IN, dns.rdatatype.NS)
+                except KeyError:
+                    pass
+                else:
+                    self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
+                    self._add_glue_ip_mapping(response)
+                    self._handle_ns_response(rrset, False)
 
             # if it is an (authoritative) answer that has authority information, then add it
             else:
@@ -2165,7 +2170,7 @@ class DomainNameAnalysis(object):
         if 'auth_ns_ip_mapping' in d:
             for target in d['auth_ns_ip_mapping']:
                 for addr in d['auth_ns_ip_mapping'][target]:
-                    self.add_auth_ns_ip_mappings((dns.name.from_text(target), addr))
+                    self.add_auth_ns_ip_mappings((dns.name.from_text(target), IPAddr(addr)))
 
         if self.stub:
             return
