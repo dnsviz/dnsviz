@@ -32,7 +32,7 @@ BLANK_LINES_RE = re.compile(r'\n\s*\n')
 def tuple_to_dict(t):
     d = {}
     for n, v in t:
-        if n not in t:
+        if n not in d:
             d[n] = []
         d[n].append(v)
     return d
