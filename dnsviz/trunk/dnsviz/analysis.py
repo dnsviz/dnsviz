@@ -312,23 +312,22 @@ class DomainNameAnalysis(object):
         #XXX this is a hack
         if name == self.name:
             return self
-        elif name == self.parent_name():
+        for cname in self.cname_targets:
+            ref = self.cname_targets[cname].get_name(name)
+            if ref is not None:
+                return ref
+        for dname in self.dname_targets:
+            ref = self.dname_targets[dname].get_name(name)
+            if ref is not None:
+                return ref
+        if name in self.external_signers:
+            return self.external_signers[name]
+        if name in self.ns_dependencies and self.ns_dependencies[name] is not None:
+            return self.ns_dependencies[name]
+        if name == self.parent_name():
             return self.parent
         elif name == self.dlv_parent_name():
             return self.dlv_parent
-        elif name in self.external_signers:
-            return self.external_signers[name]
-        elif name in self.ns_dependencies and self.ns_dependencies[name] is not None:
-            return self.ns_dependencies[name]
-        else:
-            for cname in self.cname_targets:
-                ref = self.cname_targets[cname].get_name(name)
-                if ref is not None:
-                    return ref
-            for dname in self.dname_targets:
-                ref = self.dname_targets[dname].get_name(name)
-                if ref is not None:
-                    return ref
         return None
 
     def get_bailiwick_mapping(self):
