@@ -32,6 +32,7 @@ import socket
 import sys
 import threading
 import time
+import uuid
 
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
@@ -139,6 +140,9 @@ class DomainNameAnalysis(object):
         # The name that is the focus of the analysis (serialized).
         self.name = name
         self.stub = stub
+
+        # A unique identifier for the analysis
+        self.uuid = uuid.uuid5(uuid.NAMESPACE_DNS, self.name.canonicalize().to_text())
 
         # Analysis start and end (serialized).
         self.analysis_start = None
@@ -2415,7 +2419,7 @@ class Analyst(object):
 
             if redo_analysis:
                 with self.analysis_cache_lock:
-                    if name_obj.analysis_end == self.analysis_cache[name].analysis_end:
+                    if name_obj.uuid == self.analysis_cache[name].uuid:
                         del self.analysis_cache[name]
                 return self._get_name_for_analysis(name, stub, lock)
 
