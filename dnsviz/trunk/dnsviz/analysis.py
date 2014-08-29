@@ -2192,6 +2192,10 @@ class DomainNameAnalysis(object):
         if self.referral_rdtype is not None:
             delegation_types.add(self.referral_rdtype)
         for rdtype in delegation_types:
+            # if the query has already been imported, then
+            # don't re-import
+            if (self.name, rdtype) in self.queries:
+                continue
             query_str = '%s/%s/%s' % (self.name.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             if query_str in d['queries']:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
@@ -2205,6 +2209,10 @@ class DomainNameAnalysis(object):
             vals = query_str.split('/')
             qname = dns.name.from_text('/'.join(vals[:-2]))
             rdtype = dns.rdatatype.from_text(vals[-1])
+            # if the query has already been imported, then
+            # don't re-import
+            if (qname, rdtype) in self.queries:
+                continue
             if rdtype in delegation_types:
                 continue
             if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
