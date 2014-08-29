@@ -663,8 +663,10 @@ class AggregateDNSResponse(object):
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
-                self._aggregate_answer(server, client, response, response.is_referral(qname, rdtype, bailiwick), qname, rdtype)
-                self._aggregate_nsec(server, client, response, response.is_referral(qname, rdtype, bailiwick))
+                is_referral = response.is_referral(qname, rdtype, bailiwick)
+                self._aggregate_answer(server, client, response, is_referral, qname, rdtype)
+                if not is_referral or response.is_referral(qname, rdtype, bailiwick, proper=True):
+                    self._aggregate_nsec(server, client, response, is_referral) 
         else:
             self._aggregate_error(server, client, response)
 
