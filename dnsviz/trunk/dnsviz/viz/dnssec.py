@@ -525,7 +525,7 @@ class DNSAuthGraph:
         if ds_status.dnskey is None:
             dnskey_node = self.add_dnskey_non_existent(zone_obj.name, zone_obj.name, ds_status.ds.algorithm, ds_status.ds.key_tag)
         else:
-            dnskey_node = self.get_dnskey(self.id_for_dnskey(zone_obj.name, ds_status.dnskey.rdata), zone_obj.name, ds_status.dnskey.rdata.algorithm, ds_status.ds.key_tag)
+            dnskey_node = self.get_dnskey(self.id_for_dnskey(zone_obj.name, ds_status.dnskey.rdata), zone_obj.name, ds_status.dnskey.rdata.algorithm, ds_status.dnskey.key_tag)
 
         edge_id = 'digest-%s|%s|%s|%s' % (dnskey_node, ds_node, line_color.lstrip('#'), line_style)
         self.G.add_edge(dnskey_node, ds_node, id=edge_id, color=line_color, style=line_style, dir='back')
