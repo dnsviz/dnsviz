@@ -153,7 +153,7 @@ class DNSResponse:
 
         return self.message is not None and bool(self.message.flags & dns.flags.AA)
 
-    def is_referral(self, qname, rdtype, bailiwick):
+    def is_referral(self, qname, rdtype, bailiwick, proper=False):
         '''Return True if this response yields a referral for the queried
         name.'''
 
@@ -178,10 +178,17 @@ class DNSResponse:
             return False
         except KeyError:
             pass
-        # if qname is a subdomain of an NS RRset in the authority, then it is a
+        # if proper referral is requested and qname is equal to of an NS RRset
+        # in the authority, then it is a referral
+        if proper:
+            if filter(lambda x: qname == x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
+                return True
+        # if proper referral is NOT requested and qname is a subdomain of
+        # (including equal to) of an NS RRset in the authority, then it is a
         # referral
-        if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
-            return True
+        else:
+            if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
+                return True
         return False
 
     def is_upward_referral(self, qname):
