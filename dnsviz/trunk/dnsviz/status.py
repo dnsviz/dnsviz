@@ -802,7 +802,7 @@ class NSEC3StatusNXDOMAIN(object):
         self.name_digest_map = {}
         self.digest_wildcard_name_map = {}
 
-        self.closest_encloser = nsec_set_info.get_closest_encloser(qname, origin)
+        self._set_closest_encloser(nsec_set_info)
 
         self.nsec_names_covering_qname = {}
         self.nsec_names_covering_wildcard = {}
@@ -852,6 +852,9 @@ class NSEC3StatusNXDOMAIN(object):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
+
+    def _set_closest_encloser(self, nsec_set_info):
+        self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
             
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
@@ -956,11 +959,14 @@ class NSEC3StatusNXDOMAIN(object):
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def __init__(self, qname, wildcard_name, nsec_set_info):
-        super(NSEC3StatusWildcard, self).__init__(qname, wildcard_name.parent(), nsec_set_info)
         self.wildcard_name = wildcard_name
+        super(NSEC3StatusWildcard, self).__init__(qname, wildcard_name.parent(), nsec_set_info)
 
+    def _set_closest_encloser(self, nsec_set_info):
+        super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
+            
         if not self.closest_encloser:
-            self.closest_encloser = { wildcard_name.parent(): set([None]) }
+            self.closest_encloser = { self.wildcard_name.parent(): set([None]) }
             # fill in a dummy value for wildcard_name_digest_map
             self.name_digest_map[self.wildcard_name] = { None: self.wildcard_name }
 
@@ -983,7 +989,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
             covering_names = set()
             for names in self.closest_encloser.values() + self.nsec_names_covering_qname.values():
                 covering_names.update(names)
-            self.nsec_set_info = nsec_set_info.project(*list(covering_names))
+            self.nsec_set_info = nsec_set_info.project(*filter(lambda x: x is not None, covering_names))
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
