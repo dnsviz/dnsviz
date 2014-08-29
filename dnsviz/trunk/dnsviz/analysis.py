@@ -115,12 +115,16 @@ def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logg
             raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
         elif warn:
             logger.warning('No IPv4 interfaces available for analysis!')
+    else:
+        client_ipv4 = IPAddr(client_ipv4)
     if client_ipv6 is None:
         if require_ipv6:
             raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
         elif warn:
             logger.warning('No IPv6 interfaces available for analysis!')
-    return IPAddr(client_ipv4), IPAddr(client_ipv6)
+    else:
+        client_ipv6 = IPAddr(client_ipv6)
+    return client_ipv4, client_ipv6
 
 # create a standard recurisve DNS query with checking disabled
 class StandardRecursiveQueryCD(Q.StandardRecursiveQuery):

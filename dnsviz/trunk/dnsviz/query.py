@@ -1044,7 +1044,7 @@ class DNSQuery(AggregateDNSResponse):
                 flags, edns, edns_max_udp_payload, edns_flags, edns_options)
 
         for server in d['responses']:
-            bailiwick = bailiwick_map.get(server, default_bailiwick)
+            bailiwick = bailiwick_map.get(IPAddr(server), default_bailiwick)
             for client in d['responses'][server]:
                 q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client]), bailiwick)
         return q
@@ -1225,7 +1225,7 @@ class ExecutableDNSQuery(DNSQuery):
                         else:
                             errno1 = None
                     response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query.tcp)
-                    query.add_response(qtm.dst, qtm.src, response_obj, query.bailiwick)
+                    query.add_response(IPAddr(qtm.dst), IPAddr(qtm.src), response_obj, query.bailiwick)
 
                     if not query.servers.difference(query.responses):
                         queries_to_execute.remove(query)
