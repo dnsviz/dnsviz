@@ -106,19 +106,13 @@ class MultiProcessAnalyst(Analyst):
 
         # loop until all deps have been added
         for cname in name_obj.cname_targets:
-            while name_obj.cname_targets[cname] is None:
-                try:
-                    name_obj.cname_targets[cname] = self.analysis_cache[cname]
-                except KeyError:
-                    time.sleep(1)
-            self.refresh_dependency_references(name_obj.cname_targets[cname], trace+[name_obj.name])
-        for dname in name_obj.dname_targets:
-            while name_obj.dname_targets[dname] is None:
-                try:
-                    name_obj.dname_targets[dname] = self.analysis_cache[dname]
-                except KeyError:
-                    time.sleep(1)
-            self.refresh_dependency_references(name_obj.dname_targets[dname], trace+[name_obj.name])
+            for target in name_obj.cname_targets[cname]:
+                while name_obj.cname_targets[cname][target] is None:
+                    try:
+                        name_obj.cname_targets[cname][target] = self.analysis_cache[target]
+                    except KeyError:
+                        time.sleep(1)
+                self.refresh_dependency_references(name_obj.cname_targets[cname][target], trace+[name_obj.name])
         for signer in name_obj.external_signers:
             while name_obj.external_signers[signer] is None:
                 try:
