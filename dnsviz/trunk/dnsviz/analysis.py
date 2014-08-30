@@ -803,7 +803,7 @@ class DomainNameAnalysis(object):
             if ns_obj is not None:
                 ns_obj.populate_status(trusted_keys)
 
-        _logger.warning('Assessing status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
