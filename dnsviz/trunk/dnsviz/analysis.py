@@ -181,10 +181,8 @@ class DomainNameAnalysis(object):
         self.has_soa = False
         self.has_ns = False
         self.cname_targets = {}
-        self.dname_targets = {}
         self.ns_dependencies = {}
         self.mx_targets = {}
-        self.ptr_targets = {}
         self.external_signers = {}
 
         # TTLs associated with individual record types and the minimum TTL of
@@ -317,13 +315,10 @@ class DomainNameAnalysis(object):
         if name == self.name:
             return self
         for cname in self.cname_targets:
-            ref = self.cname_targets[cname].get_name(name)
-            if ref is not None:
-                return ref
-        for dname in self.dname_targets:
-            ref = self.dname_targets[dname].get_name(name)
-            if ref is not None:
-                return ref
+            for target, cname_obj in self.cname_targets[cname].items():
+                ref = cname_obj.get_name(name)
+                if ref is not None:
+                    return ref
         if name in self.external_signers:
             return self.external_signers[name]
         if name in self.ns_dependencies and self.ns_dependencies[name] is not None:
@@ -380,19 +375,9 @@ class DomainNameAnalysis(object):
         '''Save the targets from a CNAME RRset with the name which is the
         subject of this analysis.'''
 
-        self.cname_targets[rrset[0].target] = None
-
-    def _handle_dname_response(self, rrset):
-        '''Save the targets from a DNAME RRset with the name which is the
-        subject of this analysis.'''
-
-        self.dname_targets[rrset[0].target] = None
-
-    def _handle_ptr_response(self, rrset):
-        '''Save the targets from a PTR RRset with the name which is the
-        subject of this analysis.'''
-
-        self.ptr_targets[rrset[0].target] = None
+        if rrset.name not in self.cname_targets:
+            self.cname_targets[rrset.name] = {}
+        self.cname_targets[rrset.name][rrset[0].target] = None
 
     def _handle_ns_response(self, rrset, update_ns_names):
         '''Indicate that there exist NS records for the name which is the
@@ -460,10 +445,6 @@ class DomainNameAnalysis(object):
                     self._handle_soa_response(rrset)
                 elif rrset.rdtype == dns.rdatatype.MX:
                     self._handle_mx_response(rrset)
-                elif rrset.rdtype == dns.rdatatype.CNAME:
-                    self._handle_cname_response(rrset)
-                elif rrset.rdtype == dns.rdatatype.PTR:
-                    self._handle_ptr_response(rrset)
                 elif rrset.rdtype == dns.rdatatype.NS:
                     self._handle_ns_response(rrset, True)
                 elif rrset.rdtype == dns.rdatatype.DNSKEY:
@@ -488,6 +469,9 @@ class DomainNameAnalysis(object):
                     pass
 
                 self.ttl_mapping[rrset.rdtype] = min(self.ttl_mapping.get(rrset.rdtype, MAX_TTL), rrset.ttl)
+
+            if rrset.rdtype == dns.rdatatype.CNAME:
+                self._handle_cname_response(rrset)
 
         # look for SOA in authority section, in the case of negative responses
         try:
@@ -557,14 +541,6 @@ class DomainNameAnalysis(object):
                     self.clients_ipv4.add(client)
 
                 self._process_response(query.responses[server][client], server, client, query, bailiwick)
-
-        dname_rrset_info = filter(lambda x: x.dname_info is not None or x.cname_info_from_dname, query.rrset_answer_info)
-        for rrset_info in dname_rrset_info:
-            if rrset_info.cname_info_from_dname:
-                for cname_rrset_info in rrset_info.cname_info_from_dname:
-                    self._handle_dname_response(cname_rrset_info.dname_info.rrset)
-            elif rrset_info.dname_info is not None:
-                self._handle_dname_response(rrset_info.dname_info.rrset)
 
     def get_glue_ip_mapping(self):
         '''Return a reference to the mapping of targets of delegation records
@@ -817,7 +793,17 @@ class DomainNameAnalysis(object):
             self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
             self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True)
-        _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
+
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj.populate_status(trusted_keys)
+        for signer, signer_obj in self.external_signers.items():
+            signer_obj.populate_status(trusted_keys)
+        for target, ns_obj in self.ns_dependencies.items():
+            if ns_obj is not None:
+                ns_obj.populate_status(trusted_keys)
+
+        _logger.warning('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
         self._index_dnskeys()
         self._populate_rrsig_status(supported_algs)
@@ -828,25 +814,22 @@ class DomainNameAnalysis(object):
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
         self._populate_dnskey_status(trusted_keys)
 
-        for cname, cname_obj in self.cname_targets.items():
-            cname_obj.populate_status(trusted_keys)
-        for dname, dname_obj in self.dname_targets.items():
-            dname_obj.populate_status(trusted_keys)
-        for signer, signer_obj in self.external_signers.items():
-            signer_obj.populate_status(trusted_keys)
-        for target, ns_obj in self.ns_dependencies.items():
-            if ns_obj is not None:
-                ns_obj.populate_status(trusted_keys)
-
     def _populate_name_status(self):
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
+        self.yxrrset = set()
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         
         for (qname, rdtype), query in self.queries.items():
             for rrset_info in query.rrset_answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
+                self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
+                if rrset_info.dname_info is not None:
+                    self.yxrrset.add((rrset_info.dname_info.rrset.name, rrset_info.dname_info.rrset.rdtype))
+                for cname_rrset_info in rrset_info.cname_info_from_dname:
+                    self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
+                    self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
             for qname_sought in query.rrset_noanswer_info:
                 try:
                     for soa_owner_name in query.rrset_noanswer_info[qname_sought]:
@@ -867,11 +850,18 @@ class DomainNameAnalysis(object):
                         for server in query1.responses:
                             bailiwick = bailiwick_map.get(server, default_bailiwick)
                             for client in query1.responses[server]:
-                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick):
+                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
                                     self.yxdomain.add(self.name)
                                     raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
                     pass
+
+        # now add the values of CNAMEs
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                for name, rdtype in cname_obj.yxrrset:
+                    if name == target:
+                        self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
             self.status = Status.NAME_STATUS_YXDOMAIN
@@ -883,7 +873,6 @@ class DomainNameAnalysis(object):
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
     def _populate_rrsig_status(self, supported_algs):
-        self.yxrrset = set()
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -902,16 +891,12 @@ class DomainNameAnalysis(object):
         for (qname, rdtype), query in self.queries.items():
             items_to_validate = []
             for rrset_info in query.rrset_answer_info:
-                self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
                 items_to_validate.append(rrset_info)
                 if rrset_info.dname_info is not None:
                     items_to_validate.append(rrset_info.dname_info)
-                    self.yxrrset.add((rrset_info.dname_info.rrset.name, rrset_info.dname_info.rrset.rdtype))
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
                     items_to_validate.append(cname_rrset_info.dname_info)
                     items_to_validate.append(cname_rrset_info)
-                    self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
-                    self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
             for nsec_set_info in query.nsec_set_info:
                 items_to_validate += nsec_set_info.rrsets.values()
 
@@ -1718,10 +1703,9 @@ class DomainNameAnalysis(object):
         if self.stub:
             return
 
-        for cname, cname_obj in self.cname_targets.items():
-            cname_obj.serialize(d)
-        for dname, dname_obj in self.dname_targets.items():
-            dname_obj.serialize(d)
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj.serialize(d)
         for signer, signer_obj in self.external_signers.items():
             signer_obj.serialize(d)
         for target, ns_obj in self.ns_dependencies.items():
@@ -2113,10 +2097,9 @@ class DomainNameAnalysis(object):
         if not d[name_str]:
             del d[name_str]
 
-        for cname, cname_obj in self.cname_targets.items():
-            cname_obj.serialize_status(d, loglevel=loglevel)
-        for dname, dname_obj in self.dname_targets.items():
-            dname_obj.serialize_status(d, loglevel=loglevel)
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj.serialize_status(d, loglevel=loglevel)
         for signer, signer_obj in self.external_signers.items():
             signer_obj.serialize_status(d, loglevel=loglevel)
         for target, ns_obj in self.ns_dependencies.items():
@@ -2228,9 +2211,8 @@ class DomainNameAnalysis(object):
             return
 
         for cname in self.cname_targets:
-            self.cname_targets[cname] = self.__class__.deserialize(cname, d, cache=cache)
-        for dname in self.dname_targets:
-            self.dname_targets[dname] = self.__class__.deserialize(dname, d, cache=cache)
+            for target in self.cname_targets[cname]:
+                self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
         for signer in self.external_signers:
             self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
         for target in self.ns_dependencies:
@@ -2877,16 +2859,11 @@ class Analyst(object):
 
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
-            a = self.__class__(cname, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
-            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets, cname, errors))
-            t.start()
-            threads.append(t)
-
-        for dname in name_obj.dname_targets:
-            a = self.__class__(dname, trace=self.trace + [(name_obj.name, dns.rdatatype.DNAME)], **kwargs)
-            t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.dname_targets, dname, errors))
-            t.start()
-            threads.append(t)
+            for target in name_obj.cname_targets[cname]:
+                a = self.__class__(target, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
+                t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets[cname], target, errors))
+                t.start()
+                threads.append(t)
 
         for signer in name_obj.external_signers:
             a = self.__class__(signer, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)

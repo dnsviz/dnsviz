@@ -972,10 +972,6 @@ class DNSAuthGraph:
 
             for cname in cnames:
                 cname_obj = name_obj.get_name(cname)
-                # cname_obj might be None, if analysis did not follow it (e.g.,
-                # for random names)
-                if cname_obj is None:
-                    continue
                 cname_nodes = self.graph_rrset_auth(cname_obj, cname, rdtype)
                 for my_node in my_nodes:
                     for cname_node in cname_nodes:
