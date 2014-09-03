@@ -934,6 +934,13 @@ class DNSAuthGraph:
 
         S, zone_graph_name, zone_bottom, zone_top = self.add_zone(zone_obj)
 
+        #XXX there are reasons for this (e.g., NXDOMAIN, after which no further
+        # queries are made), but it would be good to have a sanity check, so
+        # we don't simply produce an incomplete graph.  (In the case above, perhaps
+        # point to the NXDOMAIN produced by another query.)
+        if (name, rdtype) not in name_obj.queries:
+            return []
+
         id = 10
         for rrset_info in name_obj.queries[(name, rdtype)].rrset_answer_info:
             my_nodes = []
