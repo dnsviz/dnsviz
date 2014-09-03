@@ -272,7 +272,7 @@ def _validate_rrsig_gost(alg, sig, msg, key):
         _gost_cleanup()
 
 def _validate_rrsig_ec(alg, sig, msg, key):
-    pubkey = _dnskey_to_ec(key)
+    pubkey = _dnskey_to_ec(alg, key)
 
     if alg in (13,):
         alg='sha256'
