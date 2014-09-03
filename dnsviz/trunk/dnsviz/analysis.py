@@ -920,9 +920,7 @@ class DomainNameAnalysis(object):
                     if cname_obj is self:
                         continue
                     for name, rdtype in cname_obj.yxrrset:
-                        print 'CNAME',cname,'->',target,name,dns.rdatatype.to_text(rdtype)
                         if name == target:
-                            print 'adding',cname,target,name,dns.rdatatype.to_text(rdtype)
                             self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
