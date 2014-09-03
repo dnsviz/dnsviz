@@ -135,6 +135,12 @@ _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.Simpl
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
 class DomainNameAnalysis(object):
+    RDTYPES_ALL = 0
+    RDTYPES_ALL_SAME_NAME = 1
+    RDTYPES_NS_TARGET = 2
+    RDTYPES_SECURE_DELEGATION = 3
+    RDTYPES_DELEGATION = 4
+
     def __init__(self, name, stub=False):
 
         ##################################################
@@ -264,6 +270,9 @@ class DomainNameAnalysis(object):
     def __str__(self):
         return fmt.humanize_name(self.name)
 
+    def __eq__(self, other):
+        return self.name == other.name
+
     def parent_name(self):
         if self.parent is not None:
             return self.parent.name
@@ -310,13 +319,25 @@ class DomainNameAnalysis(object):
     def single_client(self):
         return len(self.clients_ipv4) <= 1 and len(self.clients_ipv6) <= 1
 
-    def get_name(self, name):
-        #XXX this is a hack
+    def get_name(self, name, trace=None):
+        #XXX this whole method is a hack
+        if trace is None:
+            trace = []
+
+        if self in trace:
+            return None
+
         if name == self.name:
             return self
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
-                ref = cname_obj.get_name(name)
+                #XXX it is possible for cname_obj to be None where
+                # this name was populated with level RDTYPES_SECURE_DELEGATION.
+                # when this method is refactored appropriately, this check won't
+                # be necessary.
+                if cname_obj is None:
+                    continue
+                ref = cname_obj.get_name(name, trace=trace + [self])
                 if ref is not None:
                     return ref
         if name in self.external_signers:
@@ -743,7 +764,7 @@ class DomainNameAnalysis(object):
             return
         for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
             # there are CNAMEs that show up here...
-            if dnskey_info.rrset.rdtype != dns.rdatatype.DNSKEY:
+            if not (dnskey_info.rrset.name == self.name and dnskey_info.rrset.rdtype == dns.rdatatype.DNSKEY):
                 continue
             dnskey_set = set()
             for dnskey_rdata in dnskey_info.rrset:
@@ -771,8 +792,27 @@ class DomainNameAnalysis(object):
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False):
-        # status has already been populated
+    def _rdtypes_for_analysis_level(self, level):
+        rdtypes = set([self.referral_rdtype, dns.rdatatype.NS])
+        if level == self.RDTYPES_DELEGATION:
+            return rdtypes
+        rdtypes.update([dns.rdatatype.DNSKEY, dns.rdatatype.DS])
+        if level == self.RDTYPES_SECURE_DELEGATION:
+            return rdtypes
+        rdtypes.update([dns.rdatatype.A, dns.rdatatype.AAAA])
+        if level == self.RDTYPES_NS_TARGET:
+            return rdtypes
+        return None
+
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None):
+        if trace is None:
+            trace = []
+
+        # avoid loops
+        if self in trace:
+            return
+
+        # if status has already been populated, then don't reevaluate
         if self.rrsig_status is not None:
             return
 
@@ -780,6 +820,8 @@ class DomainNameAnalysis(object):
         if self.stub:
             return
 
+        # identify supported algorithms as intersection of explicitly supported
+        # and software supported
         if supported_algs is not None:
             supported_algs.intersection_update(crypto._supported_algs)
         else:
@@ -789,39 +831,53 @@ class DomainNameAnalysis(object):
         else:
             supported_digest_algs = crypto._supported_digest_algs
 
-        if self.parent is not None:
-            self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs)
-        if self.dlv_parent is not None:
-            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True)
+        # populate status of dependencies
+        if level <= self.RDTYPES_NS_TARGET:
+            for cname in self.cname_targets:
+                for target, cname_obj in self.cname_targets[cname].items():
+                    cname_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            for signer, signer_obj in self.external_signers.items():
+                signer_obj.populate_status(trusted_keys, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            for target, ns_obj in self.ns_dependencies.items():
+                if ns_obj is not None:
+                    ns_obj.populate_status(trusted_keys, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
 
-        for cname in self.cname_targets:
-            for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.populate_status(trusted_keys)
-        for signer, signer_obj in self.external_signers.items():
-            signer_obj.populate_status(trusted_keys)
-        for target, ns_obj in self.ns_dependencies.items():
-            if ns_obj is not None:
-                ns_obj.populate_status(trusted_keys)
+        # populate status of ancestry
+        if self.parent is not None:
+            self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+        if self.dlv_parent is not None:
+            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
-        self._populate_name_status()
-        self._index_dnskeys()
-        self._populate_rrsig_status(supported_algs)
-        self._populate_nsec_status()
-        if not is_dlv:
-            self._populate_delegation_status(supported_algs, supported_digest_algs)
-        if self.dlv_parent is not None:
-            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
-        self._populate_dnskey_status(trusted_keys)
+        self._populate_name_status(level)
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            self._index_dnskeys()
+        self._populate_rrsig_status(supported_algs, level)
+        self._populate_nsec_status(level)
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            if not is_dlv:
+                self._populate_delegation_status(supported_algs, supported_digest_algs)
+            if self.dlv_parent is not None:
+                self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+            self._populate_dnskey_status(trusted_keys)
 
-    def _populate_name_status(self):
+    def _populate_name_status(self, level):
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
         self.yxrrset = set()
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
+
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
+
             for rrset_info in query.rrset_answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
                 self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
@@ -841,27 +897,31 @@ class DomainNameAnalysis(object):
                 except FoundYXDOMAIN:
                     break
 
-            # now check referrals (if name hasn't already been identified as YXDOMAIN)
-            if self.name == qname and self.name not in self.yxdomain:
-                if rdtype not in (self.referral_rdtype, dns.rdatatype.NS):
-                    continue
-                try:
-                    for query1 in query.queries.values():
-                        for server in query1.responses:
-                            bailiwick = bailiwick_map.get(server, default_bailiwick)
-                            for client in query1.responses[server]:
-                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
-                                    self.yxdomain.add(self.name)
-                                    raise FoundYXDOMAIN
-                except FoundYXDOMAIN:
-                    pass
+            if level <= self.RDTYPES_DELEGATION:
+                # now check referrals (if name hasn't already been identified as YXDOMAIN)
+                if self.name == qname and self.name not in self.yxdomain:
+                    if rdtype not in (self.referral_rdtype, dns.rdatatype.NS):
+                        continue
+                    try:
+                        for query1 in query.queries.values():
+                            for server in query1.responses:
+                                bailiwick = bailiwick_map.get(server, default_bailiwick)
+                                for client in query1.responses[server]:
+                                    if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
+                                        self.yxdomain.add(self.name)
+                                        raise FoundYXDOMAIN
+                    except FoundYXDOMAIN:
+                        pass
 
-        # now add the values of CNAMEs
-        for cname in self.cname_targets:
-            for target, cname_obj in self.cname_targets[cname].items():
-                for name, rdtype in cname_obj.yxrrset:
-                    if name == target:
-                        self.yxrrset.add((cname,rdtype))
+        if level <= self.RDTYPES_ALL:
+            # now add the values of CNAMEs
+            for cname in self.cname_targets:
+                for target, cname_obj in self.cname_targets[cname].items():
+                    if cname_obj is self:
+                        continue
+                    for name, rdtype in cname_obj.yxrrset:
+                        if name == target:
+                            self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
             self.status = Status.NAME_STATUS_YXDOMAIN
@@ -872,7 +932,7 @@ class DomainNameAnalysis(object):
             if self.name in query.nxdomain_info and self.status == Status.NAME_STATUS_INDETERMINATE:
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
-    def _populate_rrsig_status(self, supported_algs):
+    def _populate_rrsig_status(self, supported_algs, level):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -888,7 +948,15 @@ class DomainNameAnalysis(object):
             self.ksks = set()
 
         _logger.debug('Assessing RRSIG status of %s...' % (fmt.humanize_name(self.name)))
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
+
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
+
             items_to_validate = []
             for rrset_info in query.rrset_answer_info:
                 items_to_validate.append(rrset_info)
@@ -1190,6 +1258,10 @@ class DomainNameAnalysis(object):
                         dnskey_server_client_responses.add((server,client,response))
 
         for ds_rrset_info in ds_rrset_answer_info:
+            # there are CNAMEs that show up here...
+            if not (ds_rrset_info.rrset.name == name and ds_rrset_info.rrset.rdtype == rdtype):
+                continue
+
             # for each set of DS records provided by one or more servers,
             # identify the set of DNSSEC algorithms and the set of digest
             # algorithms per algorithm/key tag combination
@@ -1337,7 +1409,7 @@ class DomainNameAnalysis(object):
                 if not self.get_responsive_servers_udp() or not self._auth_servers_clients:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
-    def _populate_nsec_status(self):
+    def _populate_nsec_status(self, level):
         self.nxdomain_status = {}
         self.nxdomain_servers_clients = {}
         self.nxdomain_warnings = {}
@@ -1351,7 +1423,14 @@ class DomainNameAnalysis(object):
 
 
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
+
             for qname_sought in query.nxdomain_info:
                 qname_obj = self.get_name(qname_sought)
                 if rdtype == dns.rdatatype.DS:
@@ -1631,9 +1710,15 @@ class DomainNameAnalysis(object):
             for dnskey in trusted_keys_not_self_signing:
                 dnskey.errors[Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING] = dnskey.servers_clients
 
-    def serialize(self, d=None):
+    def serialize(self, d=None, trace=None):
         if d is None:
             d = collections.OrderedDict()
+
+        if trace is None:
+            trace = []
+
+        if self in trace:
+            return
 
         name_str = self.name.canonicalize().to_text()
         if name_str in d:
@@ -1641,12 +1726,12 @@ class DomainNameAnalysis(object):
 
         # serialize dependencies first because their version of the analysis
         # might be the most complete (considering re-dos)
-        self._serialize_dependencies(d)
+        self._serialize_dependencies(d, trace)
 
         if self.parent is not None:
-            self.parent.serialize(d)
+            self.parent.serialize(d, trace + [self])
         if self.dlv_parent is not None:
-            self.dlv_parent.serialize(d)
+            self.dlv_parent.serialize(d, trace + [self])
 
         clients_ipv4 = list(self.clients_ipv4)
         clients_ipv4.sort()
@@ -1699,18 +1784,18 @@ class DomainNameAnalysis(object):
             for query in self.queries[(qname, rdtype)].queries.values():
                 d['queries'][qname_type_str].append(query.serialize())
 
-    def _serialize_dependencies(self, d):
+    def _serialize_dependencies(self, d, trace):
         if self.stub:
             return
 
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.serialize(d)
+                cname_obj.serialize(d, trace=trace + [self])
         for signer, signer_obj in self.external_signers.items():
-            signer_obj.serialize(d)
+            signer_obj.serialize(d, trace=trace + [self])
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj.serialize(d)
+                ns_obj.serialize(d, trace=trace + [self])
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
@@ -1786,10 +1871,18 @@ class DomainNameAnalysis(object):
 
         return d
 
-    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG):
+    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None):
         if d is None:
             d = collections.OrderedDict()
 
+        if trace is None:
+            trace = []
+
+        # avoid loops
+        if self in trace:
+            return d
+
+        # if we're a stub, there's no status to serialize
         if self.stub:
             return d
 
@@ -1797,10 +1890,25 @@ class DomainNameAnalysis(object):
         if name_str in d:
             return d
 
-        if self.parent is not None:
-            self.parent.serialize_status(d, loglevel=loglevel)
-        if self.dlv_parent is not None:
-            self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel)
+        # serialize status of dependencies first because their version of the
+        # analysis might be the most complete (considering re-dos)
+        if level <= self.RDTYPES_NS_TARGET:
+            for cname in self.cname_targets:
+                for target, cname_obj in self.cname_targets[cname].items():
+                    cname_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            for signer, signer_obj in self.external_signers.items():
+                signer_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            for target, ns_obj in self.ns_dependencies.items():
+                if ns_obj is not None:
+                    ns_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
+
+        # serialize status of ancestry
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            if self.parent is not None:
+                self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            if self.dlv_parent is not None:
+                self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
 
         consolidate_clients = self.single_client()
 
@@ -1811,7 +1919,15 @@ class DomainNameAnalysis(object):
 
         query_keys = self.queries.keys()
         query_keys.sort()
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype) in query_keys:
+
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
+
             query = self.queries[(qname, rdtype)]
             qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             d[name_str]['answer'][qname_type_str] = []
@@ -1827,14 +1943,15 @@ class DomainNameAnalysis(object):
         if not d[name_str]['answer']:
             del d[name_str]['answer']
 
-        if (self.name, dns.rdatatype.DNSKEY) in self.queries:
-            d[name_str]['dnskeys'] = []
-            for dnskey in self.get_dnskeys():
-                dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                if dnskey_serialized:
-                    d[name_str]['dnskeys'].append(dnskey_serialized)
-            if not d[name_str]['dnskeys']:
-                del d[name_str]['dnskeys']
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            if (self.name, dns.rdatatype.DNSKEY) in self.queries:
+                d[name_str]['dnskeys'] = []
+                for dnskey in self.get_dnskeys():
+                    dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    if dnskey_serialized:
+                        d[name_str]['dnskeys'].append(dnskey_serialized)
+                if not d[name_str]['dnskeys']:
+                    del d[name_str]['dnskeys']
 
         if self.is_zone():
             if self.parent is not None and not is_dlv:
@@ -2055,6 +2172,12 @@ class DomainNameAnalysis(object):
         query_keys = self.response_errors_rcode.keys()
         query_keys.sort()
         for (qname, rdtype) in query_keys:
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
+
             qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             d[name_str]['response_errors'][qname_type_str] = []
 
@@ -2096,15 +2219,6 @@ class DomainNameAnalysis(object):
 
         if not d[name_str]:
             del d[name_str]
-
-        for cname in self.cname_targets:
-            for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.serialize_status(d, loglevel=loglevel)
-        for signer, signer_obj in self.external_signers.items():
-            signer_obj.serialize_status(d, loglevel=loglevel)
-        for target, ns_obj in self.ns_dependencies.items():
-            if ns_obj is not None:
-                ns_obj.serialize_status(d, loglevel=loglevel)
 
         return d
 
