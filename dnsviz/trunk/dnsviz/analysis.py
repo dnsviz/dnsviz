@@ -872,7 +872,7 @@ class DomainNameAnalysis(object):
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
 
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+            if level > self.RDTYPES_ALL_SAME_NAME and qname not in (self.name, self.dlv_name):
                 continue
 
             if required_rdtypes is not None and rdtype not in required_rdtypes:
@@ -913,14 +913,16 @@ class DomainNameAnalysis(object):
                     except FoundYXDOMAIN:
                         pass
 
-        if level <= self.RDTYPES_ALL:
+        if level <= self.RDTYPES_ALL_SAME_NAME:
             # now add the values of CNAMEs
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
                     if cname_obj is self:
                         continue
                     for name, rdtype in cname_obj.yxrrset:
+                        print 'CNAME',cname,'->',target,name,dns.rdatatype.to_text(rdtype)
                         if name == target:
+                            print 'adding',cname,target,name,dns.rdatatype.to_text(rdtype)
                             self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
@@ -951,7 +953,7 @@ class DomainNameAnalysis(object):
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
 
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+            if level > self.RDTYPES_ALL_SAME_NAME and qname not in (self.name, self.dlv_name):
                 continue
 
             if required_rdtypes is not None and rdtype not in required_rdtypes:
@@ -1425,7 +1427,7 @@ class DomainNameAnalysis(object):
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+            if level > self.RDTYPES_ALL_SAME_NAME and qname not in (self.name, self.dlv_name):
                 continue
 
             if required_rdtypes is not None and rdtype not in required_rdtypes:
@@ -1922,7 +1924,7 @@ class DomainNameAnalysis(object):
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype) in query_keys:
 
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+            if level > self.RDTYPES_ALL_SAME_NAME and qname not in (self.name, self.dlv_name):
                 continue
 
             if required_rdtypes is not None and rdtype not in required_rdtypes:
@@ -2172,7 +2174,7 @@ class DomainNameAnalysis(object):
         query_keys = self.response_errors_rcode.keys()
         query_keys.sort()
         for (qname, rdtype) in query_keys:
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+            if level > self.RDTYPES_ALL_SAME_NAME and qname not in (self.name, self.dlv_name):
                 continue
 
             if required_rdtypes is not None and rdtype not in required_rdtypes:
