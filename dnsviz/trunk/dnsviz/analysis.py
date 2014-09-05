@@ -917,7 +917,7 @@ class DomainNameAnalysis(object):
         if level <= self.RDTYPES_NS_TARGET:
             # now add the values of CNAMEs
             for cname in self.cname_targets:
-                if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                if level > self.RDTYPES_ALL and cname not in (self.name, self.dlv_name):
                     continue
                 for target, cname_obj in self.cname_targets[cname].items():
                     if cname_obj is self:
