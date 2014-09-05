@@ -152,7 +152,7 @@ class DomainNameAnalysis(object):
         self.stub = stub
 
         # A unique identifier for the analysis
-        self.uuid = uuid.uuid5(uuid.NAMESPACE_DNS, self.name.canonicalize().to_text())
+        self.uuid = uuid.uuid4()
 
         # Analysis start and end (serialized).
         self.analysis_start = None
