@@ -863,7 +863,16 @@ class DomainNameAnalysis(object):
                 self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
             self._populate_dnskey_status(trusted_keys)
 
-    def _populate_name_status(self, level):
+    def _populate_name_status(self, level, trace=None):
+        # using trace allows _populate_name_status to be called independent of
+        # populate_status
+        if trace is None:
+            trace = []
+
+        # avoid loops
+        if self in trace:
+            return
+
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
         self.yxrrset = set()
@@ -922,6 +931,8 @@ class DomainNameAnalysis(object):
                 for target, cname_obj in self.cname_targets[cname].items():
                     if cname_obj is self:
                         continue
+                    if cname_obj.yxrrset is None:
+                        cname_obj._populate_name_status(self.RDTYPES_ALL, trace=trace + [self])
                     for name, rdtype in cname_obj.yxrrset:
                         if name == target:
                             self.yxrrset.add((cname,rdtype))
