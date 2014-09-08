@@ -2428,7 +2428,7 @@ class Analyst(object):
         for i in range(len(self.trace) - 1, -1, -1):
             if self.trace[i][1] != dns.rdatatype.CNAME:
                 return name
-            name = self.trace[i][0]
+            name = self.trace[i][0].name
         return name
 
     def _force_dnskey_query(self, name):
@@ -2977,20 +2977,20 @@ class Analyst(object):
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
             for target in name_obj.cname_targets[cname]:
-                a = self.__class__(target, trace=self.trace + [(name_obj.name, dns.rdatatype.CNAME)], **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets[cname], target, errors))
                 t.start()
                 threads.append(t)
 
         for signer in name_obj.external_signers:
-            a = self.__class__(signer, trace=self.trace + [(name_obj.name, dns.rdatatype.RRSIG)], **kwargs)
+            a = self.__class__(signer, trace=self.trace + [(name_obj, dns.rdatatype.RRSIG)], **kwargs)
             t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.external_signers, signer, errors))
             t.start()
             threads.append(t)
 
         if self.follow_ns:
             for ns in name_obj.ns_dependencies:
-                a = self.__class__(ns, trace=self.trace + [(name_obj.name, dns.rdatatype.NS)], **kwargs)
+                a = self.__class__(ns, trace=self.trace + [(name_obj, dns.rdatatype.NS)], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.ns_dependencies, ns, errors))
                 t.start()
                 threads.append(t)
