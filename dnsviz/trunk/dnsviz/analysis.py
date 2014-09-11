@@ -796,7 +796,7 @@ class DomainNameAnalysis(object):
         rdtypes = set([self.referral_rdtype, dns.rdatatype.NS])
         if level == self.RDTYPES_DELEGATION:
             return rdtypes
-        rdtypes.update([dns.rdatatype.DNSKEY, dns.rdatatype.DS])
+        rdtypes.update([dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV])
         if level == self.RDTYPES_SECURE_DELEGATION:
             return rdtypes
         rdtypes.update([dns.rdatatype.A, dns.rdatatype.AAAA])
