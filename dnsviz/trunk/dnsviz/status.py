@@ -417,8 +417,7 @@ class DSStatus(object):
                 self.errors.append(DS_ERROR_DIGEST_INVALID)
 
     def __unicode__(self):
-        #XXX fix for DLV
-        return u'DS record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (self.ds_meta.rrset.name.canonicalize().to_text(), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
+        return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), self.ds_meta.rrset.name.canonicalize().to_text(), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
