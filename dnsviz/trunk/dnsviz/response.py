@@ -799,8 +799,8 @@ class NSECSet(object):
                 else:
                     potential_closest_enclosers[name] = ret[name]
 
-        for name in potential_closest_enclosers:
-            for nsec_name in potential_closest_enclosers[name]:
+        for name in list(potential_closest_enclosers):
+            for nsec_name in list(potential_closest_enclosers[name]):
                 if not self.check_closest_encloser(name, nsec_name, origin):
                     potential_closest_enclosers[name].remove(nsec_name)
             if not potential_closest_enclosers[name]:
