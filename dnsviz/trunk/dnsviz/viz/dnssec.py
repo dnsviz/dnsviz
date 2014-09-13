@@ -73,9 +73,10 @@ class DNSKEYNonExistent(object):
         return d
 
 class RRsetNonExistent(object):
-    def __init__(self, name, rdtype, servers_clients):
+    def __init__(self, name, rdtype, nxdomain, servers_clients):
         self.name = name
         self.rdtype = rdtype
+        self.nxdomain = nxdomain
         self.servers_clients = servers_clients
 
     def serialize(self, consolidate_clients):
@@ -86,7 +87,10 @@ class RRsetNonExistent(object):
             d['name'] = self.name.canonicalize().to_text()
         d['ttl'] = None
         d['type'] = dns.rdatatype.to_text(self.rdtype)
-        d['rdata'] = []
+        if self.nxdomain:
+            d['rdata'] = ['NXDOMAIN']
+        else:
+            d['rdata'] = ['NXRRSET']
 
         servers = tuple_to_dict(self.servers_clients)
         if consolidate_clients:
@@ -757,7 +761,7 @@ class DNSAuthGraph:
             S.add_node(node_str, id=node_id, label=node_label, fontsize='10', **attr)
             self.node_subgraph_name[node_str] = zone_top_name
 
-            rrset_info = RRsetNonExistent(name, rdtype, servers_clients)
+            rrset_info = RRsetNonExistent(name, rdtype, nxdomain, servers_clients)
 
             consolidate_clients = name_obj.single_client()
             rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
