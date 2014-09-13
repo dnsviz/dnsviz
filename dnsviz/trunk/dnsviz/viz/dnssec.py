@@ -1178,6 +1178,11 @@ class DNSAuthGraph:
                     dnskey_node = self.add_dnskey_non_existent(zone, zone, dnskey.algorithm, Response.DNSKEYMeta.calc_key_tag(dnskey))
                     dnskey_node.attr['peripheries'] = 2
 
+        if dns.name.root not in trusted_keys:
+            S, zone_name, zone_bottom_name, zone_top_name = self.get_zone(dns.name.root)
+            self.G.get_node(zone_top_name).attr['color'] = COLORS['insecure']
+            self._propagate_provable_insecurity(zone_name, trusted_zone_top_names, [])
+
         # determine DLV zones based on DLV nodes
         dlv_trusted_zone_top_names = []
         for dlv_node in dlv_nodes:
@@ -1315,13 +1320,39 @@ class DNSAuthGraph:
                 prev_node_trusted = prev_node_trusted and valid_self_loop
 
             if is_nsec:
-                if prev_node_trusted and p.attr['shape'] == 'rectangle':
-                    p.attr['color'] = COLORS['secure']
+                if prev_node_trusted:
+                    if p.attr['shape'] == 'rectangle':
+                        p.attr['color'] = COLORS['secure']
+                    else:
+                        p.attr['color'] = COLORS['insecure']
+                        self._propagate_provable_insecurity(p[:-4], trusted_zones, [])
 
             elif prev_node_trusted:
                 p.attr['color'] = COLORS['secure']
 
             self._add_trust_to_nodes_in_chain(p, trusted_zones, dlv_nodes, force, trace+[n])
+
+    def _propagate_provable_insecurity(self, subgraph_name, trusted_zones, trace):
+        if subgraph_name in trace:
+            return
+
+        top_name = self.G.get_node(subgraph_name + '_top')
+        bottom_name = self.G.get_node(subgraph_name + '_bottom')
+
+        if top_name.attr['color'] != COLORS['insecure']:
+            return
+
+        for p in self.G.predecessors(bottom_name):
+            e = self.G.get_edge(p, bottom_name)
+
+            if p in trusted_zones:
+                continue
+
+            p.attr['color'] = COLORS['insecure']
+
+            child_subgraph_name = p[:-4]
+
+            self._propagate_provable_insecurity(child_subgraph_name, trusted_zones, trace + [subgraph_name])
 
     def _add_trust_to_orphaned_nodes(self, subgraph_name, trace):
         if subgraph_name in trace:
