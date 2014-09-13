@@ -1379,7 +1379,7 @@ class DomainNameAnalysis(object):
                         self.ds_status_by_status[ds_status.validation_status] = {}
                     self.ds_status_by_status[ds_status.validation_status][(rdtype, ds_rdata)] = set([ds_status])
 
-            if not algs_validating_sep:
+            if not algs_validating_sep and dnskey_server_client_responses:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
             else:
                 for server,client,response in dnskey_server_client_responses:
