@@ -1088,7 +1088,7 @@ class DNSAuthGraph:
                     self.add_rrsigs(name_obj, parent_obj, rrset_info, ds_node)
 
             edge_id = 0
-            for nsec_status in name_obj.noanswer_status.get((ds_name, rdtype), []):
+            for nsec_status in name_obj.noanswer_status.get((ds_name, rdtype), set()).union(name_obj.nxdomain_status.get((ds_name, rdtype), set())):
                 nsec_node = self.add_nsec(nsec_status, ds_name, rdtype, parent_obj, zone_top)
                 # add a tail to the cluster
                 self.G.get_edge(zone_top, nsec_node).attr['ltail'] = zone_graph_name
