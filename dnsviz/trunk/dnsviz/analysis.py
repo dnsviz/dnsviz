@@ -1405,7 +1405,7 @@ class DomainNameAnalysis(object):
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
             elif self.parent.signed:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
-                for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
+                for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), set()).union(self.nxdomain_status.get((self.name, dns.rdatatype.DS), set())):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                         break
