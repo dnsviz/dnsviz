@@ -710,9 +710,9 @@ class NSECSet(object):
         if prev_name == next_name:
             return prev_name != name
         elif prev_name > next_name:
-            return not (next_name <= name <= prev_name)
+            return not (next_name <= name <= prev_name) and not prev_name.is_subdomain(name)
         else:
-            return prev_name < name < next_name
+            return (prev_name < name < next_name) and not next_name.is_subdomain(name)
 
     def nsec_covering_name(self, name):
         '''Return the set of owner names corresponding to NSEC records in the
