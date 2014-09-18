@@ -697,7 +697,7 @@ class NSECSet(object):
         origin = dns.name.Name(nsec_name.labels[1:])
         return dns.name.from_text(next_name_txt, origin)
                     
-    def _nsec_covers_name(self, name, nsec_name):
+    def _nsec_covers_name(self, name, nsec_name, check_empty_non_terminal):
         '''Return True if the NSEC record corresponding to NSEC name provided
         covers a name (i.e., proves its non-existence); False otherwise.'''
 
@@ -710,17 +710,17 @@ class NSECSet(object):
         if prev_name == next_name:
             return prev_name != name
         elif prev_name > next_name:
-            return not (next_name <= name <= prev_name) and not prev_name.is_subdomain(name)
+            return not (next_name <= name <= prev_name) and (not check_empty_non_terminal or not prev_name.is_subdomain(name))
         else:
-            return (prev_name < name < next_name) and not next_name.is_subdomain(name)
+            return (prev_name < name < next_name) and (not check_empty_non_terminal or not next_name.is_subdomain(name))
 
-    def nsec_covering_name(self, name):
+    def nsec_covering_name(self, name, check_empty_non_terminal):
         '''Return the set of owner names corresponding to NSEC records in the
         response that cover the given name.'''
 
         excluding_names = set()
         for nsec_name in self.rrsets:
-            if self._nsec_covers_name(name, nsec_name):
+            if self._nsec_covers_name(name, nsec_name, check_empty_non_terminal):
                 excluding_names.add(nsec_name)
         return excluding_names
 
@@ -738,7 +738,7 @@ class NSECSet(object):
 
         excluding_names = set()
         for nsec_name in self.nsec3_params[(salt, alg, iterations)]:
-            if self._nsec_covers_name(name, nsec_name):
+            if self._nsec_covers_name(name, nsec_name, False):
                 excluding_names.add(nsec_name)
         return excluding_names
 
@@ -760,7 +760,7 @@ class NSECSet(object):
             if digest_name not in nsec3_names:
                 flag = False
 
-            if self.nsec_covering_name(digest_name):
+            if self.nsec_covering_name(digest_name, False):
                 flag = True
 
             if digest_name in nsec3_names:
