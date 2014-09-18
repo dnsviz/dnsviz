@@ -1253,17 +1253,18 @@ class DomainNameAnalysis(object):
 
         secure_path = False
 
-        if not self.get_responsive_auth_or_designated_servers():
-            self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
-            return
-
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+
+        if (self.name, dns.rdatatype.DNSKEY) in self.queries:
+            dnskey_multiquery = self.queries[(self.name, dns.rdatatype.DNSKEY)]
+        else:
+            dnskey_multiquery = Q.MultiQuery(self.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN)
 
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
         # there is at least one match
         dnskey_server_client_responses = set()
-        for dnskey_query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
+        for dnskey_query in dnskey_multiquery.queries.values():
             for server in dnskey_query.responses:
                 bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client in dnskey_query.responses[server]:
@@ -1302,7 +1303,7 @@ class DomainNameAnalysis(object):
             for ds_rdata in ds_rrset_info.rrset:
                 self.ds_status_by_ds[rdtype][ds_rdata] = {}
 
-                for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
+                for dnskey_info in dnskey_multiquery.rrset_answer_info:
                     validation_status_mapping = { True: set(), False: set(), None: set() }
                     for dnskey_rdata in dnskey_info.rrset:
                         dnskey = self._dnskeys[dnskey_rdata]
@@ -1379,23 +1380,28 @@ class DomainNameAnalysis(object):
                         self.ds_status_by_status[ds_status.validation_status] = {}
                     self.ds_status_by_status[ds_status.validation_status][(rdtype, ds_rdata)] = set([ds_status])
 
-            if not algs_validating_sep and dnskey_server_client_responses:
-                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
-            else:
-                for server,client,response in dnskey_server_client_responses:
-                    if (server,client,response) not in algs_validating_sep or \
-                            supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
-                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
-                    elif supported_ds_algs:
-                        if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors[rdtype]:
-                            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
-                        self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP].add((server,client))
+            if dnskey_server_client_responses:
+                if not algs_validating_sep:
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
+                else:
+                    for server,client,response in dnskey_server_client_responses:
+                        if (server,client,response) not in algs_validating_sep or \
+                                supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
+                            self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
+                        elif supported_ds_algs:
+                            if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors[rdtype]:
+                                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
+                            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP].add((server,client))
 
-            # report an error if one or more algorithms are incorrectly validated
-            for (server,client,response) in algs_signing_sep:
-                if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors[rdtype]:
-                    self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
+                # report an error if one or more algorithms are incorrectly validated
+                for (server,client,response) in algs_signing_sep:
+                    if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors[rdtype]:
+                        self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
+                    self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
+
+            else:
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
 
         if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:
@@ -1412,16 +1418,23 @@ class DomainNameAnalysis(object):
             else:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
 
-        if rdtype == dns.rdatatype.DS:
-            if (name, rdtype) in self.nxdomain_servers_clients:
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
-                if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
-                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
+        #XXX these two checks need consideration for recursive
 
-            #XXX this needs consideration for recursive
+        # if no servers (designated or stealth authoritative) respond or none
+        # respond authoritatively, then make the delegation as lame
+        if not self.get_responsive_servers_udp():
+            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_RESPONSIVE_SERVERS] = set()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
-                if not self.get_responsive_servers_udp() or not self._auth_servers_clients:
-                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
+        elif not self._auth_servers_clients:
+            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_AUTHORITATIVE_RESPONSE] = set()
+            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
+
+        if (name, rdtype) in self.nxdomain_servers_clients:
+            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
+            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
     def _populate_nsec_status(self, level):
         self.nxdomain_status = {}
