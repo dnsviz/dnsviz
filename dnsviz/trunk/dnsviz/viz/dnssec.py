@@ -1100,10 +1100,13 @@ class DNSAuthGraph:
 
                 edge_id += 1
 
+            has_warnings = name_obj.delegation_errors[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_warnings[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_warnings[(ds_name,rdtype)])
+            has_errors = name_obj.delegation_errors[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_errors[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_errors[(ds_name,rdtype)])
+
             edge_label = ''
-            if name_obj.delegation_errors[rdtype]:
+            if has_errors:
                 edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
-            elif name_obj.delegation_warnings[rdtype]:
+            elif has_warnings:
                 edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             if name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_SECURE:
@@ -1123,7 +1126,7 @@ class DNSAuthGraph:
             del_serialized = collections.OrderedDict()
             del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
             del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status[rdtype]]
-            if name_obj.delegation_warnings[rdtype]:
+            if has_warnings:
                 del_serialized['warnings'] = collections.OrderedDict()
                 warnings = name_obj.delegation_warnings[rdtype].keys()
                 warnings.sort()
@@ -1134,7 +1137,17 @@ class DNSAuthGraph:
                         servers.sort()
                     del_serialized['warnings'][Status.delegation_error_mapping[warning]] = servers
 
-            if name_obj.delegation_errors[rdtype]:
+                for warnings_map in (name_obj.nxdomain_warnings.get((ds_name,rdtype), {}), name_obj.noanswer_warnings.get((ds_name,rdtype), {})):
+                    warnings = warnings_map.keys()
+                    warnings.sort()
+                    for warning in warnings:
+                        servers = tuple_to_dict(warnings_map[warning])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        del_serialized['warnings'][Status.response_error_mapping[warning]] = servers
+
+            if has_errors:
                 del_serialized['errors'] = collections.OrderedDict()
                 errors = name_obj.delegation_errors[rdtype].keys()
                 errors.sort()
@@ -1144,6 +1157,16 @@ class DNSAuthGraph:
                         servers = list(servers)
                         servers.sort()
                     del_serialized['errors'][Status.delegation_error_mapping[error]] = servers
+
+                for errors_map in (name_obj.nxdomain_errors.get((ds_name,rdtype), {}), name_obj.noanswer_errors.get((ds_name,rdtype), {})):
+                    errors = errors_map.keys()
+                    errors.sort()
+                    for error in errors:
+                        servers = tuple_to_dict(errors_map[error])
+                        if consolidate_clients:
+                            servers = list(servers)
+                            servers.sort()
+                        del_serialized['errors'][Status.response_error_mapping[error]] = servers
 
             edge_id = 'del-%s|%s' % (fmt.humanize_name(zone_obj.name), fmt.humanize_name(parent_obj.name))
             self.node_info[edge_id] = [del_serialized]
