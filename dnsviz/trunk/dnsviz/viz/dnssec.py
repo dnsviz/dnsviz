@@ -1427,6 +1427,7 @@ class DNSAuthGraph:
             ta_dnskeys = set()
             ksks = set()
             zsks = set()
+            sep_bit = set()
             revoked_dnskeys = set()
             non_existent_dnskeys = set()
             signing_keys_for_dnskey = {}
@@ -1446,11 +1447,14 @@ class DNSAuthGraph:
                 is_zsk = bool(filter(lambda x: not x[0].startswith('DNSKEY-'), in_edges))
                 style = n.attr['style'].split(',')
                 non_existent = 'dashed' in style
+                has_sep_bit = n.attr['fillcolor'] == 'lightgray'
 
                 if is_ksk:
                     ksks.add(n)
                 if is_zsk:
                     zsks.add(n)
+                if has_sep_bit:
+                    sep_bit.add(n)
                 if n.attr['peripheries'] == '2':
                     ta_dnskeys.add(n)
                 if ds_edges:
@@ -1463,6 +1467,12 @@ class DNSAuthGraph:
             seps = ds_dnskeys.union(ta_dnskeys).intersection(ksks).difference(revoked_dnskeys)
             ksk_only = ksks.difference(zsks).difference(revoked_dnskeys)
             zsk_only = zsks.difference(revoked_dnskeys)
+
+            # if all keys have only KSK roles,
+            # then try to distinguish using SEP bit
+            if ksk_only and not zsk_only and sep_bit:
+                ksk_only.intersection_update(sep_bit)
+
             if seps:
                 signing_keys = seps
             else:
