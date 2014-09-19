@@ -1034,63 +1034,66 @@ class DomainNameAnalysis(object):
 
                     signer = self.get_name(rrsig.signer)
 
-                    if signer.stub:
-                        continue
+                    #XXX
+                    if signer is not None:
 
-                    for server, client in rrset_info.rrsig_info[rrsig].servers_clients:
-                        for response in rrset_info.rrsig_info[rrsig].servers_clients[(server,client)]:
-                            if (server,client,response) not in algs_signing_rrset:
-                                continue
-                            algs_signing_rrset[(server,client,response)].add(rrsig.algorithm)
-                            if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]) and \
-                                    not dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]) and \
-                                    not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
-                                del algs_signing_rrset[(server,client,response)]
+                        if signer.stub:
+                            continue
 
-                    # define self-signature
-                    self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
+                        for server, client in rrset_info.rrsig_info[rrsig].servers_clients:
+                            for response in rrset_info.rrsig_info[rrsig].servers_clients[(server,client)]:
+                                if (server,client,response) not in algs_signing_rrset:
+                                    continue
+                                algs_signing_rrset[(server,client,response)].add(rrsig.algorithm)
+                                if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]) and \
+                                        not dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]) and \
+                                        not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
+                                    del algs_signing_rrset[(server,client,response)]
 
-                    checked_keys = set()
-                    for dnskey_set, dnskey_meta in signer.get_dnskey_sets():
-                        validation_status_mapping = { True: set(), False: set(), None: set() }
-                        for dnskey in dnskey_set:
-                            # if we've already checked this key (i.e., in
-                            # another DNSKEY RRset) then continue
-                            if dnskey in checked_keys:
-                                continue
-                            # if this is a RRSIG over DNSKEY RRset, then make sure we're validating
-                            # with a DNSKEY that is actually in the set
-                            if self_sig and dnskey.rdata not in rrset_info.rrset:
-                                continue
-                            checked_keys.add(dnskey)
-                            if not (dnskey.rdata.protocol == 3 and \
-                                    rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
-                                    rrsig.algorithm == dnskey.rdata.algorithm):
-                                continue
-                            rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
-                            validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
+                        # define self-signature
+                        self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
 
-                        # if we got results for multiple keys, then just select the one that validates
-                        for status in True, False, None:
-                            if validation_status_mapping[status]:
-                                for rrsig_status in validation_status_mapping[status]:
-                                    self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][rrsig_status.dnskey] = rrsig_status
+                        checked_keys = set()
+                        for dnskey_set, dnskey_meta in signer.get_dnskey_sets():
+                            validation_status_mapping = { True: set(), False: set(), None: set() }
+                            for dnskey in dnskey_set:
+                                # if we've already checked this key (i.e., in
+                                # another DNSKEY RRset) then continue
+                                if dnskey in checked_keys:
+                                    continue
+                                # if this is a RRSIG over DNSKEY RRset, then make sure we're validating
+                                # with a DNSKEY that is actually in the set
+                                if self_sig and dnskey.rdata not in rrset_info.rrset:
+                                    continue
+                                checked_keys.add(dnskey)
+                                if not (dnskey.rdata.protocol == 3 and \
+                                        rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
+                                        rrsig.algorithm == dnskey.rdata.algorithm):
+                                    continue
+                                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                                validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
 
-                                    if self.is_zone() and rrset_info.rrset.name == self.name and \
-                                            rrset_info.rrset.rdtype != dns.rdatatype.DS and \
-                                            rrsig_status.dnskey is not None:
-                                        if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
-                                            self.ksks.add(rrsig_status.dnskey)
-                                        else:
-                                            self.zsks.add(rrsig_status.dnskey)
+                            # if we got results for multiple keys, then just select the one that validates
+                            for status in True, False, None:
+                                if validation_status_mapping[status]:
+                                    for rrsig_status in validation_status_mapping[status]:
+                                        self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][rrsig_status.dnskey] = rrsig_status
 
-                                    key = rrsig_status.rrset, rrsig_status.rrsig
-                                    if rrsig_status.validation_status not in self.rrsig_status_by_status:
-                                        self.rrsig_status_by_status[rrsig_status.validation_status] = {}
-                                    if key not in self.rrsig_status_by_status[rrsig_status.validation_status]:
-                                        self.rrsig_status_by_status[rrsig_status.validation_status][key] = set()
-                                    self.rrsig_status_by_status[rrsig_status.validation_status][key].add(rrsig_status)
-                                break
+                                        if self.is_zone() and rrset_info.rrset.name == self.name and \
+                                                rrset_info.rrset.rdtype != dns.rdatatype.DS and \
+                                                rrsig_status.dnskey is not None:
+                                            if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
+                                                self.ksks.add(rrsig_status.dnskey)
+                                            else:
+                                                self.zsks.add(rrsig_status.dnskey)
+
+                                        key = rrsig_status.rrset, rrsig_status.rrsig
+                                        if rrsig_status.validation_status not in self.rrsig_status_by_status:
+                                            self.rrsig_status_by_status[rrsig_status.validation_status] = {}
+                                        if key not in self.rrsig_status_by_status[rrsig_status.validation_status]:
+                                            self.rrsig_status_by_status[rrsig_status.validation_status][key] = set()
+                                        self.rrsig_status_by_status[rrsig_status.validation_status][key].add(rrsig_status)
+                                    break
 
                     # no corresponding DNSKEY
                     if not self.rrsig_status[rrset_info][rrsig]:
