@@ -2478,26 +2478,31 @@ class Analyst(object):
         the nature of the name (particularly whether or not it is in the arpa tree)
         and the nature of the name (if any) that invoked the query as a dependency.'''
 
-        #TODO this function is broken and doesn't make any sense
+        # if this name is in the ip6.arpa tree and is the length of a full
+        # reverse IPv6 address, then return True
+        if name.is_subdomain(IP6_ARPA_NAME) and len(name) == 35:
+            return True
 
-        orig_name = self._original_alias_of_cname()
-        if orig_name.is_subdomain(IP6_ARPA_NAME):
-            if name.is_subdomain(IP6_ARPA_NAME) and len(name) == 35:
+        # if this name is in the in-addr.arpa tree and is the length of a full
+        # reverse IPv4 address, then return True
+        if name.is_subdomain(INADDR_ARPA_NAME) and len(name) == 7:
+            return True
+
+        if self._is_referral_of_type(dns.rdatatype.CNAME):
+            orig_name = self._original_alias_of_cname()
+
+            # if the original name was in the arpa tree, then return True
+            # (regardless of the length of the aliasing name)
+            if orig_name.is_subdomain(ARPA_NAME) and self.name == name:
                 return True
-            elif self.name == name:
-                return True
-        elif orig_name.is_subdomain(INADDR_ARPA_NAME):
-            if name.is_subdomain(INADDR_ARPA_NAME) and len(name) == 7:
-                return True
-            elif self.name == name:
-                return True
+
         return False
 
     def _ask_other_queries(self, name):
         '''Return True if queries other than A, PTR, NS, and SOA (e.g., MX,
         AAAA, TXT) should be asked, based on the nature of the name.'''
 
-        if name.is_subdomain(IP6_ARPA_NAME) or name.is_subdomain(INADDR_ARPA_NAME):
+        if name.is_subdomain(ARPA_NAME):
             return False
         if len(name) < 3:
             return False
