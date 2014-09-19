@@ -1169,30 +1169,35 @@ class DomainNameAnalysis(object):
                         errors = self.rrset_errors[rrset_info]
                         warnings = self.rrset_warnings[rrset_info]
                         if response.message.edns < 0:
-                            ##TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                            #if query.responses[server][client].effective_edns < 0:
-                            #    pass
-                            #else:
-                            #    pass
-                            if qname_obj is not None and qname_obj.signed:
+                            if response.effective_edns < 0:
+                                # if EDNS0 was not actually used in the
+                                # request, then note the response errors (e.g.,
+                                # TIMEOUT, SERVFAIL, etc.) leading up to it
+                                #TODO
+                                pass
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
-                        elif not response.effective_edns_flags & dns.flags.DO:
-                            if qname_obj is not None and qname_obj.signed:
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
+                                pass
+                        elif not response.dnssec_requested():
+                            if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
+                                pass
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
@@ -1418,7 +1423,7 @@ class DomainNameAnalysis(object):
             else:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
 
-        #XXX these two checks need consideration for recursive
+        #XXX the remaining checks need consideration for recursive
 
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
@@ -1546,30 +1551,35 @@ class DomainNameAnalysis(object):
                 for server_client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
                     for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server_client]:
                         if response.message.edns < 0:
-                            #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                            #if query.responses[server][client].effective_edns < 0:
-                            #    pass
-                            #else:
-                            #    pass
+                            if response.effective_edns < 0:
+                                # if EDNS0 was not actually used in the
+                                # request, then note the response errors (e.g.,
+                                # TIMEOUT, SERVFAIL, etc.) leading up to it
+                                #TODO
+                                pass
                             if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                        elif not response.effective_edns_flags & dns.flags.DO:
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                                pass
+                        elif not response.dnssec_requested():
                             if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                                pass
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
@@ -1669,30 +1679,35 @@ class DomainNameAnalysis(object):
                 for server_client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
                     for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server_client]:
                         if response.message.edns < 0:
-                            #TODO be more specific about why EDNS isn't supported (e.g., timeout vs. SERVFAIL, etc.)
-                            #if query.responses[server][client].effective_edns < 0:
-                            #    pass
-                            #else:
-                            #    pass
+                            if response.effective_edns < 0:
+                                # if EDNS0 was not actually used in the
+                                # request, then note the response errors (e.g.,
+                                # TIMEOUT, SERVFAIL, etc.) leading up to it
+                                #TODO
+                                pass
                             if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                        elif not response.effective_edns_flags & dns.flags.DO:
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                                pass
+                        elif not response.dnssec_requested():
                             if qname_obj is not None and qname_obj.zone.signed:
+                                # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
                                 errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                            #TODO determine if the following is a warning or not
-                            #else:
-                            #    if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                            #        warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                            #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                            else:
+                                #TODO determine if we should warn here - if it's not hurting anybody
+                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
+                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
+                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                                pass
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
@@ -2462,6 +2477,8 @@ class Analyst(object):
         '''Return True if PTR queries should be asked for this name, as guessed by
         the nature of the name (particularly whether or not it is in the arpa tree)
         and the nature of the name (if any) that invoked the query as a dependency.'''
+
+        #TODO this function is broken and doesn't make any sense
 
         orig_name = self._original_alias_of_cname()
         if orig_name.is_subdomain(IP6_ARPA_NAME):
