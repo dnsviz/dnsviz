@@ -570,6 +570,7 @@ class DNSAuthGraph:
             S.add_node(top_name, shape='point', style='invis')
             S.add_node(bottom_name, shape='point', style='invis')
             self.node_subgraph_name[top_name] = top_name
+            self.node_subgraph_name[bottom_name] = top_name
 
         return S, node_str, bottom_name, top_name
 
@@ -1205,11 +1206,6 @@ class DNSAuthGraph:
                     dnskey_node = self.add_dnskey_non_existent(zone, zone, dnskey.algorithm, Response.DNSKEYMeta.calc_key_tag(dnskey))
                     dnskey_node.attr['peripheries'] = 2
 
-        if dns.name.root not in trusted_keys:
-            S, zone_name, zone_bottom_name, zone_top_name = self.get_zone(dns.name.root)
-            self.G.get_node(zone_top_name).attr['color'] = COLORS['insecure']
-            self._propagate_provable_insecurity(zone_name, trusted_zone_top_names, [])
-
         # determine DLV zones based on DLV nodes
         dlv_trusted_zone_top_names = []
         for dlv_node in dlv_nodes:
@@ -1228,8 +1224,11 @@ class DNSAuthGraph:
         # can apply trust from the DLV zones
         for dlv_node in dlv_nodes:
             self._add_trust_to_nodes_in_chain(dlv_node, trusted_zone_top_names, [], True, [])
-            node_str = self.node_subgraph_name[dlv_node][:-4]
-            self._add_trust_to_orphaned_nodes(node_str, [])
+
+        # now mark the orphaned nodes
+        for dlv_node in dlv_nodes:
+            zone_node_str = self.node_subgraph_name[dlv_node][:-4]
+            self._add_trust_to_orphaned_nodes(zone_node_str, [])
 
         for n in self.G.nodes():
             if n.attr['shape'] not in ('ellipse', 'diamond', 'rectangle'):
@@ -1288,6 +1287,8 @@ class DNSAuthGraph:
             if is_revoked and n.attr['color'] == COLORS['secure'] and not valid_self_loop:
                 n.attr['color'] = COLORS['bogus'] 
 
+            # mark the zone as "secure" as there is a secure entry point;
+            # descendants will be so marked by following the delegation edges
             if is_trust_anchor and valid_self_loop:
                 n.attr['color'] = COLORS['secure']
                 top_name.attr['color'] = COLORS['secure']
@@ -1304,38 +1305,50 @@ class DNSAuthGraph:
                         dlv_nodes.append(n)
             return
 
+        # iterate through each edge and propagate trust from this node
         for e in self.G.in_edges(n):
             p = e[0]
 
             style = e.attr['style'].split(',')
-            # if this is the edge to a non-existent key, then don't follow it
-            if 'dashed' in style or 'invis' in style: 
+
+            # if this is an edge used for formatting node (invis), then don't
+            # follow it
+            if 'invis' in style: 
                 continue
 
             prev_top_name = self.G.get_node(self.node_subgraph_name[p])
+
             # don't derive trust from parent if there is a trust anchor at the
             # child
             if is_ds and prev_top_name in trusted_zones:
                 continue
 
+            # if the previous node is already secure, then no need to follow it
             if p.attr['color'] == COLORS['secure']:
                 continue
 
+            # if this is a DLV node, then the zone it covers must be marked
+            # as insecure through previous trust traversal (not because of
+            # a local trust anchor, which case is handled above)
+            if is_dlv:
+                if prev_top_name.attr['color'] not in ('', COLORS['insecure']): 
+                    continue
+                
+                # reset the security of this top_name
+                prev_top_name.attr['color'] = ''
+
+            # if this is a non-matching edge (dashed) then don't follow it
+            if 'dashed' in style:
+                continue
+
+            # derive trust for the previous node using the current node and the
+            # color of the edge in between
             prev_node_trusted = node_trusted and e.attr['color'] == COLORS['secure']
 
-            # If this is a SEP node, and the top_name hasn't been
-            # marked as secure, then enter here
             if is_ds:
-
-                # if this is a DLV node, then the zone it covers must be marked
-                # as insecure through previous trust traversal (not because of
-                # a local trust anchor, which case is handled above)
-                if is_dlv and prev_top_name.attr['color'] != COLORS['insecure']:
-                    continue
-
-                if prev_top_name.attr['color'] != COLORS['secure']:
-                    prev_top_name.attr['color'] = ''
-
+                # if this is an edge between DS and DNSKEY, then the DNSKEY is
+                # not considered secure unless it has a valid self-loop (in
+                # addition to the connecting edge being valid)
                 valid_self_loop = False
                 if self.G.has_edge(p,p):
                     for e1 in self.G.out_edges(p) + self.G.in_edges(p):
@@ -1347,39 +1360,15 @@ class DNSAuthGraph:
                 prev_node_trusted = prev_node_trusted and valid_self_loop
 
             if is_nsec:
-                if prev_node_trusted:
-                    if p.attr['shape'] == 'rectangle':
-                        p.attr['color'] = COLORS['secure']
-                    else:
-                        p.attr['color'] = COLORS['insecure']
-                        self._propagate_provable_insecurity(p[:-4], trusted_zones, [])
+                # if this is an NSEC, then only propagate trust if the previous
+                # node (i.e., the node it covers) is an RRset
+                if prev_node_trusted and p.attr['shape'] == 'rectangle':
+                    p.attr['color'] = COLORS['secure']
 
             elif prev_node_trusted:
                 p.attr['color'] = COLORS['secure']
 
             self._add_trust_to_nodes_in_chain(p, trusted_zones, dlv_nodes, force, trace+[n])
-
-    def _propagate_provable_insecurity(self, subgraph_name, trusted_zones, trace):
-        if subgraph_name in trace:
-            return
-
-        top_name = self.G.get_node(subgraph_name + '_top')
-        bottom_name = self.G.get_node(subgraph_name + '_bottom')
-
-        if top_name.attr['color'] != COLORS['insecure']:
-            return
-
-        for p in self.G.predecessors(bottom_name):
-            e = self.G.get_edge(p, bottom_name)
-
-            if p in trusted_zones:
-                continue
-
-            p.attr['color'] = COLORS['insecure']
-
-            child_subgraph_name = p[:-4]
-
-            self._propagate_provable_insecurity(child_subgraph_name, trusted_zones, trace + [subgraph_name])
 
     def _add_trust_to_orphaned_nodes(self, subgraph_name, trace):
         if subgraph_name in trace:
@@ -1388,32 +1377,53 @@ class DNSAuthGraph:
         top_name = self.G.get_node(subgraph_name + '_top')
         bottom_name = self.G.get_node(subgraph_name + '_bottom')
 
+
+        # if this subgraph (zone) is provably insecure, then don't process
+        # further
         if top_name.attr['color'] == COLORS['insecure']:
             return
 
+        # iterate through each node in the subgraph (zone) and mark as bogus
+        # all nodes that are not already marked as secure
         S = self.G.get_subgraph(subgraph_name)
         for n in S.nodes():
             style = n.attr['style'].split(',')
-            # if node is non-existent, then continue, unless we are talking about an RRset
+
+            # don't mark invisible nodes (zone marking as secure/insecure is handled in the 
+            # traversal at the delegation point below).
+            if 'invis' in style:
+                continue
+
+            # if node is non-existent, then don't mark it, unless we are talking about an RRset
             # or a non-existent trust anchor; it doesn't make sense to mark other nodes
             # as bogus
             if 'dashed' in style and not (n.attr['shape'] == 'rectangle' or \
                     n.attr['peripheries'] == 2):
                 continue
 
-            # if the name is already marked as trusted or bogus, then leave it alone
+            # if the name is already marked as secure, then leave it alone
             if n.attr['color'] == COLORS['secure']:
                 continue
 
             n.attr['color'] = COLORS['bogus']
 
+        # propagate trust through each descendant node
         for p in self.G.predecessors(bottom_name):
             e = self.G.get_edge(p, bottom_name)
+
             if top_name.attr['color'] == COLORS['secure']:
+                # if this subgraph (zone) is secure, and the delegation is also
+                # secure, then mark the delegated subgraph (zone) as secure.
                 if e.attr['color'] == COLORS['secure']:
                     p.attr['color'] = COLORS['secure']
+                # if this subgraph (zone) is secure, and the delegation is not
+                # bogus (DNSSEC broken), then mark it as provably insecure.
                 elif e.attr['color'] != COLORS['bogus']:
                     p.attr['color'] = COLORS['insecure']
+
+            # if the child was not otherwise marked, then mark it as bogus
+            if p.attr['color'] == '':
+                p.attr['color'] = COLORS['bogus']
 
             child_subgraph_name = p[:-4]
 
