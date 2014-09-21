@@ -1439,10 +1439,11 @@ class DomainNameAnalysis(object):
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
-        if (name, rdtype) in self.nxdomain_servers_clients:
-            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
-            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
-                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
+        if rdtype == dns.rdatatype.DS:
+            if (name, rdtype) in self.nxdomain_servers_clients:
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
+                if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
     def _populate_nsec_status(self, level):
         self.nxdomain_status = {}
