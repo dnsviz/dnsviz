@@ -1547,7 +1547,7 @@ class DomainNameAnalysis(object):
                 if statuses:
                     self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
 
-                if qname_sought in self.yxdomain and rdtype != dns.rdatatype.DS:
+                if qname_sought in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                     self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
 
                 errors = self.nxdomain_errors[(qname_sought, rdtype)]
