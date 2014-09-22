@@ -236,6 +236,7 @@ class DomainNameAnalysis(object):
         self._responsive_servers_clients_udp = set()
         self._responsive_servers_clients_tcp = set()
         self._auth_servers_clients = set()
+        self._valid_servers_clients = set()
 
         # Shortcuts to the values in the SOA record.
         self.serial = None
@@ -445,6 +446,8 @@ class DomainNameAnalysis(object):
             self._responsive_servers_clients_udp.add((server, client))
         if response.tcp_used():
             self._responsive_servers_clients_tcp.add((server, client))
+        if response.message.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN):
+            self._valid_servers_clients.add((server, client))
         if is_authoritative:
             if query.rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                 self._auth_servers_clients.add((server, client))
@@ -654,6 +657,18 @@ class DomainNameAnalysis(object):
             self._designated_servers = servers
         return self._designated_servers
 
+    def get_valid_servers(self, proto=None):
+        '''Return the set of servers that responded with a valid (rcode of
+        NOERROR or NXDOMAIN) response.'''
+
+        valid_servers = set([x[0] for x in self._valid_servers_clients])
+        if proto == 4:
+            return set(filter(lambda x: ':' not in x, valid_servers))
+        elif proto == 6:
+            return set(filter(lambda x: ':' in x, valid_servers))
+        else:
+            return valid_servers
+
     def get_responsive_servers_udp(self, proto=None):
         '''Return the set of servers for which some type of response was
         received from any client over UDP.'''
@@ -702,6 +717,13 @@ class DomainNameAnalysis(object):
         were responsive to queries.'''
 
         return self.get_auth_or_designated_servers(proto, no_cache).intersection(self.get_responsive_servers_udp(proto))
+
+    def get_valid_auth_or_designated_servers(self, proto=None, no_cache=False):
+        '''Return the set of servers that either answered authoritatively
+        or were explicitly designated by NS and glue or authoritative IP and
+        returned a valid (rcode of NOERROR or NXDOMAIN) response.'''
+
+        return self.get_auth_or_designated_servers(proto, no_cache).intersection(self.get_valid_servers(proto))
 
     def get_stealth_servers(self):
         '''Return the set of servers that authoritatively but weren't
@@ -1430,8 +1452,12 @@ class DomainNameAnalysis(object):
 
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
-        if not self.get_responsive_servers_udp():
+        if not self.get_responsive_auth_or_designated_servers():
             self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_RESPONSIVE_SERVERS] = set()
+            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
+        elif not self.get_valid_auth_or_designated_servers():
+            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_VALID_RCODE_RESPONSE] = set()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self._auth_servers_clients:
