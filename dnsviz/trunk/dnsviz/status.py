@@ -470,6 +470,8 @@ class DSStatus(object):
         return d
 
 class NSECStatusNXDOMAIN(object):
+    CHECK_EMPTY_NON_TERMINAL = True
+
     def __init__(self, qname, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
@@ -479,7 +481,7 @@ class NSECStatusNXDOMAIN(object):
         self.wildcard_name = dns.name.from_text('*', self.origin)
 
         self.nsec_names_covering_qname = {}
-        covering_names = nsec_set_info.nsec_covering_name(self.qname)
+        covering_names = nsec_set_info.nsec_covering_name(self.qname, self.CHECK_EMPTY_NON_TERMINAL)
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
@@ -489,7 +491,7 @@ class NSECStatusNXDOMAIN(object):
         # any one of which could be expanded into wildcard
         while wildcard_cover != self.origin:
             wildcard_name = dns.name.from_text('*', wildcard_cover.parent())
-            covering_names = nsec_set_info.nsec_covering_name(wildcard_name)
+            covering_names = nsec_set_info.nsec_covering_name(wildcard_name, True)
             if covering_names:
                 self.wildcard_name = wildcard_name
                 self.nsec_names_covering_wildcard[self.wildcard_name] = covering_names
@@ -586,6 +588,8 @@ class NSECStatusNXDOMAIN(object):
         return d
 
 class NSECStatusEmptyNonTerminal(NSECStatusNXDOMAIN):
+    CHECK_EMPTY_NON_TERMINAL = False
+
     def __init__(self, qname, origin, nsec_set_info):
         super(NSECStatusEmptyNonTerminal, self).__init__(qname, origin, nsec_set_info)
         self.nsec_names_covering_wildcard = {}
@@ -667,7 +671,7 @@ class NSECStatusNoAnswer(object):
             self.has_soa = False
 
         self.nsec_names_covering_qname = {}
-        covering_names = nsec_set_info.nsec_covering_name(self.qname)
+        covering_names = nsec_set_info.nsec_covering_name(self.qname, False)
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
