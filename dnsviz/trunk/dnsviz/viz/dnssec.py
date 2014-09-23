@@ -1101,7 +1101,7 @@ class DNSAuthGraph:
 
                 edge_id += 1
 
-            has_warnings = name_obj.delegation_errors[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_warnings[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_warnings[(ds_name,rdtype)])
+            has_warnings = name_obj.delegation_warnings[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_warnings[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_warnings[(ds_name,rdtype)])
             has_errors = name_obj.delegation_errors[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_errors[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_errors[(ds_name,rdtype)])
 
             edge_label = ''
