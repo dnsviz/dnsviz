@@ -1144,7 +1144,7 @@ class DomainNameAnalysis(object):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS] = set()
                             errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add((server,client))
-                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
+                        if dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
                             errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
