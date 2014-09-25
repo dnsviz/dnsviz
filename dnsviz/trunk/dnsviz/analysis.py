@@ -2518,13 +2518,11 @@ class Analyst(object):
         if name.is_subdomain(INADDR_ARPA_NAME) and len(name) == 7:
             return True
 
-        if self._is_referral_of_type(dns.rdatatype.CNAME):
-            orig_name = self._original_alias_of_cname()
-
-            # if the original name was in the arpa tree, then return True
-            # (regardless of the length of the aliasing name)
-            if orig_name.is_subdomain(ARPA_NAME) and self.name == name:
-                return True
+        # if the original name was in the arpa tree, then return True
+        # regardless of length
+        orig_name = self._original_alias_of_cname()
+        if orig_name.is_subdomain(ARPA_NAME) and self.name == name:
+            return True
 
         return False
 
