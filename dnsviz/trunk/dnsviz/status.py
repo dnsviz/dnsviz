@@ -809,7 +809,6 @@ class NSEC3StatusNXDOMAIN(object):
         self.errors = []
 
         self.name_digest_map = {}
-        self.digest_wildcard_name_map = {}
 
         self._set_closest_encloser(nsec_set_info)
 
@@ -823,7 +822,7 @@ class NSEC3StatusNXDOMAIN(object):
             self.name_digest_map[self.qname][(salt, alg, iterations)] = digest_name
 
         for encloser in self.closest_encloser:
-            next_closest_encloser = dns.name.Name(self.qname.labels[-(len(encloser)+1):])
+            next_closest_encloser = self._get_next_closest_encloser(encloser)
             for salt, alg, iterations in nsec_set_info.nsec3_params:
                 try:
                     digest_name = self.name_digest_map[next_closest_encloser][(salt, alg, iterations)]
@@ -838,7 +837,7 @@ class NSEC3StatusNXDOMAIN(object):
                     self.name_digest_map[next_closest_encloser] = {}
                 self.name_digest_map[next_closest_encloser][(salt, alg, iterations)] = digest_name
 
-                wildcard_name = dns.name.from_text('*', encloser)
+                wildcard_name = self._get_wildcard(encloser)
                 digest_name = nsec_set_info.get_digest_name_for_nsec3(wildcard_name, self.origin, salt, alg, iterations)
 
                 covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
@@ -848,7 +847,6 @@ class NSEC3StatusNXDOMAIN(object):
                 if wildcard_name not in self.name_digest_map:
                     self.name_digest_map[wildcard_name] = {}
                 self.name_digest_map[wildcard_name][(salt, alg, iterations)] = digest_name
-                self.digest_wildcard_name_map[digest_name] = wildcard_name
 
         self._set_validation_status(nsec_set_info)
 
@@ -861,6 +859,12 @@ class NSEC3StatusNXDOMAIN(object):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
+
+    def _get_next_closest_encloser(self, encloser):
+        return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
+
+    def _get_wildcard(self, encloser):
+        return dns.name.from_text('*', encloser)
 
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
@@ -919,20 +923,21 @@ class NSEC3StatusNXDOMAIN(object):
                 if nsec_name is not None:
                     d['meta']['closest_encloser']['name_digest'] = fmt.format_nsec3_name(nsec_name)
 
-                d['meta']['next_closest_encloser'] = fmt.humanize_name(self.name_digest_map.items()[0][0])
-                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map.items()[0][1].items()[0][1])
+                next_closest_encloser = self._get_next_closest_encloser(encloser_name)
+                d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
+                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map[next_closest_encloser].items()[0][1])
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('qname_digest', fmt.format_nsec3_name(qname)),
+                        ('next_closest_encloser_digest', fmt.format_nsec3_name(qname)),
                         ('nsec3_owner', fmt.format_nsec3_name(nsec_name)),
                         ('nsec3_next', fmt.format_nsec3_name(next_name)),
                     ))
 
-                wildcard_name = filter(lambda x: x[0] == '*', self.name_digest_map)[0]
+                wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
                 d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
@@ -1053,7 +1058,7 @@ class NSEC3StatusNoAnswer(object):
             self.name_digest_map[self.qname][(salt, alg, iterations)] = digest_name
 
             for encloser in self.closest_encloser:
-                wildcard_name = dns.name.from_text('*', encloser)
+                wildcard_name = self._get_wildcard(encloser)
                 digest_name = nsec_set_info.get_digest_name_for_nsec3(wildcard_name, self.origin, salt, alg, iterations)
                 if digest_name in nsec3_names:
                     self.nsec_for_wildcard_name.add(digest_name)
@@ -1076,7 +1081,7 @@ class NSEC3StatusNoAnswer(object):
 
             else:
                 for encloser in self.closest_encloser:
-                    next_closest_encloser = dns.name.Name(self.qname.labels[-(len(encloser)+1):])
+                    next_closest_encloser = self._get_next_closest_encloser(encloser)
                     digest_name = nsec_set_info.get_digest_name_for_nsec3(next_closest_encloser, self.origin, salt, alg, iterations)
                     if next_closest_encloser not in self.name_digest_map:
                         self.name_digest_map[next_closest_encloser] = {}
@@ -1097,6 +1102,12 @@ class NSEC3StatusNoAnswer(object):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
+
+    def _get_next_closest_encloser(self, encloser):
+        return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
+
+    def _get_wildcard(self, encloser):
+        return dns.name.from_text('*', encloser)
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
@@ -1191,8 +1202,9 @@ class NSEC3StatusNoAnswer(object):
                     ('name_digest', fmt.format_nsec3_name(nsec_name)),
                 ))
 
-                d['meta']['next_closest_encloser'] = fmt.humanize_name(self.name_digest_map.items()[0][0])
-                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map.items()[0][1].items()[0][1])
+                next_closest_encloser = self._get_next_closest_encloser(encloser_name)
+                d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
+                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map[next_closest_encloser].items()[0][1])
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -1204,7 +1216,7 @@ class NSEC3StatusNoAnswer(object):
                         ('nsec3_next', fmt.format_nsec3_name(next_name)),
                     ))
 
-                wildcard_name = filter(lambda x: x[0] == '*', self.name_digest_map)[0]
+                wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
                 d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
