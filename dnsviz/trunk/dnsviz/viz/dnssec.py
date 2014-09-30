@@ -1419,8 +1419,28 @@ class DNSAuthGraph:
                 # if this subgraph (zone) is secure, and the delegation is not
                 # bogus (DNSSEC broken), then mark it as provably insecure.
                 elif e.attr['color'] != COLORS['bogus']:
-                    p.attr['color'] = COLORS['insecure']
-
+                    # in this case, it's possible that the proven insecurity is
+                    # dependent on NSEC/NSEC3 records that need to be
+                    # authenticated.  Before marking this as insecure, reach
+                    # back up for NSEC records.  If any are found, make sure at
+                    # least one has been authenticated (i.e., has secure
+                    # color).
+                    nsec_found = False
+                    nsec_authenticated = False
+                    for e1 in self.G.out_edges(p):
+                        nsec = e1[1]
+                        if not nsec.startswith('NSEC'):
+                            continue
+                        nsec_found = True
+                        if nsec.attr['color'] == COLORS['secure']:
+                            nsec_authenticated = True
+                            break
+                            
+                    if nsec_found and not nsec_authenticated:
+                        pass
+                    else:
+                        p.attr['color'] = COLORS['insecure']
+                        
             # if the child was not otherwise marked, then mark it as bogus
             if p.attr['color'] == '':
                 p.attr['color'] = COLORS['bogus']
