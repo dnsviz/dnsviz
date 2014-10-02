@@ -913,8 +913,8 @@ class DNSAuthGraph:
 
     def add_alias(self, alias, target):
         if not filter(lambda x: x[1] == target and x.attr['color'] == 'black', self.G.out_edges(alias)):
-            #self.G.add_edge(alias, target, color='black', constraint='false')
-            self.G.add_edge(alias, target, color='black')
+            self.G.add_edge(alias, target, color='black', constraint='false')
+            #self.G.add_edge(alias, target, color='black')
 
     def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, combine_edge_id=None):
         for rrsig in name_obj.rrsig_status[rrset_info]:
@@ -1411,6 +1411,8 @@ class DNSAuthGraph:
         for p in self.G.predecessors(bottom_name):
             e = self.G.get_edge(p, bottom_name)
 
+            child_subgraph_name = p[:-4]
+
             if top_name.attr['color'] == COLORS['secure']:
                 # if this subgraph (zone) is secure, and the delegation is also
                 # secure, then mark the delegated subgraph (zone) as secure.
@@ -1427,25 +1429,44 @@ class DNSAuthGraph:
                     # color).
                     nsec_found = False
                     nsec_authenticated = False
-                    for e1 in self.G.out_edges(p):
-                        nsec = e1[1]
-                        if not nsec.startswith('NSEC'):
+                    for n in self.G.out_neighbors(p):
+                        if not n.startswith('NSEC'):
                             continue
                         nsec_found = True
-                        if nsec.attr['color'] == COLORS['secure']:
+                        if n.attr['color'] == COLORS['secure']:
                             nsec_authenticated = True
                             break
-                            
+
+                    # or if there are DS, then there are algorithms that are
+                    # not understood (otherwise it would not be insecure).
+                    # Check that at least one of the DS nodes was marked as
+                    # secure.
+                    ds_found = False
+                    ds_authenticated = False
+                    S = self.G.get_subgraph(child_subgraph_name)
+                    for n in S.nodes():
+                        # we're only concerned with DNSKEYs
+                        if not n.startswith('DNSKEY-'):
+                            continue
+                        # we're looking for DS records
+                        for d in self.G.out_neighbors(n):
+                            if not (d.startswith('DS-') or d.startswith('DLV-')):
+                                continue
+                            ds_found = True
+                            if d.attr['color'] == COLORS['secure']:
+                                ds_authenticated = True
+                                break
+
                     if nsec_found and not nsec_authenticated:
+                        pass
+                    elif ds_found and not ds_authenticated:
                         pass
                     else:
                         p.attr['color'] = COLORS['insecure']
-                        
+
             # if the child was not otherwise marked, then mark it as bogus
             if p.attr['color'] == '':
                 p.attr['color'] = COLORS['bogus']
-
-            child_subgraph_name = p[:-4]
 
             self._add_trust_to_orphaned_nodes(child_subgraph_name, trace+[subgraph_name])
 
