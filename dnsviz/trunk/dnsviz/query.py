@@ -465,7 +465,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._request.payload = payload
                 self._state = self.TCP_MINUS_ONE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
-            
+
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
                 self._upper_bound = self._request.payload - 1
@@ -1465,6 +1465,7 @@ class PMTUDiagnosticQuery(DNSSECQuery):
                 ChangeTimeoutOnTimeoutHandler(2.0, 3),
                 ChangeTimeoutOnTimeoutHandler(1.0, 4), 
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
+            UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
@@ -1480,6 +1481,7 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
                 ChangeTimeoutOnTimeoutHandler(2.0, 3),
                 ChangeTimeoutOnTimeoutHandler(1.0, 4), 
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
+            UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
 
