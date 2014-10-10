@@ -1334,6 +1334,10 @@ class DomainNameAnalysis(object):
                 self.ds_status_by_ds[rdtype][ds_rdata] = {}
 
                 for dnskey_info in dnskey_multiquery.rrset_answer_info:
+                    # there are CNAMEs that show up here...
+                    if not (dnskey_info.rrset.name == self.name and dnskey_info.rrset.rdtype == dns.rdatatype.DNSKEY):
+                        continue
+
                     validation_status_mapping = { True: set(), False: set(), None: set() }
                     for dnskey_rdata in dnskey_info.rrset:
                         dnskey = self._dnskeys[dnskey_rdata]
