@@ -1147,13 +1147,16 @@ class ExecutableDNSQuery(DNSQuery):
         return DNSQueryHandler(request, params, response_handlers, self.lifetime, server, client, self.port)
         
     @classmethod
-    def execute_queries(cls, *queries):
+    def execute_queries(cls, *queries, **kwargs):
         '''Excecute the query to a given server, and handle it appropriately.'''
 
         th = transport.get_default_dns_transport_handler()
 
         request_list = []
         response_queue = Queue.Queue()
+
+        ignore_queryid = kwargs.get('ignore_queryid', True)
+        response_wire_map = {}
 
         queries_to_execute = set()
         query_handlers = {}
@@ -1187,10 +1190,16 @@ class ExecutableDNSQuery(DNSQuery):
                 if qtm.err is not None:
                     response = qtm.err
                 else:
-                    try:
-                        response = dns.message.from_wire(qtm.res)
-                    except Exception, e:
-                        response = e
+                    wire_zero_queryid = '\x00\x00' + qtm.res[2:]
+                    if wire_zero_queryid in response_wire_map:
+                        response = response_wire_map[wire_zero_queryid]
+                    else:
+                        try:
+                            response = dns.message.from_wire(qtm.res)
+                        except Exception, e:
+                            response = e
+                        if ignore_queryid:
+                            response_wire_map[wire_zero_queryid] = response
                 if qtm.res:
                     msg_size = len(qtm.res)
                 else:
@@ -1254,8 +1263,8 @@ class ExecutableDNSQuery(DNSQuery):
             self._executed = True
 
     @require_not_executed
-    def execute(self):
-        self.execute_queries(self)
+    def execute(self, ignore_queryid=True):
+        self.execute_queries(self, ignore_queryid=ignore_queryid)
 
     join = require_executed(DNSQuery.join)
     project = require_executed(DNSQuery.project)
