@@ -176,6 +176,7 @@ NSEC_ERROR_REFERRAL_BAD_RDTYPES = 4
 NSEC_ERROR_RDTYPE_IN_BITMAP = 5
 NSEC_ERROR_CNAME_IN_BITMAP = 6
 NSEC_ERROR_NO_MATCHING_NSEC = 7
+NSEC_ERROR_WILDCARD_EXPANSION_INVALID = 8
 nsec_error_mapping = {
     NSEC_ERROR_QNAME_NOT_COVERED: 'QNAME_NOT_COVERED',
     NSEC_ERROR_WILDCARD_NOT_COVERED: 'WILDCARD_NOT_COVERED',
@@ -184,6 +185,7 @@ nsec_error_mapping = {
     NSEC_ERROR_RDTYPE_IN_BITMAP: 'RDTYPE_IN_BITMAP',
     NSEC_ERROR_CNAME_IN_BITMAP: 'CNAME_IN_BITMAP',
     NSEC_ERROR_NO_MATCHING_NSEC: 'NO_MATCHING_NSEC',
+    NSEC_ERROR_WILDCARD_EXPANSION_INVALID: 'WILDCARD_EXPANSION_INVALID',
 }
 
 RESPONSE_ERROR_NOT_AUTHORITATIVE = 1
@@ -616,6 +618,8 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         self.wildcard_name = wildcard_name
         self.nsec_names_covering_wildcard = {}
 
+        self._set_validation_status2(nsec_set_info)
+
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)
 
@@ -623,12 +627,23 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return isinstance(other, self.__class__) and \
                 super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
             
+    def _next_closest_encloser(self):
+        return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
+
     def _set_validation_status(self, nsec_set_info):
+        pass
+
+    def _set_validation_status2(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
-        if not self.nsec_names_covering_qname:
+        if self.nsec_names_covering_qname:
+            next_closest_encloser = self._next_closest_encloser()
+            if not nsec_set_info.nsec_covering_name(next_closest_encloser, self.CHECK_EMPTY_NON_TERMINAL):
+                self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(NSEC_ERROR_WILDCARD_EXPANSION_INVALID)
+        else:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
-    
+
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
         if self.validation_status == NSEC_STATUS_VALID:
