@@ -1,3 +1,0 @@
-digraph {
-	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=5, id=12345</FONT>>, style="dashed", penwidth="1.5"]
-}

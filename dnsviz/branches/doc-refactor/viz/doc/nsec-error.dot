@@ -1,3 +1,0 @@
-digraph {
-	a [label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT></TD></TR><TR><TD><IMG SRC="/Users/ctdecci/dnsviz/dnsviz/media/images/dnssec_legend/error.png"/></TD></TR></TABLE>>, shape="diamond", penwidth="1.5"]
-}

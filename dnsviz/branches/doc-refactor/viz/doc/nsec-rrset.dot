@@ -1,6 +1,0 @@
-digraph {
-	graph [rankdir="BT"]
-	a [label=<<FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT>>, shape="diamond", penwidth="1.5"]
-	c [label="non-existent.example.com/A", fontsize="10", shape="rectangle", style="rounded,filled", fillcolor="#fffa8f", penwidth="1.5"]
-  c -> a [color="#0a879a", dir="back"]
-}

@@ -1,6 +1,0 @@
-digraph {
-	graph [rankdir="BT"]
-	b [label="www.example.com/CNAME", fontsize="10", shape="rectangle", style="rounded", penwidth="1.5"]
-	c [label="example.com/A", fontsize="10", shape="rectangle", style="rounded", penwidth="1.5"]
-	b -> c
-}
