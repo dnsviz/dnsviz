@@ -1,9 +1,8 @@
-#
 # This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
 # analysis, and visualization.
-# Author: Casey Deccio (casey@deccio.net)
+# Created by Casey Deccio (casey@deccio.net)
 #
-# Copyright 2014 Verisign, Inc.
+# Copyright 2014 VeriSign, Inc.
 # 
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
