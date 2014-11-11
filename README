@@ -10,13 +10,13 @@ related to the analysis of ``example.com`` and stores the responses in the file
 
     $ dnsget example.com > example.com.json
 
-The following command creates an image of the assessment of in a file called
-``example.com.png''::
+The following command creates an image of the assessment of a file called
+``example.com.png``::
 
     $ dnsviz -Tpng -O example.com < example.com.json
 
 This command does the same thing, but the result is in HTML and javascript for
-an interactive graph.  The file is named ``example.com.html''::
+an interactive graph.  The file is named ``example.com.html``::
 
     $ dnsviz -Thtml -O example.com < example.com.json
 
