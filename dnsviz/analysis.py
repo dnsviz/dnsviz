@@ -1158,6 +1158,11 @@ class DomainNameAnalysis(object):
                     qname_obj = qname_obj.parent
 
                 for wildcard_name in rrset_info.wildcard_info:
+                    if qname_obj is None:
+                        zone = self.name
+                    else:
+                        zone = qname_obj.zone.name
+
                     statuses = []
                     for server, client in rrset_info.wildcard_info[wildcard_name]:
                         for response in rrset_info.wildcard_info[wildcard_name][(server,client)]:
@@ -1165,9 +1170,9 @@ class DomainNameAnalysis(object):
                             status = None
                             for nsec_set_info in nsec_info_list:
                                 if nsec_set_info.use_nsec3:
-                                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, qname_obj.zone.name, nsec_set_info)
+                                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
                                 else:
-                                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, qname_obj.zone.name, nsec_set_info)
+                                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
                                 if status.validation_status == Status.STATUS_VALID:
                                     break
 
