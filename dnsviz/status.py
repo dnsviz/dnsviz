@@ -619,8 +619,8 @@ class NSECStatusEmptyNonTerminal(NSECStatusNXDOMAIN):
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, nsec_set_info):
-        super(NSECStatusWildcard, self).__init__(qname, wildcard_name.parent(), nsec_set_info)
+    def __init__(self, qname, wildcard_name, origin, nsec_set_info):
+        super(NSECStatusWildcard, self).__init__(qname, origin, nsec_set_info)
         self.wildcard_name = wildcard_name
         self.nsec_names_covering_wildcard = {}
 
@@ -993,9 +993,9 @@ class NSEC3StatusNXDOMAIN(object):
         return d
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, nsec_set_info):
+    def __init__(self, qname, wildcard_name, origin, nsec_set_info):
         self.wildcard_name = wildcard_name
-        super(NSEC3StatusWildcard, self).__init__(qname, wildcard_name.parent(), nsec_set_info)
+        super(NSEC3StatusWildcard, self).__init__(qname, origin, nsec_set_info)
 
     def _set_closest_encloser(self, nsec_set_info):
         super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
