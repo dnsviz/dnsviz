@@ -2540,11 +2540,27 @@ class Analyst(object):
 
         return False
 
+    def _ask_tlsa_queries(self, name):
+        '''Return True if TLSA queries should be asked for this name, which is
+        determined by examining the structure of the name for common DANE name.'''
+
+        if len(name) > 2 and name[0] in ('_25', '_443') and name[1] == '_tcp':
+            return True
+
+        orig_name = self._original_alias_of_cname()
+        if len(orig_name) > 2 and orig_name[0] in ('_25', '_443') and orig_name[1] == '_tcp' and \
+                self.name == name:
+            return True
+
+        return False
+
     def _ask_other_queries(self, name):
         '''Return True if queries other than A, PTR, NS, and SOA (e.g., MX,
         AAAA, TXT) should be asked, based on the nature of the name.'''
 
         if name.is_subdomain(ARPA_NAME):
+            return False
+        if self._ask_tlsa_queries(name):
             return False
         if len(name) < 3:
             return False
@@ -2879,6 +2895,10 @@ class Analyst(object):
             if self._ask_ptr_queries(name_obj.name):
                 self.logger.debug('Preparing query %s/PTR...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
+            if self._ask_tlsa_queries(name_obj.name):
+                self.logger.debug('Preparing query %s/TLSA...' % fmt.humanize_name(name_obj.name))
+                queries[(name_obj.name, dns.rdatatype.TLSA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TLSA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
