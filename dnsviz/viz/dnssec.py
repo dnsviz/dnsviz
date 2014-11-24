@@ -27,6 +27,7 @@
 #
 
 import collections
+import errno
 import json
 import os
 import re
@@ -40,6 +41,7 @@ from pygraphviz import AGraph
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
+from dnsviz import query as Q
 from dnsviz import response as Response
 from dnsviz import status as Status
 from dnsviz.util import tuple_to_dict
@@ -800,6 +802,62 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
+    def add_errors(self, name_obj, name, rdtype, response_errors_rcode, response_errors):
+        if not response_errors_rcode and not response_errors:
+            return None
+
+        zone_obj = name_obj.zone
+
+        node_str = self.rrset_node_str(name, rdtype, 2)
+
+        img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+
+        node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR></TABLE>>' % (img_str)
+
+        attr = {}
+        attr['shape'] = 'none'
+        attr['margin'] = '0'
+
+        node_id = node_str.replace('*', '_')
+        S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
+        S.add_node(node_str, id=node_id, label=node_label, fontsize='10', **attr)
+        self.node_subgraph_name[node_str] = zone_top_name
+
+        consolidate_clients = name_obj.single_client()
+
+        errors_serialized = collections.OrderedDict()
+        errors_serialized['description'] = 'Response errors for %s/%s' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
+        errors_serialized['errors'] = collections.OrderedDict()
+
+        for rcode in response_errors_rcode:
+            servers = tuple_to_dict(response_errors_rcode[rcode])
+            if consolidate_clients:
+                servers = list(servers)
+                servers.sort()
+            errors_serialized['errors']['BAD_RCODE (%s)' % dns.rcode.to_text(rcode)] = servers
+
+        for error, errno1 in response_errors:
+            desc = ''
+            if errno1:
+                try:
+                    desc = ' (%s)' % errno.errorcode[errno1]
+                except KeyError:
+                    #XXX find a good cross-platform way of handling this
+                    pass
+
+            servers = tuple_to_dict(response_errors[(error, errno1)])
+            if consolidate_clients:
+                servers = list(servers)
+                servers.sort()
+            errors_serialized['errors']['%s%s' % (Q.response_errors[error], desc)] = servers
+
+        errors_serialized['status'] = 'INVALID'
+
+        self.node_info[node_id] = [errors_serialized]
+        self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+
+        return self.G.get_node(node_str)
+
     def add_dname(self, dname_status, name_obj, id):
         zone_obj = name_obj.zone
         dname_rrset_info = dname_status.synthesized_cname.dname_info
@@ -1010,6 +1068,10 @@ class DNSAuthGraph:
                     nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, noanswer_node)
                     for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                         self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+
+        error_node = self.add_errors(name_obj, name, rdtype, name_obj.response_errors_rcode[(name,rdtype)], name_obj.response_errors[(name,rdtype)])
+        if error_node is not None:
+            my_nodes_all.append(error_node)
 
         return my_nodes_all
 
