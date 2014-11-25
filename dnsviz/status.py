@@ -183,6 +183,7 @@ NSEC_ERROR_RDTYPE_IN_BITMAP = 5
 NSEC_ERROR_CNAME_IN_BITMAP = 6
 NSEC_ERROR_NO_MATCHING_NSEC = 7
 NSEC_ERROR_WILDCARD_EXPANSION_INVALID = 8
+NSEC_ERROR_WILDCARD_COVERED = 9
 nsec_error_mapping = {
     NSEC_ERROR_QNAME_NOT_COVERED: 'QNAME_NOT_COVERED',
     NSEC_ERROR_WILDCARD_NOT_COVERED: 'WILDCARD_NOT_COVERED',
@@ -192,6 +193,7 @@ nsec_error_mapping = {
     NSEC_ERROR_CNAME_IN_BITMAP: 'CNAME_IN_BITMAP',
     NSEC_ERROR_NO_MATCHING_NSEC: 'NO_MATCHING_NSEC',
     NSEC_ERROR_WILDCARD_EXPANSION_INVALID: 'WILDCARD_EXPANSION_INVALID',
+    NSEC_ERROR_WILDCARD_COVERED: 'WILDCARD_COVERED',
 }
 
 RESPONSE_ERROR_NOT_AUTHORITATIVE = 1
@@ -1017,6 +1019,10 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+
+        if self.nsec_names_covering_wildcard:
+            self.validation_status = NSEC_STATUS_INVALID
+            self.errors.append(NSEC_ERROR_WILDCARD_COVERED)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
