@@ -1694,9 +1694,6 @@ class DomainNameAnalysis(object):
                                     status = Status.NSEC3StatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
                                 else:
                                     status = Status.NSECStatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
-                                    # possible empty non-terminal
-                                    if status.validation_status != Status.STATUS_VALID:
-                                        status = Status.NSECStatusEmptyNonTerminal(qname_sought, soa_owner_name, nsec_set_info)
                                 if status.validation_status == Status.STATUS_VALID:
                                     break
 
@@ -2970,7 +2967,7 @@ class Analyst(object):
             is_nxdomain = query.is_nxdomain_all()
             is_valid = query.is_valid_complete_response_any()
 
-             # (referral type is A)
+             # (referral type is NS)
             if name_obj.referral_rdtype == dns.rdatatype.NS:
                 # if rdtype is NS and the name is not under .arpa, then there
                 # was no error, and no NXDOMAIN, so there is no need to save

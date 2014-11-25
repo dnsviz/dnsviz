@@ -480,8 +480,6 @@ class DSStatus(object):
         return d
 
 class NSECStatusNXDOMAIN(object):
-    CHECK_EMPTY_NON_TERMINAL = True
-
     def __init__(self, qname, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
@@ -491,7 +489,7 @@ class NSECStatusNXDOMAIN(object):
         self.wildcard_name = dns.name.from_text('*', self.origin)
 
         self.nsec_names_covering_qname = {}
-        covering_names = nsec_set_info.nsec_covering_name(self.qname, self.CHECK_EMPTY_NON_TERMINAL)
+        covering_names = nsec_set_info.nsec_covering_name(self.qname)
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
@@ -501,7 +499,7 @@ class NSECStatusNXDOMAIN(object):
         # any one of which could be expanded into wildcard
         while wildcard_cover != self.origin:
             wildcard_name = dns.name.from_text('*', wildcard_cover.parent())
-            covering_names = nsec_set_info.nsec_covering_name(wildcard_name, True)
+            covering_names = nsec_set_info.nsec_covering_name(wildcard_name)
             if covering_names:
                 self.wildcard_name = wildcard_name
                 self.nsec_names_covering_wildcard[self.wildcard_name] = covering_names
@@ -597,29 +595,6 @@ class NSECStatusNXDOMAIN(object):
             d['errors'] = [nsec_error_mapping[e] for e in self.errors]
         return d
 
-class NSECStatusEmptyNonTerminal(NSECStatusNXDOMAIN):
-    CHECK_EMPTY_NON_TERMINAL = False
-
-    def __init__(self, qname, origin, nsec_set_info):
-        super(NSECStatusEmptyNonTerminal, self).__init__(qname, origin, nsec_set_info)
-        self.nsec_names_covering_wildcard = {}
-
-    def _set_validation_status(self, nsec_set_info):
-        self.validation_status = NSEC_STATUS_VALID
-        if not self.nsec_names_covering_qname:
-            self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
-    
-        # if it validation_status, we project out just the pertinent NSEC records
-        # otherwise clone it by projecting them all
-        if self.validation_status == NSEC_STATUS_VALID:
-            covering_names = set()
-            for names in self.nsec_names_covering_qname.values():
-                covering_names.update(names)
-            self.nsec_set_info = nsec_set_info.project(*list(covering_names))
-        else:
-            self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
-
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
     def __init__(self, qname, wildcard_name, origin, nsec_set_info):
         super(NSECStatusWildcard, self).__init__(qname, origin, nsec_set_info)
@@ -645,7 +620,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         self.validation_status = NSEC_STATUS_VALID
         if self.nsec_names_covering_qname:
             next_closest_encloser = self._next_closest_encloser()
-            if not nsec_set_info.nsec_covering_name(next_closest_encloser, self.CHECK_EMPTY_NON_TERMINAL):
+            if not nsec_set_info.nsec_covering_name(next_closest_encloser):
                 self.validation_status = NSEC_STATUS_INVALID
                 self.errors.append(NSEC_ERROR_WILDCARD_EXPANSION_INVALID)
         else:
@@ -693,8 +668,16 @@ class NSECStatusNoAnswer(object):
             self.has_ds = False
             self.has_soa = False
 
+            # If no NSEC exists for the name itself, then look for an NSEC with
+            # an (empty non-terminal) ancestor
+            for nsec_name in nsec_set_info.rrsets:
+                next_name = nsec_set_info.rrsets[nsec_name].rrset[0].next
+                if next_name.is_subdomain(self.qname) and next_name != self.qname:
+                    self.nsec_for_qname = nsec_set_info.rrsets[nsec_name]
+                    break
+
         self.nsec_names_covering_qname = {}
-        covering_names = nsec_set_info.nsec_covering_name(self.qname, False)
+        covering_names = nsec_set_info.nsec_covering_name(self.qname)
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
@@ -753,7 +736,7 @@ class NSECStatusNoAnswer(object):
         if self.validation_status == NSEC_STATUS_VALID:
             covering_names = set()
             if self.nsec_for_qname is not None:
-                covering_names.add(self.qname)
+                covering_names.add(self.nsec_for_qname.rrset.name)
             else:
                 for names in self.nsec_names_covering_qname.values():
                     covering_names.update(names)
@@ -787,8 +770,8 @@ class NSECStatusNoAnswer(object):
             d['meta']['qname'] = self.qname.canonicalize().to_text()
             if self.nsec_for_qname is not None:
                 d['meta']['nsec_matching_qname'] = collections.OrderedDict((
-                    ('qname', self.qname.canonicalize().to_text()),
-                    #TODO - add rdtypes bitmap
+                    ('qname', self.nsec_for_qname.rrset.name.canonicalize().to_text()),
+                    #TODO - add rdtypes bitmap (when NSEC matches qname--not for empty non-terminal)
                 ))
 
             if self.nsec_names_covering_qname:
