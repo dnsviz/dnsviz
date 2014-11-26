@@ -1,0 +1,8 @@
+*.pyc
+*~
+*.swp
+/MANIFEST
+/build/
+/dist/
+dnsviz/config.py
+.DS_Store
