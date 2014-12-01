@@ -277,9 +277,12 @@ class DNSQueryTransport:
                                 finished_fds.append(fd)
 
                     except (socket.error, EOFError), e:
-                        qtm.err = e
-                        qtm.cleanup()
-                        finished_fds.append(fd)
+                        if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
+                            pass
+                        else:
+                            qtm.err = e
+                            qtm.cleanup()
+                            finished_fds.append(fd)
 
             # handle the expired queries
             future_index = bisect.bisect_right(expirations, ((time.time(), None)))
