@@ -445,11 +445,6 @@ class DomainNameAnalysis(object):
 
         is_authoritative = response.is_authoritative()
 
-        # note server responsiveness and authoritativeness
-        if response.udp_used():
-            self._responsive_servers_clients_udp.add((server, client))
-        if response.tcp_used():
-            self._responsive_servers_clients_tcp.add((server, client))
         if response.message.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN):
             self._valid_servers_clients.add((server, client))
         if is_authoritative:
@@ -559,14 +554,23 @@ class DomainNameAnalysis(object):
             self._all_servers_queried.add(server)
 
             for client in query.responses[server]:
-                # note the fact that servers were queried from clients
-                self._all_servers_clients_queried.add((server, client))
-                if query.responses[server][client].tcp_first:
-                    self._all_servers_clients_queried_tcp.add((server, client))
+                response = query.responses[server][client]
+
+                # note clients used
                 if ':' in client:
                     self.clients_ipv6.add(client)
                 else:
                     self.clients_ipv4.add(client)
+
+                # note server responsiveness
+                if response.udp_attempted:
+                    self._all_servers_clients_queried.add((server, client))
+                if response.tcp_attempted:
+                    self._all_servers_clients_queried_tcp.add((server, client))
+                if response.udp_responsive:
+                    self._responsive_servers_clients_udp.add((server, client))
+                if response.tcp_responsive:
+                    self._responsive_servers_clients_tcp.add((server, client))
 
                 self._process_response(query.responses[server][client], server, client, query, bailiwick)
 

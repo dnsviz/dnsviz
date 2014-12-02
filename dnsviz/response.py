@@ -61,14 +61,13 @@ def _rr_cmp(a, b):
 class DNSResponse:
     '''A DNS response, including meta information'''
 
-    def __init__(self, message, msg_size, error, errno, history, response_time, tcp_first):
+    def __init__(self, message, msg_size, error, errno, history, response_time):
         self.message = message
         self.msg_size = msg_size
         self.error = error
         self.errno = errno
         self.history = history
         self.response_time = response_time
-        self.tcp_first = tcp_first
 
         self.query = None
 
@@ -77,6 +76,11 @@ class DNSResponse:
         self.effective_edns_max_udp_payload = None
         self.effective_edns_flags = None
         self.effective_edns_options = None
+
+        self.udp_attempted = None
+        self.udp_responsive = None
+        self.tcp_attempted = None
+        self.tcp_responsive = None
 
     def __unicode__(self):
         import query
@@ -89,7 +93,7 @@ class DNSResponse:
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
     def copy(self):
-        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.tcp_first)
+        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time)
         clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options)
         return clone
 
@@ -100,30 +104,11 @@ class DNSResponse:
         self.effective_edns_flags = edns_flags
         self.effective_edns_options = edns_options
 
-    def udp_used(self):
-        '''Return True if UDP was used (in part) to receive the response from
-        the server.'''
-        import query
-
-        if not self.tcp_first:
-            return True
-        for retry in self.history:
-            if retry.action == query.RETRY_ACTION_USE_UDP:
-                return True
-        return False
-
-
-    def tcp_used(self):
-        '''Return True if TCP was used to receive the response from the
-        server.'''
-        import query
-
-        if self.tcp_first:
-            return True
-        for retry in self.history:
-            if retry.action == query.RETRY_ACTION_USE_TCP:
-                return True
-        return False
+    def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive):
+        self.udp_attempted = udp_attempted
+        self.udp_responsive = udp_responsive
+        self.tcp_attempted = tcp_attempted
+        self.tcp_responsive = tcp_responsive
 
     def recursion_desired_and_available(self):
         '''Return True if the recursion desired (RD) bit was set in the request to the
@@ -288,7 +273,6 @@ class DNSResponse:
             d['message'] = base64.b64encode(self.message.to_wire())
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
-        d['tcp_first'] = self.tcp_first
         d['response_time'] = self.response_time
         d['history'] = []
         for retry in self.history:
@@ -317,12 +301,11 @@ class DNSResponse:
         else:
             message = dns.message.from_wire(base64.b64decode(d['message']))
 
-        tcp_first = d['tcp_first']
         response_time = d['response_time']
         history = []
         for retry in d['history']:
             history.append(query.DNSQueryRetryAttempt.deserialize(retry))
-        return DNSResponse(message, msg_size, error, errno, history, response_time, tcp_first)
+        return DNSResponse(message, msg_size, error, errno, history, response_time)
 
 class RDataMeta(object):
     def __init__(self, name, ttl, rdtype, rdata):
