@@ -90,18 +90,20 @@ RETRY_ACTION_SET_EDNS_FLAG = 8
 RETRY_ACTION_CLEAR_EDNS_FLAG = 9
 RETRY_ACTION_ADD_EDNS_OPTION = 10
 RETRY_ACTION_REMOVE_EDNS_OPTION = 11
+RETRY_ACTION_CHANGE_SPORT = 12
 retry_actions = {
         RETRY_ACTION_NO_CHANGE: 'NO_CHANGE',
-        RETRY_ACTION_USE_TCP: 'USE_TCP',
-        RETRY_ACTION_USE_UDP: 'USE_UDP',
-        RETRY_ACTION_SET_FLAG: 'SET_FLAG',
-        RETRY_ACTION_CLEAR_FLAG: 'CLEAR_FLAG',
-        RETRY_ACTION_DISABLE_EDNS: 'DISABLE_EDNS',
-        RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD: 'CHANGE_UDP_MAX_PAYLOAD',
-        RETRY_ACTION_SET_EDNS_FLAG: 'SET_EDNS_FLAG',
-        RETRY_ACTION_CLEAR_EDNS_FLAG: 'CLEAR_EDNS_FLAG',
-        RETRY_ACTION_ADD_EDNS_OPTION: 'ADD_EDNS_OPTION',
-        RETRY_ACTION_REMOVE_EDNS_OPTION: 'REMOVE_EDNS_OPTION',
+        RETRY_ACTION_USE_TCP: 'USE_TCP', # implies CHANGE_SPORT
+        RETRY_ACTION_USE_UDP: 'USE_UDP', # implies CHANGE_SPORT
+        RETRY_ACTION_SET_FLAG: 'SET_FLAG', # implies CHANGE_SPORT
+        RETRY_ACTION_CLEAR_FLAG: 'CLEAR_FLAG', # implies CHANGE_SPORT
+        RETRY_ACTION_DISABLE_EDNS: 'DISABLE_EDNS', # implies CHANGE_SPORT
+        RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD: 'CHANGE_UDP_MAX_PAYLOAD', # implies USE_UDP, CHANGE_SPORT
+        RETRY_ACTION_SET_EDNS_FLAG: 'SET_EDNS_FLAG', # implies USE_UDP, CHANGE_SPORT
+        RETRY_ACTION_CLEAR_EDNS_FLAG: 'CLEAR_EDNS_FLAG', # implies USE_UDP, CHANGE_SPORT
+        RETRY_ACTION_ADD_EDNS_OPTION: 'ADD_EDNS_OPTION', # implies USE_UDP, CHANGE_SPORT
+        RETRY_ACTION_REMOVE_EDNS_OPTION: 'REMOVE_EDNS_OPTION', # implies USE_UDP, CHANGE_SPORT
+        RETRY_ACTION_CHANGE_SPORT: 'CHANGE_SPORT',
 }
 retry_action_codes = {
         'NO_CHANGE': RETRY_ACTION_NO_CHANGE,
@@ -115,6 +117,7 @@ retry_action_codes = {
         'CLEAR_EDNS_FLAG': RETRY_ACTION_CLEAR_EDNS_FLAG,
         'ADD_EDNS_OPTION': RETRY_ACTION_ADD_EDNS_OPTION,
         'REMOVE_EDNS_OPTION': RETRY_ACTION_REMOVE_EDNS_OPTION,
+        'CHANGE_SPORT': RETRY_ACTION_CHANGE_SPORT,
 }
 
 MIN_QUERY_TIMEOUT = 0.1
@@ -128,13 +131,12 @@ class AcceptResponse(Exception):
 class DNSQueryRetryAttempt:
     '''A failed attempt at a DNS query that invokes a subsequent retry.'''
 
-    def __init__(self, response_time, cause, cause_arg, action, action_arg, change_sport):
+    def __init__(self, response_time, cause, cause_arg, action, action_arg):
         self.response_time = response_time
         self.cause = cause
         self.cause_arg = cause_arg
         self.action = action
         self.action_arg = action_arg
-        self.change_sport = change_sport
 
     def __repr__(self):
         return '<Retry: %s -> %s>' % (retry_causes[self.cause], retry_actions[self.action])
@@ -148,7 +150,6 @@ class DNSQueryRetryAttempt:
         d['action'] = retry_actions.get(self.action, 'UNKNOWN')
         if self.action_arg is not None:
             d['action_arg'] = self.action_arg
-        d['change_sport'] = self.change_sport
         return d
 
     @classmethod
@@ -164,8 +165,7 @@ class DNSQueryRetryAttempt:
             action_arg = d['action_arg']
         else:
             action_arg = None
-        change_sport = d['change_sport']
-        return DNSQueryRetryAttempt(response_time, cause, cause_arg, action, action_arg, change_sport)
+        return DNSQueryRetryAttempt(response_time, cause, cause_arg, action, action_arg)
 
 class DNSResponseHandlerFactory(object):
     '''A factory class that holds arguments to create a DNSResponseHandler instance.'''
@@ -186,8 +186,6 @@ class DNSResponseHandlerFactory(object):
 class DNSResponseHandler(object):
     '''A base class for handling DNS responses (or exceptions) arising from a
     query attempt.'''
-
-    change_sport = True
 
     def __new__(cls, *args, **kwargs):
         '''Redirect the instantiation of a DNSResponseHandler to create instead a Factory,
@@ -268,7 +266,12 @@ class RetryOnNetworkErrorHandler(DNSResponseHandler):
             else:
                 errno1 = None
             self._params['wait'] = 0.2*(2**errors)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, RETRY_ACTION_NO_CHANGE, None, self.change_sport)
+
+            if self._params['tcp']:
+                action = RETRY_ACTION_CHANGE_SPORT
+            else:
+                action = RETRY_ACTION_NO_CHANGE
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, action, None)
 
 class UseTCPOnTCFlagHandler(DNSResponseHandler):
     '''Retry with TCP if the TC flag is set in the response.'''
@@ -276,7 +279,7 @@ class UseTCPOnTCFlagHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         if response_wire is not None and ord(response_wire[2]) & 0x02:
             self._params['tcp'] = True
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
 class DisableEDNSOnFormerrHandler(DNSResponseHandler):
     '''Disable EDNS if there was some type of issue parsing the message.  Some
@@ -285,7 +288,7 @@ class DisableEDNSOnFormerrHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         if isinstance(response, (struct.error, dns.exception.FormError, dns.exception.SyntaxError)) and self._request.edns >= 0:
             self._request.use_edns(False)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_FORMERR, None, RETRY_ACTION_DISABLE_EDNS, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_FORMERR, None, RETRY_ACTION_DISABLE_EDNS, None)
 
 class ReduceUDPMaxPayloadOnTimeoutHandler(DNSResponseHandler):
     '''Reduce the EDNS UDP max payload after a given number of timeouts.  Some
@@ -299,7 +302,7 @@ class ReduceUDPMaxPayloadOnTimeoutHandler(DNSResponseHandler):
         timeouts = self._get_num_timeouts(response)
         if timeouts >= self._timeouts and self._request.payload > self._reduced_payload:
             self._request.payload = self._reduced_payload
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
 class ClearDOFlagOnTimeoutHandler(DNSResponseHandler):
     '''Clear the EDNS DO flag after a given number of timeouts.  Some servers
@@ -312,7 +315,7 @@ class ClearDOFlagOnTimeoutHandler(DNSResponseHandler):
         timeouts = self._get_num_timeouts(response)
         if timeouts >= self._timeouts and (self._request.ednsflags & dns.flags.DO):
             self._request.want_dnssec(False)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, dns.flags.DO, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, dns.flags.DO)
 
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
     '''Disable EDNS after a given number of timeouts.  Some servers don't
@@ -325,7 +328,7 @@ class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
         timeouts = self._get_num_timeouts(response)
         if timeouts >= self._timeouts and self._request.edns >= 0:
             self._request.use_edns(False)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_DISABLE_EDNS, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_DISABLE_EDNS, None)
 
 class SetCDFlagOnServfailHandler(DNSResponseHandler):
     '''Set the CD flag when a SERVFAIL status is returned.  This is really used
@@ -335,7 +338,7 @@ class SetCDFlagOnServfailHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         if isinstance(response, dns.message.Message) and response.rcode() == dns.rcode.SERVFAIL and not self._request.flags & dns.flags.CD:
             self._request.flags |= dns.flags.CD
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_SET_FLAG, dns.flags.CD, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_SET_FLAG, dns.flags.CD)
 
 class DisableEDNSOnRcodeHandler(DNSResponseHandler):
     '''Disable EDNS if the RCODE in the response indicates that the server
@@ -344,7 +347,7 @@ class DisableEDNSOnRcodeHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         if isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOTIMP, dns.rcode.FORMERR, dns.rcode.SERVFAIL) and self._request.edns >= 0:
             self._request.use_edns(False)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_DISABLE_EDNS, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_DISABLE_EDNS, None)
 
 class UseUDPOnTimeoutHandler(DNSResponseHandler):
     '''Revert to UDP if TCP connectivity fails.'''
@@ -356,7 +359,7 @@ class UseUDPOnTimeoutHandler(DNSResponseHandler):
         timeouts = self._get_num_timeouts(response)
         if timeouts >= self._timeouts and self._params['tcp']:
             self._params['tcp'] = False
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_UDP, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_UDP, None)
 
 class UseUDPOnNetworkErrorHandler(DNSResponseHandler):
     '''Retry the query after some exponentially growing wait period upon a
@@ -373,7 +376,7 @@ class UseUDPOnNetworkErrorHandler(DNSResponseHandler):
             else:
                 errno1 = None
             self._params['tcp'] = False
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, RETRY_ACTION_USE_UDP, None, self.change_sport)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, RETRY_ACTION_USE_UDP, None)
 
         if isinstance(response, (socket.error, EOFError)):
             if hasattr(response, 'errno'):
@@ -381,7 +384,12 @@ class UseUDPOnNetworkErrorHandler(DNSResponseHandler):
             else:
                 errno1 = None
             self._params['wait'] = 0.2*(2**errors)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, RETRY_ACTION_NO_CHANGE, None, self.change_sport)
+
+            if self._params['tcp']:
+                action = RETRY_ACTION_CHANGE_SPORT
+            else:
+                action = RETRY_ACTION_NO_CHANGE
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_NETWORK_ERROR, errno1, action, None)
 
 class PMTUBoundingHandler(DNSResponseHandler):
     # define states
@@ -451,7 +459,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._upper_bound = self._request.payload - 1
                 self._request.payload = self._reduced_payload
                 self._state = self.REDUCED_PAYLOAD
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
         elif self._state == self.REDUCED_PAYLOAD:
             self.handle_sub(response_wire, response, response_time)
@@ -462,9 +470,9 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     self._params['tcp'] = True
                     self._state = self.USE_TCP
                     if response_wire is not None and ord(response_wire[2]) & 0x02:
-                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None, self.change_sport)
+                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                     else:
-                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None, self.change_sport)
+                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
         elif self._state == self.USE_TCP:
             if not is_timeout and is_valid:
@@ -473,7 +481,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 payload = len(response_wire) - 1
                 self._request.payload = payload
                 self._state = self.TCP_MINUS_ONE
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
@@ -481,56 +489,56 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
                 self._request.payload = payload
                 self._state = self.PICKLE
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
             elif response_wire is not None and len(response_wire) < self._water_mark:
                 # but if this isn't the first time, just quit.  it could be that
                 # the server simply has some wonky way of determining how/where to truncate.
-                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_NO_CHANGE:
+                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_CHANGE_SPORT:
                     self._params['tcp'] = True
                     self._state = self.TCP_FINAL
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
                 else:
                     self._params['wait'] = 1.0
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_NO_CHANGE, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             # if the response was truncated, then the size of the payload
             # received via TCP is the largest we can receive
             elif response_wire is not None and ord(response_wire[2]) & 0x02:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
         elif self._state == self.PICKLE:
             if self._upper_bound - self._lower_bound <= 1:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
                 if response_wire is not None and ord(response_wire[2]) & 0x02:
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                 elif is_timeout:
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None)
                 elif not is_valid:
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
             elif is_timeout:
                 self._upper_bound = self._request.payload - 1
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
                 self._request.payload = payload
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
             elif len(response_wire) < self._water_mark:
                 # but if this isn't the first time, just quit.  it could be that
                 # the server simply has some wonky way of determining how/where to truncate.
-                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_NO_CHANGE:
+                if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_CHANGE_SPORT:
                     self._params['tcp'] = True
                     self._state = self.TCP_FINAL
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
                 else:
                     self._params['wait'] = 1.0
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_NO_CHANGE, None, self.change_sport)
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             elif is_valid:
                 self._lower_bound = self._request.payload
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
                 self._request.payload = payload
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload, self.change_sport)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
         elif self._state == self.TCP_FINAL:
             pass
@@ -550,11 +558,13 @@ class ChangeTimeoutOnTimeoutHandler(ActionIndependentDNSResponseHandler):
 class RetryOnTimeoutHandler(DNSResponseHandler):
     '''Retry with no change when a query times out.'''
 
-    change_sport = False
-
     def handle(self, response_wire, response, response_time):
         if isinstance(response, dns.exception.Timeout):
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_NO_CHANGE, None, self.change_sport)
+            if self._params['tcp']:
+                action = RETRY_ACTION_CHANGE_SPORT
+            else:
+                action = RETRY_ACTION_NO_CHANGE
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, action, None)
 
 class DefaultAcceptHandler(DNSResponseHandler):
     '''Accept the response if there was no other reason to not accept it.'''
@@ -641,7 +651,7 @@ class DNSQueryHandler:
                 if retry_action is None:
                     retry_action = handler.handle(response_wire, response, response_time)
                     if retry_action is not None:
-                        if handler.change_sport or self.params['tcp']:
+                        if retry_action == RETRY_ACTION_NO_CHANGE:
                             self.params['sport'] = sport
                         else:
                             self.params['sport'] = None
