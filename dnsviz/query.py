@@ -929,18 +929,30 @@ class DNSQuery(AggregateDNSResponse):
         tcp_responsive = False
         udp_responsive = False
 
-        for retry in response.history:
+        responsive_cause_index = None
+
+        prev_index = None
+        for i, retry in enumerate(response.history):
             # mark if TCP or UDP was attempted prior to this retry
             if tcp:
                 tcp_attempted = True
             else:
                 udp_attempted = True
 
-            # mark if this retry wasn't caused by network error or timeout
+            # Mark responsiveness if this retry wasn't caused by network error
+            # or timeout.  Also, if the last cause/action caused responsiveness
+            # where there wasn't previously on the same protocol, then mark the
+            # cause/action.
             if retry.cause not in (RETRY_CAUSE_NETWORK_ERROR, RETRY_CAUSE_TIMEOUT):
                 if tcp:
+                    if responsive_cause_index is None and \
+                            not tcp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
+                        responsive_cause_index = prev_index
                     tcp_responsive = True
                 else:
+                    if responsive_cause_index is None and \
+                            not udp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
+                        responsive_cause_index = prev_index
                     udp_responsive = True
 
             if retry.action == RETRY_ACTION_SET_FLAG:
@@ -962,15 +974,26 @@ class DNSQuery(AggregateDNSResponse):
                 tcp = False
             #TODO do the same with EDNS options
 
-        # mark if the ultimate query didn't result in network error or timeout
+            prev_index = i
+
+        # Mark responsiveness if the ultimate query didn't result in network
+        # error or timeout.  Also, if the last cause/action caused
+        # responsiveness where there wasn't previously on the same protocol,
+        # then mark the cause/action.
         if response.error not in (RESPONSE_ERROR_NETWORK_ERROR, RESPONSE_ERROR_TIMEOUT):
             if tcp:
+                if responsive_cause_index is None and \
+                        not tcp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
+                    responsive_cause_index = prev_index
                 tcp_responsive = True
             else:
+                if responsive_cause_index is None and \
+                        not udp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
+                    responsive_cause_index = prev_index
                 udp_responsive = True
 
         response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options)
-        response.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive)
+        response.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
 
         self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 

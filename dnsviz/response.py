@@ -104,11 +104,12 @@ class DNSResponse:
         self.effective_edns_flags = edns_flags
         self.effective_edns_options = edns_options
 
-    def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive):
+    def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index):
         self.udp_attempted = udp_attempted
         self.udp_responsive = udp_responsive
         self.tcp_attempted = tcp_attempted
         self.tcp_responsive = tcp_responsive
+        self.responsive_cause_index = responsive_cause_index
 
     def recursion_desired_and_available(self):
         '''Return True if the recursion desired (RD) bit was set in the request to the
