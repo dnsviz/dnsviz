@@ -332,7 +332,7 @@ class DomainNameAnalysis(object):
         if self in trace:
             return None
 
-        if name == self.name:
+        if name in (self.name, self.nxdomain_name, self.nxrrset_name):
             return self
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
