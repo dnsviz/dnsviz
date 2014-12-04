@@ -1162,10 +1162,7 @@ class DomainNameAnalysis(object):
                     qname_obj = qname_obj.parent
 
                 for wildcard_name in rrset_info.wildcard_info:
-                    if qname_obj is None:
-                        zone = self.name
-                    else:
-                        zone = qname_obj.zone.name
+                    zone = qname_obj.zone.name
 
                     statuses = []
                     for server, client in rrset_info.wildcard_info[wildcard_name]:
@@ -1214,7 +1211,7 @@ class DomainNameAnalysis(object):
                                 # TIMEOUT, SERVFAIL, etc.) leading up to it
                                 #TODO
                                 pass
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
@@ -1226,7 +1223,7 @@ class DomainNameAnalysis(object):
                                 #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
                                 pass
                         elif not response.dnssec_requested():
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
@@ -1551,13 +1548,7 @@ class DomainNameAnalysis(object):
                         soa_owner_name = None
 
                     if soa_owner_name is None:
-                        if qname_obj is not None:
-                            soa_owner_name = qname_obj.zone.name
-                        elif self.name.is_subdomain(qname_sought) and qname_sought.is_subdomain(self.zone.name):
-                            soa_owner_name = self.zone.name
-                        #XXX this is a hack and may not be robust
-                        else:
-                            soa_owner_name = qname_sought.parent()
+                        soa_owner_name = qname_obj.zone.name
 
                     for server_client in servers_clients:
                         for response in servers_clients[server_client]:
@@ -1575,7 +1566,7 @@ class DomainNameAnalysis(object):
 
                             # report that no NSEC(3) records were returned
                             if status is None:
-                                if qname_obj is not None and qname_obj.zone.signed and response.dnssec_requested() and \
+                                if qname_obj.zone.signed and response.dnssec_requested() and \
                                         (qname_sought == qname or response.recursion_desired_and_available()):
                                     if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
                                         self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
@@ -1605,7 +1596,7 @@ class DomainNameAnalysis(object):
                                 # TIMEOUT, SERVFAIL, etc.) leading up to it
                                 #TODO
                                 pass
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
@@ -1617,7 +1608,7 @@ class DomainNameAnalysis(object):
                                 #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
                                 pass
                         elif not response.dnssec_requested():
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
@@ -1653,7 +1644,7 @@ class DomainNameAnalysis(object):
                         for server_client in servers_clients:
                             for response in servers_clients[server_client]:
                                 if qname_sought == qname or response.recursion_desired_and_available():
-                                    if qname_obj is not None and response.is_upward_referral(qname_obj.zone.name):
+                                    if response.is_upward_referral(qname_obj.zone.name):
                                         servers_upward_referral.add(server_client)
                                     else:
                                         servers_missing_soa.add(server_client)
@@ -1679,13 +1670,7 @@ class DomainNameAnalysis(object):
                         soa_owner_name = None
 
                     if soa_owner_name is None:
-                        if qname_obj is not None:
-                            soa_owner_name = qname_obj.zone.name
-                        elif self.name.is_subdomain(qname_sought) and qname_sought.is_subdomain(self.zone.name):
-                            soa_owner_name = self.zone.name
-                        #XXX this is a hack and may not be robust
-                        else:
-                            soa_owner_name = qname_sought.parent()
+                        soa_owner_name = qname_obj.zone.name
 
                     for server_client in servers_clients:
                         for response in servers_clients[server_client]:
@@ -1702,7 +1687,7 @@ class DomainNameAnalysis(object):
                                     break
 
                             if status is None:
-                                if qname_obj is not None and qname_obj.zone.signed and response.dnssec_requested() and \
+                                if qname_obj.zone.signed and response.dnssec_requested() and \
                                         (qname_sought == qname or response.recursion_desired_and_available()):
                                     if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
                                         self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
@@ -1730,7 +1715,7 @@ class DomainNameAnalysis(object):
                                 # TIMEOUT, SERVFAIL, etc.) leading up to it
                                 #TODO
                                 pass
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
@@ -1742,7 +1727,7 @@ class DomainNameAnalysis(object):
                                 #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
                                 pass
                         elif not response.dnssec_requested():
-                            if qname_obj is not None and qname_obj.zone.signed:
+                            if qname_obj.zone.signed:
                                 # if it matters (e.g., due to DNSSEC), note an error
                                 if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
                                     errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
