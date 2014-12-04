@@ -834,6 +834,40 @@ class DomainNameAnalysis(object):
             return rdtypes
         return None
 
+    def _server_responsive_with_condition(self, server, client, request_test, response_test):
+        for query in self.queries.values():
+            for query1 in query.queries.values():
+                if request_test(query1):
+                    try:
+                        if client is None:
+                            clients = query1.responses[server].keys()
+                        else:
+                            clients = (client,)
+                    except KeyError:
+                        continue
+
+                    for c in clients:
+                        try:
+                            response = query1.responses[server][client]
+                        except KeyError:
+                            continue
+                        if response.message is not None and response_test(response) and \
+                                response.message.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN):
+                            if query.rdtype == dns.rdatatype.SOA:
+                                print 'foo'
+                            return True
+        return False
+
+    def server_responsive_with_do(self, server, client):
+        return self._server_responsive_with_condition(server, client,
+                lambda x: x.edns >= 0 and x.edns_flags & dns.flags.DO,
+                lambda x: x.effective_edns >= 0 and x.effective_edns_flags & dns.flags.DO)
+
+    def server_responsive_with_edns(self, server, client):
+        return self._server_responsive_with_condition(server, client,
+                lambda x: x.edns >= 0,
+                lambda x: x.effective_edns >= 0)
+
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None):
         if trace is None:
             trace = []
@@ -1204,36 +1238,68 @@ class DomainNameAnalysis(object):
                     for response in rrset_info.servers_clients[(server,client)]:
                         errors = self.rrset_errors[rrset_info]
                         warnings = self.rrset_warnings[rrset_info]
+                        error_code = None
+                        #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
+                        #TODO mark a slow response as well (over a certain threshold)
+                        #TODO make the below functionality into a function for re-use
+
+                        # if the response didn't use EDNS
+                        #TODO (make sure the query initially used EDNS)
                         if response.message.edns < 0:
-                            if response.effective_edns < 0:
-                                # if EDNS0 was not actually used in the
-                                # request, then note the response errors (e.g.,
-                                # TIMEOUT, SERVFAIL, etc.) leading up to it
-                                #TODO
-                                pass
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
+                            # find out if this really appears to be an EDNS issue, by seeing
+                            # if any other queries to this server with EDNS were also unsuccessful 
+                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add((server,client))
-                                pass
-                        elif not response.dnssec_requested():
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
+                                if response.responsive_cause_index is not None:
+                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
+                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
+                                        else:
+                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+                                else:
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+
+                            #TODO handle this better
+                            if error_code is None:
+                                raise Exception('Unknown EDNS-related error')
+
+                        else:
+                            #TODO check for EDNS version mismatch
+
+                            # the response used EDNS, but DO wasn't requested
+                            #TODO (make sure the query initially requested DNSSEC)
+                            if not response.dnssec_requested():
+                                # find out if this really appears to be a DO-bit issue, by seeing
+                                # if any other queries to this server with the DO bit were also unsuccessful 
+                                if qname_obj.zone.server_responsive_with_do(server,client):
+                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
+                                else:
+                                    if response.responsive_cause_index is not None:
+                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
+
+                                #TODO handle this better
+                                if error_code is None:
+                                    raise Exception('Unknown DO-related error')
+
+                        if error_code is not None:
+                            # warn on intermittent errors
+                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
+                                group = warnings
+                            # if the error really matters (e.g., due to DNSSEC), note an error
+                            elif qname_obj is not None and qname_obj.zone.signed:
+                                group = errors
+                            # otherwise, warn
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add((server,client))
-                                pass
+                                group = warnings
+
+                            if error_code not in group:
+                                group[error_code] = set()
+                            group[error_code].add((server,client))
+
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
@@ -1587,43 +1653,71 @@ class DomainNameAnalysis(object):
 
                 errors = self.nxdomain_errors[(qname_sought, rdtype)]
                 warnings = self.nxdomain_warnings[(qname_sought, rdtype)]
-                for server_client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
-                    for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server_client]:
+                for server,client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
+                    for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server,client]:
+                        error_code = None
+                        # if the response didn't use EDNS
+                        #TODO (make sure the query initially used EDNS)
                         if response.message.edns < 0:
-                            if response.effective_edns < 0:
-                                # if EDNS0 was not actually used in the
-                                # request, then note the response errors (e.g.,
-                                # TIMEOUT, SERVFAIL, etc.) leading up to it
-                                #TODO
-                                pass
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                            # find out if this really appears to be an EDNS issue, by seeing
+                            # if any other queries to this server with EDNS were also unsuccessful 
+                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                                pass
-                        elif not response.dnssec_requested():
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                                if response.responsive_cause_index is not None:
+                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
+                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
+                                        else:
+                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+                                else:
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+
+                            #TODO handle this better
+                            if error_code is None:
+                                raise Exception('Unknown EDNS-related error')
+
+                        else:
+                            #TODO check for EDNS version mismatch
+
+                            # the response used EDNS, but DO wasn't requested
+                            #TODO (make sure the query initially requested DNSSEC)
+                            if not response.dnssec_requested():
+                                # find out if this really appears to be a DO-bit issue, by seeing
+                                # if any other queries to this server with the DO bit were also unsuccessful 
+                                if qname_obj.zone.server_responsive_with_do(server,client):
+                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
+                                else:
+                                    if response.responsive_cause_index is not None:
+                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
+
+                                #TODO handle this better
+                                if error_code is None:
+                                    raise Exception('Unknown DO-related error')
+
+                        if error_code is not None:
+                            # warn on intermittent errors
+                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
+                                group = warnings
+                            # if the error really matters (e.g., due to DNSSEC), note an error
+                            elif qname_obj is not None and qname_obj.zone.signed:
+                                group = errors
+                            # otherwise, warn
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                                pass
+                                group = warnings
+
+                            if error_code not in group:
+                                group[error_code] = set()
+                            group[error_code].add((server,client))
+
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
                                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server,client)
 
             # no answer
             for qname_sought in query.rrset_noanswer_info:
@@ -1706,43 +1800,71 @@ class DomainNameAnalysis(object):
 
                 errors = self.noanswer_errors[(qname_sought,rdtype)]
                 warnings = self.noanswer_warnings[(qname_sought,rdtype)]
-                for server_client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
-                    for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server_client]:
+                for server,client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
+                    for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server,client]:
+                        error_code = None
+                        # if the response didn't use EDNS
+                        #TODO (make sure the query initially used EDNS)
                         if response.message.edns < 0:
-                            if response.effective_edns < 0:
-                                # if EDNS0 was not actually used in the
-                                # request, then note the response errors (e.g.,
-                                # TIMEOUT, SERVFAIL, etc.) leading up to it
-                                #TODO
-                                pass
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
+                            # find out if this really appears to be an EDNS issue, by seeing
+                            # if any other queries to this server with EDNS were also unsuccessful 
+                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_EDNS_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_EDNS_SUPPORT].add(server_client)
-                                pass
-                        elif not response.dnssec_requested():
-                            if qname_obj.zone.signed:
-                                # if it matters (e.g., due to DNSSEC), note an error
-                                if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in errors:
-                                    errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                errors[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
+                                if response.responsive_cause_index is not None:
+                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
+                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
+                                        else:
+                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+                                else:
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+
+                            #TODO handle this better
+                            if error_code is None:
+                                raise Exception('Unknown EDNS-related error')
+
+                        else:
+                            #TODO check for EDNS version mismatch
+
+                            # the response used EDNS, but DO wasn't requested
+                            #TODO (make sure the query initially requested DNSSEC)
+                            if not response.dnssec_requested():
+                                # find out if this really appears to be a DO-bit issue, by seeing
+                                # if any other queries to this server with the DO bit were also unsuccessful 
+                                if qname_obj.zone.server_responsive_with_do(server,client):
+                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
+                                else:
+                                    if response.responsive_cause_index is not None:
+                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
+
+                                #TODO handle this better
+                                if error_code is None:
+                                    raise Exception('Unknown DO-related error')
+
+                        if error_code is not None:
+                            # warn on intermittent errors
+                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
+                                group = warnings
+                            # if the error really matters (e.g., due to DNSSEC), note an error
+                            elif qname_obj is not None and qname_obj.zone.signed:
+                                group = errors
+                            # otherwise, warn
                             else:
-                                #TODO determine if we should warn here - if it's not hurting anybody
-                                #if Status.RESPONSE_ERROR_NO_DO_SUPPORT not in warnings:
-                                #    warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT] = set()
-                                #warnings[Status.RESPONSE_ERROR_NO_DO_SUPPORT].add(server_client)
-                                pass
+                                group = warnings
+
+                            if error_code not in group:
+                                group[error_code] = set()
+                            group[error_code].add((server,client))
+
                         if not response.is_authoritative() and \
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
                                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server_client)
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server,client)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
