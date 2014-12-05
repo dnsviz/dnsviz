@@ -1260,7 +1260,7 @@ class DomainNameAnalysis(object):
                                         else:
                                             error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
                                 else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
 
                             #TODO handle this better
                             if error_code is None:
@@ -1673,7 +1673,7 @@ class DomainNameAnalysis(object):
                                         else:
                                             error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
                                 else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
 
                             #TODO handle this better
                             if error_code is None:
@@ -1717,7 +1717,7 @@ class DomainNameAnalysis(object):
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
                                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server,client)
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
             # no answer
             for qname_sought in query.rrset_noanswer_info:
@@ -1820,7 +1820,7 @@ class DomainNameAnalysis(object):
                                         else:
                                             error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
                                 else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORE
+                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
 
                             #TODO handle this better
                             if error_code is None:
@@ -1864,7 +1864,7 @@ class DomainNameAnalysis(object):
                                 not response.recursion_desired_and_available():
                             if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
                                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add(server,client)
+                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
