@@ -1167,6 +1167,10 @@ class DomainNameAnalysis(object):
                             self.rrsig_status_by_status[rrsig_status.validation_status] = {}
                         self.rrsig_status_by_status[rrsig_status.validation_status][(rrsig_status.rrset, rrsig_status.rrsig)] = set([rrsig_status])
 
+                qname_obj = self.get_name(rrset_info.rrset.name)
+                if rrset_info.rrset.rdtype == dns.rdatatype.DS:
+                    qname_obj = qname_obj.parent
+
                 # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
                 for server,client,response in algs_signing_rrset:
                     errors = self.rrset_errors[rrset_info]
@@ -1176,6 +1180,10 @@ class DomainNameAnalysis(object):
                             if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
                             errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
+                        elif qname_obj.zone.server_responsive_with_do(server,client):
+                            if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
+                                errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                            errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
                     else:
                         # report an error if RRSIGs for one or more algorithms are missing
                         if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
@@ -1190,10 +1198,6 @@ class DomainNameAnalysis(object):
                             if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
                                 errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
                             errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
-
-                qname_obj = self.get_name(rrset_info.rrset.name)
-                if rrset_info.rrset.rdtype == dns.rdatatype.DS:
-                    qname_obj = qname_obj.parent
 
                 for wildcard_name in rrset_info.wildcard_info:
                     zone = qname_obj.zone.name
@@ -1616,8 +1620,8 @@ class DomainNameAnalysis(object):
                     if soa_owner_name is None:
                         soa_owner_name = qname_obj.zone.name
 
-                    for server_client in servers_clients:
-                        for response in servers_clients[server_client]:
+                    for server,client in servers_clients:
+                        for response in servers_clients[(server,client)]:
                             if not (qname_sought == qname or response.recursion_desired_and_available()):
                                 continue
                             nsec_info_list = query.nsec_set_info_by_server[response]
@@ -1632,11 +1636,15 @@ class DomainNameAnalysis(object):
 
                             # report that no NSEC(3) records were returned
                             if status is None:
-                                if qname_obj.zone.signed and response.dnssec_requested() and \
-                                        (qname_sought == qname or response.recursion_desired_and_available()):
-                                    if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
-                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN].add(server_client)
+                                if qname_obj.zone.signed and (qname_sought == qname or response.recursion_desired_and_available()):
+                                    if response.dnssec_requested():
+                                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
+                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN].add((server,client))
+                                    elif qname_obj.zone.server_responsive_with_do(server,client):
+                                        if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.nxdomain_errors[(qname_sought, rdtype)]:
+                                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
 
                             elif status not in statuses:
                                 statuses.append(status)
@@ -1766,8 +1774,8 @@ class DomainNameAnalysis(object):
                     if soa_owner_name is None:
                         soa_owner_name = qname_obj.zone.name
 
-                    for server_client in servers_clients:
-                        for response in servers_clients[server_client]:
+                    for server,client in servers_clients:
+                        for response in servers_clients[(server,client)]:
                             if not (qname_sought == qname or response.recursion_desired_and_available()):
                                 continue
                             nsec_info_list = query.nsec_set_info_by_server[response]
@@ -1781,11 +1789,15 @@ class DomainNameAnalysis(object):
                                     break
 
                             if status is None:
-                                if qname_obj.zone.signed and response.dnssec_requested() and \
-                                        (qname_sought == qname or response.recursion_desired_and_available()):
-                                    if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
-                                        self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
-                                    self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA].add(server_client)
+                                if qname_obj.zone.signed and (qname_sought == qname or response.recursion_desired_and_available()):
+                                    if response.dnssec_requested():
+                                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
+                                            self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
+                                        self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA].add((server,client))
+                                    elif qname_obj.zone.server_responsive_with_do(server,client):
+                                        if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.noanswer_errors[(qname_sought, rdtype)]:
+                                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                                        self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
 
                             elif status not in statuses:
                                 statuses.append(status)
