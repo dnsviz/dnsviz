@@ -451,6 +451,9 @@ class DomainNameAnalysis(object):
             if query.rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                 self._auth_servers_clients.add((server, client))
 
+        if not response.is_complete_response():
+            return
+
         # retrieve the corresponding RRset in the answer section
         rrset = None
         try:
