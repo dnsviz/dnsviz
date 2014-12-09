@@ -445,7 +445,7 @@ class DomainNameAnalysis(object):
 
         is_authoritative = response.is_authoritative()
 
-        if response.message.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN):
+        if response.is_valid_response():
             self._valid_servers_clients.add((server, client))
         if is_authoritative:
             if query.rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
