@@ -931,6 +931,11 @@ class DNSQuery(AggregateDNSResponse):
 
         tcp_responsive = False
         udp_responsive = False
+        tcp_valid = False
+        udp_valid = False
+
+        #TODO - there could be room for both a responsiveness check and a valid
+        # check here, rather than just a valid check
 
         responsive_cause_index = None
 
@@ -943,20 +948,27 @@ class DNSQuery(AggregateDNSResponse):
                 udp_attempted = True
 
             # Mark responsiveness if this retry wasn't caused by network error
-            # or timeout.  Also, if the last cause/action caused responsiveness
-            # where there wasn't previously on the same protocol, then mark the
-            # cause/action.
+            # or timeout. 
             if retry.cause not in (RETRY_CAUSE_NETWORK_ERROR, RETRY_CAUSE_TIMEOUT):
+                if tcp:
+                    tcp_responsive = True
+                else:
+                    udp_responsive = True
+
+            # If the last cause/action resulted in a valid response where there
+            # wasn't previously on the same protocol, then mark the
+            # cause/action.
+            if retry.cause in (RETRY_CAUSE_TC_SET, RETRY_CAUSE_DIAGNOSTIC):
                 if tcp:
                     if responsive_cause_index is None and \
                             not tcp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
                         responsive_cause_index = prev_index
-                    tcp_responsive = True
+                    tcp_valid = True
                 else:
                     if responsive_cause_index is None and \
                             not udp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
                         responsive_cause_index = prev_index
-                    udp_responsive = True
+                    udp_valid = True
 
             if retry.action == RETRY_ACTION_SET_FLAG:
                 flags |= retry.action_arg
@@ -980,20 +992,24 @@ class DNSQuery(AggregateDNSResponse):
             prev_index = i
 
         # Mark responsiveness if the ultimate query didn't result in network
-        # error or timeout.  Also, if the last cause/action caused
-        # responsiveness where there wasn't previously on the same protocol,
-        # then mark the cause/action.
+        # error or timeout.
         if response.error not in (RESPONSE_ERROR_NETWORK_ERROR, RESPONSE_ERROR_TIMEOUT):
             if tcp:
-                if responsive_cause_index is None and \
-                        not tcp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
-                    responsive_cause_index = prev_index
                 tcp_responsive = True
             else:
-                if responsive_cause_index is None and \
-                        not udp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
-                    responsive_cause_index = prev_index
                 udp_responsive = True
+
+        # If the last cause/action resulted in a valid response where there
+        # wasn't previously on the same protocol, then mark the cause/action.
+        if response.is_valid_response():
+            if tcp:
+                if responsive_cause_index is None and \
+                        not tcp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
+                    responsive_cause_index = prev_index
+            else:
+                if responsive_cause_index is None and \
+                        not udp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
+                    responsive_cause_index = prev_index
 
         response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options)
         response.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
