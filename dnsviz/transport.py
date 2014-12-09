@@ -157,7 +157,13 @@ class DNSQueryTransportMeta:
     def check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self.queryid_wire:
             return False
-        if self.require_question_case_match and self.res[12:12+len(self.question_wire)] != self.question_wire:
+        # if a question case match is required :
+        # check that if the question count is greater than 0 and
+        # there is actually a question section (message > 12), then
+        # make sure the case matches
+        if self.require_question_case_match and \
+                self.res[4:6] != '\x00\x00' and len(self.res) > 12 and \
+                self.res[12:12+len(self.question_wire)] != self.question_wire:
             return False
         return True
 
