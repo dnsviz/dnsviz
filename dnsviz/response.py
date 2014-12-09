@@ -76,6 +76,7 @@ class DNSResponse:
         self.effective_edns_max_udp_payload = None
         self.effective_edns_flags = None
         self.effective_edns_options = None
+        self.effective_tcp = None
 
         self.udp_attempted = None
         self.udp_responsive = None
@@ -94,15 +95,16 @@ class DNSResponse:
 
     def copy(self):
         clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time)
-        clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options)
+        clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp)
         return clone
 
-    def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options):
+    def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options, effective_tcp):
         self.effective_flags = flags
         self.effective_edns = edns
         self.effective_edns_max_udp_payload = edns_max_udp_payload
         self.effective_edns_flags = edns_flags
         self.effective_edns_options = edns_options
+        self.effective_tcp = effective_tcp
 
     def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index):
         self.udp_attempted = udp_attempted

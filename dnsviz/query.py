@@ -1011,7 +1011,7 @@ class DNSQuery(AggregateDNSResponse):
                         not udp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
                     responsive_cause_index = prev_index
 
-        response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options)
+        response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
         response.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
 
         self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
