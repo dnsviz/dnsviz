@@ -941,7 +941,7 @@ class DomainNameAnalysis(object):
         if level <= self.RDTYPES_SECURE_DELEGATION:
             self._index_dnskeys()
         self._populate_rrsig_status_all(supported_algs, level)
-        self._populate_nsec_status(level)
+        self._populate_nsec_status(supported_algs, level)
         self._finalize_key_roles()
         self._populate_invalid_response_errors(level)
         if level <= self.RDTYPES_SECURE_DELEGATION:
@@ -1281,13 +1281,17 @@ class DomainNameAnalysis(object):
                             self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
                         self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
 
-                    # add status to list, if an equivalent one not already added
-                    elif status not in statuses:
-                        statuses.append(status)
-                        validation_status = status.validation_status
-                        if validation_status not in self.wildcard_status_by_status:
-                            self.wildcard_status_by_status[validation_status] = set()
-                        self.wildcard_status_by_status[validation_status].add(status)
+                    else:
+                        for nsec_rrset_info in status.nsec_set_info.rrsets.values():
+                            self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+
+                        # add status to list, if an equivalent one not already added
+                        if status not in statuses:
+                            statuses.append(status)
+                            validation_status = status.validation_status
+                            if validation_status not in self.wildcard_status_by_status:
+                                self.wildcard_status_by_status[validation_status] = set()
+                            self.wildcard_status_by_status[validation_status].add(status)
 
             if statuses:
                 if rrset_info.rrset.name not in self.wildcard_status:
@@ -1332,8 +1336,6 @@ class DomainNameAnalysis(object):
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
                     items_to_validate.append(cname_rrset_info.dname_info)
                     items_to_validate.append(cname_rrset_info)
-            for nsec_set_info in query.nsec_set_info:
-                items_to_validate += nsec_set_info.rrsets.values()
 
             for rrset_info in items_to_validate:
                 qname_obj = self.get_name(rrset_info.rrset.name)
@@ -1599,7 +1601,7 @@ class DomainNameAnalysis(object):
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
-    def _populate_nsec_status(self, level):
+    def _populate_nsec_status(self, supported_algs, level):
         self.nxdomain_status = {}
         self.nxdomain_servers_clients = {}
         self.nxdomain_warnings = {}
@@ -1687,13 +1689,16 @@ class DomainNameAnalysis(object):
                                         if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.nxdomain_errors[(qname_sought, rdtype)]:
                                             self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
                                         self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+                            else:
+                                for rrset_info in status.nsec_set_info.rrsets.values():
+                                    self._populate_rrsig_status(qname_sought, rdtype, query, rrset_info, qname_obj, supported_algs)
 
-                            elif status not in statuses:
-                                statuses.append(status)
-                                validation_status = status.validation_status
-                                if validation_status not in self.nxdomain_status_by_status:
-                                    self.nxdomain_status_by_status[validation_status] = set()
-                                self.nxdomain_status_by_status[validation_status].add(status)
+                                if status not in statuses:
+                                    statuses.append(status)
+                                    validation_status = status.validation_status
+                                    if validation_status not in self.nxdomain_status_by_status:
+                                        self.nxdomain_status_by_status[validation_status] = set()
+                                    self.nxdomain_status_by_status[validation_status].add(status)
 
                 if statuses:
                     self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
@@ -1777,13 +1782,16 @@ class DomainNameAnalysis(object):
                                         if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.noanswer_errors[(qname_sought, rdtype)]:
                                             self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
                                         self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+                            else:
+                                for rrset_info in status.nsec_set_info.rrsets.values():
+                                    self._populate_rrsig_status(qname_sought, rdtype, query, rrset_info, qname_obj, supported_algs)
 
-                            elif status not in statuses:
-                                statuses.append(status)
-                                validation_status = status.validation_status
-                                if validation_status not in self.noanswer_status_by_status:
-                                    self.noanswer_status_by_status[validation_status] = set()
-                                self.noanswer_status_by_status[validation_status].add((qname_sought, query.rdtype))
+                                if status not in statuses:
+                                    statuses.append(status)
+                                    validation_status = status.validation_status
+                                    if validation_status not in self.noanswer_status_by_status:
+                                        self.noanswer_status_by_status[validation_status] = set()
+                                    self.noanswer_status_by_status[validation_status].add((qname_sought, query.rdtype))
 
                 if statuses:
                     if (qname_sought, rdtype) not in self.noanswer_status:
