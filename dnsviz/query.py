@@ -961,12 +961,12 @@ class DNSQuery(AggregateDNSResponse):
             if retry.cause in (RETRY_CAUSE_TC_SET, RETRY_CAUSE_DIAGNOSTIC):
                 if tcp:
                     if responsive_cause_index is None and \
-                            not tcp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
+                            not tcp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
                         responsive_cause_index = prev_index
                     tcp_valid = True
                 else:
                     if responsive_cause_index is None and \
-                            not udp_responsive and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
+                            not udp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
                         responsive_cause_index = prev_index
                     udp_valid = True
 
