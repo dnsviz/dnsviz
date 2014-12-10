@@ -940,8 +940,10 @@ class DomainNameAnalysis(object):
         self._populate_name_status(level)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             self._index_dnskeys()
-        self._populate_rrsig_status(supported_algs, level)
+        self._populate_rrsig_status_all(supported_algs, level)
         self._populate_nsec_status(level)
+        self._finalize_key_roles()
+        self._populate_invalid_response_errors(level)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             if not is_dlv:
                 self._populate_delegation_status(supported_algs, supported_digest_algs)
@@ -1032,7 +1034,272 @@ class DomainNameAnalysis(object):
             if self.name in query.nxdomain_info and self.status == Status.NAME_STATUS_INDETERMINATE:
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
-    def _populate_rrsig_status(self, supported_algs, level):
+    def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
+        error_code = None
+        #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
+        #TODO mark a slow response as well (over a certain threshold)
+        #TODO make the below functionality into a function for re-use
+
+        # if the response didn't use EDNS
+        #TODO (make sure the query initially used EDNS)
+        if response.message.edns < 0:
+            # find out if this really appears to be an EDNS issue, by seeing
+            # if any other queries to this server with EDNS were also unsuccessful 
+            if qname_obj.zone.server_responsive_with_edns(server,client):
+                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
+            else:
+                if response.responsive_cause_index is not None:
+                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
+                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
+                        else:
+                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+                else:
+                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
+
+            #TODO handle this better
+            if error_code is None:
+                raise Exception('Unknown EDNS-related error')
+
+        else:
+            #TODO check for EDNS version mismatch
+
+            # the response used EDNS, but DO wasn't requested
+            #TODO (make sure the query initially requested DNSSEC)
+            if not response.dnssec_requested():
+                # find out if this really appears to be a DO-bit issue, by seeing
+                # if any other queries to this server with the DO bit were also unsuccessful 
+                if qname_obj.zone.server_responsive_with_do(server,client):
+                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
+                else:
+                    if response.responsive_cause_index is not None:
+                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
+
+                #TODO handle this better
+                if error_code is None:
+                    raise Exception('Unknown DO-related error')
+
+        if error_code is not None:
+            # warn on intermittent errors
+            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
+                group = warnings
+            # if the error really matters (e.g., due to DNSSEC), note an error
+            elif qname_obj is not None and qname_obj.zone.signed:
+                group = errors
+            # otherwise, warn
+            else:
+                group = warnings
+
+            if error_code not in group:
+                group[error_code] = set()
+            group[error_code].add((server,client))
+
+        if not response.is_authoritative() and \
+                not response.recursion_desired_and_available():
+            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
+                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
+            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
+
+    def _populate_rrsig_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
+        self.rrset_warnings[rrset_info] = {}
+        self.rrset_errors[rrset_info] = {}
+        self.rrsig_status[rrset_info] = {}
+
+        qname_obj = self.get_name(qname)
+        if rdtype == dns.rdatatype.DS:
+            qname_obj = qname_obj.parent
+
+        if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
+            dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
+            dnssec_algorithms_in_ds = set()
+            dnssec_algorithms_in_dlv = set()
+        elif rdtype == dns.rdatatype.DS:
+            dnssec_algorithms_in_dnskey = self.parent.dnssec_algorithms_in_dnskey
+            dnssec_algorithms_in_ds = self.parent.dnssec_algorithms_in_ds
+            dnssec_algorithms_in_dlv = self.parent.dnssec_algorithms_in_dlv
+        else:
+            dnssec_algorithms_in_dnskey = self.zone.dnssec_algorithms_in_dnskey
+            dnssec_algorithms_in_ds = self.zone.dnssec_algorithms_in_ds
+            dnssec_algorithms_in_dlv = self.zone.dnssec_algorithms_in_dlv
+
+        # handle DNAMEs
+        has_dname = set()
+        if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+            if rrset_info.dname_info is not None:
+                dname_info_list = [rrset_info.dname_info]
+                dname_status = Status.CNAMEFromDNAMEStatus(rrset_info, None)
+            elif rrset_info.cname_info_from_dname:
+                dname_info_list = [c.dname_info for c in rrset_info.cname_info_from_dname]
+                dname_status = Status.CNAMEFromDNAMEStatus(rrset_info.cname_info_from_dname[0], rrset_info)
+            else:
+                dname_info_list = []
+                dname_status = None
+
+            if dname_info_list:
+                for dname_info in dname_info_list:
+                    for server, client in dname_info.servers_clients:
+                        has_dname.update([(server,client,response) for response in dname_info.servers_clients[(server,client)]])
+
+                if rrset_info.rrset.name not in self.dname_status:
+                    self.dname_status[rrset_info] = []
+                self.dname_status[rrset_info].append(dname_status)
+
+        algs_signing_rrset = {}
+        if dnssec_algorithms_in_dnskey or dnssec_algorithms_in_ds or dnssec_algorithms_in_dlv:
+            for server, client in rrset_info.servers_clients:
+                for response in rrset_info.servers_clients[(server, client)]:
+                    if (server, client, response) not in has_dname:
+                        algs_signing_rrset[(server, client, response)] = set()
+
+        for rrsig in rrset_info.rrsig_info:
+            self.rrsig_status[rrset_info][rrsig] = {}
+
+            signer = self.get_name(rrsig.signer)
+
+            #XXX
+            if signer is not None:
+
+                if signer.stub:
+                    continue
+
+                for server, client in rrset_info.rrsig_info[rrsig].servers_clients:
+                    for response in rrset_info.rrsig_info[rrsig].servers_clients[(server,client)]:
+                        if (server,client,response) not in algs_signing_rrset:
+                            continue
+                        algs_signing_rrset[(server,client,response)].add(rrsig.algorithm)
+                        if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]) and \
+                                not dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]) and \
+                                not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
+                            del algs_signing_rrset[(server,client,response)]
+
+                # define self-signature
+                self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
+
+                checked_keys = set()
+                for dnskey_set, dnskey_meta in signer.get_dnskey_sets():
+                    validation_status_mapping = { True: set(), False: set(), None: set() }
+                    for dnskey in dnskey_set:
+                        # if we've already checked this key (i.e., in
+                        # another DNSKEY RRset) then continue
+                        if dnskey in checked_keys:
+                            continue
+                        # if this is a RRSIG over DNSKEY RRset, then make sure we're validating
+                        # with a DNSKEY that is actually in the set
+                        if self_sig and dnskey.rdata not in rrset_info.rrset:
+                            continue
+                        checked_keys.add(dnskey)
+                        if not (dnskey.rdata.protocol == 3 and \
+                                rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
+                                rrsig.algorithm == dnskey.rdata.algorithm):
+                            continue
+                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                        validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
+
+                    # if we got results for multiple keys, then just select the one that validates
+                    for status in True, False, None:
+                        if validation_status_mapping[status]:
+                            for rrsig_status in validation_status_mapping[status]:
+                                self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][rrsig_status.dnskey] = rrsig_status
+
+                                if self.is_zone() and rrset_info.rrset.name == self.name and \
+                                        rrset_info.rrset.rdtype != dns.rdatatype.DS and \
+                                        rrsig_status.dnskey is not None:
+                                    if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
+                                        self.ksks.add(rrsig_status.dnskey)
+                                    else:
+                                        self.zsks.add(rrsig_status.dnskey)
+
+                                key = rrsig_status.rrset, rrsig_status.rrsig
+                                if rrsig_status.validation_status not in self.rrsig_status_by_status:
+                                    self.rrsig_status_by_status[rrsig_status.validation_status] = {}
+                                if key not in self.rrsig_status_by_status[rrsig_status.validation_status]:
+                                    self.rrsig_status_by_status[rrsig_status.validation_status][key] = set()
+                                self.rrsig_status_by_status[rrsig_status.validation_status][key].add(rrsig_status)
+                            break
+
+            # no corresponding DNSKEY
+            if not self.rrsig_status[rrset_info][rrsig]:
+                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
+                if rrsig_status.validation_status not in self.rrsig_status_by_status:
+                    self.rrsig_status_by_status[rrsig_status.validation_status] = {}
+                self.rrsig_status_by_status[rrsig_status.validation_status][(rrsig_status.rrset, rrsig_status.rrsig)] = set([rrsig_status])
+
+        # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
+        for server,client,response in algs_signing_rrset:
+            errors = self.rrset_errors[rrset_info]
+            # report an error if all RRSIGs are missing
+            if not algs_signing_rrset[(server,client,response)]:
+                if response.dnssec_requested():
+                    if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
+                        errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
+                    errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
+                elif qname_obj.zone.server_responsive_with_do(server,client):
+                    if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
+                        errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                    errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+            else:
+                # report an error if RRSIGs for one or more algorithms are missing
+                if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
+                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY not in errors:
+                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY] = set()
+                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY].add((server,client))
+                if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
+                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS not in errors:
+                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS] = set()
+                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add((server,client))
+                if dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
+                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
+                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
+                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
+
+        for wildcard_name in rrset_info.wildcard_info:
+            zone = qname_obj.zone.name
+
+            statuses = []
+            for server, client in rrset_info.wildcard_info[wildcard_name]:
+                for response in rrset_info.wildcard_info[wildcard_name][(server,client)]:
+                    nsec_info_list = query.nsec_set_info_by_server[response]
+                    status = None
+                    for nsec_set_info in nsec_info_list:
+                        if nsec_set_info.use_nsec3:
+                            status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
+                        else:
+                            status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
+                        if status.validation_status == Status.STATUS_VALID:
+                            break
+
+                    # report that no NSEC(3) records were returned
+                    if status is None:
+                        # by definition, DNSSEC was requested (otherwise we
+                        # wouldn't know this was a wildcard), so no need to
+                        # check for DO bit in request
+                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
+                            self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
+                        self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
+
+                    # add status to list, if an equivalent one not already added
+                    elif status not in statuses:
+                        statuses.append(status)
+                        validation_status = status.validation_status
+                        if validation_status not in self.wildcard_status_by_status:
+                            self.wildcard_status_by_status[validation_status] = set()
+                        self.wildcard_status_by_status[validation_status].add(status)
+
+            if statuses:
+                if rrset_info.rrset.name not in self.wildcard_status:
+                    self.wildcard_status[rrset_info.rrset.name] = {}
+                if wildcard_name not in self.wildcard_status[rrset_info.rrset.name]:
+                    self.wildcard_status[rrset_info.rrset.name][wildcard_name] = set(statuses)
+
+        for server,client in rrset_info.servers_clients:
+            for response in rrset_info.servers_clients[(server,client)]:
+                self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+
+    def _populate_rrsig_status_all(self, supported_algs, level):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -1069,268 +1336,26 @@ class DomainNameAnalysis(object):
                 items_to_validate += nsec_set_info.rrsets.values()
 
             for rrset_info in items_to_validate:
-                self.rrset_warnings[rrset_info] = {}
-                self.rrset_errors[rrset_info] = {}
-                self.rrsig_status[rrset_info] = {}
-
-                if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
-                    dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
-                    dnssec_algorithms_in_ds = set()
-                    dnssec_algorithms_in_dlv = set()
-                elif rdtype == dns.rdatatype.DS:
-                    dnssec_algorithms_in_dnskey = self.parent.dnssec_algorithms_in_dnskey
-                    dnssec_algorithms_in_ds = self.parent.dnssec_algorithms_in_ds
-                    dnssec_algorithms_in_dlv = self.parent.dnssec_algorithms_in_dlv
-                else:
-                    dnssec_algorithms_in_dnskey = self.zone.dnssec_algorithms_in_dnskey
-                    dnssec_algorithms_in_ds = self.zone.dnssec_algorithms_in_ds
-                    dnssec_algorithms_in_dlv = self.zone.dnssec_algorithms_in_dlv
-
-                # handle DNAMEs
-                has_dname = set()
-                if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
-                    if rrset_info.dname_info is not None:
-                        dname_info_list = [rrset_info.dname_info]
-                        dname_status = Status.CNAMEFromDNAMEStatus(rrset_info, None)
-                    elif rrset_info.cname_info_from_dname:
-                        dname_info_list = [c.dname_info for c in rrset_info.cname_info_from_dname]
-                        dname_status = Status.CNAMEFromDNAMEStatus(rrset_info.cname_info_from_dname[0], rrset_info)
-                    else:
-                        dname_info_list = []
-                        dname_status = None
-
-                    if dname_info_list:
-                        for dname_info in dname_info_list:
-                            for server, client in dname_info.servers_clients:
-                                has_dname.update([(server,client,response) for response in dname_info.servers_clients[(server,client)]])
-
-                        if rrset_info.rrset.name not in self.dname_status:
-                            self.dname_status[rrset_info] = []
-                        self.dname_status[rrset_info].append(dname_status)
-
-                algs_signing_rrset = {}
-                if dnssec_algorithms_in_dnskey or dnssec_algorithms_in_ds or dnssec_algorithms_in_dlv:
-                    for server, client in rrset_info.servers_clients:
-                        for response in rrset_info.servers_clients[(server, client)]:
-                            if (server, client, response) not in has_dname:
-                                algs_signing_rrset[(server, client, response)] = set()
-
-                for rrsig in rrset_info.rrsig_info:
-                    self.rrsig_status[rrset_info][rrsig] = {}
-
-                    signer = self.get_name(rrsig.signer)
-
-                    #XXX
-                    if signer is not None:
-
-                        if signer.stub:
-                            continue
-
-                        for server, client in rrset_info.rrsig_info[rrsig].servers_clients:
-                            for response in rrset_info.rrsig_info[rrsig].servers_clients[(server,client)]:
-                                if (server,client,response) not in algs_signing_rrset:
-                                    continue
-                                algs_signing_rrset[(server,client,response)].add(rrsig.algorithm)
-                                if not dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]) and \
-                                        not dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]) and \
-                                        not dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
-                                    del algs_signing_rrset[(server,client,response)]
-
-                        # define self-signature
-                        self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
-
-                        checked_keys = set()
-                        for dnskey_set, dnskey_meta in signer.get_dnskey_sets():
-                            validation_status_mapping = { True: set(), False: set(), None: set() }
-                            for dnskey in dnskey_set:
-                                # if we've already checked this key (i.e., in
-                                # another DNSKEY RRset) then continue
-                                if dnskey in checked_keys:
-                                    continue
-                                # if this is a RRSIG over DNSKEY RRset, then make sure we're validating
-                                # with a DNSKEY that is actually in the set
-                                if self_sig and dnskey.rdata not in rrset_info.rrset:
-                                    continue
-                                checked_keys.add(dnskey)
-                                if not (dnskey.rdata.protocol == 3 and \
-                                        rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
-                                        rrsig.algorithm == dnskey.rdata.algorithm):
-                                    continue
-                                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
-                                validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
-
-                            # if we got results for multiple keys, then just select the one that validates
-                            for status in True, False, None:
-                                if validation_status_mapping[status]:
-                                    for rrsig_status in validation_status_mapping[status]:
-                                        self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][rrsig_status.dnskey] = rrsig_status
-
-                                        if self.is_zone() and rrset_info.rrset.name == self.name and \
-                                                rrset_info.rrset.rdtype != dns.rdatatype.DS and \
-                                                rrsig_status.dnskey is not None:
-                                            if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
-                                                self.ksks.add(rrsig_status.dnskey)
-                                            else:
-                                                self.zsks.add(rrsig_status.dnskey)
-
-                                        key = rrsig_status.rrset, rrsig_status.rrsig
-                                        if rrsig_status.validation_status not in self.rrsig_status_by_status:
-                                            self.rrsig_status_by_status[rrsig_status.validation_status] = {}
-                                        if key not in self.rrsig_status_by_status[rrsig_status.validation_status]:
-                                            self.rrsig_status_by_status[rrsig_status.validation_status][key] = set()
-                                        self.rrsig_status_by_status[rrsig_status.validation_status][key].add(rrsig_status)
-                                    break
-
-                    # no corresponding DNSKEY
-                    if not self.rrsig_status[rrset_info][rrsig]:
-                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
-                        self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
-                        if rrsig_status.validation_status not in self.rrsig_status_by_status:
-                            self.rrsig_status_by_status[rrsig_status.validation_status] = {}
-                        self.rrsig_status_by_status[rrsig_status.validation_status][(rrsig_status.rrset, rrsig_status.rrsig)] = set([rrsig_status])
-
                 qname_obj = self.get_name(rrset_info.rrset.name)
                 if rrset_info.rrset.rdtype == dns.rdatatype.DS:
                     qname_obj = qname_obj.parent
 
-                # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
-                for server,client,response in algs_signing_rrset:
-                    errors = self.rrset_errors[rrset_info]
-                    # report an error if all RRSIGs are missing
-                    if not algs_signing_rrset[(server,client,response)]:
-                        if response.dnssec_requested():
-                            if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
-                                errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
-                        elif qname_obj.zone.server_responsive_with_do(server,client):
-                            if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
-                                errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                            errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
-                    else:
-                        # report an error if RRSIGs for one or more algorithms are missing
-                        if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
-                            if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY not in errors:
-                                errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY].add((server,client))
-                        if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
-                            if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS not in errors:
-                                errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add((server,client))
-                        if dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
-                            if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
-                                errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
-                            errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
+                self._populate_rrsig_status(rrset_info.rrset.name, rdtype, query, rrset_info, qname_obj, supported_algs)
 
-                for wildcard_name in rrset_info.wildcard_info:
-                    zone = qname_obj.zone.name
+    def _finalize_key_roles(self):
+        if self.is_zone():
+            self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
+            self.revoked_keys = set(filter(lambda x: x.rdata.flags & fmt.DNSKEY_FLAGS['revoke'], self.get_dnskeys()))
 
-                    statuses = []
-                    for server, client in rrset_info.wildcard_info[wildcard_name]:
-                        for response in rrset_info.wildcard_info[wildcard_name][(server,client)]:
-                            nsec_info_list = query.nsec_set_info_by_server[response]
-                            status = None
-                            for nsec_set_info in nsec_info_list:
-                                if nsec_set_info.use_nsec3:
-                                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
-                                else:
-                                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
-                                if status.validation_status == Status.STATUS_VALID:
-                                    break
+    def _populate_invalid_response_errors(self, level):
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
+        for (qname, rdtype), query in self.queries.items():
 
-                            # report that no NSEC(3) records were returned
-                            if status is None:
-                                # by definition, DNSSEC was requested (otherwise we
-                                # wouldn't know this was a wildcard), so no need to
-                                # check for DO bit in request
-                                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
-                                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
-                                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
 
-                            # add status to list, if an equivalent one not already added
-                            elif status not in statuses:
-                                statuses.append(status)
-                                validation_status = status.validation_status
-                                if validation_status not in self.wildcard_status_by_status:
-                                    self.wildcard_status_by_status[validation_status] = set()
-                                self.wildcard_status_by_status[validation_status].add(status)
-
-                    if statuses:
-                        if rrset_info.rrset.name not in self.wildcard_status:
-                            self.wildcard_status[rrset_info.rrset.name] = {}
-                        if wildcard_name not in self.wildcard_status[rrset_info.rrset.name]:
-                            self.wildcard_status[rrset_info.rrset.name][wildcard_name] = set(statuses)
-
-                for server,client in rrset_info.servers_clients:
-                    for response in rrset_info.servers_clients[(server,client)]:
-                        errors = self.rrset_errors[rrset_info]
-                        warnings = self.rrset_warnings[rrset_info]
-                        error_code = None
-                        #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
-                        #TODO mark a slow response as well (over a certain threshold)
-                        #TODO make the below functionality into a function for re-use
-
-                        # if the response didn't use EDNS
-                        #TODO (make sure the query initially used EDNS)
-                        if response.message.edns < 0:
-                            # find out if this really appears to be an EDNS issue, by seeing
-                            # if any other queries to this server with EDNS were also unsuccessful 
-                            if qname_obj.zone.server_responsive_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                            else:
-                                if response.responsive_cause_index is not None:
-                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
-                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
-                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
-                                        else:
-                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
-                                else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
-
-                            #TODO handle this better
-                            if error_code is None:
-                                raise Exception('Unknown EDNS-related error')
-
-                        else:
-                            #TODO check for EDNS version mismatch
-
-                            # the response used EDNS, but DO wasn't requested
-                            #TODO (make sure the query initially requested DNSSEC)
-                            if not response.dnssec_requested():
-                                # find out if this really appears to be a DO-bit issue, by seeing
-                                # if any other queries to this server with the DO bit were also unsuccessful 
-                                if qname_obj.zone.server_responsive_with_do(server,client):
-                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                                else:
-                                    if response.responsive_cause_index is not None:
-                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
-
-                                #TODO handle this better
-                                if error_code is None:
-                                    raise Exception('Unknown DO-related error')
-
-                        if error_code is not None:
-                            # warn on intermittent errors
-                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
-                                group = warnings
-                            # if the error really matters (e.g., due to DNSSEC), note an error
-                            elif qname_obj is not None and qname_obj.zone.signed:
-                                group = errors
-                            # otherwise, warn
-                            else:
-                                group = warnings
-
-                            if error_code not in group:
-                                group[error_code] = set()
-                            group[error_code].add((server,client))
-
-                        if not response.is_authoritative() and \
-                                not response.recursion_desired_and_available():
-                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
 
             self.response_errors_rcode[(qname, rdtype)] = {}
             for rcode in query.error_rcode:
@@ -1338,10 +1363,6 @@ class DomainNameAnalysis(object):
             self.response_errors[(qname, rdtype)] = {}
             for (error, errno1) in query.error:
                 self.response_errors[(qname, rdtype)][(error, errno1)] = query.error[(error, errno1)]
-
-        if self.is_zone():
-            self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
-            self.revoked_keys = set(filter(lambda x: x.rdata.flags & fmt.DNSKEY_FLAGS['revoke'], self.get_dnskeys()))
 
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
@@ -1590,7 +1611,6 @@ class DomainNameAnalysis(object):
         self.noanswer_errors = {}
         self.noanswer_status_by_status = {}
 
-
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
@@ -1681,79 +1701,16 @@ class DomainNameAnalysis(object):
                 if qname_sought in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                     self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
 
-                errors = self.nxdomain_errors[(qname_sought, rdtype)]
-                warnings = self.nxdomain_warnings[(qname_sought, rdtype)]
                 for server,client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
                     for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server,client]:
-                        error_code = None
-                        # if the response didn't use EDNS
-                        #TODO (make sure the query initially used EDNS)
-                        if response.message.edns < 0:
-                            # find out if this really appears to be an EDNS issue, by seeing
-                            # if any other queries to this server with EDNS were also unsuccessful 
-                            if qname_obj.zone.server_responsive_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                            else:
-                                if response.responsive_cause_index is not None:
-                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
-                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
-                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
-                                        else:
-                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
-                                else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
-
-                            #TODO handle this better
-                            if error_code is None:
-                                raise Exception('Unknown EDNS-related error')
-
-                        else:
-                            #TODO check for EDNS version mismatch
-
-                            # the response used EDNS, but DO wasn't requested
-                            #TODO (make sure the query initially requested DNSSEC)
-                            if not response.dnssec_requested():
-                                # find out if this really appears to be a DO-bit issue, by seeing
-                                # if any other queries to this server with the DO bit were also unsuccessful 
-                                if qname_obj.zone.server_responsive_with_do(server,client):
-                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                                else:
-                                    if response.responsive_cause_index is not None:
-                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
-
-                                #TODO handle this better
-                                if error_code is None:
-                                    raise Exception('Unknown DO-related error')
-
-                        if error_code is not None:
-                            # warn on intermittent errors
-                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
-                                group = warnings
-                            # if the error really matters (e.g., due to DNSSEC), note an error
-                            elif qname_obj is not None and qname_obj.zone.signed:
-                                group = errors
-                            # otherwise, warn
-                            else:
-                                group = warnings
-
-                            if error_code not in group:
-                                group[error_code] = set()
-                            group[error_code].add((server,client))
-
-                        if not response.is_authoritative() and \
-                                not response.recursion_desired_and_available():
-                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
+                        self._populate_response_errors(qname_obj, response, server, client,  self.nxdomain_warnings[(qname_sought, rdtype)], self.nxdomain_errors[(qname_sought, rdtype)])
 
             # no answer
             for qname_sought in query.rrset_noanswer_info:
                 qname_obj = self.get_name(qname_sought)
                 if rdtype == dns.rdatatype.DS:
                     qname_obj = qname_obj.parent
+
                 statuses = []
                 self.noanswer_warnings[(qname_sought, rdtype)] = {}
                 self.noanswer_errors[(qname_sought, rdtype)] = {}
@@ -1832,73 +1789,9 @@ class DomainNameAnalysis(object):
                     if (qname_sought, rdtype) not in self.noanswer_status:
                         self.noanswer_status[(qname_sought, rdtype)] = set(statuses)
 
-                errors = self.noanswer_errors[(qname_sought,rdtype)]
-                warnings = self.noanswer_warnings[(qname_sought,rdtype)]
                 for server,client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
                     for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server,client]:
-                        error_code = None
-                        # if the response didn't use EDNS
-                        #TODO (make sure the query initially used EDNS)
-                        if response.message.edns < 0:
-                            # find out if this really appears to be an EDNS issue, by seeing
-                            # if any other queries to this server with EDNS were also unsuccessful 
-                            if qname_obj.zone.server_responsive_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                            else:
-                                if response.responsive_cause_index is not None:
-                                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
-                                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
-                                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
-                                        else:
-                                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
-                                else:
-                                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
-
-                            #TODO handle this better
-                            if error_code is None:
-                                raise Exception('Unknown EDNS-related error')
-
-                        else:
-                            #TODO check for EDNS version mismatch
-
-                            # the response used EDNS, but DO wasn't requested
-                            #TODO (make sure the query initially requested DNSSEC)
-                            if not response.dnssec_requested():
-                                # find out if this really appears to be a DO-bit issue, by seeing
-                                # if any other queries to this server with the DO bit were also unsuccessful 
-                                if qname_obj.zone.server_responsive_with_do(server,client):
-                                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                                else:
-                                    if response.responsive_cause_index is not None:
-                                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
-
-                                #TODO handle this better
-                                if error_code is None:
-                                    raise Exception('Unknown DO-related error')
-
-                        if error_code is not None:
-                            # warn on intermittent errors
-                            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
-                                group = warnings
-                            # if the error really matters (e.g., due to DNSSEC), note an error
-                            elif qname_obj is not None and qname_obj.zone.signed:
-                                group = errors
-                            # otherwise, warn
-                            else:
-                                group = warnings
-
-                            if error_code not in group:
-                                group[error_code] = set()
-                            group[error_code].add((server,client))
-
-                        if not response.is_authoritative() and \
-                                not response.recursion_desired_and_available():
-                            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-                            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
+                        self._populate_response_errors(qname_obj, response, server, client,  self.noanswer_warnings[(qname_sought, rdtype)], self.noanswer_errors[(qname_sought, rdtype)])
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
