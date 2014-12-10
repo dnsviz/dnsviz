@@ -1093,6 +1093,13 @@ class DomainNameAnalysis(object):
                         warnings[Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION] = set()
                     warnings[Status.RESPONSE_UNSUPPORTED_EDNS_VERSION].add((server,client))
 
+                # check for PMTU issues
+                #TODO need bounding here
+                if response.effective_edns_max_udp_payload != response.query.edns_max_udp_payload and response.msg_size > 512:
+                    if Status.RESPONSE_ERROR_PMTU_EXCEEDED not in warnings:
+                        warnings[Status.RESPONSE_ERROR_PMTU_EXCEEDED] = set()
+                    warnings[Status.RESPONSE_PMTU_EXCEEDED].add((server,client))
+
                 if response.query.edns_flags != response.effective_edns_flags:
                     for i in range(15, -1, -1):
                         f = 1 << i
