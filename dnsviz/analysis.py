@@ -1195,7 +1195,7 @@ class DomainNameAnalysis(object):
                                 rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
                                 rrsig.algorithm == dnskey.rdata.algorithm):
                             continue
-                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, qname_obj.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
                         validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
 
                     # if we got results for multiple keys, then just select the one that validates
@@ -1339,7 +1339,7 @@ class DomainNameAnalysis(object):
 
             for rrset_info in items_to_validate:
                 qname_obj = self.get_name(rrset_info.rrset.name)
-                if rrset_info.rrset.rdtype == dns.rdatatype.DS:
+                if rdtype == dns.rdatatype.DS:
                     qname_obj = qname_obj.parent
 
                 self._populate_rrsig_status(rrset_info.rrset.name, rdtype, query, rrset_info, qname_obj, supported_algs)

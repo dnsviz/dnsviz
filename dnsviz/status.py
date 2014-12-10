@@ -312,9 +312,7 @@ class RRSIGStatus(object):
 
         min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
             
-        #XXX get parent right for DS and related NSEC(3)
-        #if self.rrsig.signer != zone_name:
-        if not self.rrset.rrset.name.is_subdomain(self.rrsig.signer):
+        if self.rrsig.signer != zone_name:
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_INVALID
             self.errors.append(RRSIG_ERROR_SIGNER_NOT_ZONE)
