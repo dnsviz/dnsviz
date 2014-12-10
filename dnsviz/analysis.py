@@ -1035,67 +1035,123 @@ class DomainNameAnalysis(object):
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
-        error_code = None
-        #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
-        #TODO mark a slow response as well (over a certain threshold)
-        #TODO make the below functionality into a function for re-use
+        # if the initial request used EDNS
+        if response.query.edns >= 0:
+            error_code = None
+            #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
+            #TODO mark a slow response as well (over a certain threshold)
 
-        # if the response didn't use EDNS
-        #TODO (make sure the query initially used EDNS)
-        if response.message.edns < 0:
-            # find out if this really appears to be an EDNS issue, by seeing
-            # if any other queries to this server with EDNS were also unsuccessful 
-            if qname_obj.zone.server_responsive_with_edns(server,client):
-                error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-            else:
-                if response.responsive_cause_index is not None:
-                    if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
-                    elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                        if response.history[response.responsive_cause_index].cause_arg == dns.rcode.BADVERS:
-                            error_code = Status.RESPONSE_ERROR_BAD_EDNS_VERSION
-                        else:
-                            error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+            # if the response didn't use EDNS
+            if response.message.edns < 0:
+                # if the effective request didn't use EDNS either
+                if response.effective_edns < 0:
+                    # find out if this really appears to be an EDNS issue, by
+                    # seeing if any other queries to this server with EDNS were
+                    # actually successful 
+                    if response.responsive_cause_index is not None:
+                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
+                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
+                            else:
+                                error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS
+                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
+                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
+                            else:
+                                error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS
+                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
+                            else:
+                                error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
+                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
+                            else:
+                                error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS
+                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
+                            else:
+                                error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+
+                # if the ultimate request used EDNS, then it was simply ignored
+                # by the server
                 else:
                     error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
 
-            #TODO handle this better
-            if error_code is None:
-                raise Exception('Unknown EDNS-related error')
-
-        else:
-            #TODO check for EDNS version mismatch
-
-            # the response used EDNS, but DO wasn't requested
-            #TODO (make sure the query initially requested DNSSEC)
-            if not response.dnssec_requested():
-                # find out if this really appears to be a DO-bit issue, by seeing
-                # if any other queries to this server with the DO bit were also unsuccessful 
-                if qname_obj.zone.server_responsive_with_do(server,client):
-                    error_code = Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE
-                else:
-                    if response.responsive_cause_index is not None:
-                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                            error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_DO_FLAG
-
                 #TODO handle this better
                 if error_code is None:
-                    raise Exception('Unknown DO-related error')
+                    raise Exception('Unknown EDNS-related error')
 
-        if error_code is not None:
-            # warn on intermittent errors
-            if error_code == Status.RESPONSE_ERROR_INTERMITTENT_RESPONSE:
-                group = warnings
-            # if the error really matters (e.g., due to DNSSEC), note an error
-            elif qname_obj is not None and qname_obj.zone.signed:
-                group = errors
-            # otherwise, warn
+            # the response did use EDNS
             else:
-                group = warnings
 
-            if error_code not in group:
-                group[error_code] = set()
-            group[error_code].add((server,client))
+                # check for EDNS version mismatch
+                if response.effective_edns != response.message.edns:
+                    if Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION not in warnings:
+                        warnings[Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION] = set()
+                    warnings[Status.RESPONSE_UNSUPPORTED_EDNS_VERSION].add((server,client))
+
+                if response.query.edns_flags != response.effective_edns_flags:
+                    for i in range(15, -1, -1):
+                        f = 1 << i
+                        # the response used EDNS with the given flag, but the flag
+                        # wasn't (ultimately) requested
+                        if response.query.edns_flags & f and not response.effective_edns_flags & f:
+                            # find out if this really appears to be a flag issue,
+                            # by seeing if any other queries to this server with
+                            # the DO bit were also unsuccessful 
+                            if response.responsive_cause_index is not None:
+                                if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
+                                    if qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
+                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
+                                    else:
+                                        error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_FLAG
+                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
+                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
+                                    else:
+                                        error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS_FLAG
+                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
+                                    if qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
+                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
+                                    else:
+                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS_FLAG
+                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
+                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
+                                    else:
+                                        error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS_FLAG
+                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
+                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
+                                    else:
+                                        error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_FLAG
+
+                            #TODO handle this better
+                            if error_code is None:
+                                raise Exception('Unknown EDNS-flag-related error')
+
+                        if error_code is not None:
+                            break
+
+            if error_code is not None:
+                # warn on intermittent errors
+                if error_code in (Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR, Status.RESPONSE_ERROR_INTERMITTENT_FORMERR,
+                        Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT, Status.RESPONSE_ERROR_INTERMITTENT_ERROR,
+                        Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE):
+                    group = warnings
+                # if the error really matters (e.g., due to DNSSEC), note an error
+                elif qname_obj is not None and qname_obj.zone.signed:
+                    group = errors
+                # otherwise, warn
+                else:
+                    group = warnings
+
+                if error_code not in group:
+                    group[error_code] = set()
+                group[error_code].add((server,client))
 
         if not response.is_authoritative() and \
                 not response.recursion_desired_and_available():
