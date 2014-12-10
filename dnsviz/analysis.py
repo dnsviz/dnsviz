@@ -854,22 +854,41 @@ class DomainNameAnalysis(object):
                             response = query1.responses[server][client]
                         except KeyError:
                             continue
-                        if response.message is not None and response_test(response) and \
-                                response.message.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN):
-                            if query.rdtype == dns.rdatatype.SOA:
-                                print 'foo'
+                        if response_test(response):
                             return True
         return False
 
-    def server_responsive_with_do(self, server, client):
+    def server_responsive_with_edns_flag(self, server, client, f):
         return self._server_responsive_with_condition(server, client,
-                lambda x: x.edns >= 0 and x.edns_flags & dns.flags.DO,
-                lambda x: x.effective_edns >= 0 and x.effective_edns_flags & dns.flags.DO)
+                lambda x: x.edns >= 0 and x.edns_flags & f,
+                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
+                        (not x.effective_tcp and x.udp_responsive)) and \
+                        x.effective_edns >= 0 and x.effective_edns_flags & f)
+
+    def server_responsive_valid_with_edns_flag(self, server, client, f):
+        return self._server_responsive_with_condition(server, client,
+                lambda x: x.edns >= 0 and x.edns_flags & f,
+                lambda x: x.is_valid_response() and \
+                        x.effective_edns >= 0 and x.effective_edns_flags & f)
+
+    def server_responsive_with_do(self, server, client):
+        return self.server_responsive_with_edns_flag(server, client, dns.flags.DO)
+
+    def server_responsive_valid_with_do(self, server, client):
+        return self.server_responsive_valid_with_edns_flag(server, client, dns.flags.DO)
 
     def server_responsive_with_edns(self, server, client):
         return self._server_responsive_with_condition(server, client,
                 lambda x: x.edns >= 0,
-                lambda x: x.effective_edns >= 0)
+                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
+                        (not x.effective_tcp and x.udp_responsive)) and \
+                        x.effective_edns >= 0)
+
+    def server_responsive_valid_with_edns(self, server, client):
+        return self._server_responsive_with_condition(server, client,
+                lambda x: x.edns >= 0,
+                lambda x: x.is_valid_response() and \
+                        x.effective_edns >= 0)
 
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None):
         if trace is None:
