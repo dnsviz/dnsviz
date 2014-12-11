@@ -394,7 +394,7 @@ class DNSAuthGraph:
             label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
                     (12, 'Helvetica', 10, algorithm, key_tag)
 
-            attr = {'style': 'filled,dashed', 'fillcolor': '#ffffff' }
+            attr = {'style': 'filled,dashed', 'color': COLORS['non_existent'], 'fillcolor': '#ffffff' }
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone)
             S.add_node(node_str, id=node_str, shape='ellipse', label=label_str, **attr)
@@ -517,10 +517,10 @@ class DNSAuthGraph:
             line_color = COLORS['secure']
             line_style = 'solid'
         elif ds_status.validation_status in (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
-            line_color = COLORS['unknown']
+            line_color = COLORS['non_existent']
             line_style = 'dashed'
         elif ds_status.validation_status == Status.DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
-            line_color = COLORS['unknown']
+            line_color = COLORS['warnings']
             line_style = 'solid'
         elif ds_status.validation_status == Status.DS_STATUS_INVALID_DIGEST:
             line_color = COLORS['errors']
@@ -594,10 +594,10 @@ class DNSAuthGraph:
             line_color = COLORS['secure']
             line_style = 'solid'
         elif rrsig_status.validation_status in (Status.RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, Status.RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
-            line_color = COLORS['unknown']
+            line_color = COLORS['non_existent']
             line_style = 'dashed'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
-            line_color = COLORS['unknown']
+            line_color = COLORS['warnings']
             line_style = 'solid'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_EXPIRED:
             line_color = COLORS['expired']
