@@ -98,6 +98,7 @@ LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
 UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
 
 DANE_PORT_RE = re.compile(r'^_(\d+)$')
+SRV_PORT_RE = re.compile(r'^_.*[^\d].*$')
 PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 
 MAX_TTL = 100000000
@@ -2663,6 +2664,21 @@ class Analyst(object):
 
         return False
 
+    def _ask_srv_queries(self, name):
+        '''Return True if SRV queries should be asked for this name, which is
+        determined by examining the structure of the name for common
+        service-related name.'''
+
+        if len(name) > 2 and SRV_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+            return True
+
+        orig_name = self._original_alias_of_cname()
+        if len(orig_name) > 2 and SRV_PORT_RE.search(orig_name[0]) is not None and PROTO_LABEL_RE.search(orig_name[1]) is not None and \
+                self.name == name:
+            return True
+
+        return False
+
     def _ask_other_queries(self, name):
         '''Return True if queries other than A, PTR, NS, and SOA (e.g., MX,
         AAAA, TXT) should be asked, based on the nature of the name.'''
@@ -3004,6 +3020,10 @@ class Analyst(object):
             if self._ask_ptr_queries(name_obj.name):
                 self.logger.debug('Preparing query %s/PTR...' % fmt.humanize_name(name_obj.name))
                 queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
+            if self._ask_srv_queries(name_obj.name):
+                self.logger.debug('Preparing query %s/SRV...' % fmt.humanize_name(name_obj.name))
+                queries[(name_obj.name, dns.rdatatype.SRV)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SRV, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
             if self._ask_tlsa_queries(name_obj.name):
                 self.logger.debug('Preparing query %s/TLSA...' % fmt.humanize_name(name_obj.name))
