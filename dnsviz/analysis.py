@@ -2954,9 +2954,9 @@ class Analyst(object):
                 if (not self.qname_only) or self.name == name_obj.name:
                     if self.dlv_domain != self.name:
                         self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
-                        # note that we use TCP diagnostic query here, to simultaneously test TCP connectivity
-                        # (the query falls back to UDP in case there are issues)
-                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                        # we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
+                        queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU

@@ -1505,32 +1505,16 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
 
 class TCPDiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
-    compatibility and connectivity issues, beginning with TCP.'''
+    compatibility and connectivity issues over TCP.'''
 
     tcp_first = True
 
-    response_handlers = [UseUDPOnNetworkErrorHandler(1), UseUDPOnTimeoutHandler(1),
-            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
-            ClearDOFlagOnTimeoutHandler(7), DisableEDNSOnTimeoutHandler(8),
-            ChangeTimeoutOnTimeoutHandler(1.0, 1),
-            ChangeTimeoutOnTimeoutHandler(2.0, 4),
-            ChangeTimeoutOnTimeoutHandler(1.0, 5), 
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
-    # For timeouts:
-    #  1 - Change to UDP
-    #  2 - no change
-    #  3 - no change
-    #  4 - change timeout to 2 seconds
-    #  5 - reduce udp max payload to 512; change timeout to 1 second
-    #  6 - change timeout to 2 seconds
-    #  7 - clear DO flag
-    #  8 - disable EDNS
-    #  9 - return
+    response_handlers = [
+            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]
 
     query_timeout = 4.0
-    max_attempts = 9
-    lifetime = 19.0
+    max_attempts = 2
+    lifetime = 8.0
 
 class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
@@ -1538,28 +1522,12 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
     tcp_first = True
 
-    response_handlers = [UseUDPOnNetworkErrorHandler(1), UseUDPOnTimeoutHandler(1),
-            DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
-            ClearDOFlagOnTimeoutHandler(7), DisableEDNSOnTimeoutHandler(8),
-            ChangeTimeoutOnTimeoutHandler(1.0, 1),
-            ChangeTimeoutOnTimeoutHandler(2.0, 4),
-            ChangeTimeoutOnTimeoutHandler(1.0, 5), 
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
-    # For timeouts:
-    #  1 - Change to UDP
-    #  2 - no change
-    #  3 - no change
-    #  4 - change timeout to 2 seconds
-    #  5 - reduce udp max payload to 512; change timeout to 1 second
-    #  6 - change timeout to 2 seconds
-    #  7 - clear DO flag
-    #  8 - disable EDNS
-    #  9 - return
+    response_handlers = [
+            DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler()]
 
     query_timeout = 4.0
-    max_attempts = 9
-    lifetime = 19.0
+    max_attempts = 2
+    lifetime = 8.0
 
 class PMTUDiagnosticQuery(DNSSECQuery):
     
