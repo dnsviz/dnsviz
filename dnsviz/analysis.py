@@ -97,6 +97,9 @@ RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
 LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
 UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
 
+DANE_PORT_RE = re.compile(r'^_(\d+)$')
+PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
+
 MAX_TTL = 100000000
 
 def _get_client_address(server):
@@ -2650,11 +2653,11 @@ class Analyst(object):
         '''Return True if TLSA queries should be asked for this name, which is
         determined by examining the structure of the name for common DANE name.'''
 
-        if len(name) > 2 and name[0] in ('_25', '_443') and name[1] == '_tcp':
+        if len(name) > 2 and DANE_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
             return True
 
         orig_name = self._original_alias_of_cname()
-        if len(orig_name) > 2 and orig_name[0] in ('_25', '_443') and orig_name[1] == '_tcp' and \
+        if len(orig_name) > 2 and DANE_PORT_RE.search(orig_name[0]) is not None and PROTO_LABEL_RE.search(orig_name[1]) is not None and \
                 self.name == name:
             return True
 
