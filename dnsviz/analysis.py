@@ -2643,9 +2643,10 @@ class Analyst(object):
             return True
 
         # if the original name was in the arpa tree, then return True
-        # regardless of length
         orig_name = self._original_alias_of_cname()
-        if orig_name.is_subdomain(ARPA_NAME) and self.name == name:
+        if ((orig_name.is_subdomain(IP6_ARPA_NAME) and len(orig_name) == 35) or \
+                (orig_name.is_subdomain(INADDR_ARPA_NAME) and len(orig_name) == 7)) and \
+                self.name == name:
             return True
 
         return False
