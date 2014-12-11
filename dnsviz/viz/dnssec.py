@@ -516,7 +516,7 @@ class DNSAuthGraph:
         if ds_status.validation_status == Status.DS_STATUS_VALID:
             line_color = COLORS['secure']
             line_style = 'solid'
-        elif ds_status.validation_status == Status.DS_STATUS_INDETERMINATE_NO_DNSKEY:
+        elif ds_status.validation_status in (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
             line_color = COLORS['unknown']
             line_style = 'dashed'
         elif ds_status.validation_status == Status.DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
@@ -527,9 +527,6 @@ class DNSAuthGraph:
             line_style = 'solid'
         elif ds_status.validation_status == Status.DS_STATUS_INVALID:
             line_color = COLORS['errors']
-            line_style = 'dashed'
-        elif ds_status.validation_status == Status.DS_STATUS_MATCH_PRE_REVOKE:
-            line_color = COLORS['warnings']
             line_style = 'dashed'
 
         if ds_status.dnskey is None:
@@ -596,7 +593,7 @@ class DNSAuthGraph:
         if rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
             line_color = COLORS['secure']
             line_style = 'solid'
-        elif rrsig_status.validation_status == Status.RRSIG_STATUS_INDETERMINATE_NO_DNSKEY:
+        elif rrsig_status.validation_status in (Status.RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, Status.RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
             line_color = COLORS['unknown']
             line_style = 'dashed'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
@@ -613,9 +610,6 @@ class DNSAuthGraph:
             line_style = 'solid'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INVALID:
             line_color = COLORS['errors']
-            line_style = 'dashed'
-        elif rrsig_status.validation_status == Status.RRSIG_STATUS_MATCH_PRE_REVOKE:
-            line_color = COLORS['warnings']
             line_style = 'dashed'
 
         #XXX cruft - is this needed? why?
