@@ -970,8 +970,12 @@ class DNSAuthGraph:
 
     def add_alias(self, alias, target):
         if not filter(lambda x: x[1] == target and x.attr['color'] == 'black', self.G.out_edges(alias)):
-            self.G.add_edge(alias, target, color='black', constraint='false')
-            #self.G.add_edge(alias, target, color='black')
+            alias_zone = self.node_subgraph_name[alias][8:-4]
+            target_zone = self.node_subgraph_name[target][8:-4]
+            if alias_zone.endswith(target_zone) and alias_zone != target_zone:
+                self.G.add_edge(target, alias, color='black', dir='back', constraint='false')
+            else:
+                self.G.add_edge(target, alias, color='black', dir='back')
 
     def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, combine_edge_id=None):
         for rrsig in name_obj.rrsig_status[rrset_info]:
