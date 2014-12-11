@@ -1105,7 +1105,7 @@ class DomainNameAnalysis(object):
                         f = 1 << i
                         # the response used EDNS with the given flag, but the flag
                         # wasn't (ultimately) requested
-                        if response.query.edns_flags & f and not response.effective_edns_flags & f:
+                        if ((response.query.edns_flags & f) != (response.effective_edns_flags & f)):
                             # find out if this really appears to be a flag issue,
                             # by seeing if any other queries to this server with
                             # the DO bit were also unsuccessful 
