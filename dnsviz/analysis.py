@@ -91,6 +91,7 @@ ROOT_NS_IPS_4 = ROOT_NS_IPS.difference(ROOT_NS_IPS_6)
 ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
+E164_ARPA_NAME = dns.name.from_text('e164', ARPA_NAME)
 
 LOOPBACK_IP_RE = re.compile(r'^(127\.|::1$)')
 RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
@@ -2547,7 +2548,7 @@ class Analyst(object):
     clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
     def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
-             follow_ns=False, trace=None, explicit_delegations=None, analysis_cache=None, analysis_cache_lock=None):
+             follow_ns=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -2572,6 +2573,7 @@ class Analyst(object):
             self.explicit_delegations = {}
         else:
             self.explicit_delegations = explicit_delegations
+        self.extra_rdtypes = extra_rdtypes
         if analysis_cache is None:
             self.analysis_cache = {}
         else:
@@ -2627,10 +2629,48 @@ class Analyst(object):
     def _force_dnskey_query(self, name):
         return name == self.name and self._is_referral_of_type(dns.rdatatype.RRSIG)
 
+    def _rdtypes_to_query(self, name):
+        orig_name = self._original_alias_of_cname()
+
+        rdtypes = self._rdtypes_to_query_for_name(name)
+        if self.name == name:
+            if orig_name != name:
+                rdtypes.extend(self._rdtypes_to_query_for_name(orig_name))
+
+            if self.extra_rdtypes is not None:
+                rdtypes.extend(self.extra_rdtypes)
+
+        # remove duplicates
+        rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
+
+        return rdtypes
+
+    def _rdtypes_to_query_for_name(self, name):
+        rdtypes = []
+
+        if self._ask_ptr_queries(name):
+            rdtypes.append(dns.rdatatype.PTR)
+        elif self._ask_naptr_queries(name):
+            rdtypes.append(dns.rdatatype.NAPTR)
+        elif self._ask_tlsa_queries(name):
+            rdtypes.append(dns.rdatatype.TLSA)
+        elif self._ask_srv_queries(name):
+            rdtypes.append(dns.rdatatype.SRV)
+        elif self._is_dkim(name):
+            rdtypes.append(dns.rdatatype.TXT)
+        elif name.is_subdomain(ARPA_NAME):
+            pass
+        elif PROTO_LABEL_RE.search(name[0]):
+            pass
+        elif self._is_sld_or_lower(name):
+            rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
+
+        return rdtypes
+
     def _ask_ptr_queries(self, name):
-        '''Return True if PTR queries should be asked for this name, as guessed by
-        the nature of the name (particularly whether or not it is in the arpa tree)
-        and the nature of the name (if any) that invoked the query as a dependency.'''
+        '''Return True if PTR queries should be asked for this name, as guessed
+        by the nature of the name, based on its length and its presence in the
+        in-addr.arpa or ip6.arpa trees.'''
 
         # if this name is in the ip6.arpa tree and is the length of a full
         # reverse IPv6 address, then return True
@@ -2642,25 +2682,23 @@ class Analyst(object):
         if name.is_subdomain(INADDR_ARPA_NAME) and len(name) == 7:
             return True
 
-        # if the original name was in the arpa tree, then return True
-        orig_name = self._original_alias_of_cname()
-        if ((orig_name.is_subdomain(IP6_ARPA_NAME) and len(orig_name) == 35) or \
-                (orig_name.is_subdomain(INADDR_ARPA_NAME) and len(orig_name) == 7)) and \
-                self.name == name:
+        return False
+
+    def _ask_naptr_queries(self, name):
+        '''Return True if NAPTR queries should be asked for this name, as guessed by
+        the nature of the name, based on its presence in the e164.arpa tree.'''
+
+        if name.is_subdomain(E164_ARPA_NAME) and name != E164_ARPA_NAME:
             return True
 
         return False
 
     def _ask_tlsa_queries(self, name):
         '''Return True if TLSA queries should be asked for this name, which is
-        determined by examining the structure of the name for common DANE name.'''
+        determined by examining the structure of the name for _<port>._<proto>
+        format.'''
 
         if len(name) > 2 and DANE_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
-            return True
-
-        orig_name = self._original_alias_of_cname()
-        if len(orig_name) > 2 and DANE_PORT_RE.search(orig_name[0]) is not None and PROTO_LABEL_RE.search(orig_name[1]) is not None and \
-                self.name == name:
             return True
 
         return False
@@ -2668,38 +2706,32 @@ class Analyst(object):
     def _ask_srv_queries(self, name):
         '''Return True if SRV queries should be asked for this name, which is
         determined by examining the structure of the name for common
-        service-related name.'''
+        service-related names.'''
 
         if len(name) > 2 and SRV_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
             return True
 
-        orig_name = self._original_alias_of_cname()
-        if len(orig_name) > 2 and SRV_PORT_RE.search(orig_name[0]) is not None and PROTO_LABEL_RE.search(orig_name[1]) is not None and \
-                self.name == name:
-            return True
-
         return False
-
-    def _ask_other_queries(self, name):
-        '''Return True if queries other than A, PTR, NS, and SOA (e.g., MX,
-        AAAA, TXT) should be asked, based on the nature of the name.'''
-
-        if name.is_subdomain(ARPA_NAME):
-            return False
-        if self._ask_tlsa_queries(name):
-            return False
-        if len(name) < 3:
-            return False
-        if self.qname_only and name != self.name:
-            return False
-        if self.dlv_domain == self.name:
-            return False
-        return True
 
     def _is_dkim(self, name):
         '''Return True if the name is a DKIM name.'''
 
         return '_domainkey' in name
+
+    def _is_sld_or_lower(self, name):
+        '''Return True if the name is an SLD or lower.'''
+
+        return len(name) >= 3
+
+    def _ask_non_delegation_queries(self, name):
+        '''Return True if non-delegation-related queries should be asked for
+        name.'''
+
+        if self.qname_only and name != self.name:
+            return False
+        if self.dlv_domain == self.name:
+            return False
+        return True
 
     def _filter_servers(self, servers):
         if self.client_ipv6 is None:
@@ -2746,9 +2778,11 @@ class Analyst(object):
 
             # re-do analysis if this name is referenced by an alias
             # and previously the necessary queries weren't asked
-            if self._is_referral_of_type(dns.rdatatype.CNAME) and \
-                    (self.name, dns.rdatatype.A) not in name_obj.queries:
-                redo_analysis = True
+            if self._is_referral_of_type(dns.rdatatype.CNAME):
+                rdtypes_to_query = set(self._rdtypes_to_query(name))
+                rdtypes_queried = set([r for n,r in name_obj.queries if n == name_obj.name])
+                if rdtypes_to_query.difference(rdtypes_queried):
+                    redo_analysis = True
 
             # if the previous analysis was a stub, but now we want the
             # whole analysis
@@ -2944,39 +2978,48 @@ class Analyst(object):
         exclude_no_answer = set()
         queries = {}
 
+        # if there are responsive servers to query...
         if servers:
-            if self._ask_other_queries(name_obj.name):
-                # A query might already have been performed during delegation
-                # analysis
-                if (name_obj.name, dns.rdatatype.A) not in name_obj.queries:
-                    self.logger.debug('Preparing query %s/A...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.A)] = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                self.logger.debug('Preparing query %s/AAAA...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.AAAA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.AAAA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                if name_obj.is_zone():
-                    # A query might already have been performed during
-                    # delegation analysis
-                    if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
-                        self.logger.debug('Preparing query %s/NS...' % fmt.humanize_name(name_obj.name))
-                        queries[(name_obj.name, dns.rdatatype.NS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
+            # queries specific to zones for which non-delegation-related
+            # queries are being issued
+            if name_obj.is_zone() and self._ask_non_delegation_queries(name_obj.name):
+
+                # negative queries for all zones
+                self._set_negative_queries(name_obj)
+                if name_obj.nxdomain_name is not None:
+                    self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
+                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                if name_obj.nxrrset_name is not None:
+                    self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
+                # if the name is SLD or lower, then ask MX and TXT
+                if self._is_sld_or_lower(name_obj.name):
                     self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                     queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
                     # we also do a query with small UDP payload to elicit and test a truncated response
                     queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                if name_obj.is_zone() or self._is_dkim(name_obj.name):
+
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
+        # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
 
+            # if there are responsive servers to query...
             if servers:
-                if (not self.qname_only) or self.name == name_obj.name:
-                    if self.dlv_domain != self.name:
-                        self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
-                        queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                        # we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
+                if self._ask_non_delegation_queries(name_obj.name):
+                    self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
+                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
+                    if name_obj.is_zone():
+                        # for zones we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
                         queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    else:
+                        # for non-zones we don't need to keey the (UDP) SOA query, if there is no positive response
+                        exclude_no_answer.add((name_obj.name, dns.rdatatype.SOA))
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
@@ -2984,6 +3027,7 @@ class Analyst(object):
                 # we also do a query with small UDP payload to elicit and test a truncated response
                 queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
+            # query for DS/DLV
             if name_obj.parent is not None:
                 if not name_obj.parent._all_servers_queried:
                     parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
@@ -3007,29 +3051,21 @@ class Analyst(object):
                         queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
-        if servers and self.dlv_domain != self.name:
-            if name_obj.is_zone() and \
-                    ((not self.qname_only) or name_obj.name == self.name):
-                self._set_negative_queries(name_obj)
-                if name_obj.nxdomain_name is not None:
-                    self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
-                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                if name_obj.nxrrset_name is not None:
-                    self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+        # finally, query any additional rdtypes
+        if servers and self._ask_non_delegation_queries(name_obj.name):
+            all_queries = set(name_obj.queries).union(set(queries))
+            for rdtype in self._rdtypes_to_query(name_obj.name):
+                if (name_obj.name, rdtype) not in all_queries:
+                    self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+                    queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-            if self._ask_ptr_queries(name_obj.name):
-                self.logger.debug('Preparing query %s/PTR...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.PTR)] = self.diagnostic_query(name_obj.name, dns.rdatatype.PTR, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-
-            if self._ask_srv_queries(name_obj.name):
-                self.logger.debug('Preparing query %s/SRV...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.SRV)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SRV, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-
-            if self._ask_tlsa_queries(name_obj.name):
-                self.logger.debug('Preparing query %s/TLSA...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.TLSA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TLSA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-
+            # if no default queries were identified (e.g., empty non-terminal in
+            # in-addr.arpa space), then add a backup.
+            if not queries:
+                rdtype = dns.rdatatype.A
+                self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+                queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+        
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
         Q.ExecutableDNSQuery.execute_queries(*queries.values())
@@ -3053,13 +3089,20 @@ class Analyst(object):
         if not parent_auth_servers:
             return False
 
-        servers_queried = { dns.rdatatype.NS: set(), dns.rdatatype.A: set() }
+        servers_queried = collections.OrderedDict(((dns.rdatatype.NS, set()),))
         referral_queries = {}
 
-        # elicit a referral from parent servers by querying first for NS, then for A as a fallback
-        for rdtype in (dns.rdatatype.NS, dns.rdatatype.A):
-            if rdtype in servers_queried:
-                servers_queried[rdtype].update(parent_auth_servers)
+        rdtypes = self._rdtypes_to_query(name_obj.name)
+        if rdtypes:
+            secondary_rdtype = rdtypes[0]
+            servers_queried[secondary_rdtype] = set()
+        else:
+            secondary_rdtype = None
+
+        # elicit a referral from parent servers by querying first for NS, then
+        # a secondary type as a fallback
+        for rdtype in servers_queried:
+            servers_queried[rdtype].update(parent_auth_servers)
 
             name_obj.referral_rdtype = rdtype
 
@@ -3068,8 +3111,9 @@ class Analyst(object):
             query.execute()
             referral_queries[rdtype] = query
 
-            # if NXDOMAIN was received, then double-check with A, as some servers
-            # (mostly load balancers) don't respond well to NS queries
+            # if NXDOMAIN was received, then double-check with the secondary
+            # type, as some servers (mostly load balancers) don't respond well
+            # to NS queries
             if query.is_nxdomain_all():
                 continue
 
@@ -3077,12 +3121,9 @@ class Analyst(object):
             if query.is_valid_complete_response_any():
                 break
 
-            if name_obj.name.is_subdomain(ARPA_NAME):
-                break
-
-            # we only go a second time through the loop with an A query if the name
-            # is not under .arpa and if 1) there was NXDOMAIN or 2) there were
-            # no valid responses  In either case the A record becomes the
+            # we only go a second time through the loop, querying the secondary
+            # rdtype query if 1) there was NXDOMAIN or 2) there were no valid
+            # responses.  In either case the secondary record type becomes the
             # referral rdtype.
 
         # if the name is not a delegation, or if we received no valid and
@@ -3094,25 +3135,25 @@ class Analyst(object):
             #   3) this is the name in question and the response was NXDOMAIN,
             #      in which case we use this to show the NXDOMAIN (empty answers
             #      will be asked later by better queries)
-            # And in the case of a referral type of A, we only keep the NS
-            # referral if there was a discrepancy between NXDOMAIN and YXDOMAIN.
+            # And in the case of a referral using the secondary rdtype, we only
+            # keep the NS referral if there was a discrepancy between NXDOMAIN
+            # and YXDOMAIN.
 
             is_nxdomain = query.is_nxdomain_all()
             is_valid = query.is_valid_complete_response_any()
 
              # (referral type is NS)
             if name_obj.referral_rdtype == dns.rdatatype.NS:
-                # if rdtype is NS and the name is not under .arpa, then there
-                # was no error, and no NXDOMAIN, so there is no need to save
-                # the referral.  Delete it.
-                if not name_obj.name.is_subdomain(ARPA_NAME):
+                # If there was a secondary type, the fact that only NS was queried
+                # for indicates that there was no error and no NXDOMAIN response.
+                # In this case, there is no need to save the referral.  Delete it.
+                if secondary_rdtype is not None:
                     name_obj.referral_rdtype = None
                     del referral_queries[dns.rdatatype.NS]
 
-                # if the name was under .arpa, we only performed one referral query
-                # (NS).  save the referral if there was an error or if NXDOMAIN
-                # and the name matches this name.  Return positive response only
-                # if not NXDOMAIN
+                # If there was no secondary type, we need to evaluate the responses
+                # to see if they're worth saving.  Save the referral if there
+                # was an error or NXDOMAIN and the name matches this name.
                 else:
                     if not is_valid or (name_obj.name == self.name and is_nxdomain):
                         pass
@@ -3120,21 +3161,21 @@ class Analyst(object):
                         name_obj.referral_rdtype = None
                         del referral_queries[dns.rdatatype.NS]
 
-             # (referral type is A)
+             # (referral type is secondary type)
             else:
-                # don't remove either record if there's not an NXDOMAIN/YXDOMAIN mismatch
+                # don't remove either record if there's an NXDOMAIN/YXDOMAIN mismatch
                 if referral_queries[dns.rdatatype.NS].is_nxdomain_all() and \
                         is_valid and not is_nxdomain:
                     pass
                 else:
                     # if no mismatch, then always delete the NS record
                     del referral_queries[dns.rdatatype.NS]
-                    # also, delete the A record query if the name doesn't match or is not NXDOMAIN
+                    # also, delete the query from the secondary type if the name doesn't match or is not NXDOMAIN
                     if not is_valid or (name_obj.name == self.name and is_nxdomain):
                         pass
                     else:
                         name_obj.referral_rdtype = None
-                        del referral_queries[dns.rdatatype.A]
+                        del referral_queries[secondary_rdtype]
 
             # add remaining queries
             for query in referral_queries.values():
@@ -3147,6 +3188,9 @@ class Analyst(object):
         for query in referral_queries.values():
             name_obj.add_query(query)
 
+        # now identify the authoritative NS RRset from all servers, resolve all
+        # names referred to in the NS RRset(s), and query each corresponding
+        # server, until all names have been queried
         names_resolved = set()
         names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
         while names_not_resolved:
@@ -3180,14 +3224,14 @@ class Analyst(object):
                 self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
                 queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
-            # A query
-            if self._ask_other_queries(name_obj.name):
-                servers = auth_servers.difference(servers_queried[dns.rdatatype.A])
-                servers_queried[dns.rdatatype.A].update(servers)
+            # secondary query
+            if secondary_rdtype is not None and self._ask_non_delegation_queries(name_obj.name):
+                servers = auth_servers.difference(servers_queried[secondary_rdtype])
+                servers_queried[secondary_rdtype].update(servers)
                 servers = self._filter_servers(servers)
                 if servers:
-                    self.logger.debug('Querying %s/A...' % fmt.humanize_name(name_obj.name))
-                    queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
+                    self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(secondary_rdtype)))
+                    queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries)
@@ -3215,7 +3259,7 @@ class Analyst(object):
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
             for target in name_obj.cname_targets[cname]:
-                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], extra_rdtypes=self.extra_rdtypes, **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets[cname], target, errors))
                 t.start()
                 threads.append(t)
