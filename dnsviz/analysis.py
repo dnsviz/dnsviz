@@ -2583,6 +2583,29 @@ class Analyst(object):
         else:
             self.analysis_cache_lock = analysis_cache_lock
 
+        self._detect_cname_chain()
+
+    def _detect_cname_chain(self):
+        self._cname_chain = []
+
+        try:
+            rdtype = self._rdtypes_to_query(self.name)[0]
+        except IndexError:
+            rdtype = dns.rdatatype.A
+
+        try:
+            ans = _resolver.query(self.name, rdtype, dns.rdataclass.IN, allow_noanswer=True)
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.DNSException):
+            return
+
+        cname = self.name
+        for i in range(Resolver.MAX_CNAME_REDIRECTION):
+            try:
+                cname = ans.response.find_rrset(ans.response.answer, cname, dns.rdataclass.IN, dns.rdatatype.CNAME)[0].target
+                self._cname_chain.append(cname)
+            except KeyError:
+                return
+
     def _detect_ceiling(self, ceiling):
         if ceiling == dns.name.root or ceiling is None:
             return ceiling, None
@@ -2639,6 +2662,9 @@ class Analyst(object):
 
             if self.extra_rdtypes is not None:
                 rdtypes.extend(self.extra_rdtypes)
+
+        elif name in self._cname_chain:
+            rdtypes.extend(self._rdtypes_to_query(self.name))
 
         # remove duplicates
         rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
@@ -2727,7 +2753,7 @@ class Analyst(object):
         '''Return True if non-delegation-related queries should be asked for
         name.'''
 
-        if self.qname_only and name != self.name:
+        if self.qname_only and name != self.name and name not in self._cname_chain:
             return False
         if self.dlv_domain == self.name:
             return False
