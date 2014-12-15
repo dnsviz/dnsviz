@@ -3118,11 +3118,10 @@ class Analyst(object):
         servers_queried = collections.OrderedDict(((dns.rdatatype.NS, set()),))
         referral_queries = {}
 
-        rdtypes = self._rdtypes_to_query(name_obj.name)
-        if rdtypes:
-            secondary_rdtype = rdtypes[0]
+        try:
+            secondary_rdtype = self._rdtypes_to_query(name_obj.name)[0]
             servers_queried[secondary_rdtype] = set()
-        else:
+        except IndexError:
             secondary_rdtype = None
 
         # elicit a referral from parent servers by querying first for NS, then
