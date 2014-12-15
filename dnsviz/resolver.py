@@ -54,8 +54,7 @@ class DNSAnswer:
 
         self.rrset = None
 
-        if response.rcode() == dns.rcode.NXDOMAIN:
-            raise dns.resolver.NXDOMAIN()
+        self._handle_nxdomain(response)
 
         i = 0
         qname_sought = qname
@@ -71,8 +70,22 @@ class DNSAnswer:
                     break
             i += 1
 
+        self._handle_noanswer()
+
+    def _handle_nxdomain(self, response):
+        if response.rcode() == dns.rcode.NXDOMAIN:
+            raise dns.resolver.NXDOMAIN()
+
+    def _handle_noanswer(self):
         if self.rrset is None:
             raise dns.resolver.NoAnswer()
+
+class DNSAnswerNoAnswerAllowed(DNSAnswer):
+    '''An answer to a DNS query, including the full DNS response message, the
+    RRset requested, and the server.'''
+
+    def _handle_noanswer(self):
+        pass
 
 class Resolver:
     '''A simple stub DNS resolver.'''
@@ -104,17 +117,22 @@ class Resolver:
             servers.append(IPAddr('127.0.0.1'))
         return Resolver(servers, query_cls)
 
-    def query(self, qname, rdtype, rdclass=dns.rdataclass.IN):
-        answer = self.query_multiple((qname, rdtype, rdclass)).values()[0]
+    def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
+        answer = self.query_multiple((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
         if isinstance(answer, DNSAnswer):
             return answer
         else:
             raise answer
 
-    def query_multiple(self, *query_tuples):
+    def query_multiple(self, *query_tuples, **kwargs):
         valid_servers = {}
         answers = {}
         attempts = {}
+
+        if kwargs.get('allow_noanswer', False):
+            answer_cls = DNSAnswerNoAnswerAllowed
+        else:
+            answer_cls = DNSAnswer
 
         query_tuples = set(query_tuples)
         for query_tuple in query_tuples:
@@ -159,7 +177,7 @@ class Resolver:
                 client, response = client_response.items()[0]
                 if response.is_complete_response() and response.is_valid_response():
                     try:
-                        answers[query_tuple] = DNSAnswer(query_tuple[0], query_tuple[1], response.message, server)
+                        answers[query_tuple] = answer_cls(query_tuple[0], query_tuple[1], response.message, server)
                     except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
                         answers[query_tuple] = e
                 # if we received a message that was invalid or if there was
