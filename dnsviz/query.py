@@ -1186,6 +1186,12 @@ class MultiQuery(AggregateDNSResponse):
             query.add_query(self.queries[params].project(servers, bailiwick_map, default_bailiwick))
         return query
 
+    def is_nxdomain_all(self):
+        for params in self.queries:
+            if not self.queries[params].is_nxdomain_all():
+                return False
+        return True
+
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
 

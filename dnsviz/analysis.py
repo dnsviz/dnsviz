@@ -187,6 +187,10 @@ class DomainNameAnalysis(object):
         self._dlv_parent = None
         self._dlv_name = None
 
+        # A reference to the highest ancestor for which NXDOMAIN was received
+        # (serialized).
+        self.nxdomain_ancestor = None
+
         # The clients used for queries (serialized - for convenience)
         self.clients_ipv4 = set() 
         self.clients_ipv6 = set()
@@ -293,6 +297,11 @@ class DomainNameAnalysis(object):
             return self.dlv_parent.name
         return None
 
+    def nxdomain_ancestor_name(self):
+        if self.nxdomain_ancestor is not None:
+            return self.nxdomain_ancestor.name
+        return None
+
     def _set_dlv_parent(self, dlv_parent):
         self._dlv_parent = dlv_parent
         if dlv_parent is None:
@@ -358,6 +367,8 @@ class DomainNameAnalysis(object):
             return self.parent
         elif name == self.dlv_parent_name():
             return self.dlv_parent
+        elif name == self.nxdomain_ancestor_name():
+            return self.nxdomain_ancestor
         return None
 
     def get_bailiwick_mapping(self):
@@ -1929,6 +1940,8 @@ class DomainNameAnalysis(object):
             self.parent.serialize(d, trace + [self])
         if self.dlv_parent is not None:
             self.dlv_parent.serialize(d, trace + [self])
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor.serialize(d, trace + [self])
 
         clients_ipv4 = list(self.clients_ipv4)
         clients_ipv4.sort()
@@ -1947,6 +1960,8 @@ class DomainNameAnalysis(object):
                 d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
             if self.dlv_parent is not None:
                 d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+            if self.nxdomain_ancestor is not None:
+                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
@@ -2444,12 +2459,21 @@ class DomainNameAnalysis(object):
             dlv_parent_name = None
             dlv_parent = None
 
+        if 'nxdomain_ancestor' in d:
+            nxdomain_ancestor_name = dns.name.from_text(d['nxdomain_ancestor'])
+            nxdomain_ancestor = cls.deserialize(nxdomain_ancestor_name, d1, cache=cache)
+        else:
+            nxdomain_ancestor_name = None
+            nxdomain_ancestor = None
+
         _logger.info('Loading %s' % fmt.humanize_name(name))
 
         cache[name] = a = cls(name, stub=stub)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
+        if nxdomain_ancestor is not None:
+            a.nxdomain_ancestor = nxdomain_ancestor
         a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
         a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
 
@@ -2933,10 +2957,19 @@ class Analyst(object):
             parent_obj = self._analyze(name.parent())
 
         if parent_obj is not None:
+            nxdomain_ancestor = parent_obj.nxdomain_ancestor
+            if nxdomain_ancestor is None and \
+                    parent_obj.referral_rdtype is not None and \
+                    parent_obj.queries[(parent_obj.name, parent_obj.referral_rdtype)].is_nxdomain_all():
+                nxdomain_ancestor = parent_obj
+
             # for zones other than the root assign parent_obj to the zone apex,
             # rather than the simply the domain formed by dropping its lower
             # leftmost label
             parent_obj = parent_obj.zone
+
+        else:
+            nxdomain_ancestor = None
 
         # retrieve the dlv
         if self.dlv_domain is not None and self.name != self.dlv_domain:
@@ -2953,6 +2986,7 @@ class Analyst(object):
             try:
                 name_obj.parent = parent_obj
                 name_obj.dlv_parent = dlv_parent_obj
+                name_obj.nxdomain_ancestor = nxdomain_ancestor
 
                 name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
@@ -3185,9 +3219,10 @@ class Analyst(object):
 
                 # If there was no secondary type, we need to evaluate the responses
                 # to see if they're worth saving.  Save the referral if there
-                # was an error or NXDOMAIN and the name matches this name.
+                # was an error or NXDOMAIN and there is no nxdomain_ancestor or
+                # this is the name in question.
                 else:
-                    if not is_valid or (name_obj.name == self.name and is_nxdomain):
+                    if not is_valid or (is_nxdomain and (name_obj.name == self.name or name_obj.nxdomain_ancestor is None)):
                         pass
                     else:
                         name_obj.referral_rdtype = None
@@ -3202,8 +3237,10 @@ class Analyst(object):
                 else:
                     # if no mismatch, then always delete the NS record
                     del referral_queries[dns.rdatatype.NS]
-                    # also, delete the query from the secondary type if the name doesn't match or is not NXDOMAIN
-                    if not is_valid or (name_obj.name == self.name and is_nxdomain):
+                    # Save the referral if there was an error or NXDOMAIN and
+                    # there is no nxdomain_ancestor or this is the name in
+                    # question.
+                    if not is_valid or (is_nxdomain and (name_obj.name == self.name or name_obj.nxdomain_ancestor is None)):
                         pass
                     else:
                         name_obj.referral_rdtype = None
