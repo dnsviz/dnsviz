@@ -2663,8 +2663,12 @@ class Analyst(object):
             if self.extra_rdtypes is not None:
                 rdtypes.extend(self.extra_rdtypes)
 
-        elif name in self._cname_chain:
-            rdtypes.extend(self._rdtypes_to_query(self.name))
+        else:
+            if name in self._cname_chain:
+                rdtypes.extend(self._rdtypes_to_query(self.name))
+
+            if self._ask_tlsa_queries(self.name) and len(name) == len(self.name) - 2:
+                rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
 
         # remove duplicates
         rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
@@ -2753,7 +2757,10 @@ class Analyst(object):
         '''Return True if non-delegation-related queries should be asked for
         name.'''
 
-        if self.qname_only and name != self.name and name not in self._cname_chain:
+        if self.qname_only and not \
+                (name == self.name or \
+                name in self._cname_chain or \
+                (self._ask_tlsa_queries(self.name) and len(name) == len(self.name) - 2)):
             return False
         if self.dlv_domain == self.name:
             return False
