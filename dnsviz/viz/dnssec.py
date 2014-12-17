@@ -738,6 +738,11 @@ class DNSAuthGraph:
                     warnings_map = name_obj.noanswer_warnings[(name,rdtype)]
                     errors_map = name_obj.noanswer_errors[(name,rdtype)]
 
+            if nxdomain:
+                rdtype_str = ''
+            else:
+                rdtype_str = '/%s' % dns.rdatatype.to_text(rdtype)
+
             img_str = ''
             if errors_map:
                 img_str = '<IMG SRC="%s"/>' % ERROR_ICON
@@ -745,11 +750,11 @@ class DNSAuthGraph:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
 
             if img_str:
-                node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
-                        (12, 'Helvetica', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), img_str)
+                node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
+                        (12, 'Helvetica', fmt.humanize_name(name, True), rdtype_str, img_str)
             else:
-                node_label = u'<<FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT>>' % \
-                        (12, 'Helvetica', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype))
+                node_label = u'<<FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT>>' % \
+                        (12, 'Helvetica', fmt.humanize_name(name, True), rdtype_str)
 
             attr = {}
             attr['shape'] = 'rectangle'
