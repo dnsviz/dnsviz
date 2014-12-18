@@ -363,6 +363,8 @@ class DomainNameAnalysis(object):
             return self.external_signers[name]
         if name in self.ns_dependencies and self.ns_dependencies[name] is not None:
             return self.ns_dependencies[name]
+        if name in self.mx_targets and self.mx_targets[name] is not None:
+            return self.mx_targets[name]
         if name == self.parent_name():
             return self.parent
         elif name == self.dlv_parent_name():
@@ -906,7 +908,7 @@ class DomainNameAnalysis(object):
                 lambda x: x.is_valid_response() and \
                         x.effective_edns >= 0)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None, follow_mx=True):
         if trace is None:
             trace = []
 
@@ -939,6 +941,10 @@ class DomainNameAnalysis(object):
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
                     cname_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+            if follow_mx:
+                for target, mx_obj in self.mx_targets.items():
+                    if mx_obj is not None:
+                        mx_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             for signer, signer_obj in self.external_signers.items():
                 signer_obj.populate_status(trusted_keys, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
@@ -2008,6 +2014,9 @@ class DomainNameAnalysis(object):
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
                 ns_obj.serialize(d, trace=trace + [self])
+        for target, mx_obj in self.mx_targets.items():
+            if mx_obj is not None:
+                mx_obj.serialize(d, trace=trace + [self])
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
@@ -2083,7 +2092,7 @@ class DomainNameAnalysis(object):
 
         return d
 
-    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None):
+    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True):
         if d is None:
             d = collections.OrderedDict()
 
@@ -2108,6 +2117,10 @@ class DomainNameAnalysis(object):
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
                     cname_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+            if follow_mx:
+                for target, mx_obj in self.mx_targets.items():
+                    if mx_obj is not None:
+                        mx_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             for signer, signer_obj in self.external_signers.items():
                 signer_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
@@ -2550,9 +2563,14 @@ class DomainNameAnalysis(object):
                 self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
         for signer in self.external_signers:
             self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
+
+        # these two are optional
         for target in self.ns_dependencies:
             if target.canonicalize().to_text() in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
+        for target in self.mx_targets:
+            if target.canonicalize().to_text() in d:
+                self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(DomainNameAnalysis):
     def __init__(self, *args, **kwargs):
@@ -2572,7 +2590,7 @@ class Analyst(object):
     clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
     def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
-             follow_ns=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, analysis_cache_lock=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, analysis_cache_lock=None):
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -2588,6 +2606,7 @@ class Analyst(object):
         self.logger = logger
 
         self.follow_ns = follow_ns
+        self.follow_mx = follow_mx
 
         if trace is None:
             self.trace = []
@@ -3346,7 +3365,12 @@ class Analyst(object):
                 t.start()
                 threads.append(t)
 
-        #TODO MX targets?
+        if self.follow_mx:
+            for target in name_obj.mx_targets:
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.MX)], extra_rdtypes=[dns.rdatatype.A, dns.rdatatype.AAAA], **kwargs)
+                t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.mx_targets, target, errors))
+                t.start()
+                threads.append(t)
 
         for t in threads:
             t.join()
