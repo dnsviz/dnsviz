@@ -346,7 +346,7 @@ class DomainNameAnalysis(object):
         if self in trace:
             return None
 
-        if name in (self.name, self.nxdomain_name, self.nxrrset_name):
+        if name in (self.name, self.nxdomain_name, self.nxrrset_name, self.dlv_name):
             return self
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
@@ -1196,6 +1196,8 @@ class DomainNameAnalysis(object):
         qname_obj = self.get_name(qname)
         if rdtype == dns.rdatatype.DS:
             qname_obj = qname_obj.parent
+        elif rdtype == dns.rdatatype.DLV:
+            qname_obj = qname_obj.dlv_parent
 
         if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
             dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
@@ -2631,6 +2633,9 @@ class Analyst(object):
     def _detect_cname_chain(self):
         self._cname_chain = []
 
+        if self.dlv_domain == self.name:
+            return
+
         try:
             rdtype = self._rdtypes_to_query(self.name)[0]
         except IndexError:
@@ -3088,8 +3093,10 @@ class Analyst(object):
                     # we also do a query with small UDP payload to elicit and test a truncated response
                     queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-                    self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    # this one might have been queried in the _analyze_delegation() method
+                    if (name_obj.name, dns.rdatatype.TXT) not in name_obj.queries:
+                        self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
+                        queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
@@ -3147,7 +3154,7 @@ class Analyst(object):
 
             # if no default queries were identified (e.g., empty non-terminal in
             # in-addr.arpa space), then add a backup.
-            if not queries:
+            if not (queries or name_obj.queries):
                 rdtype = dns.rdatatype.A
                 self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
                 queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
