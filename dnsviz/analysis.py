@@ -346,7 +346,7 @@ class DomainNameAnalysis(object):
         if self in trace:
             return None
 
-        if name in (self.name, self.nxdomain_name, self.nxrrset_name):
+        if name in (self.name, self.nxdomain_name, self.nxrrset_name, self.dlv_name):
             return self
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
@@ -1190,6 +1190,8 @@ class DomainNameAnalysis(object):
         qname_obj = self.get_name(qname)
         if rdtype == dns.rdatatype.DS:
             qname_obj = qname_obj.parent
+        elif rdtype == dns.rdatatype.DLV:
+            qname_obj = qname_obj.dlv_parent
 
         if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
             dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
