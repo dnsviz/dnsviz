@@ -3071,8 +3071,10 @@ class Analyst(object):
                     # we also do a query with small UDP payload to elicit and test a truncated response
                     queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-                    self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    # this one might have been queried in the _analyze_delegation() method
+                    if (name_obj.name, dns.rdatatype.TXT) not in name_obj.queries:
+                        self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
+                        queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
