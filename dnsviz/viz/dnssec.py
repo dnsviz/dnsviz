@@ -1311,11 +1311,11 @@ class DNSAuthGraph:
             if n.attr['color'] == COLORS['secure']:
                 status = Status.RRSET_STATUS_SECURE
                 if 'dashed' in style:
-                    n.attr['color'] = COLORS['secure_light']
+                    n.attr['color'] = COLORS['secure_non_existent']
             elif n.attr['color'] == COLORS['bogus']:
                 status = Status.RRSET_STATUS_BOGUS
                 if 'dashed' in style:
-                    n.attr['color'] = COLORS['bogus_light']
+                    n.attr['color'] = COLORS['bogus_non_existent']
             elif 'dashed' in style:
                 #TODO (this should be done even when add_trust hasn't been
                 # called)
