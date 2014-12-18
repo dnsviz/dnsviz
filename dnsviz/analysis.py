@@ -2614,6 +2614,9 @@ class Analyst(object):
     def _detect_cname_chain(self):
         self._cname_chain = []
 
+        if self.dlv_domain == self.name:
+            return
+
         try:
             rdtype = self._rdtypes_to_query(self.name)[0]
         except IndexError:
