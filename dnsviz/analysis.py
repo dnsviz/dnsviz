@@ -1008,12 +1008,11 @@ class DomainNameAnalysis(object):
                     self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
             for qname_sought in query.rrset_noanswer_info:
                 try:
-                    for soa_owner_name in query.rrset_noanswer_info[qname_sought]:
-                        for (server,client) in query.rrset_noanswer_info[qname_sought][soa_owner_name]:
-                            for response in query.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)]:
-                                if qname_sought == qname or response.recursion_desired_and_available():
-                                    self.yxdomain.add(qname_sought)
-                                    raise FoundYXDOMAIN
+                    for (server,client) in query.rrset_noanswer_info[qname_sought].servers_clients:
+                        for response in query.rrset_noanswer_info[qname_sought].servers_clients[(server,client)]:
+                            if qname_sought == qname or response.recursion_desired_and_available():
+                                self.yxdomain.add(qname_sought)
+                                raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
                     break
 
@@ -1353,9 +1352,9 @@ class DomainNameAnalysis(object):
                     status = None
                     for nsec_set_info in nsec_info_list:
                         if nsec_set_info.use_nsec3:
-                            status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
+                            status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
                         else:
-                            status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, zone, nsec_set_info)
+                            status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
                         if status.validation_status == Status.STATUS_VALID:
                             break
 
@@ -1688,6 +1687,99 @@ class DomainNameAnalysis(object):
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
+    def _populate_negative_response_status(self, query, qname_sought, negative_response_info, \
+            bad_soa_error, missing_soa_error, upward_referral_error, missing_nsec_error, \
+            nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs):
+
+        qname_obj = self.get_name(qname_sought)
+        if query.rdtype == dns.rdatatype.DS:
+            qname_obj = qname_obj.parent
+
+        soa_owner_name_for_servers = {}
+        servers_without_soa = set()
+        for server, client in negative_response_info.servers_clients:
+            for response in negative_response_info.servers_clients[(server, client)]:
+                servers_without_soa.add((server, client, response))
+
+                self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
+
+        statuses = []
+        for soa_rrset_info in negative_response_info.soa_info:
+
+            soa_owner_name = soa_rrset_info.rrset.name
+
+            for server, client in soa_rrset_info.servers_clients:
+                for response in soa_rrset_info.servers_clients[(server, client)]:
+                    servers_without_soa.remove((server, client, response))
+                    soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
+
+            if soa_owner_name != qname_obj.zone.name:
+                if qname_sought == query.qname:
+                    if bad_soa_error not in errors:
+                        errors[bad_soa_error] = set()
+                    errors[bad_soa_error].update(soa_rrset_info.servers_clients)
+                else:
+                    for server,client in soa_rrset_info.servers_clients:
+                        for response in soa_rrset_info.servers_clients[(server,client)]:
+                            if response.recursion_desired_and_available():
+                                if bad_soa_error not in errors:
+                                    errors[bad_soa_error] = set()
+                                errors[bad_soa_error].add((server,client))
+
+            self._populate_rrsig_status(soa_owner_name, dns.rdatatype.SOA, query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs)
+
+        servers_missing_soa = set()
+        servers_upward_referral = set()
+        for server,client,response in servers_without_soa:
+            if qname_sought == query.qname or response.recursion_desired_and_available():
+                # check for an upward referral
+                if upward_referral_error is not None and response.is_upward_referral(qname_obj.zone.name):
+                    servers_upward_referral.add((server,client))
+                else:
+                    servers_missing_soa.add((server,client))
+        if servers_missing_soa:
+            errors[missing_soa_error] = servers_missing_soa
+        if servers_upward_referral:
+            errors[upward_referral_error] = servers_upward_referral
+
+        for server,client in negative_response_info.servers_clients:
+            for response in negative_response_info.servers_clients[(server,client)]:
+                if not (qname_sought == query.qname or response.recursion_desired_and_available()):
+                    continue
+                nsec_info_list = query.nsec_set_info_by_server[response]
+                status = None
+                for nsec_set_info in nsec_info_list:
+                    if nsec_set_info.use_nsec3:
+                        status = nsec3_status_cls(qname_sought, query.rdtype, \
+                                soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+                    else:
+                        status = nsec_status_cls(qname_sought, query.rdtype, \
+                                soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+                    if status.validation_status == Status.STATUS_VALID:
+                        break
+
+                # report that no NSEC(3) records were returned
+                if status is None:
+                    if qname_obj.zone.signed and (qname_sought == query.qname or response.recursion_desired_and_available()):
+                        if response.dnssec_requested():
+                            if missing_nsec_error not in errors:
+                                errors[missing_nsec_error] = set()
+                            errors[missing_nsec_error].add((server,client))
+                        elif qname_obj.zone.server_responsive_with_do(server,client):
+                            if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
+                                errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                            errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+                else:
+                    for rrset_info in status.nsec_set_info.rrsets.values():
+                        self._populate_rrsig_status(qname_sought, query.rdtype, query, rrset_info, qname_obj, supported_algs)
+
+                    if status not in statuses:
+                        statuses.append(status)
+                        validation_status = status.validation_status
+                        if validation_status not in self.nxdomain_status_by_status:
+                            self.nxdomain_status_by_status[validation_status] = set()
+                        self.nxdomain_status_by_status[validation_status].add(status)
+
     def _populate_nsec_status(self, supported_algs, level):
         self.nxdomain_status = {}
         self.nxdomain_servers_clients = {}
@@ -1710,183 +1802,35 @@ class DomainNameAnalysis(object):
                 continue
 
             for qname_sought in query.nxdomain_info:
-                qname_obj = self.get_name(qname_sought)
-                if rdtype == dns.rdatatype.DS:
-                    qname_obj = qname_obj.parent
-                statuses = []
                 self.nxdomain_warnings[(qname_sought, rdtype)] = {}
                 self.nxdomain_errors[(qname_sought, rdtype)] = {}
-                self.nxdomain_servers_clients[(qname_sought, rdtype)] = {}
-                for soa_owner_name, servers_clients in query.nxdomain_info[qname_sought].items():
-                    self.nxdomain_servers_clients[(qname_sought, rdtype)].update(servers_clients)
+                self.nxdomain_servers_clients[(qname_sought, rdtype)] = query.nxdomain_info[qname_sought].servers_clients
 
-                    if soa_owner_name is None:
-                        if qname_sought == qname:
-                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_clients.copy()
-                        else:
-                            servers_affected = set()
-                            for server_client in servers_clients:
-                                for response in servers_clients[server_client]:
-                                    if response.recursion_desired_and_available():
-                                        servers_affected.add(server_client)
-                            if servers_affected:
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN] = servers_affected
-                    elif not qname_sought.is_subdomain(soa_owner_name):
-                        if qname_sought == qname:
-                            if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
-                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_clients)
-                        else:
-                            servers_affected = set()
-                            for server_client in servers_clients:
-                                for response in servers_clients[server_client]:
-                                    if response.recursion_desired_and_available():
-                                        servers_affected.add(server_client)
-                            if servers_affected:
-                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN] = set()
-                                self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN].update(servers_affected)
-                        soa_owner_name = None
-
-                    if soa_owner_name is None:
-                        soa_owner_name = qname_obj.zone.name
-
-                    for server,client in servers_clients:
-                        for response in servers_clients[(server,client)]:
-                            if not (qname_sought == qname or response.recursion_desired_and_available()):
-                                continue
-                            nsec_info_list = query.nsec_set_info_by_server[response]
-                            status = None
-                            for nsec_set_info in nsec_info_list:
-                                if nsec_set_info.use_nsec3:
-                                    status = Status.NSEC3StatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
-                                else:
-                                    status = Status.NSECStatusNXDOMAIN(qname_sought, soa_owner_name, nsec_set_info)
-                                if status.validation_status == Status.STATUS_VALID:
-                                    break
-
-                            # report that no NSEC(3) records were returned
-                            if status is None:
-                                if qname_obj.zone.signed and (qname_sought == qname or response.recursion_desired_and_available()):
-                                    if response.dnssec_requested():
-                                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN] = set()
-                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN].add((server,client))
-                                    elif qname_obj.zone.server_responsive_with_do(server,client):
-                                        if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.nxdomain_errors[(qname_sought, rdtype)]:
-                                            self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                                        self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
-                            else:
-                                for rrset_info in status.nsec_set_info.rrsets.values():
-                                    self._populate_rrsig_status(qname_sought, rdtype, query, rrset_info, qname_obj, supported_algs)
-
-                                if status not in statuses:
-                                    statuses.append(status)
-                                    validation_status = status.validation_status
-                                    if validation_status not in self.nxdomain_status_by_status:
-                                        self.nxdomain_status_by_status[validation_status] = set()
-                                    self.nxdomain_status_by_status[validation_status].add(status)
+                statuses = self._populate_negative_response_status(query, qname_sought, query.nxdomain_info[qname_sought], \
+                        Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN, None, \
+                        Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
+                        self.nxdomain_warnings[(qname_sought, rdtype)], self.nxdomain_errors[(qname_sought, rdtype)], \
+                        supported_algs)
 
                 if statuses:
                     self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
 
                 if qname_sought in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
-                    self.nxdomain_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
+                    self.nxdomain_warnings[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
 
-                for server,client in self.nxdomain_servers_clients[(qname_sought, rdtype)]:
-                    for response in self.nxdomain_servers_clients[(qname_sought, rdtype)][server,client]:
-                        self._populate_response_errors(qname_obj, response, server, client,  self.nxdomain_warnings[(qname_sought, rdtype)], self.nxdomain_errors[(qname_sought, rdtype)])
-
-            # no answer
             for qname_sought in query.rrset_noanswer_info:
-                qname_obj = self.get_name(qname_sought)
-                if rdtype == dns.rdatatype.DS:
-                    qname_obj = qname_obj.parent
-
-                statuses = []
                 self.noanswer_warnings[(qname_sought, rdtype)] = {}
                 self.noanswer_errors[(qname_sought, rdtype)] = {}
-                self.noanswer_servers_clients[(qname_sought, rdtype)] = {}
-                for soa_owner_name, servers_clients in query.rrset_noanswer_info[qname_sought].items():
-                    self.noanswer_servers_clients[(qname_sought, rdtype)].update(servers_clients)
+                self.noanswer_servers_clients[(qname_sought, rdtype)] = query.rrset_noanswer_info[qname_sought].servers_clients
 
-                    if soa_owner_name is None:
-                        # check for an upward referral
-                        servers_missing_soa = set()
-                        servers_upward_referral = set()
-                        for server_client in servers_clients:
-                            for response in servers_clients[server_client]:
-                                if qname_sought == qname or response.recursion_desired_and_available():
-                                    if response.is_upward_referral(qname_obj.zone.name):
-                                        servers_upward_referral.add(server_client)
-                                    else:
-                                        servers_missing_soa.add(server_client)
-                        if servers_missing_soa:
-                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA] = servers_missing_soa
-                        if servers_upward_referral:
-                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UPWARD_REFERRAL] = servers_upward_referral
-                    elif not qname_sought.is_subdomain(soa_owner_name):
-                        if qname_sought == qname:
-                            if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
-                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_clients)
-                        else:
-                            servers_affected = set()
-                            for server_client in servers_clients:
-                                for response in servers_clients[server_client]:
-                                    if response.recursion_desired_and_available():
-                                        servers_affected.add(server_client)
-                            if servers_affected:
-                                if Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA not in self.noanswer_errors[(qname_sought, rdtype)]:
-                                    self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA] = set()
-                                self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA].update(servers_affected)
-                        soa_owner_name = None
-
-                    if soa_owner_name is None:
-                        soa_owner_name = qname_obj.zone.name
-
-                    for server,client in servers_clients:
-                        for response in servers_clients[(server,client)]:
-                            if not (qname_sought == qname or response.recursion_desired_and_available()):
-                                continue
-                            nsec_info_list = query.nsec_set_info_by_server[response]
-                            status = None
-                            for nsec_set_info in nsec_info_list:
-                                if nsec_set_info.use_nsec3:
-                                    status = Status.NSEC3StatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
-                                else:
-                                    status = Status.NSECStatusNoAnswer(qname_sought, query.rdtype, soa_owner_name, nsec_set_info.referral, nsec_set_info)
-                                if status.validation_status == Status.STATUS_VALID:
-                                    break
-
-                            if status is None:
-                                if qname_obj.zone.signed and (qname_sought == qname or response.recursion_desired_and_available()):
-                                    if response.dnssec_requested():
-                                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA not in self.noanswer_errors[(qname_sought,rdtype)]:
-                                            self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA] = set()
-                                        self.noanswer_errors[(qname_sought,rdtype)][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA].add((server,client))
-                                    elif qname_obj.zone.server_responsive_with_do(server,client):
-                                        if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in self.noanswer_errors[(qname_sought, rdtype)]:
-                                            self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                                        self.noanswer_errors[(qname_sought, rdtype)][Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
-                            else:
-                                for rrset_info in status.nsec_set_info.rrsets.values():
-                                    self._populate_rrsig_status(qname_sought, rdtype, query, rrset_info, qname_obj, supported_algs)
-
-                                if status not in statuses:
-                                    statuses.append(status)
-                                    validation_status = status.validation_status
-                                    if validation_status not in self.noanswer_status_by_status:
-                                        self.noanswer_status_by_status[validation_status] = set()
-                                    self.noanswer_status_by_status[validation_status].add((qname_sought, query.rdtype))
+                statuses = self._populate_negative_response_status(query, qname_sought, query.rrset_noanswer_info[qname_sought], \
+                        Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA, Status.RESPONSE_ERROR_UPWARD_REFERRAL, \
+                        Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
+                        self.noanswer_warnings[(qname_sought, rdtype)], self.noanswer_errors[(qname_sought, rdtype)], \
+                        supported_algs)
 
                 if statuses:
-                    if (qname_sought, rdtype) not in self.noanswer_status:
-                        self.noanswer_status[(qname_sought, rdtype)] = set(statuses)
-
-                for server,client in self.noanswer_servers_clients[(qname_sought, rdtype)]:
-                    for response in self.noanswer_servers_clients[(qname_sought, rdtype)][server,client]:
-                        self._populate_response_errors(qname_obj, response, server, client,  self.noanswer_warnings[(qname_sought, rdtype)], self.noanswer_errors[(qname_sought, rdtype)])
+                    self.noanswer_status[(qname_sought, rdtype)] = set(statuses)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:

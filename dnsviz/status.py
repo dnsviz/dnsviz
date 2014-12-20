@@ -526,7 +526,7 @@ class DSStatus(object):
         return d
 
 class NSECStatusNXDOMAIN(object):
-    def __init__(self, qname, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
         self.warnings = []
@@ -642,8 +642,8 @@ class NSECStatusNXDOMAIN(object):
         return d
 
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, origin, nsec_set_info):
-        super(NSECStatusWildcard, self).__init__(qname, origin, nsec_set_info)
+    def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
+        super(NSECStatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
         self.wildcard_name = wildcard_name
         self.nsec_names_covering_wildcard = {}
 
@@ -692,11 +692,11 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return d
 
 class NSECStatusNoAnswer(object):
-    def __init__(self, qname, rdtype, origin, referral, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
-        self.referral = referral
+        self.referral = nsec_set_info.referral
         self.warnings = []
         self.errors = []
         self.wildcard_name = dns.name.from_text('*', origin)
@@ -854,7 +854,7 @@ class NSECStatusNoAnswer(object):
         return d
 
 class NSEC3StatusNXDOMAIN(object):
-    def __init__(self, qname, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
         self.warnings = []
@@ -1024,9 +1024,9 @@ class NSEC3StatusNXDOMAIN(object):
         return d
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, origin, nsec_set_info):
+    def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
         self.wildcard_name = wildcard_name
-        super(NSEC3StatusWildcard, self).__init__(qname, origin, nsec_set_info)
+        super(NSEC3StatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
 
     def _set_closest_encloser(self, nsec_set_info):
         super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
@@ -1081,11 +1081,11 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         return d
     
 class NSEC3StatusNoAnswer(object):
-    def __init__(self, qname, rdtype, origin, referral, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
-        self.referral = referral
+        self.referral = nsec_set_info.referral
         self.wildcard_name = None
         self.warnings = []
         self.errors = []

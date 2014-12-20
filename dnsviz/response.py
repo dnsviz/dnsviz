@@ -608,6 +608,22 @@ def cname_from_dname(name, dname_rrset):
     rrset.add(dns.rdtypes.ANY.CNAME.CNAME(dns.rdataclass.IN, dns.rdatatype.CNAME, synthesized_cname))
     return rrset
 
+class NegativeResponseInfo(object):
+    def __init__(self):
+        self.servers_clients = {}
+        self.soa_info = []
+
+    def create_or_update_soa_info(self, soa_info, server, client, response):
+        try:
+            index = self.soa_info.index(soa_info)
+            soa_info = self.soa_info[index]
+        except ValueError:
+            self.soa_info.append(soa_info)
+        if (server, client) not in soa_info.servers_clients:
+            soa_info.servers_clients[(server, client)] = []
+        soa_info.servers_clients[(server, client)].append(response)
+        return soa_info
+
 class NSECSet(object):
     def __init__(self, rrsets, referral):
         self.rrsets = {}

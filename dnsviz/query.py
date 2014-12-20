@@ -739,31 +739,31 @@ class AggregateDNSResponse(object):
             if qname_sought != qname and not response.recursion_desired_and_available():
                 return
 
+            if msg.rcode() == dns.rcode.NXDOMAIN:
+                if qname_sought not in self.nxdomain_info:
+                    self.nxdomain_info[qname_sought] = NegativeResponseInfo()
+                neg_info = self.nxdomain_info[qname_sought]
+            else:
+                if qname_sought not in self.rrset_noanswer_info:
+                    self.rrset_noanswer_info[qname_sought] = NegativeResponseInfo()
+                neg_info = self.rrset_noanswer_info[qname_sought]
+
+            if (server,client) not in neg_info.servers_clients:
+                neg_info.servers_clients[(server,client)] = []
+            neg_info.servers_clients[(server,client)].append(response)
+
             try:
                 soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and qname_sought.is_subdomain(x.name), msg.authority)
                 if not soa_rrsets:
                     soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA, msg.authority)
                 soa_rrsets.sort(reverse=True)
-                soa_owner_name = soa_rrsets[0].name
+                soa_rrset = soa_rrsets[0]
             except IndexError:
-                soa_owner_name = None
+                soa_rrset = None
 
-            if msg.rcode() == dns.rcode.NXDOMAIN:
-                if qname_sought not in self.nxdomain_info:
-                    self.nxdomain_info[qname_sought] = {}
-                if soa_owner_name not in self.nxdomain_info[qname_sought]:
-                    self.nxdomain_info[qname_sought][soa_owner_name] = {}
-                if (server,client) not in self.nxdomain_info[qname_sought][soa_owner_name]:
-                    self.nxdomain_info[qname_sought][soa_owner_name][(server,client)] = []
-                self.nxdomain_info[qname_sought][soa_owner_name][(server,client)].append(response)
-            else:
-                if qname_sought not in self.rrset_noanswer_info:
-                    self.rrset_noanswer_info[qname_sought] = {}
-                if soa_owner_name not in self.rrset_noanswer_info[qname_sought]:
-                    self.rrset_noanswer_info[qname_sought][soa_owner_name] = {}
-                if (server,client) not in self.rrset_noanswer_info[qname_sought][soa_owner_name]:
-                    self.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)] = []
-                self.rrset_noanswer_info[qname_sought][soa_owner_name][(server,client)].append(response)
+            if soa_rrset is not None: 
+                soa_rrset_info = neg_info.create_or_update_soa_info(RRsetInfo(soa_rrset), server, client, response)
+                self._update_rrsig_info(server, client, response, msg.authority, soa_rrset_info)
 
     def _update_rrsig_info(self, server, client, response, section, rrset_info):
         msg = response.message
