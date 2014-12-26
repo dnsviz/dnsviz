@@ -30,15 +30,23 @@ import base64
 import struct
 import hashlib
 
-from M2Crypto import DSA, EC, Engine, EVP, m2, RSA
-from M2Crypto.m2 import hex_to_bn, bn_to_mpi
+try:
+    import M2Crypto
+except ImportError:
+    _supported_algs = set()
+    _supported_digest_algs = set()
+else:
+    from M2Crypto import DSA, EC, Engine, EVP, m2, RSA
+    from M2Crypto.m2 import hex_to_bn, bn_to_mpi
+
+    _supported_algs = set([1,5,7,8,10])
+    _supported_digest_algs = set([1,2,4])
+
+_supported_nsec3_algs = set([1])
 
 GOST_PREFIX = '\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_DIGEST_NAME = 'GOST R 34.11-94'
 
-_supported_algs = set([1,5,7,8,10])
-_supported_digest_algs = set([1,2,4])
-_supported_nsec3_algs = set([1])
 def _check_dsa_support():
     try:
         DSA.pub_key_from_params
@@ -86,15 +94,20 @@ def _gost_cleanup():
     gost.finish()
     Engine.cleanup()
 
-_check_dsa_support()
-_check_gost_support()
-_check_ec_support()
+try:
+    import M2Crypto
+except ImportError:
+    pass
+else:
+    _check_dsa_support()
+    _check_gost_support()
+    _check_ec_support()
 
-class GostMessageDigest(EVP.MessageDigest):
-    def __init__(self, md):
-        self.md=md
-        self.ctx=m2.md_ctx_new()
-        m2.digest_init(self.ctx, self.md)
+    class GostMessageDigest(EVP.MessageDigest):
+        def __init__(self, md):
+            self.md=md
+            self.ctx=m2.md_ctx_new()
+            m2.digest_init(self.ctx, self.md)
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
     if not digest_alg_is_supported(digest_alg):

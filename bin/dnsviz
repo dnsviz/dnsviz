@@ -71,6 +71,12 @@ def finish_graph(G, trusted_keys, fmt, filename):
         else:
             G.draw(fmt, path=filename)
 
+def test_m2crypto():
+    try:
+        import M2Crypto
+    except ImportError:
+        sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
+
 def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Oo:T:')
@@ -119,6 +125,8 @@ def main():
         trusted_keys = get_trusted_keys(open(opts['-t']).read())
     else:
         trusted_keys = ()
+
+    test_m2crypto()
 
     name_objs = []
     for name in names:
