@@ -34,11 +34,11 @@ import time
 
 import dns.name
 
-from dnsviz.analysis import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
+from dnsviz.analysis.online import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 
-logger = logging.getLogger('dnsviz.analysis')
+logger = logging.getLogger('dnsviz.analysis.online')
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
