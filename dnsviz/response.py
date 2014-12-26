@@ -61,7 +61,7 @@ def _rr_cmp(a, b):
 class DNSResponse:
     '''A DNS response, including meta information'''
 
-    def __init__(self, message, msg_size, error, errno, history, response_time):
+    def __init__(self, message, msg_size, error, errno, history, response_time, query, review_history=True):
         self.message = message
         self.msg_size = msg_size
         self.error = error
@@ -69,7 +69,7 @@ class DNSResponse:
         self.history = history
         self.response_time = response_time
 
-        self.query = None
+        self.query = query
 
         self.effective_flags = None
         self.effective_edns = None
@@ -84,6 +84,9 @@ class DNSResponse:
         self.tcp_responsive = None
         self.responsive_cause_index = None
 
+        if review_history:
+            self._review_history()
+
     def __unicode__(self):
         import query as Q
         if self.message is not None:
@@ -95,8 +98,9 @@ class DNSResponse:
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
     def copy(self):
-        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time)
+        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, review_history=False)
         clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp)
+        clone.set_responsiveness(self.udp_attempted, self.udp_responsive, self.tcp_attempted, self.tcp_responsive, self.responsive_cause_index)
         return clone
 
     def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options, effective_tcp):
@@ -113,6 +117,104 @@ class DNSResponse:
         self.tcp_attempted = tcp_attempted
         self.tcp_responsive = tcp_responsive
         self.responsive_cause_index = responsive_cause_index
+
+    def _review_history(self):
+        import query as Q
+
+        flags = self.query.flags
+        edns = self.query.edns
+        edns_max_udp_payload = self.query.edns_max_udp_payload
+        edns_flags = self.query.edns_flags
+        edns_options = self.query.edns_options[:]
+
+        # mark whether TCP or UDP was attempted initially
+        tcp_attempted = tcp = self.query.tcp_first
+        udp_attempted = not tcp
+
+        tcp_responsive = False
+        udp_responsive = False
+        tcp_valid = False
+        udp_valid = False
+
+        #TODO - there could be room for both a responsiveness check and a valid
+        # check here, rather than just a valid check
+
+        responsive_cause_index = None
+
+        prev_index = None
+        for i, retry in enumerate(self.history):
+            # mark if TCP or UDP was attempted prior to this retry
+            if tcp:
+                tcp_attempted = True
+            else:
+                udp_attempted = True
+
+            # Mark responsiveness if this retry wasn't caused by network error
+            # or timeout. 
+            if retry.cause not in (Q.RETRY_CAUSE_NETWORK_ERROR, Q.RETRY_CAUSE_TIMEOUT):
+                if tcp:
+                    tcp_responsive = True
+                else:
+                    udp_responsive = True
+
+            # If the last cause/action resulted in a valid response where there
+            # wasn't previously on the same protocol, then mark the
+            # cause/action.
+            if retry.cause in (Q.RETRY_CAUSE_TC_SET, Q.RETRY_CAUSE_DIAGNOSTIC):
+                if tcp:
+                    if responsive_cause_index is None and \
+                            not tcp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_TCP:
+                        responsive_cause_index = prev_index
+                    tcp_valid = True
+                else:
+                    if responsive_cause_index is None and \
+                            not udp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_UDP:
+                        responsive_cause_index = prev_index
+                    udp_valid = True
+
+            if retry.action == Q.RETRY_ACTION_SET_FLAG:
+                flags |= retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_CLEAR_FLAG:
+                flags &= ~retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_DISABLE_EDNS:
+                edns = -1
+            elif retry.action == Q.RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD:
+                edns_max_udp_payload = retry.action_arg
+                tcp = False
+            elif retry.action == Q.RETRY_ACTION_SET_EDNS_FLAG:
+                edns_flags |= retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_CLEAR_EDNS_FLAG:
+                edns_flags &= ~retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_USE_TCP:
+                tcp = True
+            elif retry.action == Q.RETRY_ACTION_USE_UDP:
+                tcp = False
+            #TODO do the same with EDNS options
+
+            prev_index = i
+
+        # Mark responsiveness if the ultimate query didn't result in network
+        # error or timeout.
+        if self.error not in (Q.RESPONSE_ERROR_NETWORK_ERROR, Q.RESPONSE_ERROR_TIMEOUT):
+            if tcp:
+                tcp_responsive = True
+            else:
+                udp_responsive = True
+
+        # If the last cause/action resulted in a valid response where there
+        # wasn't previously on the same protocol, then mark the cause/action.
+        if self.is_valid_response():
+            if tcp:
+                if responsive_cause_index is None and \
+                        not tcp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_TCP:
+                    responsive_cause_index = prev_index
+            else:
+                if responsive_cause_index is None and \
+                        not udp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_UDP:
+                    responsive_cause_index = prev_index
+
+        self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
+        self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
 
     def recursion_desired_and_available(self):
         '''Return True if the recursion desired (RD) bit was set in the request to the
@@ -284,7 +386,7 @@ class DNSResponse:
         return d
 
     @classmethod
-    def deserialize(cls, d):
+    def deserialize(cls, d, query):
         import query as Q
 
         if 'msg_size' in d:
@@ -309,7 +411,7 @@ class DNSResponse:
         history = []
         for retry in d['history']:
             history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
-        return DNSResponse(message, msg_size, error, errno, history, response_time)
+        return DNSResponse(message, msg_size, error, errno, history, response_time, query)
 
 class RDataMeta(object):
     def __init__(self, name, ttl, rdtype, rdata):
