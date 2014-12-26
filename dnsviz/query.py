@@ -843,13 +843,11 @@ class AggregateDNSResponse(object):
                 self.error_rcode[msg.rcode()] = set()
             self.error_rcode[msg.rcode()].add((server, client))
 
-class DNSQuery(AggregateDNSResponse):
+class DNSQuery(object):
     '''An simple DNS Query and its responses.'''
 
     def __init__(self, qname, rdtype, rdclass,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first):
-
-        super(DNSQuery, self).__init__()
 
         self.qname = qname
         self.rdtype = rdtype
@@ -939,6 +937,15 @@ class DNSQuery(AggregateDNSResponse):
         if val is None:
             val = False
         return val
+
+    def is_answer_any(self):
+        for server in self.responses:
+            for response in self.responses[server].values():
+                if not (response.is_valid_response() and response.is_complete_response()):
+                    continue
+                if response.is_answer(self.qname, self.rdtype):
+                    return True
+        return False
 
     def is_nxdomain_all(self):
         val = None
@@ -1058,11 +1065,21 @@ class DNSQuery(AggregateDNSResponse):
                 q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client], q), bailiwick)
         return q
 
-class MultiQuery(AggregateDNSResponse):
+class DNSQueryAggregateDNSResponse(DNSQuery, AggregateDNSResponse):
+    def __init__(self, qname, rdtype, rdclass,
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first):
+        DNSQuery.__init__(self, qname, rdtype, rdclass,
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first)
+        AggregateDNSResponse.__init__(self)
+
+    def add_response(self, server, client, response, bailiwick):
+        super(DNSQueryAggregateDNSResponse, self).add_response(server, client, response, bailiwick)
+        self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
+
+class MultiQuery(object):
     '''An simple DNS Query and its responses.'''
 
     def __init__(self, qname, rdtype, rdclass):
-        super(MultiQuery, self).__init__()
         self.qname = qname
         self.rdtype = rdtype
         self.rdclass = rdclass
@@ -1083,13 +1100,9 @@ class MultiQuery(AggregateDNSResponse):
             self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
         else:
             self.queries[params] = query
-        for server in query.responses:
-            bailiwick = bailiwick_map.get(server, default_bailiwick)
-            for client, response in query.responses[server].items():
-                self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
     def project(self, servers, bailiwick_map, default_bailiwick):
-        query = MultiQuery(self.qname, self.rdtype, self.rdclass)
+        query = self.__class__(self.qname, self.rdtype, self.rdclass)
 
         for params in self.queries:
             query.add_query(self.queries[params].project(servers, bailiwick_map, default_bailiwick))
@@ -1100,6 +1113,18 @@ class MultiQuery(AggregateDNSResponse):
             if not self.queries[params].is_nxdomain_all():
                 return False
         return True
+
+class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
+    def __init__(self, qname, rdtype, rdclass):
+        MultiQuery.__init__(self, qname, rdtype, rdclass)
+        AggregateDNSResponse.__init__(self)
+
+    def add_query(self, query, bailiwick_map, default_bailiwick):
+        super(MultiQueryAggregateDNSResponse, self).add_query(query, bailiwick_map, default_bailiwick)
+        for server in query.responses:
+            bailiwick = bailiwick_map.get(server, default_bailiwick)
+            for client, response in query.responses[server].items():
+                self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''

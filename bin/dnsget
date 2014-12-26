@@ -34,7 +34,7 @@ import time
 
 import dns.name
 
-from dnsviz.analysis import Analyst, DomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
+from dnsviz.analysis import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 
@@ -82,7 +82,7 @@ class BulkAnalyst(object):
         return name_objs
 
 class MultiProcessAnalyst(Analyst):
-    analysis_model = DomainNameAnalysis
+    analysis_model = OnlineDomainNameAnalysis
 
     def _finalize_analysis_proper(self, name_obj):
         self.analysis_cache[name_obj.name] = name_obj
@@ -286,7 +286,7 @@ def main():
         else:
             analysis_structured = json.loads(analysis_str)
         for name in names:
-            name_objs.append(DomainNameAnalysis.deserialize(name, analysis_structured))
+            name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
     else:
         if '-t' in opts:
             a = ParallelAnalyst(ceiling, explicit_delegations, dlv_domain, processes)

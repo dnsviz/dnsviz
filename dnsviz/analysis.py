@@ -150,6 +150,8 @@ class DomainNameAnalysis(object):
     RDTYPES_SECURE_DELEGATION = 3
     RDTYPES_DELEGATION = 4
 
+    QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
+
     def __init__(self, name, stub=False):
 
         ##################################################
@@ -565,7 +567,7 @@ class DomainNameAnalysis(object):
 
         key = (query.qname, query.rdtype)
         if key not in self.queries:
-            self.queries[key] = Q.MultiQuery(query.qname, query.rdtype, query.rdclass)
+            self.queries[key] = self.QUERY_CLASS(query.qname, query.rdtype, query.rdclass)
         self.queries[key].add_query(query, bailiwick_map, default_bailiwick)
 
         for server in query.responses:
@@ -1500,7 +1502,7 @@ class DomainNameAnalysis(object):
         if (self.name, dns.rdatatype.DNSKEY) in self.queries:
             dnskey_multiquery = self.queries[(self.name, dns.rdatatype.DNSKEY)]
         else:
-            dnskey_multiquery = Q.MultiQuery(self.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN)
+            dnskey_multiquery = self.QUERY_CLASS(self.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN)
 
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
@@ -2518,7 +2520,10 @@ class DomainNameAnalysis(object):
             if target.canonicalize().to_text() in d:
                 self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
-class ActiveDomainNameAnalysis(DomainNameAnalysis):
+class OnlineDomainNameAnalysis(DomainNameAnalysis):
+    QUERY_CLASS = Q.MultiQuery
+
+class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
     def __init__(self, *args, **kwargs):
         super(ActiveDomainNameAnalysis, self).__init__(*args, **kwargs)
         self.complete = threading.Event()
@@ -3107,7 +3112,7 @@ class Analyst(object):
         self.logger.debug('Executing queries...')
         Q.ExecutableDNSQuery.execute_queries(*queries.values())
         for key, query in queries.items():
-            if query.rrset_answer_info or key not in exclude_no_answer:
+            if query.is_answer_any() or key not in exclude_no_answer:
                 name_obj.add_query(query)
 
     def _analyze_delegation(self, name_obj):
