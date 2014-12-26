@@ -216,12 +216,9 @@ class DomainNameAnalysis(object):
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
-        self.rrsig_status_by_status = None
         self.wildcard_status = None
-        self.wildcard_status_by_status = None
         self.dname_status = None
         self.nxdomain_status = None
-        self.nxdomain_status_by_status = None
         self.nxdomain_servers_clients = None
         self.noanswer_servers_clients = None
         self.response_errors_rcode = None
@@ -266,7 +263,6 @@ class DomainNameAnalysis(object):
 
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
-        self.ds_status_by_status = None
 
         self.delegation_warnings = None
         self.delegation_errors = None
@@ -1301,20 +1297,12 @@ class DomainNameAnalysis(object):
                                         self.zsks.add(rrsig_status.dnskey)
 
                                 key = rrsig_status.rrset, rrsig_status.rrsig
-                                if rrsig_status.validation_status not in self.rrsig_status_by_status:
-                                    self.rrsig_status_by_status[rrsig_status.validation_status] = {}
-                                if key not in self.rrsig_status_by_status[rrsig_status.validation_status]:
-                                    self.rrsig_status_by_status[rrsig_status.validation_status][key] = set()
-                                self.rrsig_status_by_status[rrsig_status.validation_status][key].add(rrsig_status)
                             break
 
             # no corresponding DNSKEY
             if not self.rrsig_status[rrset_info][rrsig]:
                 rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
                 self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
-                if rrsig_status.validation_status not in self.rrsig_status_by_status:
-                    self.rrsig_status_by_status[rrsig_status.validation_status] = {}
-                self.rrsig_status_by_status[rrsig_status.validation_status][(rrsig_status.rrset, rrsig_status.rrsig)] = set([rrsig_status])
 
         # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
         for server,client,response in algs_signing_rrset:
@@ -1377,9 +1365,6 @@ class DomainNameAnalysis(object):
                         if status not in statuses:
                             statuses.append(status)
                             validation_status = status.validation_status
-                            if validation_status not in self.wildcard_status_by_status:
-                                self.wildcard_status_by_status[validation_status] = set()
-                            self.wildcard_status_by_status[validation_status].add(status)
 
             if statuses:
                 if rrset_info.rrset.name not in self.wildcard_status:
@@ -1395,10 +1380,8 @@ class DomainNameAnalysis(object):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
-        self.rrsig_status_by_status = {}
         self.dname_status = {}
         self.wildcard_status = {}
-        self.wildcard_status_by_status = {}
         self.response_errors_rcode = {}
         self.response_errors = {}
 
@@ -1457,7 +1440,6 @@ class DomainNameAnalysis(object):
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
         self.ds_status_by_dnskey = {}
-        self.ds_status_by_status = {}
         self.delegation_errors = {}
         self.delegation_warnings = {}
         self.delegation_status = {}
@@ -1481,7 +1463,6 @@ class DomainNameAnalysis(object):
         _logger.debug('Assessing delegation status of %s...' % (fmt.humanize_name(self.name)))
         self.ds_status_by_ds[rdtype] = {}
         self.ds_status_by_dnskey[rdtype] = {}
-        self.ds_status_by_status[rdtype] = {}
         self.delegation_warnings[rdtype] = {}
         self.delegation_errors[rdtype] = {}
         self.delegation_status[rdtype] = None
@@ -1608,13 +1589,6 @@ class DomainNameAnalysis(object):
                             for ds_status in validation_status_mapping[status]:
                                 self.ds_status_by_ds[rdtype][ds_status.ds][ds_status.dnskey] = ds_status
                                 self.ds_status_by_dnskey[rdtype][ds_status.dnskey][ds_status.ds] = ds_status
-
-                                if ds_status.validation_status not in self.ds_status_by_status[rdtype]:
-                                    self.ds_status_by_status[ds_status.validation_status] = {}
-                                key = rdtype, ds_status.ds
-                                if key not in self.ds_status_by_status[ds_status.validation_status]:
-                                    self.ds_status_by_status[ds_status.validation_status][key] = set()
-                                self.ds_status_by_status[ds_status.validation_status][key].add(ds_status)
                             break
 
                 # no corresponding DNSKEY
@@ -1624,9 +1598,6 @@ class DomainNameAnalysis(object):
                     if None not in self.ds_status_by_dnskey[rdtype]:
                         self.ds_status_by_dnskey[rdtype][None] = {}
                     self.ds_status_by_dnskey[rdtype][None][ds_rdata] = ds_status
-                    if ds_status.validation_status not in self.ds_status_by_status:
-                        self.ds_status_by_status[ds_status.validation_status] = {}
-                    self.ds_status_by_status[ds_status.validation_status][(rdtype, ds_rdata)] = set([ds_status])
 
             if dnskey_server_client_responses:
                 if not algs_validating_sep:
@@ -1778,21 +1749,16 @@ class DomainNameAnalysis(object):
                     if status not in statuses:
                         statuses.append(status)
                         validation_status = status.validation_status
-                        if validation_status not in self.nxdomain_status_by_status:
-                            self.nxdomain_status_by_status[validation_status] = set()
-                        self.nxdomain_status_by_status[validation_status].add(status)
 
     def _populate_nsec_status(self, supported_algs, level):
         self.nxdomain_status = {}
         self.nxdomain_servers_clients = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
-        self.nxdomain_status_by_status = {}
         self.noanswer_status = {}
         self.noanswer_servers_clients = {}
         self.noanswer_warnings = {}
         self.noanswer_errors = {}
-        self.noanswer_status_by_status = {}
 
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         required_rdtypes = self._rdtypes_for_analysis_level(level)
