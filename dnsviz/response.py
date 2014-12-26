@@ -85,11 +85,11 @@ class DNSResponse:
         self.responsive_cause_index = None
 
     def __unicode__(self):
-        import query
+        import query as Q
         if self.message is not None:
             return repr(self.message)
         else:
-            return query.response_errors.get(self.error)
+            return Q.response_errors.get(self.error)
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
@@ -265,12 +265,12 @@ class DNSResponse:
         return ip_mapping
 
     def serialize(self):
-        import query
+        import query as Q
 
         d = collections.OrderedDict()
         if self.message is None:
             d['message'] = None
-            d['error'] = query.response_errors[self.error]
+            d['error'] = Q.response_errors[self.error]
             if self.errno:
                 d['errno'] = self.errno
         else:
@@ -285,14 +285,14 @@ class DNSResponse:
 
     @classmethod
     def deserialize(cls, d):
-        import query
+        import query as Q
 
         if 'msg_size' in d:
             msg_size = int(d['msg_size'])
         else:
             msg_size = None
         if 'error' in d:
-            error = query.response_error_codes[d['error']]
+            error = Q.response_error_codes[d['error']]
         else:
             error = None
         if 'errno' in d:
@@ -308,7 +308,7 @@ class DNSResponse:
         response_time = d['response_time']
         history = []
         for retry in d['history']:
-            history.append(query.DNSQueryRetryAttempt.deserialize(retry))
+            history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
         return DNSResponse(message, msg_size, error, errno, history, response_time)
 
 class RDataMeta(object):
