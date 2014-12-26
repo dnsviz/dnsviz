@@ -82,6 +82,7 @@ class DNSResponse:
         self.udp_responsive = None
         self.tcp_attempted = None
         self.tcp_responsive = None
+        self.responsive_cause_index = None
 
     def __unicode__(self):
         import query
