@@ -30,7 +30,7 @@ import sys
 
 import dns.message, dns.name 
 
-from dnsviz.analysis import DomainNameAnalysis
+from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
@@ -122,7 +122,7 @@ def main():
 
     name_objs = []
     for name in names:
-        name_objs.append(DomainNameAnalysis.deserialize(name, analysis_structured))
+        name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
 
     G = DNSAuthGraph()
     for name_obj in name_objs:

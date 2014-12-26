@@ -143,14 +143,8 @@ _resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQue
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
-class DomainNameAnalysis(object):
-    RDTYPES_ALL = 0
-    RDTYPES_ALL_SAME_NAME = 1
-    RDTYPES_NS_TARGET = 2
-    RDTYPES_SECURE_DELEGATION = 3
-    RDTYPES_DELEGATION = 4
-
-    QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
+class OnlineDomainNameAnalysis(object):
+    QUERY_CLASS = Q.MultiQuery
 
     def __init__(self, name, stub=False):
 
@@ -210,20 +204,6 @@ class DomainNameAnalysis(object):
         # dependencies
         self.ttl_mapping = {}
 
-        self.status = None
-        self.yxdomain = None
-        self.yxrrset = None
-        self.rrset_warnings = None
-        self.rrset_errors = None
-        self.rrsig_status = None
-        self.wildcard_status = None
-        self.dname_status = None
-        self.nxdomain_status = None
-        self.nxdomain_servers_clients = None
-        self.noanswer_servers_clients = None
-        self.response_errors_rcode = None
-        self.response_errors = None
-
         ##################################################
         # Zone-specific attributes
         ##################################################
@@ -260,18 +240,6 @@ class DomainNameAnalysis(object):
         self.dnssec_algorithms_in_dlv = set()
         self.dnssec_algorithms_digest_in_ds = set()
         self.dnssec_algorithms_digest_in_dlv = set()
-
-        self.ds_status_by_ds = None
-        self.ds_status_by_dnskey = None
-
-        self.delegation_warnings = None
-        self.delegation_errors = None
-        self.delegation_status = None
-
-        self.published_keys = None
-        self.revoked_keys = None
-        self.zsks = None
-        self.ksks = None
 
     def __repr__(self):
         return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
@@ -805,6 +773,263 @@ class DomainNameAnalysis(object):
         if self.parent is None:
             return [], None
         return self.parent.get_ns_name_for_ip(ip)
+
+    def serialize(self, d=None, trace=None):
+        if d is None:
+            d = collections.OrderedDict()
+
+        if trace is None:
+            trace = []
+
+        if self in trace:
+            return
+
+        name_str = self.name.canonicalize().to_text()
+        if name_str in d:
+            return
+
+        # serialize dependencies first because their version of the analysis
+        # might be the most complete (considering re-dos)
+        self._serialize_dependencies(d, trace)
+
+        if self.parent is not None:
+            self.parent.serialize(d, trace + [self])
+        if self.dlv_parent is not None:
+            self.dlv_parent.serialize(d, trace + [self])
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor.serialize(d, trace + [self])
+
+        clients_ipv4 = list(self.clients_ipv4)
+        clients_ipv4.sort()
+        clients_ipv6 = list(self.clients_ipv6)
+        clients_ipv6.sort()
+
+        d[name_str] = collections.OrderedDict()
+        d[name_str]['stub'] = self.stub
+        d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
+        d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
+        if not self.stub:
+            d[name_str]['clients_ipv4'] = clients_ipv4
+            d[name_str]['clients_ipv6'] = clients_ipv6
+
+            if self.parent is not None:
+                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
+            if self.dlv_parent is not None:
+                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+            if self.nxdomain_ancestor is not None:
+                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
+            if self.referral_rdtype is not None:
+                d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
+            d[name_str]['explicit_delegation'] = self.explicit_delegation
+            if self.nxdomain_name is not None:
+                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
+                d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
+            if self.nxrrset_name is not None:
+                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
+                d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
+
+        self._serialize_related(d[name_str])
+
+    def _serialize_related(self, d):
+        if self._auth_ns_ip_mapping:
+            d['auth_ns_ip_mapping'] = collections.OrderedDict()
+            ns_names = self._auth_ns_ip_mapping.keys()
+            ns_names.sort()
+            for name in ns_names:
+                addrs = list(self._auth_ns_ip_mapping[name])
+                addrs.sort()
+                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+
+        if self.stub:
+            return
+
+        d['queries'] = collections.OrderedDict()
+        query_keys = self.queries.keys()
+        query_keys.sort()
+        for (qname, rdtype) in query_keys:
+            qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+            d['queries'][qname_type_str] = []
+            for query in self.queries[(qname, rdtype)].queries.values():
+                d['queries'][qname_type_str].append(query.serialize())
+
+    def _serialize_dependencies(self, d, trace):
+        if self.stub:
+            return
+
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj.serialize(d, trace=trace + [self])
+        for signer, signer_obj in self.external_signers.items():
+            signer_obj.serialize(d, trace=trace + [self])
+        for target, ns_obj in self.ns_dependencies.items():
+            if ns_obj is not None:
+                ns_obj.serialize(d, trace=trace + [self])
+        for target, mx_obj in self.mx_targets.items():
+            if mx_obj is not None:
+                mx_obj.serialize(d, trace=trace + [self])
+
+    @classmethod
+    def deserialize(cls, name, d1, cache=None):
+        if cache is None:
+            cache = {}
+
+        if name in cache:
+            return cache[name]
+
+        name_str = name.canonicalize().to_text()
+        d = d1[name_str]
+        stub = d['stub']
+        
+        if 'parent' in d:
+            parent_name = dns.name.from_text(d['parent'])
+            parent = cls.deserialize(parent_name, d1, cache=cache)
+        else:
+            parent = None
+
+        if name != dns.name.root and 'dlv_parent' in d:
+            dlv_parent_name = dns.name.from_text(d['dlv_parent'])
+            dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
+        else:
+            dlv_parent_name = None
+            dlv_parent = None
+
+        if 'nxdomain_ancestor' in d:
+            nxdomain_ancestor_name = dns.name.from_text(d['nxdomain_ancestor'])
+            nxdomain_ancestor = cls.deserialize(nxdomain_ancestor_name, d1, cache=cache)
+        else:
+            nxdomain_ancestor_name = None
+            nxdomain_ancestor = None
+
+        _logger.info('Loading %s' % fmt.humanize_name(name))
+
+        cache[name] = a = cls(name, stub=stub)
+        a.parent = parent
+        if dlv_parent is not None:
+            a.dlv_parent = dlv_parent
+        if nxdomain_ancestor is not None:
+            a.nxdomain_ancestor = nxdomain_ancestor
+        a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
+        a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
+
+        if not a.stub:
+            if 'referral_rdtype' in d:
+                a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
+            a.explicit_delegation = d['explicit_delegation']
+            if 'nxdomain_name' in d:
+                a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
+                a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
+            if 'nxrrset_name' in d:
+                a.nxrrset_name = dns.name.from_text(d['nxrrset_name'])
+                a.nxrrset_rdtype = dns.rdatatype.from_text(d['nxrrset_rdtype'])
+
+        a._deserialize_related(d)
+        a._deserialize_dependencies(d1, cache)
+        return a
+
+    def _deserialize_related(self, d):
+        if 'auth_ns_ip_mapping' in d:
+            for target in d['auth_ns_ip_mapping']:
+                for addr in d['auth_ns_ip_mapping'][target]:
+                    self.add_auth_ns_ip_mappings((dns.name.from_text(target), IPAddr(addr)))
+
+        if self.stub:
+            return
+
+        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+
+        # import delegation NS queries first
+        delegation_types = set([dns.rdatatype.NS])
+        if self.referral_rdtype is not None:
+            delegation_types.add(self.referral_rdtype)
+        for rdtype in delegation_types:
+            # if the query has already been imported, then
+            # don't re-import
+            if (self.name, rdtype) in self.queries:
+                continue
+            query_str = '%s/%s/%s' % (self.name.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+            if query_str in d['queries']:
+                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
+                for query in d['queries'][query_str]:
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
+        # set the NS dependencies for the name
+        if self.is_zone():
+            self.set_ns_dependencies()
+
+        for query_str in d['queries']:
+            vals = query_str.split('/')
+            qname = dns.name.from_text('/'.join(vals[:-2]))
+            rdtype = dns.rdatatype.from_text(vals[-1])
+            # if the query has already been imported, then
+            # don't re-import
+            if (qname, rdtype) in self.queries:
+                continue
+            if rdtype in delegation_types:
+                continue
+            if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
+                extra = ' (NXDOMAIN)'
+            elif (qname, rdtype) == (self.nxrrset_name, self.nxrrset_rdtype):
+                extra = ' (No data)'
+            else:
+                extra = ''
+            _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
+            for query in d['queries'][query_str]:
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
+
+    def _deserialize_dependencies(self, d, cache):
+        if self.stub:
+            return
+
+        for cname in self.cname_targets:
+            for target in self.cname_targets[cname]:
+                self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
+        for signer in self.external_signers:
+            self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
+
+        # these two are optional
+        for target in self.ns_dependencies:
+            if target.canonicalize().to_text() in d:
+                self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
+        for target in self.mx_targets:
+            if target.canonicalize().to_text() in d:
+                self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
+
+class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
+    RDTYPES_ALL = 0
+    RDTYPES_ALL_SAME_NAME = 1
+    RDTYPES_NS_TARGET = 2
+    RDTYPES_SECURE_DELEGATION = 3
+    RDTYPES_DELEGATION = 4
+
+    QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
+
+    def __init__(self, name, stub=False):
+        super(OfflineDomainNameAnalysis, self).__init__(name, stub=stub)
+
+        self.status = None
+        self.yxdomain = None
+        self.yxrrset = None
+        self.rrset_warnings = None
+        self.rrset_errors = None
+        self.rrsig_status = None
+        self.wildcard_status = None
+        self.dname_status = None
+        self.nxdomain_status = None
+        self.nxdomain_servers_clients = None
+        self.noanswer_servers_clients = None
+        self.response_errors_rcode = None
+        self.response_errors = None
+
+        self.ds_status_by_ds = None
+        self.ds_status_by_dnskey = None
+
+        self.delegation_warnings = None
+        self.delegation_errors = None
+        self.delegation_status = None
+
+        self.published_keys = None
+        self.revoked_keys = None
+        self.zsks = None
+        self.ksks = None
 
     def _index_dnskeys(self):
         self._dnskey_sets = []
@@ -1838,100 +2063,6 @@ class DomainNameAnalysis(object):
             for dnskey in trusted_keys_not_self_signing:
                 dnskey.errors[Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING] = dnskey.servers_clients
 
-    def serialize(self, d=None, trace=None):
-        if d is None:
-            d = collections.OrderedDict()
-
-        if trace is None:
-            trace = []
-
-        if self in trace:
-            return
-
-        name_str = self.name.canonicalize().to_text()
-        if name_str in d:
-            return
-
-        # serialize dependencies first because their version of the analysis
-        # might be the most complete (considering re-dos)
-        self._serialize_dependencies(d, trace)
-
-        if self.parent is not None:
-            self.parent.serialize(d, trace + [self])
-        if self.dlv_parent is not None:
-            self.dlv_parent.serialize(d, trace + [self])
-        if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor.serialize(d, trace + [self])
-
-        clients_ipv4 = list(self.clients_ipv4)
-        clients_ipv4.sort()
-        clients_ipv6 = list(self.clients_ipv6)
-        clients_ipv6.sort()
-
-        d[name_str] = collections.OrderedDict()
-        d[name_str]['stub'] = self.stub
-        d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
-        d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
-        if not self.stub:
-            d[name_str]['clients_ipv4'] = clients_ipv4
-            d[name_str]['clients_ipv6'] = clients_ipv6
-
-            if self.parent is not None:
-                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
-            if self.dlv_parent is not None:
-                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
-            if self.nxdomain_ancestor is not None:
-                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
-            if self.referral_rdtype is not None:
-                d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
-            d[name_str]['explicit_delegation'] = self.explicit_delegation
-            if self.nxdomain_name is not None:
-                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
-                d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
-            if self.nxrrset_name is not None:
-                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
-                d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
-
-        self._serialize_related(d[name_str])
-
-    def _serialize_related(self, d):
-        if self._auth_ns_ip_mapping:
-            d['auth_ns_ip_mapping'] = collections.OrderedDict()
-            ns_names = self._auth_ns_ip_mapping.keys()
-            ns_names.sort()
-            for name in ns_names:
-                addrs = list(self._auth_ns_ip_mapping[name])
-                addrs.sort()
-                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
-
-        if self.stub:
-            return
-
-        d['queries'] = collections.OrderedDict()
-        query_keys = self.queries.keys()
-        query_keys.sort()
-        for (qname, rdtype) in query_keys:
-            qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d['queries'][qname_type_str] = []
-            for query in self.queries[(qname, rdtype)].queries.values():
-                d['queries'][qname_type_str].append(query.serialize())
-
-    def _serialize_dependencies(self, d, trace):
-        if self.stub:
-            return
-
-        for cname in self.cname_targets:
-            for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.serialize(d, trace=trace + [self])
-        for signer, signer_obj in self.external_signers.items():
-            signer_obj.serialize(d, trace=trace + [self])
-        for target, ns_obj in self.ns_dependencies.items():
-            if ns_obj is not None:
-                ns_obj.serialize(d, trace=trace + [self])
-        for target, mx_obj in self.mx_targets.items():
-            if mx_obj is not None:
-                mx_obj.serialize(d, trace=trace + [self])
-
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
 
@@ -2360,134 +2491,6 @@ class DomainNameAnalysis(object):
             del d[name_str]
 
         return d
-
-    @classmethod
-    def deserialize(cls, name, d1, cache=None):
-        if cache is None:
-            cache = {}
-
-        if name in cache:
-            return cache[name]
-
-        name_str = name.canonicalize().to_text()
-        d = d1[name_str]
-        stub = d['stub']
-        
-        if 'parent' in d:
-            parent_name = dns.name.from_text(d['parent'])
-            parent = cls.deserialize(parent_name, d1, cache=cache)
-        else:
-            parent = None
-
-        if name != dns.name.root and 'dlv_parent' in d:
-            dlv_parent_name = dns.name.from_text(d['dlv_parent'])
-            dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
-        else:
-            dlv_parent_name = None
-            dlv_parent = None
-
-        if 'nxdomain_ancestor' in d:
-            nxdomain_ancestor_name = dns.name.from_text(d['nxdomain_ancestor'])
-            nxdomain_ancestor = cls.deserialize(nxdomain_ancestor_name, d1, cache=cache)
-        else:
-            nxdomain_ancestor_name = None
-            nxdomain_ancestor = None
-
-        _logger.info('Loading %s' % fmt.humanize_name(name))
-
-        cache[name] = a = cls(name, stub=stub)
-        a.parent = parent
-        if dlv_parent is not None:
-            a.dlv_parent = dlv_parent
-        if nxdomain_ancestor is not None:
-            a.nxdomain_ancestor = nxdomain_ancestor
-        a.analysis_start = fmt.str_to_datetime(d['analysis_start'])
-        a.analysis_end = fmt.str_to_datetime(d['analysis_end'])
-
-        if not a.stub:
-            if 'referral_rdtype' in d:
-                a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
-            a.explicit_delegation = d['explicit_delegation']
-            if 'nxdomain_name' in d:
-                a.nxdomain_name = dns.name.from_text(d['nxdomain_name'])
-                a.nxdomain_rdtype = dns.rdatatype.from_text(d['nxdomain_rdtype'])
-            if 'nxrrset_name' in d:
-                a.nxrrset_name = dns.name.from_text(d['nxrrset_name'])
-                a.nxrrset_rdtype = dns.rdatatype.from_text(d['nxrrset_rdtype'])
-
-        a._deserialize_related(d)
-        a._deserialize_dependencies(d1, cache)
-        return a
-
-    def _deserialize_related(self, d):
-        if 'auth_ns_ip_mapping' in d:
-            for target in d['auth_ns_ip_mapping']:
-                for addr in d['auth_ns_ip_mapping'][target]:
-                    self.add_auth_ns_ip_mappings((dns.name.from_text(target), IPAddr(addr)))
-
-        if self.stub:
-            return
-
-        bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
-
-        # import delegation NS queries first
-        delegation_types = set([dns.rdatatype.NS])
-        if self.referral_rdtype is not None:
-            delegation_types.add(self.referral_rdtype)
-        for rdtype in delegation_types:
-            # if the query has already been imported, then
-            # don't re-import
-            if (self.name, rdtype) in self.queries:
-                continue
-            query_str = '%s/%s/%s' % (self.name.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            if query_str in d['queries']:
-                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
-                for query in d['queries'][query_str]:
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
-        # set the NS dependencies for the name
-        if self.is_zone():
-            self.set_ns_dependencies()
-
-        for query_str in d['queries']:
-            vals = query_str.split('/')
-            qname = dns.name.from_text('/'.join(vals[:-2]))
-            rdtype = dns.rdatatype.from_text(vals[-1])
-            # if the query has already been imported, then
-            # don't re-import
-            if (qname, rdtype) in self.queries:
-                continue
-            if rdtype in delegation_types:
-                continue
-            if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
-                extra = ' (NXDOMAIN)'
-            elif (qname, rdtype) == (self.nxrrset_name, self.nxrrset_rdtype):
-                extra = ' (No data)'
-            else:
-                extra = ''
-            _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
-            for query in d['queries'][query_str]:
-                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
-
-    def _deserialize_dependencies(self, d, cache):
-        if self.stub:
-            return
-
-        for cname in self.cname_targets:
-            for target in self.cname_targets[cname]:
-                self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
-        for signer in self.external_signers:
-            self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
-
-        # these two are optional
-        for target in self.ns_dependencies:
-            if target.canonicalize().to_text() in d:
-                self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
-        for target in self.mx_targets:
-            if target.canonicalize().to_text() in d:
-                self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
-
-class OnlineDomainNameAnalysis(DomainNameAnalysis):
-    QUERY_CLASS = Q.MultiQuery
 
 class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
     def __init__(self, *args, **kwargs):
