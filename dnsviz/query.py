@@ -876,7 +876,9 @@ class DNSQuery(AggregateDNSResponse):
             for server in self.responses:
                 bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client, response in self.responses[server].items():
-                    clone.add_response(server, client, response.copy(), bailiwick)
+                    response_clone = response.copy()
+                    response_clone.query = clone
+                    clone.add_response(server, client, response_clone, bailiwick)
 
         return clone
 
@@ -895,7 +897,9 @@ class DNSQuery(AggregateDNSResponse):
         for server in query.responses:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in query.responses[server].items():
-                clone.add_response(server, client, response.copy(), bailiwick)
+                response_clone = response.copy()
+                response_clone.query = clone
+                clone.add_response(server, client, response_clone, bailiwick)
         return clone
 
     def project(self, servers, bailiwick_map, default_bailiwick):
@@ -906,115 +910,20 @@ class DNSQuery(AggregateDNSResponse):
         for server in servers:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in self.responses[server].items():
-                clone.add_response(server, client, response.copy(), bailiwick)
+                response_clone = response.copy()
+                response_clone.query = clone
+                clone.add_response(server, client, response_clone, bailiwick)
         return clone
 
     def add_response(self, server, client, response, bailiwick):
         if server not in self.responses:
             self.responses[server] = {}
-        if response.query is not None:
+        if response.query is not None and response.query is not self:
             raise ValueError('Response for %s/%s is already associated with a query.' % (self.qname, dns.rdatatype.to_text(self.rdtype)))
         if client in self.responses[server]:
             raise ValueError('Response for %s/%s from server %s to client %s already exists.' % (self.qname, dns.rdatatype.to_text(self.rdtype), server, client))
         response.query = self
         self.responses[server][client] = response
-
-        flags = self.flags
-        edns = self.edns
-        edns_max_udp_payload = self.edns_max_udp_payload
-        edns_flags = self.edns_flags
-        edns_options = self.edns_options[:]
-
-        # mark whether TCP or UDP was attempted initially
-        tcp_attempted = tcp = self.tcp_first
-        udp_attempted = not tcp
-
-        tcp_responsive = False
-        udp_responsive = False
-        tcp_valid = False
-        udp_valid = False
-
-        #TODO - there could be room for both a responsiveness check and a valid
-        # check here, rather than just a valid check
-
-        responsive_cause_index = None
-
-        prev_index = None
-        for i, retry in enumerate(response.history):
-            # mark if TCP or UDP was attempted prior to this retry
-            if tcp:
-                tcp_attempted = True
-            else:
-                udp_attempted = True
-
-            # Mark responsiveness if this retry wasn't caused by network error
-            # or timeout. 
-            if retry.cause not in (RETRY_CAUSE_NETWORK_ERROR, RETRY_CAUSE_TIMEOUT):
-                if tcp:
-                    tcp_responsive = True
-                else:
-                    udp_responsive = True
-
-            # If the last cause/action resulted in a valid response where there
-            # wasn't previously on the same protocol, then mark the
-            # cause/action.
-            if retry.cause in (RETRY_CAUSE_TC_SET, RETRY_CAUSE_DIAGNOSTIC):
-                if tcp:
-                    if responsive_cause_index is None and \
-                            not tcp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
-                        responsive_cause_index = prev_index
-                    tcp_valid = True
-                else:
-                    if responsive_cause_index is None and \
-                            not udp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
-                        responsive_cause_index = prev_index
-                    udp_valid = True
-
-            if retry.action == RETRY_ACTION_SET_FLAG:
-                flags |= retry.action_arg
-            elif retry.action == RETRY_ACTION_CLEAR_FLAG:
-                flags &= ~retry.action_arg
-            elif retry.action == RETRY_ACTION_DISABLE_EDNS:
-                edns = -1
-            elif retry.action == RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD:
-                edns_max_udp_payload = retry.action_arg
-                tcp = False
-            elif retry.action == RETRY_ACTION_SET_EDNS_FLAG:
-                edns_flags |= retry.action_arg
-            elif retry.action == RETRY_ACTION_CLEAR_EDNS_FLAG:
-                edns_flags &= ~retry.action_arg
-            elif retry.action == RETRY_ACTION_USE_TCP:
-                tcp = True
-            elif retry.action == RETRY_ACTION_USE_UDP:
-                tcp = False
-            #TODO do the same with EDNS options
-
-            prev_index = i
-
-        # Mark responsiveness if the ultimate query didn't result in network
-        # error or timeout.
-        if response.error not in (RESPONSE_ERROR_NETWORK_ERROR, RESPONSE_ERROR_TIMEOUT):
-            if tcp:
-                tcp_responsive = True
-            else:
-                udp_responsive = True
-
-        # If the last cause/action resulted in a valid response where there
-        # wasn't previously on the same protocol, then mark the cause/action.
-        if response.is_valid_response():
-            if tcp:
-                if responsive_cause_index is None and \
-                        not tcp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_TCP:
-                    responsive_cause_index = prev_index
-            else:
-                if responsive_cause_index is None and \
-                        not udp_valid and prev_index is not None and response.history[prev_index].action != RETRY_ACTION_USE_UDP:
-                    responsive_cause_index = prev_index
-
-        response.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
-        response.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
-
-        self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
     def is_authoritative_answer_all(self):
         val = None
@@ -1146,7 +1055,7 @@ class DNSQuery(AggregateDNSResponse):
         for server in d['responses']:
             bailiwick = bailiwick_map.get(IPAddr(server), default_bailiwick)
             for client in d['responses'][server]:
-                q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client]), bailiwick)
+                q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client], q), bailiwick)
         return q
 
 class MultiQuery(AggregateDNSResponse):
@@ -1338,7 +1247,7 @@ class ExecutableDNSQuery(DNSQuery):
                             errno1 = response.errno
                         else:
                             errno1 = None
-                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time)
+                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query)
                     query.add_response(IPAddr(qtm.dst), IPAddr(qtm.src), response_obj, query.bailiwick)
 
                     if not query.servers.difference(query.responses):
