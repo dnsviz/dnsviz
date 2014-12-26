@@ -913,9 +913,9 @@ class DNSQuery(AggregateDNSResponse):
         if server not in self.responses:
             self.responses[server] = {}
         if response.query is not None:
-            raise ValueError('Response for %s/%s is already associated with a query.' % (self.qname, self.rdtype))
+            raise ValueError('Response for %s/%s is already associated with a query.' % (self.qname, dns.rdatatype.to_text(self.rdtype)))
         if client in self.responses[server]:
-            raise ValueError('Response for %s/%s from server %s to client %s already exists.' % (self.qname, self.rdtype, server, client))
+            raise ValueError('Response for %s/%s from server %s to client %s already exists.' % (self.qname, dns.rdatatype.to_text(self.rdtype), server, client))
         response.query = self
         self.responses[server][client] = response
 
