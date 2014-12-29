@@ -1212,6 +1212,56 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
+    def _serialize_negative_response_info(self, neg_response_info_list, neg_status, warnings, errors, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
+        d = collections.OrderedDict()
+        for neg_response_info in neg_response_info_list:
+            qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
+            d[qname_type_str] = collections.OrderedDict()
+            if neg_response_info in neg_status:
+                d[qname_type_str]['proof'] = []
+                for nsec_status in neg_status[neg_response_info]:
+                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    if nsec_serialized:
+                        d[qname_type_str]['proof'].append(nsec_serialized)
+                if not d[qname_type_str]['proof']:
+                    del d[qname_type_str]['proof']
+
+            if loglevel <= logging.DEBUG or \
+                    (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
+                    (errors[neg_response_info] and loglevel <= logging.ERROR):
+                servers = tuple_to_dict(neg_response_info.servers_clients)
+                if consolidate_clients:
+                    servers = list(servers)
+                    servers.sort()
+                d[qname_type_str]['servers'] = servers
+
+            if warnings[neg_response_info] and loglevel <= logging.WARNING:
+                d[qname_type_str]['warnings'] = collections.OrderedDict()
+                items = warnings[neg_response_info].keys()
+                items.sort()
+                for item in items:
+                    servers = tuple_to_dict(warnings[neg_response_info][item])
+                    if consolidate_clients:
+                        servers = list(servers)
+                        servers.sort()
+                    d[qname_type_str]['warnings'][Status.response_error_mapping[item]] = servers
+
+            if errors[neg_response_info] and loglevel <= logging.ERROR:
+                d[qname_type_str]['errors'] = collections.OrderedDict()
+                items = errors[neg_response_info].keys()
+                items.sort()
+                for item in items:
+                    servers = tuple_to_dict(errors[neg_response_info][item])
+                    if consolidate_clients:
+                        servers = list(servers)
+                        servers.sort()
+                    d[qname_type_str]['errors'][Status.response_error_mapping[item]] = servers
+
+            if not d[qname_type_str]:
+                del d[qname_type_str]
+
+        return d
+
     def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True):
         if d is None:
             d = collections.OrderedDict()
@@ -1418,102 +1468,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     del d[name_str]['dlv']
 
         if query.nxdomain_info:
-            d[name_str]['nxdomain'] = collections.OrderedDict()
-            for neg_response_info in query.nxdomain_info:
-                qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
-                d[name_str]['nxdomain'][qname_type_str] = collections.OrderedDict()
-                if neg_response_info in self.nxdomain_status:
-                    d[name_str]['nxdomain'][qname_type_str]['proof'] = []
-                    for nsec_status in self.nxdomain_status[neg_response_info]:
-                        nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                        if nsec_serialized:
-                            d[name_str]['nxdomain'][qname_type_str]['proof'].append(nsec_serialized)
-                    if not d[name_str]['nxdomain'][qname_type_str]['proof']:
-                        del d[name_str]['nxdomain'][qname_type_str]['proof']
-
-                if loglevel <= logging.DEBUG or \
-                        (self.nxdomain_warnings[neg_response_info] and loglevel <= logging.WARNING) or \
-                        (self.nxdomain_errors[neg_response_info] and loglevel <= logging.ERROR):
-                    servers = tuple_to_dict(neg_response_info.servers_clients)
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[name_str]['nxdomain'][qname_type_str]['servers'] = servers
-
-                if self.nxdomain_warnings[neg_response_info] and loglevel <= logging.WARNING:
-                    d[name_str]['nxdomain'][qname_type_str]['warnings'] = collections.OrderedDict()
-                    warnings = self.nxdomain_warnings[neg_response_info].keys()
-                    warnings.sort()
-                    for warning in warnings:
-                        servers = tuple_to_dict(self.nxdomain_warnings[neg_response_info][warning])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['nxdomain'][qname_type_str]['warnings'][Status.response_error_mapping[warning]] = servers
-
-                if self.nxdomain_errors[neg_response_info] and loglevel <= logging.ERROR:
-                    d[name_str]['nxdomain'][qname_type_str]['errors'] = collections.OrderedDict()
-                    errors = self.nxdomain_errors[neg_response_info].keys()
-                    errors.sort()
-                    for error in errors:
-                        servers = tuple_to_dict(neg_response_info.servers_clients)
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['nxdomain'][qname_type_str]['errors'][Status.response_error_mapping[error]] = servers
-
-                if not d[name_str]['nxdomain'][qname_type_str]:
-                    del d[name_str]['nxdomain'][qname_type_str]
+            d[name_str]['nxdomain'] = self._serialize_negative_response_info(query.nxdomain_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
             if not d[name_str]['nxdomain']:
                 del d[name_str]['nxdomain']
 
         if query.nodata_info:
-            d[name_str]['nodata'] = collections.OrderedDict()
-            for neg_response_info in query.nodata_info:
-                qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
-                d[name_str]['nodata'][qname_type_str] = collections.OrderedDict()
-                if neg_response_info in self.noanswer_status:
-                    d[name_str]['nodata'][qname_type_str]['proof'] = []
-                    for nsec_status in self.noanswer_status[neg_response_info]:
-                        nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                        if nsec_serialized:
-                            d[name_str]['nodata'][qname_type_str]['proof'].append(nsec_serialized)
-                    if not d[name_str]['nodata'][qname_type_str]['proof']:
-                        del d[name_str]['nodata'][qname_type_str]['proof']
-
-                if loglevel <= logging.DEBUG or \
-                        (self.noanswer_warnings[neg_response_info] and loglevel <= logging.WARNING) or \
-                        (self.noanswer_errors[neg_response_info] and loglevel <= logging.ERROR):
-                    servers = tuple_to_dict(neg_response_info.servers_clients)
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[name_str]['nodata'][qname_type_str]['servers'] = servers
-
-                if self.noanswer_warnings[neg_response_info] and loglevel <= logging.WARNING:
-                    d[name_str]['nodata'][qname_type_str]['warnings'] = collections.OrderedDict()
-                    warnings = self.noanswer_warnings[neg_response_info].keys()
-                    warnings.sort()
-                    for warning in warnings:
-                        servers = tuple_to_dict(self.noanswer_warnings[neg_response_info][warning])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['nodata'][qname_type_str]['warnings'][Status.response_error_mapping[warning]] = servers
-
-                if self.noanswer_errors[neg_response_info] and loglevel <= logging.ERROR:
-                    d[name_str]['nodata'][qname_type_str]['errors'] = collections.OrderedDict()
-                    errors = self.noanswer_errors[neg_response_info].keys()
-                    errors.sort()
-                    for error in errors:
-                        servers = tuple_to_dict(self.noanswer_errors[neg_response_info][error])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['nodata'][qname_type_str]['errors'][Status.response_error_mapping[error]] = servers
-
-                if not d[name_str]['nodata'][qname_type_str]:
-                    del d[name_str]['nodata'][qname_type_str]
+            d[name_str]['nodata'] = self._serialize_negative_response_info(query.nodata_info, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
             if not d[name_str]['nodata']:
                 del d[name_str]['nodata']
 
