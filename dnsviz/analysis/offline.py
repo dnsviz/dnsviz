@@ -911,7 +911,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
             elif self.parent.signed:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
-                for nsec_status in self.noanswer_status.get((self.name, dns.rdatatype.DS), set()).union(self.nxdomain_status.get((self.name, dns.rdatatype.DS), set())):
+                for nsec_status in filter(lambda x: x.qname == qname and x.rdtype == dns.rdatatype.DS, self.nxdomain_status + self.noanswer_status):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                         break
@@ -936,8 +936,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
         if rdtype == dns.rdatatype.DS:
-            if (name, rdtype) in self.nxdomain_status:
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_status[(self.name, dns.rdatatype.DS)].servers_clients.copy()
+            try:
+                ds_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == dns.rdatatype.DS, self.queries[(name, rdtype)].nxdomain_info)[0]
+            except IndexError:
+                pass
+            else:
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = ds_nxdomain_info.servers_clients.copy()
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
@@ -1295,9 +1299,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if not d[name_str]['delegation']['ds']:
                             del d[name_str]['delegation']['ds']
 
-                    if self.noanswer_status.get((self.name, dns.rdatatype.DS), []):
+                    try:
+                        neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == dns.rdatatype.DS, self.noanswer_status)[0]
+                    except IndexError:
+                        pass
+                    else:
                         d[name_str]['delegation']['insecurity_proof'] = []
-                        for nsec_status in self.noanswer_status[(self.name, dns.rdatatype.DS)]:
+                        for nsec_status in self.noanswer_status[neg_response_info]:
                             nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                             if nsec_serialized:
                                 d[name_str]['delegation']['insecurity_proof'].append(nsec_serialized)
@@ -1350,9 +1358,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if not d[name_str]['dlv']['ds']:
                             del d[name_str]['dlv']['ds']
 
-                    if self.noanswer_status.get((self.dlv_name, dns.rdatatype.DLV), []):
+                    try:
+                        neg_response_info = filter(lambda x: x.qname == self.dlv_name and x.rdtype == dns.rdatatype.DLV, self.noanswer_status)[0]
+                    except IndexError:
+                        pass
+                    else:
                         d[name_str]['dlv']['insecurity_proof'] = []
-                        for nsec_status in self.noanswer_status[(self.name, dns.rdatatype.DLV)]:
+                        for nsec_status in self.noanswer_status[neg_response_info]:
                             nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                             if nsec_serialized:
                                 d[name_str]['dlv']['insecurity_proof'].append(nsec_serialized)

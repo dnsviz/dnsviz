@@ -683,13 +683,13 @@ class AggregateDNSResponse(object):
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
-                self._aggregate_answer(server, client, response, qname, rdtype, bailiwick)
+                is_referral = response.is_referral(qname, rdtype, bailiwick)
+                self._aggregate_answer(server, client, response, is_referral, qname, rdtype)
         else:
             self._aggregate_error(server, client, response)
 
-    def _aggregate_answer(self, server, client, response, qname, rdtype, bailiwick):
+    def _aggregate_answer(self, server, client, response, referral, qname, rdtype):
         msg = response.message
-        is_referral = response.is_referral(qname, rdtype, bailiwick)
 
         # sort with the most specific DNAME infos first
         dname_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.DNAME, msg.answer)
@@ -708,20 +708,18 @@ class AggregateDNSResponse(object):
                         break
 
                 try:
-                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype, is_referral)
+                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype, referral)
 
                     # if there was a synthesized CNAME, add it to the rrset_info
                     if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and synthesized_cname_info is not None:
                         synthesized_cname_info = rrset_info.create_or_update_cname_from_dname_info(synthesized_cname_info, server, client, response)
-                        synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
+                        synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, referral)
 
                 except KeyError:
                     if synthesized_cname_info is None:
                         raise
                     synthesized_cname_info = DNSResponseComponent.insert_into_list(synthesized_cname_info, self.rrset_answer_info, server, client, response)
-                    synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
-
-                    rrset_info = synthesized_cname_info
+                    synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, referral)
 
                 if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                     qname_sought = rrset_info.rrset[0].target
@@ -729,7 +727,7 @@ class AggregateDNSResponse(object):
                     break
                 i += 1
         except KeyError:
-            if response.is_referral(qname, rdtype, bailiwick, proper=True):
+            if referral:
                 return
 
             # don't store no answer or NXDOMAIN info for names other than qname
@@ -744,10 +742,10 @@ class AggregateDNSResponse(object):
 
             neg_response_info = NegativeResponseInfo(qname_sought, rdtype)
             neg_response_info = DNSResponseComponent.insert_into_list(neg_response_info, neg_response_info_list, server, client, response)
-            neg_response_info.create_or_update_nsec_info(server, client, response, is_referral)
-            neg_response_info.create_or_update_soa_info(server, client, response, is_referral)
+            neg_response_info.create_or_update_nsec_info(server, client, response, referral)
+            neg_response_info.create_or_update_soa_info(server, client, response, referral)
 
-    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, is_referral):
+    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, referral):
         msg = response.message
 
         try:
@@ -765,7 +763,7 @@ class AggregateDNSResponse(object):
                 answer_info[rr] = set()
             answer_info[rr].add(rrset_info)
 
-        rrset_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
+        rrset_info.update_rrsig_info(server, client, response, msg.answer, referral)
 
         return rrset_info
 
