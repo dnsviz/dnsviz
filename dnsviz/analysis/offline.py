@@ -468,6 +468,51 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
             errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
+    def _populate_wildcard_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
+        zone = qname_obj.zone.name
+
+        for wildcard_name in rrset_info.wildcard_info:
+            servers_missing_nsec = set()
+            for server, client in rrset_info.wildcard_info[wildcard_name].servers_clients:
+                for response in rrset_info.wildcard_info[wildcard_name].servers_clients[(server,client)]:
+                    servers_missing_nsec.add((server,client,response))
+
+            self.wildcard_status[rrset_info.wildcard_info[wildcard_name]] = {}
+            status_by_response = {}
+
+            for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
+                if nsec_set_info.use_nsec3:
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+                else:
+                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+
+                for nsec_rrset_info in nsec_set_info.rrsets.values():
+                    self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+
+                if status.validation_status == Status.NSEC_STATUS_VALID:
+                    self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][nsec_set_info] = status
+
+                for server, client in nsec_set_info.servers_clients:
+                    for response in nsec_set_info.servers_clients[(server,client)]:
+                        if (server,client,response) in servers_missing_nsec:
+                            servers_missing_nsec.remove((server,client,response))
+                        if status.validation_status == Status.NSEC_STATUS_VALID:
+                            if (server,client,response) in status_by_response:
+                                del status_by_response[(server,client,response)]
+                        else:
+                            status_by_response[(server,client,response)] = status
+
+            for (server,client,response), status in status_by_response.items():
+                self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][status.nsec_set_info] = status
+
+            for server, client, response in servers_missing_nsec:
+                # by definition, DNSSEC was requested (otherwise we
+                # wouldn't know this was a wildcard), so no need to
+                # check for DO bit in request
+                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
+                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
+                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
+
     def _populate_rrsig_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
         self.rrset_warnings[rrset_info] = {}
         self.rrset_errors[rrset_info] = {}
@@ -615,50 +660,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
                     errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
 
-        for wildcard_name in rrset_info.wildcard_info:
-            zone = qname_obj.zone.name
-
-            servers_missing_nsec = set()
-            for server, client in rrset_info.wildcard_info[wildcard_name].servers_clients:
-                for response in rrset_info.wildcard_info[wildcard_name].servers_clients[(server,client)]:
-                    servers_missing_nsec.add((server,client,response))
-
-            self.wildcard_status[rrset_info.wildcard_info[wildcard_name]] = {}
-            status_by_response = {}
-
-            for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
-                if nsec_set_info.use_nsec3:
-                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
-                else:
-                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
-
-                for nsec_rrset_info in nsec_set_info.rrsets.values():
-                    self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
-
-                if status.validation_status == Status.NSEC_STATUS_VALID:
-                    self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][nsec_set_info] = status
-
-                for server, client in nsec_set_info.servers_clients:
-                    for response in nsec_set_info.servers_clients[(server,client)]:
-                        if (server,client,response) in servers_missing_nsec:
-                            servers_missing_nsec.remove((server,client,response))
-                        if status.validation_status == Status.NSEC_STATUS_VALID:
-                            if (server,client,response) in status_by_response:
-                                del status_by_response[(server,client,response)]
-                        else:
-                            status_by_response[(server,client,response)] = status
-
-            for (server,client,response), status in status_by_response.items():
-                self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][status.nsec_set_info] = status
-
-            for server, client, response in servers_missing_nsec:
-                # by definition, DNSSEC was requested (otherwise we
-                # wouldn't know this was a wildcard), so no need to
-                # check for DO bit in request
-                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
-                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
-                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
-
+        self._populate_wildcard_status(qname, rdtype, query, rrset_info, qname_obj, supported_algs)
 
         for server,client in rrset_info.servers_clients:
             for response in rrset_info.servers_clients[(server,client)]:
