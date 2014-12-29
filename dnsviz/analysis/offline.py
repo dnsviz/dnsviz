@@ -87,7 +87,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._dnskeys = {}
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
             return
-        for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].rrset_answer_info:
+        for dnskey_info in self.queries[(self.name, dns.rdatatype.DNSKEY)].answer_info:
             # there are CNAMEs that show up here...
             if not (dnskey_info.rrset.name == self.name and dnskey_info.rrset.rdtype == dns.rdatatype.DNSKEY):
                 continue
@@ -278,7 +278,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif rdtype == dns.rdatatype.DLV:
                 qname_obj = qname_obj.dlv_parent
 
-            for rrset_info in query.rrset_answer_info:
+            for rrset_info in query.answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
                 self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
                 if rrset_info.dname_info is not None:
@@ -688,7 +688,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 continue
 
             items_to_validate = []
-            for rrset_info in query.rrset_answer_info:
+            for rrset_info in query.answer_info:
                 items_to_validate.append(rrset_info)
                 if rrset_info.dname_info is not None:
                     items_to_validate.append(rrset_info.dname_info)
@@ -756,7 +756,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.delegation_status[rdtype] = None
 
         try:
-            ds_rrset_answer_info = self.queries[(name, rdtype)].rrset_answer_info
+            ds_rrset_answer_info = self.queries[(name, rdtype)].answer_info
         except KeyError:
             # zones should have DS queries
             if self.is_zone():
@@ -816,7 +816,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for ds_rdata in ds_rrset_info.rrset:
                 self.ds_status_by_ds[rdtype][ds_rdata] = {}
 
-                for dnskey_info in dnskey_multiquery.rrset_answer_info:
+                for dnskey_info in dnskey_multiquery.answer_info:
                     # there are CNAMEs that show up here...
                     if not (dnskey_info.rrset.name == self.name and dnskey_info.rrset.rdtype == dns.rdatatype.DNSKEY):
                         continue
@@ -1275,7 +1275,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
             d[name_str]['answer'][qname_type_str] = []
             #TODO sort by CNAME dependencies, beginning with question
-            for rrset_info in query.rrset_answer_info:
+            for rrset_info in query.answer_info:
                 # only look at qname
                 if rrset_info.rrset.name == qname:
                     rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
