@@ -1000,6 +1000,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if servers_upward_referral:
             errors[upward_referral_error] = servers_upward_referral
 
+            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE in errors:
+                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].difference_update(errors[upward_referral_error])
+                if not errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]:
+                    del errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]
+            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE in warnings:
+                warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].difference_update(errors[upward_referral_error])
+                if not warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]:
+                    del warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]
+
         statuses = []
         status_by_response = {}
         for nsec_set_info in neg_response_info.nsec_set_info:
