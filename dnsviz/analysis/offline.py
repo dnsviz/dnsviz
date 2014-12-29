@@ -272,6 +272,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if required_rdtypes is not None and rdtype not in required_rdtypes:
                 continue
 
+            qname_obj = self.get_name(qname)
+            if rdtype == dns.rdatatype.DS:
+                qname_obj = qname_obj.parent
+            elif rdtype == dns.rdatatype.DLV:
+                qname_obj = qname_obj.dlv_parent
+
             for rrset_info in query.rrset_answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
                 self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
@@ -284,9 +290,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 try:
                     for (server,client) in neg_response_info.servers_clients:
                         for response in neg_response_info.servers_clients[(server,client)]:
-                            if neg_response_info.qname == qname or response.recursion_desired_and_available():
-                                self.yxdomain.add(neg_response_info.qname)
-                                raise FoundYXDOMAIN
+                            if not response.is_upward_referral(qname_obj.zone.name):
+                                if neg_response_info.qname == qname or response.recursion_desired_and_available():
+                                    self.yxdomain.add(neg_response_info.qname)
+                                    raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
                     break
 
