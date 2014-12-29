@@ -286,7 +286,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
                     self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
                     self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
-            for neg_response_info in query.rrset_noanswer_info:
+            for neg_response_info in query.nodata_info:
                 try:
                     for (server,client) in neg_response_info.servers_clients:
                         for response in neg_response_info.servers_clients[(server,client)]:
@@ -1089,7 +1089,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if neg_response_info.qname in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                     self.nxdomain_warnings[neg_response_info][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = neg_response_info.servers_clients.copy()
 
-            for neg_response_info in query.rrset_noanswer_info:
+            for neg_response_info in query.nodata_info:
                 self.noanswer_warnings[neg_response_info] = {}
                 self.noanswer_errors[neg_response_info] = {}
                 self.noanswer_status[neg_response_info] = \
@@ -1465,9 +1465,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if not d[name_str]['nxdomain']:
                 del d[name_str]['nxdomain']
 
-        if query.rrset_noanswer_info:
+        if query.nodata_info:
             d[name_str]['nodata'] = collections.OrderedDict()
-            for neg_response_info in query.rrset_noanswer_info:
+            for neg_response_info in query.nodata_info:
                 qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
                 d[name_str]['nodata'][qname_type_str] = collections.OrderedDict()
                 if neg_response_info in self.noanswer_status:

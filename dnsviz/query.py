@@ -675,7 +675,7 @@ class AggregateDNSResponse(object):
         self.rdata_answer_info = {}
         self.cname_answer_info = {}
         self.rrset_answer_info = []
-        self.rrset_noanswer_info = []
+        self.nodata_info = []
         self.nxdomain_info = []
         self.error_rcode = {}
         self.error = {}
@@ -738,7 +738,7 @@ class AggregateDNSResponse(object):
             if msg.rcode() == dns.rcode.NXDOMAIN:
                 neg_response_info_list = self.nxdomain_info
             else:
-                neg_response_info_list = self.rrset_noanswer_info
+                neg_response_info_list = self.nodata_info
 
             neg_response_info = NegativeResponseInfo(qname_sought, rdtype)
             neg_response_info = DNSResponseComponent.insert_into_list(neg_response_info, neg_response_info_list, server, client, response)
