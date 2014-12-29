@@ -672,8 +672,6 @@ class DNSQueryHandler:
 
 class AggregateDNSResponse(object):
     def __init__(self):
-        self.rdata_answer_info = {}
-        self.cname_answer_info = {}
         self.rrset_answer_info = []
         self.nodata_info = []
         self.nxdomain_info = []
@@ -750,18 +748,11 @@ class AggregateDNSResponse(object):
 
         try:
             rrset = msg.find_rrset(msg.answer, qname, dns.rdataclass.IN, rdtype)
-            answer_info = self.rdata_answer_info
         except KeyError:
             rrset = msg.find_rrset(msg.answer, qname, dns.rdataclass.IN, dns.rdatatype.CNAME)
-            answer_info = self.cname_answer_info
 
         rrset_info = RRsetInfo(rrset)
         rrset_info = DNSResponseComponent.insert_into_list(rrset_info, self.rrset_answer_info, server, client, response)
-
-        for rr in rrset:
-            if rr not in answer_info:
-                answer_info[rr] = set()
-            answer_info[rr].add(rrset_info)
 
         rrset_info.update_rrsig_info(server, client, response, msg.answer, referral)
 
