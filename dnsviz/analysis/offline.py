@@ -67,8 +67,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.wildcard_status = None
         self.dname_status = None
         self.nxdomain_status = None
-        self.nxdomain_servers_clients = None
-        self.noanswer_servers_clients = None
         self.response_errors_rcode = None
         self.response_errors = None
 
@@ -282,12 +280,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
                     self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
                     self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
-            for qname_sought in query.rrset_noanswer_info:
+            for neg_response_info in query.rrset_noanswer_info:
                 try:
-                    for (server,client) in query.rrset_noanswer_info[qname_sought].servers_clients:
-                        for response in query.rrset_noanswer_info[qname_sought].servers_clients[(server,client)]:
-                            if qname_sought == qname or response.recursion_desired_and_available():
-                                self.yxdomain.add(qname_sought)
+                    for (server,client) in neg_response_info.servers_clients:
+                        for response in neg_response_info.servers_clients[(server,client)]:
+                            if neg_response_info.qname == qname or response.recursion_desired_and_available():
+                                self.yxdomain.add(neg_response_info.qname)
                                 raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
                     break
@@ -328,7 +326,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for (qname, rdtype), query in self.queries.items():
             if rdtype == dns.rdatatype.DS:
                 continue
-            if self.name in query.nxdomain_info and self.status == Status.NAME_STATUS_INDETERMINATE:
+            if filter(lambda x: x.qname == qname, query.nxdomain_info) and self.status == Status.NAME_STATUS_INDETERMINATE:
                 self.status = Status.NAME_STATUS_NXDOMAIN
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
@@ -613,42 +611,47 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for wildcard_name in rrset_info.wildcard_info:
             zone = qname_obj.zone.name
 
-            statuses = []
-            for server, client in rrset_info.wildcard_info[wildcard_name]:
-                for response in rrset_info.wildcard_info[wildcard_name][(server,client)]:
-                    nsec_info_list = query.nsec_set_info_by_server[response]
-                    status = None
-                    for nsec_set_info in nsec_info_list:
-                        if nsec_set_info.use_nsec3:
-                            status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+            servers_missing_nsec = set()
+            for server, client in rrset_info.wildcard_info[wildcard_name].servers_clients:
+                for response in rrset_info.wildcard_info[wildcard_name].servers_clients[(server,client)]:
+                    servers_missing_nsec.add((server,client,response))
+
+            self.wildcard_status[rrset_info.wildcard_info[wildcard_name]] = {}
+            status_by_response = {}
+
+            for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
+                if nsec_set_info.use_nsec3:
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+                else:
+                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+
+                for nsec_rrset_info in nsec_set_info.rrsets.values():
+                    self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+
+                if status.validation_status == Status.NSEC_STATUS_VALID:
+                    self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][nsec_set_info] = status
+
+                for server, client in nsec_set_info.servers_clients:
+                    for response in nsec_set_info.servers_clients[(server,client)]:
+                        if (server,client,response) in servers_missing_nsec:
+                            servers_missing_nsec.remove((server,client,response))
+                        if status.validation_status == Status.NSEC_STATUS_VALID:
+                            if (server,client,response) in status_by_response:
+                                del status_by_response[(server,client,response)]
                         else:
-                            status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
-                        if status.validation_status == Status.STATUS_VALID:
-                            break
+                            status_by_response[(server,client,response)] = status
 
-                    # report that no NSEC(3) records were returned
-                    if status is None:
-                        # by definition, DNSSEC was requested (otherwise we
-                        # wouldn't know this was a wildcard), so no need to
-                        # check for DO bit in request
-                        if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
-                            self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
-                        self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
+            for (server,client,response), status in status_by_response.items():
+                self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][status.nsec_set_info] = status
 
-                    else:
-                        for nsec_rrset_info in status.nsec_set_info.rrsets.values():
-                            self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+            for server, client, response in servers_missing_nsec:
+                # by definition, DNSSEC was requested (otherwise we
+                # wouldn't know this was a wildcard), so no need to
+                # check for DO bit in request
+                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
+                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
+                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
 
-                        # add status to list, if an equivalent one not already added
-                        if status not in statuses:
-                            statuses.append(status)
-                            validation_status = status.validation_status
-
-            if statuses:
-                if rrset_info.rrset.name not in self.wildcard_status:
-                    self.wildcard_status[rrset_info.rrset.name] = {}
-                if wildcard_name not in self.wildcard_status[rrset_info.rrset.name]:
-                    self.wildcard_status[rrset_info.rrset.name][wildcard_name] = set(statuses)
 
         for server,client in rrset_info.servers_clients:
             for response in rrset_info.servers_clients[(server,client)]:
@@ -933,30 +936,30 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
         if rdtype == dns.rdatatype.DS:
-            if (name, rdtype) in self.nxdomain_servers_clients:
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_servers_clients[(self.name, dns.rdatatype.DS)].copy()
+            if (name, rdtype) in self.nxdomain_status:
+                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = self.nxdomain_status[(self.name, dns.rdatatype.DS)].servers_clients.copy()
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
-    def _populate_negative_response_status(self, query, qname_sought, negative_response_info, \
+    def _populate_negative_response_status(self, query, neg_response_info, \
             bad_soa_error, missing_soa_error, upward_referral_error, missing_nsec_error, \
             nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs):
 
-        qname_obj = self.get_name(qname_sought)
+        qname_obj = self.get_name(neg_response_info.qname)
         if query.rdtype == dns.rdatatype.DS:
             qname_obj = qname_obj.parent
 
         soa_owner_name_for_servers = {}
         servers_without_soa = set()
-        for server, client in negative_response_info.servers_clients:
-            for response in negative_response_info.servers_clients[(server, client)]:
+        servers_missing_nsec = set()
+        for server, client in neg_response_info.servers_clients:
+            for response in neg_response_info.servers_clients[(server, client)]:
                 servers_without_soa.add((server, client, response))
+                servers_missing_nsec.add((server, client, response))
 
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
 
-        statuses = []
-        for soa_rrset_info in negative_response_info.soa_info:
-
+        for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
 
             for server, client in soa_rrset_info.servers_clients:
@@ -965,7 +968,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
 
             if soa_owner_name != qname_obj.zone.name:
-                if qname_sought == query.qname:
+                if neg_response_info.qname == query.qname:
                     if bad_soa_error not in errors:
                         errors[bad_soa_error] = set()
                     errors[bad_soa_error].update(soa_rrset_info.servers_clients)
@@ -982,7 +985,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         servers_missing_soa = set()
         servers_upward_referral = set()
         for server,client,response in servers_without_soa:
-            if qname_sought == query.qname or response.recursion_desired_and_available():
+            if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
                 # check for an upward referral
                 if upward_referral_error is not None and response.is_upward_referral(qname_obj.zone.name):
                     servers_upward_referral.add((server,client))
@@ -993,48 +996,54 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if servers_upward_referral:
             errors[upward_referral_error] = servers_upward_referral
 
-        for server,client in negative_response_info.servers_clients:
-            for response in negative_response_info.servers_clients[(server,client)]:
-                if not (qname_sought == query.qname or response.recursion_desired_and_available()):
-                    continue
-                nsec_info_list = query.nsec_set_info_by_server[response]
-                status = None
-                for nsec_set_info in nsec_info_list:
-                    if nsec_set_info.use_nsec3:
-                        status = nsec3_status_cls(qname_sought, query.rdtype, \
-                                soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
-                    else:
-                        status = nsec_status_cls(qname_sought, query.rdtype, \
-                                soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
-                    if status.validation_status == Status.STATUS_VALID:
-                        break
+        statuses = []
+        status_by_response = {}
+        for nsec_set_info in neg_response_info.nsec_set_info:
+            if nsec_set_info.use_nsec3:
+                status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
+                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+            else:
+                status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
+                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
 
-                # report that no NSEC(3) records were returned
-                if status is None:
-                    if qname_obj.zone.signed and (qname_sought == query.qname or response.recursion_desired_and_available()):
-                        if response.dnssec_requested():
-                            if missing_nsec_error not in errors:
-                                errors[missing_nsec_error] = set()
-                            errors[missing_nsec_error].add((server,client))
-                        elif qname_obj.zone.server_responsive_with_do(server,client):
-                            if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
-                                errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                            errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
-                else:
-                    for rrset_info in status.nsec_set_info.rrsets.values():
-                        self._populate_rrsig_status(qname_sought, query.rdtype, query, rrset_info, qname_obj, supported_algs)
+            for nsec_rrset_info in nsec_set_info.rrsets.values():
+                self._populate_rrsig_status(neg_response_info.qname, query.rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
 
-                    if status not in statuses:
-                        statuses.append(status)
-                        validation_status = status.validation_status
+            if status.validation_status == Status.NSEC_STATUS_VALID:
+                statuses.append(status)
+
+            for server, client in nsec_set_info.servers_clients:
+                for response in nsec_set_info.servers_clients[(server,client)]:
+                    if (server,client,response) in servers_missing_nsec:
+                        servers_missing_nsec.remove((server,client,response))
+                    if status.validation_status == Status.NSEC_STATUS_VALID:
+                        if (server,client,response) in status_by_response:
+                            del status_by_response[(server,client,response)]
+                    elif neg_response_info.qname == query.qname or response.recursion_desired_and_available():
+                        status_by_response[(server,client,response)] = status
+
+        for (server,client,response), status in status_by_response.items():
+            statuses.append(status)
+
+        for server, client, response in servers_missing_nsec:
+            # report that no NSEC(3) records were returned
+            if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
+                if response.dnssec_requested():
+                    if missing_nsec_error not in errors:
+                        errors[missing_nsec_error] = set()
+                    errors[missing_nsec_error].add((server,client))
+                elif qname_obj.zone.server_responsive_with_do(server,client):
+                    if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
+                        errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
+                    errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+
+        return statuses
 
     def _populate_nsec_status(self, supported_algs, level):
         self.nxdomain_status = {}
-        self.nxdomain_servers_clients = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
         self.noanswer_status = {}
-        self.noanswer_servers_clients = {}
         self.noanswer_warnings = {}
         self.noanswer_errors = {}
 
@@ -1047,36 +1056,28 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if required_rdtypes is not None and rdtype not in required_rdtypes:
                 continue
 
-            for qname_sought in query.nxdomain_info:
-                self.nxdomain_warnings[(qname_sought, rdtype)] = {}
-                self.nxdomain_errors[(qname_sought, rdtype)] = {}
-                self.nxdomain_servers_clients[(qname_sought, rdtype)] = query.nxdomain_info[qname_sought].servers_clients
+            for neg_response_info in query.nxdomain_info:
+                self.nxdomain_warnings[neg_response_info] = {}
+                self.nxdomain_errors[neg_response_info] = {}
+                self.nxdomain_status[neg_response_info] = \
+                        self._populate_negative_response_status(query, neg_response_info, \
+                                Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN, None, \
+                                Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
+                                self.nxdomain_warnings[neg_response_info], self.nxdomain_errors[neg_response_info], \
+                                supported_algs)
 
-                statuses = self._populate_negative_response_status(query, qname_sought, query.nxdomain_info[qname_sought], \
-                        Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN, None, \
-                        Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
-                        self.nxdomain_warnings[(qname_sought, rdtype)], self.nxdomain_errors[(qname_sought, rdtype)], \
-                        supported_algs)
+                if neg_response_info.qname in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                    self.nxdomain_warnings[neg_response_info][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = neg_response_info.servers_clients.copy()
 
-                if statuses:
-                    self.nxdomain_status[(qname_sought, rdtype)] = set(statuses)
-
-                if qname_sought in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
-                    self.nxdomain_warnings[(qname_sought, rdtype)][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = self.nxdomain_servers_clients[(qname_sought, rdtype)].copy()
-
-            for qname_sought in query.rrset_noanswer_info:
-                self.noanswer_warnings[(qname_sought, rdtype)] = {}
-                self.noanswer_errors[(qname_sought, rdtype)] = {}
-                self.noanswer_servers_clients[(qname_sought, rdtype)] = query.rrset_noanswer_info[qname_sought].servers_clients
-
-                statuses = self._populate_negative_response_status(query, qname_sought, query.rrset_noanswer_info[qname_sought], \
-                        Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA, Status.RESPONSE_ERROR_UPWARD_REFERRAL, \
-                        Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
-                        self.noanswer_warnings[(qname_sought, rdtype)], self.noanswer_errors[(qname_sought, rdtype)], \
-                        supported_algs)
-
-                if statuses:
-                    self.noanswer_status[(qname_sought, rdtype)] = set(statuses)
+            for neg_response_info in query.rrset_noanswer_info:
+                self.noanswer_warnings[neg_response_info] = {}
+                self.noanswer_errors[neg_response_info] = {}
+                self.noanswer_status[neg_response_info] = \
+                        self._populate_negative_response_status(query, neg_response_info, \
+                                Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA, Status.RESPONSE_ERROR_UPWARD_REFERRAL, \
+                                Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
+                                self.noanswer_warnings[neg_response_info], self.noanswer_errors[neg_response_info], \
+                                supported_algs)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
@@ -1156,11 +1157,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for wildcard_name in wildcard_names:
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
                 d['wildcard_proof'][wildcard_name_str] = []
-                if rrset_info.rrset.name in self.wildcard_status and wildcard_name in self.wildcard_status[rrset_info.rrset.name]:
-                    for nsec_status in self.wildcard_status[rrset_info.rrset.name][wildcard_name]:
-                        nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                        if nsec_serialized:
-                            d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
+                for nsec_set_info, nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]].items():
+                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    if nsec_serialized:
+                        d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
                 if not d['wildcard_proof'][wildcard_name_str]:
                     del d['wildcard_proof'][wildcard_name_str]
             if not d['wildcard_proof']:
@@ -1387,16 +1387,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not d[name_str]['dlv']:
                     del d[name_str]['dlv']
 
-        if self.nxdomain_servers_clients:
+        if query.nxdomain_info:
             d[name_str]['nxdomain'] = collections.OrderedDict()
-            query_keys = self.nxdomain_servers_clients.keys()
-            query_keys.sort()
-            for (qname, rdtype) in query_keys:
-                qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+            for neg_response_info in query.nxdomain_info:
+                qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
                 d[name_str]['nxdomain'][qname_type_str] = collections.OrderedDict()
-                if (qname, rdtype) in self.nxdomain_status:
+                if neg_response_info in self.nxdomain_status:
                     d[name_str]['nxdomain'][qname_type_str]['proof'] = []
-                    for nsec_status in self.nxdomain_status[(qname, rdtype)]:
+                    for nsec_status in self.nxdomain_status[neg_response_info]:
                         nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                         if nsec_serialized:
                             d[name_str]['nxdomain'][qname_type_str]['proof'].append(nsec_serialized)
@@ -1404,31 +1402,31 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         del d[name_str]['nxdomain'][qname_type_str]['proof']
 
                 if loglevel <= logging.DEBUG or \
-                        (self.nxdomain_warnings[(qname, rdtype)] and loglevel <= logging.WARNING) or \
-                        (self.nxdomain_errors[(qname, rdtype)] and loglevel <= logging.ERROR):
-                    servers = tuple_to_dict(self.nxdomain_servers_clients[(qname, rdtype)])
+                        (self.nxdomain_warnings[neg_response_info] and loglevel <= logging.WARNING) or \
+                        (self.nxdomain_errors[neg_response_info] and loglevel <= logging.ERROR):
+                    servers = tuple_to_dict(neg_response_info.servers_clients)
                     if consolidate_clients:
                         servers = list(servers)
                         servers.sort()
                     d[name_str]['nxdomain'][qname_type_str]['servers'] = servers
 
-                if self.nxdomain_warnings[(qname, rdtype)] and loglevel <= logging.WARNING:
+                if self.nxdomain_warnings[neg_response_info] and loglevel <= logging.WARNING:
                     d[name_str]['nxdomain'][qname_type_str]['warnings'] = collections.OrderedDict()
-                    warnings = self.nxdomain_warnings[(qname, rdtype)].keys()
+                    warnings = self.nxdomain_warnings[neg_response_info].keys()
                     warnings.sort()
                     for warning in warnings:
-                        servers = tuple_to_dict(self.nxdomain_warnings[(qname, rdtype)][warning])
+                        servers = tuple_to_dict(self.nxdomain_warnings[neg_response_info][warning])
                         if consolidate_clients:
                             servers = list(servers)
                             servers.sort()
                         d[name_str]['nxdomain'][qname_type_str]['warnings'][Status.response_error_mapping[warning]] = servers
 
-                if self.nxdomain_errors[(qname, rdtype)] and loglevel <= logging.ERROR:
+                if self.nxdomain_errors[neg_response_info] and loglevel <= logging.ERROR:
                     d[name_str]['nxdomain'][qname_type_str]['errors'] = collections.OrderedDict()
-                    errors = self.nxdomain_errors[(qname, rdtype)].keys()
+                    errors = self.nxdomain_errors[neg_response_info].keys()
                     errors.sort()
                     for error in errors:
-                        servers = tuple_to_dict(self.nxdomain_errors[(qname, rdtype)][error])
+                        servers = tuple_to_dict(neg_response_info.servers_clients)
                         if consolidate_clients:
                             servers = list(servers)
                             servers.sort()
@@ -1439,16 +1437,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if not d[name_str]['nxdomain']:
                 del d[name_str]['nxdomain']
 
-        if self.noanswer_servers_clients:
+        if query.rrset_noanswer_info:
             d[name_str]['nodata'] = collections.OrderedDict()
-            query_keys = self.noanswer_servers_clients.keys()
-            query_keys.sort()
-            for (qname, rdtype) in query_keys:
-                qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+            for neg_response_info in query.rrset_noanswer_info:
+                qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
                 d[name_str]['nodata'][qname_type_str] = collections.OrderedDict()
-                if (qname, rdtype) in self.noanswer_status:
+                if neg_response_info in self.noanswer_status:
                     d[name_str]['nodata'][qname_type_str]['proof'] = []
-                    for nsec_status in self.noanswer_status[(qname, rdtype)]:
+                    for nsec_status in self.noanswer_status[neg_response_info]:
                         nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                         if nsec_serialized:
                             d[name_str]['nodata'][qname_type_str]['proof'].append(nsec_serialized)
@@ -1456,31 +1452,31 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         del d[name_str]['nodata'][qname_type_str]['proof']
 
                 if loglevel <= logging.DEBUG or \
-                        (self.noanswer_warnings[(qname, rdtype)] and loglevel <= logging.WARNING) or \
-                        (self.noanswer_errors[(qname, rdtype)] and loglevel <= logging.ERROR):
-                    servers = tuple_to_dict(self.noanswer_servers_clients[(qname, rdtype)])
+                        (self.noanswer_warnings[neg_response_info] and loglevel <= logging.WARNING) or \
+                        (self.noanswer_errors[neg_response_info] and loglevel <= logging.ERROR):
+                    servers = tuple_to_dict(neg_response_info.servers_clients)
                     if consolidate_clients:
                         servers = list(servers)
                         servers.sort()
                     d[name_str]['nodata'][qname_type_str]['servers'] = servers
 
-                if self.noanswer_warnings[(qname, rdtype)] and loglevel <= logging.WARNING:
+                if self.noanswer_warnings[neg_response_info] and loglevel <= logging.WARNING:
                     d[name_str]['nodata'][qname_type_str]['warnings'] = collections.OrderedDict()
-                    warnings = self.noanswer_warnings[(qname, rdtype)].keys()
+                    warnings = self.noanswer_warnings[neg_response_info].keys()
                     warnings.sort()
                     for warning in warnings:
-                        servers = tuple_to_dict(self.noanswer_warnings[(qname,rdtype)][warning])
+                        servers = tuple_to_dict(self.noanswer_warnings[neg_response_info][warning])
                         if consolidate_clients:
                             servers = list(servers)
                             servers.sort()
                         d[name_str]['nodata'][qname_type_str]['warnings'][Status.response_error_mapping[warning]] = servers
 
-                if self.noanswer_errors[(qname, rdtype)] and loglevel <= logging.ERROR:
+                if self.noanswer_errors[neg_response_info] and loglevel <= logging.ERROR:
                     d[name_str]['nodata'][qname_type_str]['errors'] = collections.OrderedDict()
-                    errors = self.noanswer_errors[(qname, rdtype)].keys()
+                    errors = self.noanswer_errors[neg_response_info].keys()
                     errors.sort()
                     for error in errors:
-                        servers = tuple_to_dict(self.noanswer_errors[(qname,rdtype)][error])
+                        servers = tuple_to_dict(self.noanswer_errors[neg_response_info][error])
                         if consolidate_clients:
                             servers = list(servers)
                             servers.sort()

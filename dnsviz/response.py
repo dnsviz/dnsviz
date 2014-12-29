@@ -413,21 +413,40 @@ class DNSResponse:
             history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
         return DNSResponse(message, msg_size, error, errno, history, response_time, query)
 
-class RDataMeta(object):
+class DNSResponseComponent(object):
+    def __init__(self):
+        self.servers_clients = {}
+
+    def add_server_client(self, server, client, response):
+        if (server, client) not in self.servers_clients:
+            self.servers_clients[(server, client)] = []
+        self.servers_clients[(server, client)].append(response)
+
+    @classmethod
+    def insert_into_list(self, component_info, component_info_list, server, client, response):
+        try:
+            index = component_info_list.index(component_info)
+            component_info = component_info_list[index]
+        except ValueError:
+            component_info_list.append(component_info)
+        component_info.add_server_client(server, client, response)
+        return component_info
+
+class RDataMeta(DNSResponseComponent):
     def __init__(self, name, ttl, rdtype, rdata):
+        super(RDataMeta, self).__init__()
         self.name = name
         self.ttl = ttl
         self.rdtype = rdtype
         self.rdata = rdata
-        self.servers_clients = {}
         self.rrset_info = set()
     
-class DNSKEYMeta(object):
+class DNSKEYMeta(DNSResponseComponent):
     def __init__(self, name, rdata, ttl):
+        super(DNSKEYMeta, self).__init__()
         self.name = name
         self.rdata = rdata
         self.ttl = ttl
-        self.servers_clients = {}
         self.warnings = {}
         self.errors = {}
         self.rrset_info = []
@@ -583,11 +602,11 @@ class DNSKEYMeta(object):
                 d['errors'][Status.dnskey_error_mapping[error]] = servers
         return d
 
-class RRsetInfo(object):
+class RRsetInfo(DNSResponseComponent):
     def __init__(self, rrset, dname_info=None):
+        super(RRsetInfo, self).__init__()
         self.rrset = rrset
         self.rrsig_info = {}
-        self.servers_clients = {}
         self.wildcard_info = {}
 
         self.dname_info = dname_info
@@ -608,26 +627,24 @@ class RRsetInfo(object):
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
 
-    def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response):
+    def update_rrsig_info(self, server, client, response, section, is_referral):
+        try:
+            rrsig_rrset = response.message.find_rrset(section, self.rrset.name, dns.rdataclass.IN, dns.rdatatype.RRSIG, self.rrset.rdtype)
+            for rrsig in rrsig_rrset:
+                self.create_or_update_rrsig_info(rrsig, rrsig_rrset.ttl, server, client, response, is_referral)
+        except KeyError:
+            pass
+
+    def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response, is_referral):
         try:
             rrsig_info = self.get_rrsig_info(rrsig)
         except KeyError:
             rrsig_info = self.rrsig_info[rrsig] = RDataMeta(self.rrset.name, ttl, dns.rdatatype.RRSIG, rrsig)
-        if (server, client) not in rrsig_info.servers_clients:
-            rrsig_info.servers_clients[(server, client)] = []
-        rrsig_info.servers_clients[(server, client)].append(response)
-        self.set_wildcard_info(rrsig, server, client, response)
+        rrsig_info.add_server_client(server, client, response)
+        self.set_wildcard_info(rrsig, server, client, response, is_referral)
 
     def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response):
-        try:
-            index = self.cname_info_from_dname.index(synthesized_cname_info)
-            synthesized_cname_info = self.cname_info_from_dname[index]
-        except ValueError:
-            self.cname_info_from_dname.append(synthesized_cname_info)
-        if (server, client) not in synthesized_cname_info.servers_clients:
-            synthesized_cname_info.servers_clients[(server, client)] = []
-        synthesized_cname_info.servers_clients[(server, client)].append(response)
-        return synthesized_cname_info
+        return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response)
 
     def is_wildcard(self, rrsig):
         if self.rrset.name[0] == '*':
@@ -639,14 +656,13 @@ class RRsetInfo(object):
             return dns.name.Name(('*',)+self.rrset.name.labels[-(rrsig.labels+1):])
         return self.rrset.name
 
-    def set_wildcard_info(self, rrsig, server, client, response):
+    def set_wildcard_info(self, rrsig, server, client, response, is_referral):
         if self.is_wildcard(rrsig):
             wildcard_name = self.reduce_wildcard(rrsig)
             if wildcard_name not in self.wildcard_info:
-                self.wildcard_info[wildcard_name] = {}
-            if (server, client) not in self.wildcard_info[wildcard_name]:
-                self.wildcard_info[wildcard_name][(server, client)] = []
-            self.wildcard_info[wildcard_name][(server, client)].append(response)
+                self.wildcard_info[wildcard_name] = NegativeResponseInfo(self.rrset.name, self.rrset.rdtype)
+            self.wildcard_info[wildcard_name].add_server_client(server, client, response)
+            self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, is_referral)
 
     def message_for_rrsig(self, rrsig):
         s = StringIO.StringIO()
@@ -711,24 +727,54 @@ def cname_from_dname(name, dname_rrset):
     rrset.add(dns.rdtypes.ANY.CNAME.CNAME(dns.rdataclass.IN, dns.rdatatype.CNAME, synthesized_cname))
     return rrset
 
-class NegativeResponseInfo(object):
-    def __init__(self):
-        self.servers_clients = {}
-        self.soa_info = []
+class NegativeResponseInfo(DNSResponseComponent):
+    def __init__(self, qname, rdtype):
+        super(NegativeResponseInfo, self).__init__()
+        self.qname = qname
+        self.rdtype = rdtype
+        self.soa_rrset_info = []
+        self.nsec_set_info = []
 
-    def create_or_update_soa_info(self, soa_info, server, client, response):
+    def __repr__(self):
+        return '<%s %s/%s>' % (self.__class__.__name__, self.qname, dns.rdatatype.to_text(self.rdtype))
+
+    def __eq__(self, other):
+        return self.qname == other.qname and self.rdtype == other.rdtype
+
+    def create_or_update_soa_info(self, server, client, response, is_referral):
+        soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name), response.message.authority)
+        if not soa_rrsets:
+            soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)
+        soa_rrsets.sort(reverse=True)
         try:
-            index = self.soa_info.index(soa_info)
-            soa_info = self.soa_info[index]
-        except ValueError:
-            self.soa_info.append(soa_info)
-        if (server, client) not in soa_info.servers_clients:
-            soa_info.servers_clients[(server, client)] = []
-        soa_info.servers_clients[(server, client)].append(response)
-        return soa_info
+            soa_rrset = soa_rrsets[0]
+        except IndexError:
+            soa_rrset = None
 
-class NSECSet(object):
+        if soa_rrset is None: 
+            return None
+
+        soa_rrset_info = RRsetInfo(soa_rrset)
+        soa_rrset_info = self.insert_into_list(soa_rrset_info, self.soa_rrset_info, server, client, response)
+        soa_rrset_info.update_rrsig_info(server, client, response, response.message.authority, is_referral)
+
+        return soa_rrset_info
+
+    def create_or_update_nsec_info(self, server, client, response, is_referral):
+        for rdtype in dns.rdatatype.NSEC, dns.rdatatype.NSEC3:
+            nsec_rrsets = filter(lambda x: x.rdtype == rdtype, response.message.authority)
+            if not nsec_rrsets:
+                continue
+
+            nsec_set_info = NSECSet(nsec_rrsets, is_referral)
+            nsec_set_info = self.insert_into_list(nsec_set_info, self.nsec_set_info, server, client, response)
+
+            for name in nsec_set_info.rrsets:
+                nsec_set_info.rrsets[name].update_rrsig_info(server, client, response, response.message.authority, is_referral)
+
+class NSECSet(DNSResponseComponent):
     def __init__(self, rrsets, referral):
+        super(NSECSet, self).__init__()
         self.rrsets = {}
         self.referral = referral
         self.nsec3_params = {}
@@ -772,16 +818,12 @@ class NSECSet(object):
         return obj
 
     def add_server_client(self, server, client, response):
+        super(NSECSet, self).add_server_client(server, client, response)
         for name, rrset_info in self.rrsets.items():
-            if (server, client) not in rrset_info.servers_clients:
-                rrset_info.servers_clients[(server, client)] = []
-            rrset_info.servers_clients[(server, client)].append(response)
-        if (server, client) not in self.servers_clients:
-            self.servers_clients[(server, client)] = []
-        self.servers_clients[(server, client)].append(response)
+            rrset_info.add_server_client(server, client, response)
 
-    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response):
-        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response)
+    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response, is_referral):
+        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
 
     def rdtype_exists_in_bitmap(self, nsec_name, rdtype):
         '''Return True if the rdtype exists in the bitmap of the NSEC(3) record

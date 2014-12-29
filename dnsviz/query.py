@@ -675,25 +675,21 @@ class AggregateDNSResponse(object):
         self.rdata_answer_info = {}
         self.cname_answer_info = {}
         self.rrset_answer_info = []
-        self.rrset_noanswer_info = {}
-        self.nxdomain_info = {}
-        self.nsec_set_info = []
-        self.nsec_set_info_by_server = {}
+        self.rrset_noanswer_info = []
+        self.nxdomain_info = []
         self.error_rcode = {}
         self.error = {}
 
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
-                is_referral = response.is_referral(qname, rdtype, bailiwick)
-                self._aggregate_answer(server, client, response, is_referral, qname, rdtype)
-                if not is_referral or response.is_referral(qname, rdtype, bailiwick, proper=True):
-                    self._aggregate_nsec(server, client, response, is_referral) 
+                self._aggregate_answer(server, client, response, qname, rdtype, bailiwick)
         else:
             self._aggregate_error(server, client, response)
 
-    def _aggregate_answer(self, server, client, response, referral, qname, rdtype):
+    def _aggregate_answer(self, server, client, response, qname, rdtype, bailiwick):
         msg = response.message
+        is_referral = response.is_referral(qname, rdtype, bailiwick)
 
         # sort with the most specific DNAME infos first
         dname_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.DNAME, msg.answer)
@@ -712,18 +708,20 @@ class AggregateDNSResponse(object):
                         break
 
                 try:
-                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype)
+                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype, is_referral)
 
                     # if there was a synthesized CNAME, add it to the rrset_info
                     if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and synthesized_cname_info is not None:
                         synthesized_cname_info = rrset_info.create_or_update_cname_from_dname_info(synthesized_cname_info, server, client, response)
-                        self._update_rrsig_info(server, client, response, msg.answer, synthesized_cname_info.dname_info)
+                        synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
 
                 except KeyError:
                     if synthesized_cname_info is None:
                         raise
-                    synthesized_cname_info = self._insert_rrset(server, client, synthesized_cname_info, response)
-                    self._update_rrsig_info(server, client, response, msg.answer, synthesized_cname_info.dname_info)
+                    synthesized_cname_info = DNSResponseComponent.insert_into_list(synthesized_cname_info, self.rrset_answer_info, server, client, response)
+                    synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
+
+                    rrset_info = synthesized_cname_info
 
                 if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                     qname_sought = rrset_info.rrset[0].target
@@ -731,7 +729,7 @@ class AggregateDNSResponse(object):
                     break
                 i += 1
         except KeyError:
-            if referral:
+            if response.is_referral(qname, rdtype, bailiwick, proper=True):
                 return
 
             # don't store no answer or NXDOMAIN info for names other than qname
@@ -740,41 +738,16 @@ class AggregateDNSResponse(object):
                 return
 
             if msg.rcode() == dns.rcode.NXDOMAIN:
-                if qname_sought not in self.nxdomain_info:
-                    self.nxdomain_info[qname_sought] = NegativeResponseInfo()
-                neg_info = self.nxdomain_info[qname_sought]
+                neg_response_info_list = self.nxdomain_info
             else:
-                if qname_sought not in self.rrset_noanswer_info:
-                    self.rrset_noanswer_info[qname_sought] = NegativeResponseInfo()
-                neg_info = self.rrset_noanswer_info[qname_sought]
+                neg_response_info_list = self.rrset_noanswer_info
 
-            if (server,client) not in neg_info.servers_clients:
-                neg_info.servers_clients[(server,client)] = []
-            neg_info.servers_clients[(server,client)].append(response)
+            neg_response_info = NegativeResponseInfo(qname_sought, rdtype)
+            neg_response_info = DNSResponseComponent.insert_into_list(neg_response_info, neg_response_info_list, server, client, response)
+            neg_response_info.create_or_update_nsec_info(server, client, response, is_referral)
+            neg_response_info.create_or_update_soa_info(server, client, response, is_referral)
 
-            try:
-                soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and qname_sought.is_subdomain(x.name), msg.authority)
-                if not soa_rrsets:
-                    soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA, msg.authority)
-                soa_rrsets.sort(reverse=True)
-                soa_rrset = soa_rrsets[0]
-            except IndexError:
-                soa_rrset = None
-
-            if soa_rrset is not None: 
-                soa_rrset_info = neg_info.create_or_update_soa_info(RRsetInfo(soa_rrset), server, client, response)
-                self._update_rrsig_info(server, client, response, msg.authority, soa_rrset_info)
-
-    def _update_rrsig_info(self, server, client, response, section, rrset_info):
-        msg = response.message
-        try:
-            rrsig_rrset = msg.find_rrset(section, rrset_info.rrset.name, dns.rdataclass.IN, dns.rdatatype.RRSIG, rrset_info.rrset.rdtype)
-            for rrsig in rrsig_rrset:
-                rrset_info.create_or_update_rrsig_info(rrsig, rrsig_rrset.ttl, server, client, response)
-        except KeyError:
-            pass
-
-    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype):
+    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, is_referral):
         msg = response.message
 
         try:
@@ -785,52 +758,16 @@ class AggregateDNSResponse(object):
             answer_info = self.cname_answer_info
 
         rrset_info = RRsetInfo(rrset)
-        rrset_info = self._insert_rrset(server, client, rrset_info, response)
+        rrset_info = DNSResponseComponent.insert_into_list(rrset_info, self.rrset_answer_info, server, client, response)
 
         for rr in rrset:
             if rr not in answer_info:
                 answer_info[rr] = set()
             answer_info[rr].add(rrset_info)
 
-        self._update_rrsig_info(server, client, response, msg.answer, rrset_info)
+        rrset_info.update_rrsig_info(server, client, response, msg.answer, is_referral)
 
         return rrset_info
-
-    def _insert_rrset(self, server, client, rrset_info, response):
-        try:
-            index = self.rrset_answer_info.index(rrset_info)
-            rrset_info = self.rrset_answer_info[index]
-        except ValueError:
-            self.rrset_answer_info.append(rrset_info)
-
-        if (server, client) not in rrset_info.servers_clients:
-            rrset_info.servers_clients[(server, client)] = []
-        rrset_info.servers_clients[(server, client)].append(response)
-
-        return rrset_info
-
-    def _aggregate_nsec(self, server, client, response, referral):
-        msg = response.message
-
-        self.nsec_set_info_by_server[response] = []
-        for rdtype in (dns.rdatatype.NSEC, dns.rdatatype.NSEC3):
-            nsec_rrsets = filter(lambda x: x.rdtype == rdtype, msg.authority)
-
-            if not nsec_rrsets:
-                continue
-
-            nsec_set_info = NSECSet(nsec_rrsets, referral)
-            try:
-                index = self.nsec_set_info.index(nsec_set_info)
-                nsec_set_info = self.nsec_set_info[index]
-            except ValueError:
-                self.nsec_set_info.append(nsec_set_info)
-            nsec_set_info.add_server_client(server, client, response)
-
-            for name in nsec_set_info.rrsets:
-                self._update_rrsig_info(server, client, response, msg.authority, nsec_set_info.rrsets[name])
-
-            self.nsec_set_info_by_server[response].append(nsec_set_info)
 
     def _aggregate_error(self, server, client, response):
         msg = response.message
