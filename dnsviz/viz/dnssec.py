@@ -722,28 +722,28 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_rrset_non_existent(self, name_obj, name, rdtype, nxdomain, wildcard, servers_clients):
+    def add_rrset_non_existent(self, name_obj, neg_response_info, nxdomain, wildcard):
         zone_obj = name_obj.zone
         if nxdomain:
-            node_str = self.rrset_node_str(name, rdtype, 0)
+            node_str = self.rrset_node_str(neg_response_info.qname, neg_response_info.rdtype, 0)
         else:
-            node_str = self.rrset_node_str(name, rdtype, 1)
+            node_str = self.rrset_node_str(neg_response_info.qname, neg_response_info.rdtype, 1)
 
         if not self.G.has_node(node_str):
             if wildcard:
                 warnings_map = errors_map = {}
             else:
                 if nxdomain:
-                    warnings_map = name_obj.nxdomain_warnings[(name,rdtype)]
-                    errors_map = name_obj.nxdomain_errors[(name,rdtype)]
+                    warnings_map = name_obj.nxdomain_warnings[neg_response_info]
+                    errors_map = name_obj.nxdomain_errors[neg_response_info]
                 else:
-                    warnings_map = name_obj.noanswer_warnings[(name,rdtype)]
-                    errors_map = name_obj.noanswer_errors[(name,rdtype)]
+                    warnings_map = name_obj.nodata_warnings[neg_response_info]
+                    errors_map = name_obj.nodata_errors[neg_response_info]
 
             if nxdomain:
                 rdtype_str = ''
             else:
-                rdtype_str = '/%s' % dns.rdatatype.to_text(rdtype)
+                rdtype_str = '/%s' % dns.rdatatype.to_text(neg_response_info.rdtype)
 
             img_str = ''
             if errors_map:
@@ -753,10 +753,10 @@ class DNSAuthGraph:
 
             if img_str:
                 node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
-                        (12, 'Helvetica', fmt.humanize_name(name, True), rdtype_str, img_str)
+                        (12, 'Helvetica', fmt.humanize_name(neg_response_info.qname, True), rdtype_str, img_str)
             else:
                 node_label = u'<<FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT>>' % \
-                        (12, 'Helvetica', fmt.humanize_name(name, True), rdtype_str)
+                        (12, 'Helvetica', fmt.humanize_name(neg_response_info.qname, True), rdtype_str)
 
             attr = {}
             attr['shape'] = 'rectangle'
@@ -770,7 +770,7 @@ class DNSAuthGraph:
             S.add_node(node_str, id=node_id, label=node_label, fontsize='10', **attr)
             self.node_subgraph_name[node_str] = zone_top_name
 
-            rrset_info = RRsetNonExistent(name, rdtype, nxdomain, servers_clients)
+            rrset_info = RRsetNonExistent(neg_response_info.qname, neg_response_info.rdtype, nxdomain, neg_response_info.servers_clients)
 
             consolidate_clients = name_obj.single_client()
             rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
@@ -804,8 +804,8 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_errors(self, name_obj, name, rdtype, response_errors_rcode, response_errors):
-        if not response_errors_rcode and not response_errors:
+    def add_errors(self, name_obj, name, rdtype, error_info_list):
+        if not error_info_list:
             return None
 
         zone_obj = name_obj.zone
@@ -828,30 +828,29 @@ class DNSAuthGraph:
         consolidate_clients = name_obj.single_client()
 
         errors_serialized = collections.OrderedDict()
+
         errors_serialized['description'] = 'Response errors for %s/%s' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
-        errors_serialized['errors'] = collections.OrderedDict()
+        errors_serialized['errors'] = []
+        for error_info in error_info_list:
+            err = collections.OrderedDict()
+            err['error'] = Q.response_errors[error_info.code]
 
-        for rcode in response_errors_rcode:
-            servers = tuple_to_dict(response_errors_rcode[rcode])
-            if consolidate_clients:
-                servers = list(servers)
-                servers.sort()
-            errors_serialized['errors']['BAD_RCODE (%s)' % dns.rcode.to_text(rcode)] = servers
-
-        for error, errno1 in response_errors:
-            desc = ''
-            if errno1:
+            if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
+                err['detail'] = dns.rcode.to_text(error_info.arg)
+            elif error_info.arg is not None:
                 try:
-                    desc = ' (%s)' % errno.errorcode[errno1]
+                    err['detail'] = errno.errorcode[error_info.arg]
                 except KeyError:
                     #XXX find a good cross-platform way of handling this
                     pass
 
-            servers = tuple_to_dict(response_errors[(error, errno1)])
+            servers = tuple_to_dict(error_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
                 servers.sort()
-            errors_serialized['errors']['%s%s' % (Q.response_errors[error], desc)] = servers
+            err['servers'] = servers
+
+            errors_serialized['errors'].append(err)
 
         errors_serialized['status'] = 'INVALID'
 
@@ -876,7 +875,7 @@ class DNSAuthGraph:
             line_style = 'solid'
 
         if dname_status.included_cname is None:
-            cname_node = self.add_rrset_non_existent(name_obj, dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, True, dname_status.synthesized_cname.servers_clients)
+            cname_node = self.add_rrset_non_existent(name_obj, Response.NegativeResponseInfo(dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME), False, False)
         else:
             cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, id)
 
@@ -960,7 +959,7 @@ class DNSAuthGraph:
 
         wildcard_node = self.add_rrset(rrset_info, wildcard_name, name_obj, id)
         self.add_rrsigs(name_obj, zone_obj, rrset_info, wildcard_node)
-        nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.rrset.name, rrset_info.rrset.rdtype, True, True, rrset_info.servers_clients)
+        nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.wildcard_info[wildcard_name], True, True)
 
         if nsec_status is not None:
             nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, zone_obj, nxdomain_node)
@@ -1015,11 +1014,13 @@ class DNSAuthGraph:
             return []
 
         id = 10
-        for rrset_info in name_obj.queries[(name, rdtype)].rrset_answer_info:
+        query = name_obj.queries[(name, rdtype)]
+        for rrset_info in query.answer_info:
             my_nodes = []
             cnames = []
 
             # only do qname
+            #XXX fix this for recursive
             if rrset_info.rrset.name != name:
                 continue
 
@@ -1035,13 +1036,9 @@ class DNSAuthGraph:
                     id += 1
             elif rrset_info.wildcard_info:
                 for wildcard_name in rrset_info.wildcard_info:
-                    if rrset_info.rrset.name not in name_obj.wildcard_status:
-                        my_nodes.append(self.add_wildcard(name_obj, rrset_info, None, wildcard_name, id))
+                    for nsec_status in name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]].values():
+                        my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, nsec_status.wildcard_name, id))
                         id += 1
-                    else:
-                        for nsec_status in name_obj.wildcard_status[rrset_info.rrset.name][wildcard_name]:
-                            my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, nsec_status.wildcard_name, id))
-                            id += 1
             else:
                 rrset_node = self.add_rrset(rrset_info, None, name_obj, id)
                 self.add_rrsigs(name_obj, zone_obj, rrset_info, rrset_node)
@@ -1057,25 +1054,31 @@ class DNSAuthGraph:
                     for cname_node in cname_nodes:
                         self.add_alias(my_node, cname_node)
 
-        if (name, rdtype) in name_obj.nxdomain_servers_clients:
-            nxdomain_node = self.add_rrset_non_existent(name_obj, name, rdtype, True, False, name_obj.nxdomain_servers_clients[(name,rdtype)])
+        try:
+            neg_response_info = filter(lambda x: x.qname == name and x.rdtype == rdtype, query.nxdomain_info)[0]
+        except IndexError:
+            pass
+        else:
+            nxdomain_node = self.add_rrset_non_existent(name_obj, neg_response_info, True, False)
             my_nodes_all.append(nxdomain_node)
-            if (name, rdtype) in name_obj.nxdomain_status:
-                for nsec_status in name_obj.nxdomain_status[(name,rdtype)]:
-                    nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nxdomain_node)
-                    for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                        self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+            for nsec_status in name_obj.nxdomain_status[neg_response_info]:
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nxdomain_node)
+                for rrset_info in nsec_status.nsec_set_info.rrsets.values():
+                    self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
 
-        if (name,rdtype) in name_obj.noanswer_servers_clients:
-            noanswer_node = self.add_rrset_non_existent(name_obj, name, rdtype, False, False, name_obj.noanswer_servers_clients[(name,rdtype)])
-            my_nodes_all.append(noanswer_node)
-            if (name,rdtype) in name_obj.noanswer_status:
-                for nsec_status in name_obj.noanswer_status[(name,rdtype)]:
-                    nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, noanswer_node)
-                    for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                        self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+        try:
+            neg_response_info = filter(lambda x: x.qname == name and x.rdtype == rdtype, query.nodata_info)[0]
+        except IndexError:
+            pass
+        else:
+            nodata_node = self.add_rrset_non_existent(name_obj, neg_response_info, False, False)
+            my_nodes_all.append(nodata_node)
+            for nsec_status in name_obj.nodata_status[neg_response_info]:
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nodata_node)
+                for rrset_info in nsec_status.nsec_set_info.rrsets.values():
+                    self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
 
-        error_node = self.add_errors(name_obj, name, rdtype, name_obj.response_errors_rcode[(name,rdtype)], name_obj.response_errors[(name,rdtype)])
+        error_node = self.add_errors(name_obj, name, rdtype, query.error_info)
         if error_node is not None:
             my_nodes_all.append(error_node)
 
@@ -1161,7 +1164,21 @@ class DNSAuthGraph:
                     self.add_rrsigs(name_obj, parent_obj, rrset_info, ds_node)
 
             edge_id = 0
-            for nsec_status in name_obj.noanswer_status.get((ds_name, rdtype), set()).union(name_obj.nxdomain_status.get((ds_name, rdtype), set())):
+
+            nsec_statuses = []
+            try:
+                ds_nodata_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nodata_status)[0]
+                nsec_statuses.extend(name_obj.nodata_status[ds_nodata_info])
+            except IndexError:
+                ds_nodata_info = None
+            try:
+                ds_nxdomain_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nxdomain_status)[0]
+                nsec_statuses.extend(name_obj.nxdomain_status[ds_nxdomain_info])
+            except IndexError:
+                ds_nxdomain_info = None
+
+            for nsec_status in nsec_statuses:
+
                 nsec_node = self.add_nsec(nsec_status, ds_name, rdtype, parent_obj, zone_top)
                 # add a tail to the cluster
                 self.G.get_edge(zone_top, nsec_node).attr['ltail'] = zone_graph_name
@@ -1173,8 +1190,8 @@ class DNSAuthGraph:
 
                 edge_id += 1
 
-            has_warnings = name_obj.delegation_warnings[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_warnings[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_warnings[(ds_name,rdtype)])
-            has_errors = name_obj.delegation_errors[rdtype] or ((ds_name,rdtype) in name_obj.nxdomain_servers_clients and name_obj.nxdomain_errors[(ds_name,rdtype)]) or ((ds_name,rdtype) in name_obj.noanswer_servers_clients and name_obj.noanswer_errors[(ds_name,rdtype)])
+            has_warnings = name_obj.delegation_warnings[rdtype] or (ds_nxdomain_info is not None and name_obj.nxdomain_warnings[ds_nxdomain_info]) or (ds_nodata_info is not None and name_obj.nodata_warnings[ds_nodata_info])
+            has_errors = name_obj.delegation_errors[rdtype] or (ds_nxdomain_info is not None and name_obj.nxdomain_errors[ds_nxdomain_info]) or (ds_nodata_info is not None and name_obj.nodata_errors[ds_nodata_info])
 
             edge_label = ''
             if has_errors:
@@ -1210,7 +1227,7 @@ class DNSAuthGraph:
                         servers.sort()
                     del_serialized['warnings'][Status.delegation_error_mapping[warning]] = servers
 
-                for warnings_map in (name_obj.nxdomain_warnings.get((ds_name,rdtype), {}), name_obj.noanswer_warnings.get((ds_name,rdtype), {})):
+                for warnings_map in (name_obj.nxdomain_warnings.get(ds_nxdomain_info, {}), name_obj.nodata_warnings.get(ds_nodata_info, {})):
                     warnings = warnings_map.keys()
                     warnings.sort()
                     for warning in warnings:
@@ -1231,7 +1248,7 @@ class DNSAuthGraph:
                         servers.sort()
                     del_serialized['errors'][Status.delegation_error_mapping[error]] = servers
 
-                for errors_map in (name_obj.nxdomain_errors.get((ds_name,rdtype), {}), name_obj.noanswer_errors.get((ds_name,rdtype), {})):
+                for errors_map in (name_obj.nxdomain_errors.get(ds_nxdomain_info, {}), name_obj.nodata_errors.get(ds_nodata_info, {})):
                     errors = errors_map.keys()
                     errors.sort()
                     for error in errors:
