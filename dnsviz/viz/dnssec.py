@@ -1066,6 +1066,10 @@ class DNSAuthGraph:
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
+            for soa_rrset_info in neg_response_info.soa_rrset_info:
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, id)
+                self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
+                id += 1
 
         try:
             neg_response_info = filter(lambda x: x.qname == name and x.rdtype == rdtype, query.nodata_info)[0]
@@ -1078,6 +1082,10 @@ class DNSAuthGraph:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nodata_node)
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+                id += 1
+            for soa_rrset_info in neg_response_info.soa_rrset_info:
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, id)
+                self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
         error_node = self.add_errors(name_obj, name, rdtype, query.error_info)
