@@ -1200,14 +1200,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
 
-        if neg_response_info in neg_status:
-            d['proof'] = []
-            for nsec_status in neg_status[neg_response_info]:
-                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                if nsec_serialized:
-                    d['proof'].append(nsec_serialized)
-            if not d['proof']:
-                del d['proof']
+        d['proof'] = []
+        for nsec_status in neg_status[neg_response_info]:
+            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if nsec_serialized:
+                d['proof'].append(nsec_serialized)
+        if not d['proof']:
+            del d['proof']
 
         if loglevel <= logging.DEBUG or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
