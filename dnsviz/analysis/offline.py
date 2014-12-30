@@ -67,6 +67,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.wildcard_status = None
         self.dname_status = None
         self.nxdomain_status = None
+        self.nxdomain_warnings = None
+        self.nxdomain_errors = None
+        self.noanswer_status = None
+        self.noanswer_warnings = None
+        self.noanswer_errors = None
+
         self.response_errors_rcode = None
         self.response_errors = None
 
