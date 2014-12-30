@@ -69,9 +69,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.nxdomain_status = None
         self.nxdomain_warnings = None
         self.nxdomain_errors = None
-        self.noanswer_status = None
-        self.noanswer_warnings = None
-        self.noanswer_errors = None
+        self.nodata_status = None
+        self.nodata_warnings = None
+        self.nodata_errors = None
 
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
@@ -905,7 +905,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
             elif self.parent.signed:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
-                for nsec_status in filter(lambda x: x.qname == qname and x.rdtype == dns.rdatatype.DS, self.nxdomain_status + self.noanswer_status):
+                for nsec_status in filter(lambda x: x.qname == qname and x.rdtype == dns.rdatatype.DS, self.nxdomain_status + self.nodata_status):
                     if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                         break
@@ -1050,9 +1050,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.nxdomain_status = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
-        self.noanswer_status = {}
-        self.noanswer_warnings = {}
-        self.noanswer_errors = {}
+        self.nodata_status = {}
+        self.nodata_warnings = {}
+        self.nodata_errors = {}
 
         _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
         required_rdtypes = self._rdtypes_for_analysis_level(level)
@@ -1077,13 +1077,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.nxdomain_warnings[neg_response_info][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = neg_response_info.servers_clients.copy()
 
             for neg_response_info in query.nodata_info:
-                self.noanswer_warnings[neg_response_info] = {}
-                self.noanswer_errors[neg_response_info] = {}
-                self.noanswer_status[neg_response_info] = \
+                self.nodata_warnings[neg_response_info] = {}
+                self.nodata_errors[neg_response_info] = {}
+                self.nodata_status[neg_response_info] = \
                         self._populate_negative_response_status(query, neg_response_info, \
                                 Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA, Status.RESPONSE_ERROR_UPWARD_REFERRAL, \
                                 Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
-                                self.noanswer_warnings[neg_response_info], self.noanswer_errors[neg_response_info], \
+                                self.nodata_warnings[neg_response_info], self.nodata_errors[neg_response_info], \
                                 supported_algs)
 
     def _populate_dnskey_status(self, trusted_keys):
@@ -1292,7 +1292,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # only look at qname
             #TODO fix this check for recursive
             if neg_response_info.qname == query.qname:
-                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nodata_status, self.nodata_warnings, self.nodata_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
                 if neg_response_serialized:
                     d['nodata'].append(neg_response_serialized)
 
@@ -1335,8 +1335,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         d['ds'].append(ds_serialized)
 
         try:
-            neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.noanswer_status)[0]
-            status = self.noanswer_status
+            neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nodata_status)[0]
+            status = self.nodata_status
         except IndexError:
             try:
                 neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nxdomain_status)[0]
