@@ -958,3 +958,12 @@ class NSECSet(DNSResponseComponent):
                 del potential_closest_enclosers[name]
 
         return potential_closest_enclosers
+
+class DNSResponseError(DNSResponseComponent):
+    def __init__(self, code, arg):
+        super(DNSResponseError, self).__init__()
+        self.code = code
+        self.arg = arg
+
+    def __eq__(self, other):
+        return self.code == other.code and self.arg == other.arg

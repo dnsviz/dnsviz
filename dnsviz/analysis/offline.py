@@ -73,9 +73,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.noanswer_warnings = None
         self.noanswer_errors = None
 
-        self.response_errors_rcode = None
-        self.response_errors = None
-
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
 
@@ -245,7 +242,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_rrsig_status_all(supported_algs, level)
         self._populate_nsec_status(supported_algs, level)
         self._finalize_key_roles()
-        self._populate_invalid_response_errors(level)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             if not is_dlv:
                 self._populate_delegation_status(supported_algs, supported_digest_algs)
@@ -336,11 +332,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.name in self.yxdomain:
             self.status = Status.NAME_STATUS_YXDOMAIN
 
-        for (qname, rdtype), query in self.queries.items():
-            if rdtype == dns.rdatatype.DS:
-                continue
-            if filter(lambda x: x.qname == qname, query.nxdomain_info) and self.status == Status.NAME_STATUS_INDETERMINATE:
-                self.status = Status.NAME_STATUS_NXDOMAIN
+        if self.status == Status.NAME_STATUS_INDETERMINATE:
+            for (qname, rdtype), query in self.queries.items():
+                if rdtype == dns.rdatatype.DS:
+                    continue
+                if filter(lambda x: x.qname == qname, query.nxdomain_info):
+                    self.status = Status.NAME_STATUS_NXDOMAIN
+                    break
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
         # if the initial request used EDNS
@@ -678,8 +676,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrsig_status = {}
         self.dname_status = {}
         self.wildcard_status = {}
-        self.response_errors_rcode = {}
-        self.response_errors = {}
 
         if self.is_zone():
             self.zsks = set()
@@ -715,23 +711,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.is_zone():
             self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
             self.revoked_keys = set(filter(lambda x: x.rdata.flags & fmt.DNSKEY_FLAGS['revoke'], self.get_dnskeys()))
-
-    def _populate_invalid_response_errors(self, level):
-        required_rdtypes = self._rdtypes_for_analysis_level(level)
-        for (qname, rdtype), query in self.queries.items():
-
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
-
-            self.response_errors_rcode[(qname, rdtype)] = {}
-            for rcode in query.error_rcode:
-                self.response_errors_rcode[(qname, rdtype)][rcode] = query.error_rcode[rcode]
-            self.response_errors[(qname, rdtype)] = {}
-            for (error, errno1) in query.error:
-                self.response_errors[(qname, rdtype)][(error, errno1)] = query.error[(error, errno1)]
 
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
@@ -1218,53 +1197,114 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
-    def _serialize_negative_response_info(self, neg_response_info_list, neg_status, warnings, errors, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
+    def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
-        for neg_response_info in neg_response_info_list:
-            qname_type_str = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(neg_response_info.rdtype))
-            d[qname_type_str] = collections.OrderedDict()
-            if neg_response_info in neg_status:
-                d[qname_type_str]['proof'] = []
-                for nsec_status in neg_status[neg_response_info]:
-                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                    if nsec_serialized:
-                        d[qname_type_str]['proof'].append(nsec_serialized)
-                if not d[qname_type_str]['proof']:
-                    del d[qname_type_str]['proof']
 
-            if loglevel <= logging.DEBUG or \
-                    (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
-                    (errors[neg_response_info] and loglevel <= logging.ERROR):
-                servers = tuple_to_dict(neg_response_info.servers_clients)
+        if neg_response_info in neg_status:
+            d['proof'] = []
+            for nsec_status in neg_status[neg_response_info]:
+                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if nsec_serialized:
+                    d['proof'].append(nsec_serialized)
+            if not d['proof']:
+                del d['proof']
+
+        if loglevel <= logging.DEBUG or \
+                (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
+                (errors[neg_response_info] and loglevel <= logging.ERROR):
+            servers = tuple_to_dict(neg_response_info.servers_clients)
+            if consolidate_clients:
+                servers = list(servers)
+                servers.sort()
+            d['servers'] = servers
+
+        if warnings[neg_response_info] and loglevel <= logging.WARNING:
+            d['warnings'] = collections.OrderedDict()
+            items = warnings[neg_response_info].keys()
+            items.sort()
+            for item in items:
+                servers = tuple_to_dict(warnings[neg_response_info][item])
                 if consolidate_clients:
                     servers = list(servers)
                     servers.sort()
-                d[qname_type_str]['servers'] = servers
+                d['warnings'][Status.response_error_mapping[item]] = servers
 
-            if warnings[neg_response_info] and loglevel <= logging.WARNING:
-                d[qname_type_str]['warnings'] = collections.OrderedDict()
-                items = warnings[neg_response_info].keys()
-                items.sort()
-                for item in items:
-                    servers = tuple_to_dict(warnings[neg_response_info][item])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[qname_type_str]['warnings'][Status.response_error_mapping[item]] = servers
+        if errors[neg_response_info] and loglevel <= logging.ERROR:
+            d['errors'] = collections.OrderedDict()
+            items = errors[neg_response_info].keys()
+            items.sort()
+            for item in items:
+                servers = tuple_to_dict(errors[neg_response_info][item])
+                if consolidate_clients:
+                    servers = list(servers)
+                    servers.sort()
+                d['errors'][Status.response_error_mapping[item]] = servers
 
-            if errors[neg_response_info] and loglevel <= logging.ERROR:
-                d[qname_type_str]['errors'] = collections.OrderedDict()
-                items = errors[neg_response_info].keys()
-                items.sort()
-                for item in items:
-                    servers = tuple_to_dict(errors[neg_response_info][item])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    d[qname_type_str]['errors'][Status.response_error_mapping[item]] = servers
+        return d
 
-            if not d[qname_type_str]:
-                del d[qname_type_str]
+    def _serialize_error_response_info(self, error_info, consolidate_clients=False, loglevel=logging.DEBUG):
+        d = collections.OrderedDict()
+
+        d['error'] = Q.response_errors[error_info.code]
+
+        if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
+            d['description'] = dns.rcode.to_text(error_info.arg)
+        elif error_info.arg is not None:
+            try:
+                d['description'] = errno.errorcode[error_info.arg]
+            except KeyError:
+                #XXX find a good cross-platform way of handling this
+                pass
+
+        servers = tuple_to_dict(error_info.servers_clients)
+        if consolidate_clients:
+            servers = list(servers)
+            servers.sort()
+        d['servers'] = servers
+
+        return d
+
+    def _serialize_query_status(self, query, consolidate_clients=False, loglevel=logging.DEBUG):
+        d = collections.OrderedDict()
+        d['answer'] = []
+        d['nodata'] = []
+        d['nxdomain'] = []
+        d['error'] = []
+
+        #TODO sort by CNAME dependencies, beginning with question
+        for rrset_info in query.answer_info:
+            # only look at qname
+            #TODO fix this check for recursive
+            if rrset_info.rrset.name == query.qname:
+                rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if rrset_serialized:
+                    d['answer'].append(rrset_serialized)
+
+        for neg_response_info in query.nxdomain_info:
+            # only look at qname
+            #TODO fix this check for recursive
+            if neg_response_info.qname == query.qname:
+                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if neg_response_serialized:
+                    d['nxdomain'].append(neg_response_serialized)
+
+        for neg_response_info in query.nodata_info:
+            # only look at qname
+            #TODO fix this check for recursive
+            if neg_response_info.qname == query.qname:
+                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if neg_response_serialized:
+                    d['nodata'].append(neg_response_serialized)
+
+        for error_info in query.error_info:
+            error_serialized = self._serialize_error_response_info(error_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if error_serialized:
+                d['error'].append(error_serialized)
+
+        if not d['answer']: del d['answer']
+        if not d['nxdomain']: del d['nxdomain']
+        if not d['nodata']: del d['nodata']
+        if not d['error']: del d['error']
 
         return d
 
@@ -1316,8 +1356,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d[name_str] = collections.OrderedDict()
         if loglevel <= logging.INFO or self.status not in (Status.NAME_STATUS_YXDOMAIN, Status.NAME_STATUS_NXDOMAIN):
             d[name_str]['status'] = Status.name_status_mapping[self.status]
-        d[name_str]['answer'] = collections.OrderedDict()
 
+        d[name_str]['queries'] = collections.OrderedDict()
         query_keys = self.queries.keys()
         query_keys.sort()
         required_rdtypes = self._rdtypes_for_analysis_level(level)
@@ -1329,20 +1369,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if required_rdtypes is not None and rdtype not in required_rdtypes:
                 continue
 
-            query = self.queries[(qname, rdtype)]
-            qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d[name_str]['answer'][qname_type_str] = []
-            #TODO sort by CNAME dependencies, beginning with question
-            for rrset_info in query.answer_info:
-                # only look at qname
-                if rrset_info.rrset.name == qname:
-                    rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                    if rrset_serialized:
-                        d[name_str]['answer'][qname_type_str].append(rrset_serialized)
-            if not d[name_str]['answer'][qname_type_str]:
-                del d[name_str]['answer'][qname_type_str]
-        if not d[name_str]['answer']:
-            del d[name_str]['answer']
+            query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if query_serialized:
+                qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+                d[name_str]['queries'][qname_type_str] = query_serialized
+
+        if not d[name_str]['queries']:
+            del d[name_str]['queries']
 
         if level <= self.RDTYPES_SECURE_DELEGATION:
             if (self.name, dns.rdatatype.DNSKEY) in self.queries:
@@ -1472,65 +1505,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 if not d[name_str]['dlv']:
                     del d[name_str]['dlv']
-
-        if self.nxdomain_status:
-            d[name_str]['nxdomain'] = self._serialize_negative_response_info(self.nxdomain_status, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
-            if not d[name_str]['nxdomain']:
-                del d[name_str]['nxdomain']
-
-        if self.noanswer_status:
-            d[name_str]['nodata'] = self._serialize_negative_response_info(self.noanswer_status, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
-            if not d[name_str]['nodata']:
-                del d[name_str]['nodata']
-
-        d[name_str]['response_errors'] = collections.OrderedDict()
-        query_keys = self.response_errors_rcode.keys()
-        query_keys.sort()
-        for (qname, rdtype) in query_keys:
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
-
-            qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d[name_str]['response_errors'][qname_type_str] = []
-
-            rcodes = self.response_errors_rcode[(qname, rdtype)].keys()
-            rcodes.sort()
-            for rcode in rcodes:
-                val = collections.OrderedDict()
-                val['error'] = 'BAD_RCODE'
-                val['description'] = dns.rcode.to_text(rcode)
-                servers = tuple_to_dict(self.response_errors_rcode[(qname, rdtype)][rcode])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                val['servers'] = servers
-                d[name_str]['response_errors'][qname_type_str].append(val)
-
-            errors_errno = self.response_errors[(qname, rdtype)].keys()
-            errors_errno.sort()
-            for error, errno1 in errors_errno:
-                val = collections.OrderedDict()
-                val['error'] = Q.response_errors[error]
-                if errno1:
-                    try:
-                        val['description'] = errno.errorcode[errno1]
-                    except KeyError:
-                        #XXX find a good cross-platform way of handling this
-                        pass
-                servers = tuple_to_dict(self.response_errors[(qname, rdtype)][(error, errno1)])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                val['servers'] = servers
-                d[name_str]['response_errors'][qname_type_str].append(val)
-
-            if not d[name_str]['response_errors'][qname_type_str]:
-                del d[name_str]['response_errors'][qname_type_str]
-        if not d[name_str]['response_errors']:
-            del d[name_str]['response_errors']
 
         if not d[name_str]:
             del d[name_str]

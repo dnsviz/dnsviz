@@ -46,7 +46,7 @@ RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2
 RETRY_CAUSE_TIMEOUT = RESPONSE_ERROR_TIMEOUT = 3
 RETRY_CAUSE_OTHER = RESPONSE_ERROR_OTHER = 4
 RETRY_CAUSE_TC_SET = 5
-RETRY_CAUSE_RCODE = 6
+RETRY_CAUSE_RCODE = RESPONSE_ERROR_INVALID_RCODE = 6
 RETRY_CAUSE_DIAGNOSTIC = 7
 retry_causes = {
         RETRY_CAUSE_NETWORK_ERROR: 'NETWORK_ERROR',
@@ -70,13 +70,15 @@ response_errors = {
         RESPONSE_ERROR_NETWORK_ERROR: retry_causes[RETRY_CAUSE_NETWORK_ERROR],
         RESPONSE_ERROR_FORMERR: retry_causes[RETRY_CAUSE_FORMERR],
         RESPONSE_ERROR_TIMEOUT: retry_causes[RETRY_CAUSE_TIMEOUT],
-        RESPONSE_ERROR_OTHER: retry_causes[RETRY_CAUSE_OTHER]
+        RESPONSE_ERROR_OTHER: retry_causes[RETRY_CAUSE_OTHER],
+        RESPONSE_ERROR_INVALID_RCODE: retry_causes[RETRY_CAUSE_RCODE]
 }
 response_error_codes = {
         retry_causes[RETRY_CAUSE_NETWORK_ERROR]: RESPONSE_ERROR_NETWORK_ERROR,
         retry_causes[RETRY_CAUSE_FORMERR]: RESPONSE_ERROR_FORMERR,
         retry_causes[RETRY_CAUSE_TIMEOUT]: RESPONSE_ERROR_TIMEOUT,
-        retry_causes[RETRY_CAUSE_OTHER]: RESPONSE_ERROR_OTHER
+        retry_causes[RETRY_CAUSE_OTHER]: RESPONSE_ERROR_OTHER,
+        retry_causes[RETRY_CAUSE_RCODE]: RESPONSE_ERROR_INVALID_RCODE
 }
 
 RETRY_ACTION_NO_CHANGE = 1
@@ -675,8 +677,7 @@ class AggregateDNSResponse(object):
         self.answer_info = []
         self.nodata_info = []
         self.nxdomain_info = []
-        self.error_rcode = {}
-        self.error = {}
+        self.error_info = []
 
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
@@ -762,13 +763,10 @@ class AggregateDNSResponse(object):
     def _aggregate_error(self, server, client, response):
         msg = response.message
         if msg is None:
-            if (response.error, response.errno) not in self.error:
-                self.error[(response.error, response.errno)] = set()
-            self.error[(response.error, response.errno)].add((server, client))
+            error_info = DNSResponseError(response.error, response.errno)
         else:
-            if msg.rcode() not in self.error_rcode:
-                self.error_rcode[msg.rcode()] = set()
-            self.error_rcode[msg.rcode()].add((server, client))
+            error_info = DNSResponseError(RESPONSE_ERROR_INVALID_RCODE, msg.rcode())
+        error_info = DNSResponseComponent.insert_into_list(error_info, self.error_info, server, client, response)
 
 class DNSQuery(object):
     '''An simple DNS Query and its responses.'''
