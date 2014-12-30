@@ -1318,6 +1318,68 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
+    def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG):
+        d = collections.OrderedDict()
+
+        dss = self.ds_status_by_ds[rdtype].keys()
+        if dss:
+            dss.sort()
+            d['ds'] = []
+            for ds in dss:
+                dnskeys = self.ds_status_by_ds[rdtype][ds].keys()
+                dnskeys.sort()
+                for dnskey in dnskeys:
+                    ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
+                    ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    if ds_serialized:
+                        d['ds'].append(ds_serialized)
+
+        try:
+            neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.noanswer_status)[0]
+            status = self.noanswer_status
+        except IndexError:
+            try:
+                neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nxdomain_status)[0]
+                status = self.nxdomain_status
+            except IndexError:
+                neg_response_info = None
+
+        if neg_response_info is not None:
+            d['insecurity_proof'] = []
+            for nsec_status in status[neg_response_info]:
+                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if nsec_serialized:
+                    d['insecurity_proof'].append(nsec_serialized)
+            if not d['insecurity_proof']:
+                del d['insecurity_proof']
+
+        if loglevel <= logging.INFO or self.delegation_status[rdtype] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
+            d['status'] = Status.delegation_status_mapping[self.delegation_status[rdtype]]
+
+        if self.delegation_warnings[rdtype] and loglevel <= logging.WARNING:
+            d['warnings'] = collections.OrderedDict()
+            warnings = self.delegation_warnings[rdtype].keys()
+            warnings.sort()
+            for warning in warnings:
+                servers = tuple_to_dict(self.delegation_warnings[rdtype][warning])
+                if consolidate_clients:
+                    servers = list(servers)
+                    servers.sort()
+                d['warnings'][Status.delegation_error_mapping[warning]] = servers
+
+        if self.delegation_errors[rdtype] and loglevel <= logging.ERROR:
+            d['errors'] = collections.OrderedDict()
+            errors = self.delegation_errors[rdtype].keys()
+            errors.sort()
+            for error in errors:
+                servers = tuple_to_dict(self.delegation_errors[rdtype][error])
+                if consolidate_clients:
+                    servers = list(servers)
+                    servers.sort()
+                d['errors'][Status.delegation_error_mapping[error]] = servers
+
+        return d
+
     def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True):
         if d is None:
             d = collections.OrderedDict()
@@ -1394,122 +1456,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if self.is_zone():
             if self.parent is not None and not is_dlv:
-                d[name_str]['delegation'] = collections.OrderedDict()
-                if (self.name, dns.rdatatype.DS) in self.queries:
-                    if self.ds_status_by_ds[dns.rdatatype.DS]:
-                        d[name_str]['delegation']['ds'] = []
-                        dss = self.ds_status_by_ds[dns.rdatatype.DS].keys()
-                        dss.sort()
-                        for ds in dss:
-                            dnskeys = self.ds_status_by_ds[dns.rdatatype.DS][ds].keys()
-                            dnskeys.sort()
-                            for dnskey in dnskeys:
-                                ds_status = self.ds_status_by_ds[dns.rdatatype.DS][ds][dnskey]
-                                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                                if ds_serialized:
-                                    d[name_str]['delegation']['ds'].append(ds_serialized)
-                        if not d[name_str]['delegation']['ds']:
-                            del d[name_str]['delegation']['ds']
-
-                    try:
-                        neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == dns.rdatatype.DS, self.noanswer_status)[0]
-                    except IndexError:
-                        pass
-                    else:
-                        d[name_str]['delegation']['insecurity_proof'] = []
-                        for nsec_status in self.noanswer_status[neg_response_info]:
-                            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                            if nsec_serialized:
-                                d[name_str]['delegation']['insecurity_proof'].append(nsec_serialized)
-                        if not d[name_str]['delegation']['insecurity_proof']:
-                            del d[name_str]['delegation']['insecurity_proof']
-
-                if loglevel <= logging.INFO or self.delegation_status[dns.rdatatype.DS] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
-                    d[name_str]['delegation']['status'] = Status.delegation_status_mapping[self.delegation_status[dns.rdatatype.DS]]
-
-                if self.delegation_warnings[dns.rdatatype.DS] and loglevel <= logging.WARNING:
-                    d[name_str]['delegation']['warnings'] = collections.OrderedDict()
-                    warnings = self.delegation_warnings[dns.rdatatype.DS].keys()
-                    warnings.sort()
-                    for warning in warnings:
-                        servers = tuple_to_dict(self.delegation_warnings[dns.rdatatype.DS][warning])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['delegation']['warnings'][Status.delegation_error_mapping[warning]] = servers
-
-                if self.delegation_errors[dns.rdatatype.DS] and loglevel <= logging.ERROR:
-                    d[name_str]['delegation']['errors'] = collections.OrderedDict()
-                    errors = self.delegation_errors[dns.rdatatype.DS].keys()
-                    errors.sort()
-                    for error in errors:
-                        servers = tuple_to_dict(self.delegation_errors[dns.rdatatype.DS][error])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['delegation']['errors'][Status.delegation_error_mapping[error]] = servers
-
-                if not d[name_str]['delegation']:
-                    del d[name_str]['delegation']
+                delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DS, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if delegation_serialized:
+                    d[name_str]['delegation'] = delegation_serialized
 
             if self.dlv_parent is not None:
-                d[name_str]['dlv'] = collections.OrderedDict()
                 if (self.dlv_name, dns.rdatatype.DLV) in self.queries:
-                    if self.ds_status_by_ds[dns.rdatatype.DLV]:
-                        d[name_str]['dlv']['ds'] = []
-                        dss = self.ds_status_by_ds[dns.rdatatype.DLV].keys()
-                        dss.sort()
-                        for ds in dss:
-                            dnskeys = self.ds_status_by_ds[dns.rdatatype.DLV][ds].keys()
-                            dnskeys.sort()
-                            for dnskey in dnskeys:
-                                ds_status = self.ds_status_by_ds[dns.rdatatype.DLV][ds][dnskey]
-                                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                                if ds_serialized:
-                                    d[name_str]['dlv']['ds'].append(ds_serialized)
-                        if not d[name_str]['dlv']['ds']:
-                            del d[name_str]['dlv']['ds']
-
-                    try:
-                        neg_response_info = filter(lambda x: x.qname == self.dlv_name and x.rdtype == dns.rdatatype.DLV, self.noanswer_status)[0]
-                    except IndexError:
-                        pass
-                    else:
-                        d[name_str]['dlv']['insecurity_proof'] = []
-                        for nsec_status in self.noanswer_status[neg_response_info]:
-                            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
-                            if nsec_serialized:
-                                d[name_str]['dlv']['insecurity_proof'].append(nsec_serialized)
-                        if not d[name_str]['dlv']['insecurity_proof']:
-                            del d[name_str]['dlv']['insecurity_proof']
-
-                if loglevel <= logging.INFO or self.delegation_status[dns.rdatatype.DLV] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
-                    d[name_str]['dlv']['status'] = Status.delegation_status_mapping[self.delegation_status[dns.rdatatype.DLV]]
-
-                if self.delegation_warnings[dns.rdatatype.DLV] and loglevel <= logging.WARNING:
-                    d[name_str]['dlv']['warnings'] = collections.OrderedDict()
-                    warnings = self.delegation_warnings[dns.rdatatype.DLV].keys()
-                    warnings.sort()
-                    for warning in warnings:
-                        servers = tuple_to_dict(self.delegation_warnings[dns.rdatatype.DLV][warning])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['dlv']['warnings'][Status.delegation_error_mapping[warning]] = servers
-
-                if self.delegation_errors[dns.rdatatype.DLV] and loglevel <= logging.ERROR:
-                    d[name_str]['dlv']['errors'] = collections.OrderedDict()
-                    errors = self.delegation_errors[dns.rdatatype.DLV].keys()
-                    errors.sort()
-                    for error in errors:
-                        servers = tuple_to_dict(self.delegation_errors[dns.rdatatype.DLV][error])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        d[name_str]['dlv']['errors'][Status.delegation_error_mapping[error]] = servers
-
-                if not d[name_str]['dlv']:
-                    del d[name_str]['dlv']
+                    delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DLV, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    if delegation_serialized:
+                        d[name_str]['dlv'] = delegation_serialized
 
         if not d[name_str]:
             del d[name_str]
