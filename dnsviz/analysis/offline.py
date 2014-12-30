@@ -1321,17 +1321,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d = collections.OrderedDict()
 
         dss = self.ds_status_by_ds[rdtype].keys()
-        if dss:
-            dss.sort()
-            d['ds'] = []
-            for ds in dss:
-                dnskeys = self.ds_status_by_ds[rdtype][ds].keys()
-                dnskeys.sort()
-                for dnskey in dnskeys:
-                    ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
-                    ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                    if ds_serialized:
-                        d['ds'].append(ds_serialized)
+        d['ds'] = []
+        dss.sort()
+        for ds in dss:
+            dnskeys = self.ds_status_by_ds[rdtype][ds].keys()
+            dnskeys.sort()
+            for dnskey in dnskeys:
+                ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
+                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                if ds_serialized:
+                    d['ds'].append(ds_serialized)
+        if not d['ds']:
+            del d['ds']
 
         try:
             neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nodata_status)[0]
