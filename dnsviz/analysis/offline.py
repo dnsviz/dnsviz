@@ -1267,8 +1267,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_query_status(self, query, consolidate_clients=False, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
         d['answer'] = []
-        d['nodata'] = []
         d['nxdomain'] = []
+        d['nodata'] = []
         d['error'] = []
 
         #TODO sort by CNAME dependencies, beginning with question
@@ -1305,6 +1305,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not d['nxdomain']: del d['nxdomain']
         if not d['nodata']: del d['nodata']
         if not d['error']: del d['error']
+
+        return d
+
+    def _serialize_dnskey_status(self, consolidate_clients=False, loglevel=logging.DEBUG):
+        d = []
+
+        for dnskey in self.get_dnskeys():
+            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if dnskey_serialized:
+                d.append(dnskey_serialized)
 
         return d
 
@@ -1377,15 +1387,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not d[name_str]['queries']:
             del d[name_str]['queries']
 
-        if level <= self.RDTYPES_SECURE_DELEGATION:
-            if (self.name, dns.rdatatype.DNSKEY) in self.queries:
-                d[name_str]['dnskeys'] = []
-                for dnskey in self.get_dnskeys():
-                    dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
-                    if dnskey_serialized:
-                        d[name_str]['dnskeys'].append(dnskey_serialized)
-                if not d[name_str]['dnskeys']:
-                    del d[name_str]['dnskeys']
+        if level <= self.RDTYPES_SECURE_DELEGATION and (self.name, dns.rdatatype.DNSKEY) in self.queries:
+            dnskey_serialized = self._serialize_dnskey_status(consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if dnskey_serialized:
+                d[name_str]['dnskey'] = dnskey_serialized
 
         if self.is_zone():
             if self.parent is not None and not is_dlv:
