@@ -1473,13 +1473,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not d[name_str]['dlv']:
                     del d[name_str]['dlv']
 
-        if query.nxdomain_info:
-            d[name_str]['nxdomain'] = self._serialize_negative_response_info(query.nxdomain_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+        if self.nxdomain_status:
+            d[name_str]['nxdomain'] = self._serialize_negative_response_info(self.nxdomain_status, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
             if not d[name_str]['nxdomain']:
                 del d[name_str]['nxdomain']
 
-        if query.nodata_info:
-            d[name_str]['nodata'] = self._serialize_negative_response_info(query.nodata_info, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+        if self.noanswer_status:
+            d[name_str]['nodata'] = self._serialize_negative_response_info(self.noanswer_status, self.noanswer_status, self.noanswer_warnings, self.noanswer_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
             if not d[name_str]['nodata']:
                 del d[name_str]['nodata']
 
