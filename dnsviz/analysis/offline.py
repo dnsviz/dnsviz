@@ -330,7 +330,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
-            self.status = Status.NAME_STATUS_YXDOMAIN
+            self.status = Status.NAME_STATUS_NOERROR
 
         if self.status == Status.NAME_STATUS_INDETERMINATE:
             for (qname, rdtype), query in self.queries.items():
@@ -1426,7 +1426,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         consolidate_clients = self.single_client()
 
         d[name_str] = collections.OrderedDict()
-        if loglevel <= logging.INFO or self.status not in (Status.NAME_STATUS_YXDOMAIN, Status.NAME_STATUS_NXDOMAIN):
+        if loglevel <= logging.INFO or self.status not in (Status.NAME_STATUS_NOERROR, Status.NAME_STATUS_NXDOMAIN):
             d[name_str]['status'] = Status.name_status_mapping[self.status]
 
         d[name_str]['queries'] = collections.OrderedDict()
