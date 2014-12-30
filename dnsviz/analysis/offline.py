@@ -1164,7 +1164,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for wildcard_name in wildcard_names:
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
                 d['wildcard_proof'][wildcard_name_str] = []
-                for nsec_set_info, nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]].items():
+                for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]].values():
                     nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                     if nsec_serialized:
                         d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
