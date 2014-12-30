@@ -1208,6 +1208,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not d['proof']:
             del d['proof']
 
+        d['soa'] = []
+        for soa_rrset_info in neg_response_info.soa_rrset_info:
+            rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            if rrset_serialized:
+                d['soa'].append(rrset_serialized)
+        if not d['soa']:
+            del d['soa']
+
         if loglevel <= logging.DEBUG or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
                 (errors[neg_response_info] and loglevel <= logging.ERROR):
