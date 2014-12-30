@@ -1241,7 +1241,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
-    def _serialize_error_response_info(self, error_info, consolidate_clients=False, loglevel=logging.DEBUG):
+    def _serialize_response_error_info(self, error_info, consolidate_clients=False, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
 
         d['error'] = Q.response_errors[error_info.code]
@@ -1296,7 +1296,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     d['nodata'].append(neg_response_serialized)
 
         for error_info in query.error_info:
-            error_serialized = self._serialize_error_response_info(error_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            error_serialized = self._serialize_response_error_info(error_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
             if error_serialized:
                 d['error'].append(error_serialized)
 
