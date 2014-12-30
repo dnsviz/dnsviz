@@ -718,6 +718,7 @@ class AggregateDNSResponse(object):
                         raise
                     synthesized_cname_info = DNSResponseComponent.insert_into_list(synthesized_cname_info, self.answer_info, server, client, response)
                     synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, referral)
+                    rrset_info = synthesized_cname_info
 
                 if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                     qname_sought = rrset_info.rrset[0].target
