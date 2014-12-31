@@ -131,7 +131,7 @@ def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logg
 class StandardRecursiveQueryCD(Q.StandardRecursiveQuery):
     flags = Q.StandardRecursiveQuery.flags | dns.flags.CD
 
-_resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
+resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
@@ -1053,7 +1053,7 @@ class Analyst(object):
             rdtype = dns.rdatatype.A
 
         try:
-            ans = _resolver.query(self.name, rdtype, dns.rdataclass.IN, allow_noanswer=True)
+            ans = resolver.query(self.name, rdtype, dns.rdataclass.IN, allow_noanswer=True)
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.DNSException):
             return
 
@@ -1075,7 +1075,7 @@ class Analyst(object):
             ceiling = self.name
 
         try:
-            ans = _resolver.query(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            ans = resolver.query(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
             try:
                 ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 return ceiling, False
@@ -1344,13 +1344,13 @@ class Analyst(object):
             self._handle_explicit_delegations(name_obj)
             if not name_obj.explicit_delegation:
                 try:
-                    ans = _resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
+                    ans = resolver.query(name, dns.rdatatype.NS, dns.rdataclass.IN)
                     
                     # resolve every name in the NS RRset
                     query_tuples = []
                     for rr in ans.rrset:
                         query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-                    answer_map = _resolver.query_multiple(*query_tuples)
+                    answer_map = resolver.query_multiple(*query_tuples)
                     for query_tuple in answer_map:
                         a = answer_map[query_tuple]
                         if isinstance(a, Resolver.DNSAnswer):
@@ -1704,7 +1704,7 @@ class Analyst(object):
             query_tuples = []
             for name in names_not_resolved:
                 query_tuples.extend([(name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-            answer_map = _resolver.query_multiple(*query_tuples)
+            answer_map = resolver.query_multiple(*query_tuples)
             for query_tuple in answer_map:
                 name = query_tuple[0]
                 a = answer_map[query_tuple]

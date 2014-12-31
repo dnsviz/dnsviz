@@ -1,2 +1,2 @@
-from online import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, _resolver
+from online import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver
 from offline import OfflineDomainNameAnalysis
