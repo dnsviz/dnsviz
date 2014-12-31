@@ -31,7 +31,7 @@ import sys
 
 import dns.message, dns.name 
 
-from dnsviz.analysis.offline import OfflineDomainNameAnalysis
+from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.util import get_trusted_keys
 
 def usage():
