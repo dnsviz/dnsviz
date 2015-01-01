@@ -905,10 +905,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
             elif self.parent.signed:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
-                for nsec_status in filter(lambda x: x.qname == qname and x.rdtype == dns.rdatatype.DS, self.nxdomain_status + self.nodata_status):
-                    if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
-                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
-                        break
+                for nsec_status_list in [self.nxdomain_status[n] for n in self.nxdomain_status if n.qname == name and n.rdtype == dns.rdatatype.DS] + \
+                        [self.nodata_status[n] for n in self.nodata_status if n.qname == name and n.rdtype == dns.rdatatype.DS]:
+                    for nsec_status in nsec_status_list:
+                        if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
+                            self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
+                            break
             else:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
 
