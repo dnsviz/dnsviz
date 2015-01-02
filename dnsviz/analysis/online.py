@@ -323,8 +323,8 @@ class OnlineDomainNameAnalysis(object):
             return self.ns_dependencies[name]
         if name in self.mx_targets and self.mx_targets[name] is not None:
             return self.mx_targets[name]
-        if name == self.parent_name():
-            return self.parent
+        if self.name.is_subdomain(name) and self.parent is not None:
+            return self.parent.get_name(name)
         elif name == self.dlv_parent_name():
             return self.dlv_parent
         elif name == self.nxdomain_ancestor_name():
