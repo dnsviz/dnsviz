@@ -401,7 +401,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # check for PMTU issues
                 #TODO need bounding here
-                if response.effective_edns_max_udp_payload != response.query.edns_max_udp_payload and response.msg_size > 512:
+                if response.effective_edns_max_udp_payload != response.query.edns_max_udp_payload:
                     if Status.RESPONSE_ERROR_PMTU_EXCEEDED not in warnings:
                         warnings[Status.RESPONSE_ERROR_PMTU_EXCEEDED] = set()
                     warnings[Status.RESPONSE_ERROR_PMTU_EXCEEDED].add((server,client))
