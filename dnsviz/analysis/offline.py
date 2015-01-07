@@ -472,7 +472,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
             errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
-    def _populate_wildcard_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
+    def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
                 zone_name = wildcard_info.parent()
@@ -489,12 +489,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
                 if nsec_set_info.use_nsec3:
-                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone_name, nsec_set_info)
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, nsec_set_info)
                 else:
-                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone_name, nsec_set_info)
+                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, nsec_set_info)
 
                 for nsec_rrset_info in nsec_set_info.rrsets.values():
-                    self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
 
                 if status.validation_status == Status.NSEC_STATUS_VALID:
                     self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][nsec_set_info] = status
@@ -520,7 +520,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
                 self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
 
-    def _populate_rrsig_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
+    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs):
         self.rrset_warnings[rrset_info] = {}
         self.rrset_errors[rrset_info] = {}
         self.rrsig_status[rrset_info] = {}
@@ -530,11 +530,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         else:
             zone_name = qname_obj.zone.name
 
-        if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
+        if query.rdtype == dns.rdatatype.DLV and query.qname == self.dlv_name:
             dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
             dnssec_algorithms_in_ds = set()
             dnssec_algorithms_in_dlv = set()
-        elif rdtype == dns.rdatatype.DS:
+        elif query.rdtype == dns.rdatatype.DS:
             dnssec_algorithms_in_dnskey = self.parent.dnssec_algorithms_in_dnskey
             dnssec_algorithms_in_ds = self.parent.dnssec_algorithms_in_ds
             dnssec_algorithms_in_dlv = self.parent.dnssec_algorithms_in_dlv
@@ -594,7 +594,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             del algs_signing_rrset[(server,client,response)]
 
                 # define self-signature
-                self_sig = rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
+                self_sig = rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY and rrsig.signer == rrset_info.rrset.name
 
                 checked_keys = set()
                 for dnskey_set, dnskey_meta in signer.get_dnskey_sets():
@@ -666,7 +666,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
                     errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
 
-        self._populate_wildcard_status(qname, rdtype, query, rrset_info, qname_obj, supported_algs)
+        self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs)
 
         for server,client in rrset_info.servers_clients:
             for response in rrset_info.servers_clients[(server,client)]:
@@ -709,7 +709,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 elif rdtype == dns.rdatatype.DLV:
                     qname_obj = qname_obj.dlv_parent
 
-                self._populate_rrsig_status(rrset_info.rrset.name, rdtype, query, rrset_info, qname_obj, supported_algs)
+                self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs)
 
     def _finalize_key_roles(self):
         if self.is_zone():
@@ -984,7 +984,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                     errors[bad_soa_error] = set()
                                 errors[bad_soa_error].add((server,client))
 
-            self._populate_rrsig_status(soa_owner_name, dns.rdatatype.SOA, query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs)
+            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs)
 
         servers_missing_soa = set()
         servers_upward_referral = set()
@@ -1020,7 +1020,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
 
             for nsec_rrset_info in nsec_set_info.rrsets.values():
-                self._populate_rrsig_status(neg_response_info.qname, query.rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
+                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
 
             if status.validation_status == Status.NSEC_STATUS_VALID:
                 statuses.append(status)
