@@ -525,14 +525,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrset_errors[rrset_info] = {}
         self.rrsig_status[rrset_info] = {}
 
-        qname_obj = self.get_name(qname)
         if qname_obj is None:
             zone_name = None
         else:
-            if rdtype == dns.rdatatype.DS:
-                qname_obj = qname_obj.parent
-            elif rdtype == dns.rdatatype.DLV:
-                qname_obj = qname_obj.dlv_parent
             zone_name = qname_obj.zone.name
 
         if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
@@ -711,6 +706,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 qname_obj = self.get_name(rrset_info.rrset.name)
                 if rdtype == dns.rdatatype.DS:
                     qname_obj = qname_obj.parent
+                elif rdtype == dns.rdatatype.DLV:
+                    qname_obj = qname_obj.dlv_parent
 
                 self._populate_rrsig_status(rrset_info.rrset.name, rdtype, query, rrset_info, qname_obj, supported_algs)
 
