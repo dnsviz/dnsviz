@@ -635,6 +635,9 @@ class RRsetInfo(DNSResponseComponent):
         except KeyError:
             pass
 
+        if self.dname_info is not None:
+            self.dname_info.update_rrsig_info(server, client, response, section, is_referral)
+
     def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response, is_referral):
         try:
             rrsig_info = self.get_rrsig_info(rrsig)
