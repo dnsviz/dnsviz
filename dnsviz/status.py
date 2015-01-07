@@ -352,7 +352,8 @@ class RRSIGStatus(object):
 
         min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
             
-        if self.rrsig.signer != zone_name:
+        if (zone_name is not None and self.rrsig.signer != zone_name) or \
+                (zone_name is None and not self.rrset.rrset.name.is_subdomain(self.rrsig.signer)):
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_INVALID
             self.errors.append(RRSIG_ERROR_SIGNER_NOT_ZONE)

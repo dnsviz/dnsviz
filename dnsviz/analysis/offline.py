@@ -356,27 +356,27 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # actually successful 
                     if response.responsive_cause_index is not None:
                         if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
-                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                            if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client):
                                 error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
                             else:
                                 error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
-                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
                                 error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
                             else:
                                 error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                            if qname_obj.zone.server_responsive_with_edns(server,client):
+                            if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client):
                                 error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
                             else:
                                 error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
-                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
                                 error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
                             else:
                                 error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                            if qname_obj.zone.server_responsive_valid_with_edns(server,client):
+                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
                                 error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
                             else:
                                 error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
@@ -417,27 +417,27 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             # the DO bit were also unsuccessful 
                             if response.responsive_cause_index is not None:
                                 if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
-                                    if qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
+                                    if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
                                         error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
                                     else:
                                         error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_FLAG
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
-                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
                                         error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
                                     else:
                                         error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS_FLAG
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                    if qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
+                                    if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
                                         error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
                                     else:
                                         error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS_FLAG
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
-                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
                                         error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
                                     else:
                                         error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS_FLAG
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                                    if qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
+                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
                                         error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
                                     else:
                                         error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_FLAG
@@ -473,9 +473,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
 
     def _populate_wildcard_status(self, qname, rdtype, query, rrset_info, qname_obj, supported_algs):
-        zone = qname_obj.zone.name
-
         for wildcard_name in rrset_info.wildcard_info:
+            if qname_obj is None:
+                zone_name = wildcard_info.parent()
+            else:
+                zone_name = qname_obj.zone.name
+
             servers_missing_nsec = set()
             for server, client in rrset_info.wildcard_info[wildcard_name].servers_clients:
                 for response in rrset_info.wildcard_info[wildcard_name].servers_clients[(server,client)]:
@@ -486,9 +489,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
                 if nsec_set_info.use_nsec3:
-                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone_name, nsec_set_info)
                 else:
-                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone, nsec_set_info)
+                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rdtype, zone_name, nsec_set_info)
 
                 for nsec_rrset_info in nsec_set_info.rrsets.values():
                     self._populate_rrsig_status(qname, rdtype, query, nsec_rrset_info, qname_obj, supported_algs)
@@ -523,10 +526,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrsig_status[rrset_info] = {}
 
         qname_obj = self.get_name(qname)
-        if rdtype == dns.rdatatype.DS:
-            qname_obj = qname_obj.parent
-        elif rdtype == dns.rdatatype.DLV:
-            qname_obj = qname_obj.dlv_parent
+        if qname_obj is None:
+            zone_name = None
+        else:
+            if rdtype == dns.rdatatype.DS:
+                qname_obj = qname_obj.parent
+            elif rdtype == dns.rdatatype.DLV:
+                qname_obj = qname_obj.dlv_parent
+            zone_name = qname_obj.zone.name
 
         if rdtype == dns.rdatatype.DLV and qname == self.dlv_name:
             dnssec_algorithms_in_dnskey = self.dlv_parent.dnssec_algorithms_in_dnskey
@@ -611,7 +618,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
                                 rrsig.algorithm == dnskey.rdata.algorithm):
                             continue
-                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, qname_obj.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, zone_name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
                         validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
 
                     # if we got results for multiple keys, then just select the one that validates
@@ -645,7 +652,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
                         errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
                     errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
-                elif qname_obj.zone.server_responsive_with_do(server,client):
+                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
                     if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
                         errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
                     errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
