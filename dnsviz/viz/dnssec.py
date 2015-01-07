@@ -975,7 +975,7 @@ class DNSAuthGraph:
         #return rrset_node
 
     def add_alias(self, alias, target):
-        if not filter(lambda x: x[1] == target and x.attr['color'] == 'black', self.G.out_edges(alias)):
+        if not filter(lambda x: x[1] == alias and x.attr['color'] == 'black', self.G.out_edges(target)):
             alias_zone = self.node_subgraph_name[alias][8:-4]
             target_zone = self.node_subgraph_name[target][8:-4]
             if alias_zone.endswith(target_zone) and alias_zone != target_zone:
