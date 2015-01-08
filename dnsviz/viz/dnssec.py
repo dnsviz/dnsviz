@@ -836,10 +836,10 @@ class DNSAuthGraph:
             err['error'] = Q.response_errors[error_info.code]
 
             if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
-                err['detail'] = dns.rcode.to_text(error_info.arg)
+                err['description'] = dns.rcode.to_text(error_info.arg)
             elif error_info.arg is not None:
                 try:
-                    err['detail'] = errno.errorcode[error_info.arg]
+                    err['description'] = errno.errorcode[error_info.arg]
                 except KeyError:
                     #XXX find a good cross-platform way of handling this
                     pass
