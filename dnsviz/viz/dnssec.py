@@ -938,24 +938,27 @@ class DNSAuthGraph:
 
             self.node_info[node_str] = [nsec_status.serialize()]
 
-        nsec_node = self.G.get_node(node_str)
+            nsec_node = self.G.get_node(node_str)
 
-        if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
-            line_color = COLORS['secure']
-            line_style = 'solid'
-        elif nsec_status.validation_status == Status.NSEC_STATUS_INDETERMINATE:
-            line_color = COLORS['unknown']
-            line_style = 'solid'
-        elif nsec_status.validation_status == Status.NSEC_STATUS_INVALID:
-            line_color = COLORS['bogus']
-            line_style = 'solid'
+            if nsec_status.validation_status == Status.NSEC_STATUS_VALID:
+                line_color = COLORS['secure']
+                line_style = 'solid'
+            elif nsec_status.validation_status == Status.NSEC_STATUS_INDETERMINATE:
+                line_color = COLORS['unknown']
+                line_style = 'solid'
+            elif nsec_status.validation_status == Status.NSEC_STATUS_INVALID:
+                line_color = COLORS['bogus']
+                line_style = 'solid'
 
-        edge_label = ''
-        edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
-        self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
+            edge_label = ''
+            edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
+            self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
 
-        self.node_info[edge_id] = [self.node_info[nsec_node][0].copy()]
-        self.node_info[edge_id][0]['description'] = 'Non-existence proof provided by %s' % (self.node_info[edge_id][0]['description'])
+            self.node_info[edge_id] = [self.node_info[nsec_node][0].copy()]
+            self.node_info[edge_id][0]['description'] = 'Non-existence proof provided by %s' % (self.node_info[edge_id][0]['description'])
+
+        else:
+            nsec_node = self.G.get_node(node_str)
 
         return nsec_node
 
