@@ -1044,7 +1044,7 @@ class DNSAuthGraph:
                     id += 1
             elif rrset_info.wildcard_info:
                 for wildcard_name in rrset_info.wildcard_info:
-                    for nsec_status in name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]].values():
+                    for nsec_status in name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                         my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, nsec_status.wildcard_name, id))
                         id += 1
             else:

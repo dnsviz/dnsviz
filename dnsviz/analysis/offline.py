@@ -484,9 +484,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for response in rrset_info.wildcard_info[wildcard_name].servers_clients[(server,client)]:
                     servers_missing_nsec.add((server,client,response))
 
-            self.wildcard_status[rrset_info.wildcard_info[wildcard_name]] = {}
+            statuses = []
             status_by_response = {}
-
             for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
                 if nsec_set_info.use_nsec3:
                     status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, nsec_set_info)
@@ -497,7 +496,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
 
                 if status.validation_status == Status.NSEC_STATUS_VALID:
-                    self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][nsec_set_info] = status
+                    if status not in statuses:
+                        statuses.append(status)
 
                 for server, client in nsec_set_info.servers_clients:
                     for response in nsec_set_info.servers_clients[(server,client)]:
@@ -510,7 +510,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             status_by_response[(server,client,response)] = status
 
             for (server,client,response), status in status_by_response.items():
-                self.wildcard_status[rrset_info.wildcard_info[wildcard_name]][status.nsec_set_info] = status
+                if status not in statuses:
+                    statuses.append(status)
+
+            self.wildcard_status[rrset_info.wildcard_info[wildcard_name]] = statuses
 
             for server, client, response in servers_missing_nsec:
                 # by definition, DNSSEC was requested (otherwise we
@@ -1176,7 +1179,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for wildcard_name in wildcard_names:
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
                 d['wildcard_proof'][wildcard_name_str] = []
-                for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]].values():
+                for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                     nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
                     if nsec_serialized:
                         d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
