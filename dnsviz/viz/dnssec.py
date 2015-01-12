@@ -581,10 +581,15 @@ class DNSAuthGraph:
         return S, node_str, bottom_name, top_name
 
     def add_rrsig(self, rrsig_status, name_obj, signer_obj, signed_node, combine_edge_id=None):
-        if rrsig_status.dnskey is None:
-            dnskey_node = self.add_dnskey_non_existent(signer_obj.name, signer_obj.zone.name, rrsig_status.rrsig.algorithm, rrsig_status.rrsig.key_tag)
+        if signer_obj is not None:
+            zone_name = signer_obj.zone.name
         else:
-            dnskey_node = self.get_dnskey(self.id_for_dnskey(signer_obj.name, rrsig_status.dnskey.rdata), signer_obj.name, rrsig_status.dnskey.rdata.algorithm, rrsig_status.dnskey.key_tag)
+            zone_name = name_obj.zone.name
+
+        if rrsig_status.dnskey is None:
+            dnskey_node = self.add_dnskey_non_existent(rrsig_status.rrsig.signer, zone_name, rrsig_status.rrsig.algorithm, rrsig_status.rrsig.key_tag)
+        else:
+            dnskey_node = self.get_dnskey(self.id_for_dnskey(rrsig_status.rrsig.signer, rrsig_status.dnskey.rdata), rrsig_status.rrsig.signer, rrsig_status.dnskey.rdata.algorithm, rrsig_status.dnskey.key_tag)
 
         #XXX consider not adding icons if errors are apparent from color of line
         edge_label = ''
@@ -986,7 +991,7 @@ class DNSAuthGraph:
     def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, combine_edge_id=None):
         for rrsig in name_obj.rrsig_status[rrset_info]:
             signer_obj = name_obj.get_name(rrsig.signer)
-            if rrsig.signer != zone_obj.name:
+            if rrsig.signer != zone_obj.name and signer_obj is not None:
                 self.graph_zone_auth(signer_obj, False)
             for dnskey in name_obj.rrsig_status[rrset_info][rrsig]:
                 rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
