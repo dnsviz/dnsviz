@@ -25,14 +25,17 @@ class IPAddr(str):
     def __new__(cls, string):
         if ':' in string:
             af = socket.AF_INET6
+            vers = 6
         else:
             af = socket.AF_INET
+            vers = 4
         try:
             ipaddr_bytes = socket.inet_pton(af, string)
         except socket.error:
             raise ValueError('Invalid value for IP address: %s' % string)
         obj = super(IPAddr, cls).__new__(cls, socket.inet_ntop(af, ipaddr_bytes))
         obj._ipaddr_bytes = ipaddr_bytes
+        obj.version = vers
         return obj
 
     def __lt__(self, other):

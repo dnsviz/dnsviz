@@ -33,6 +33,8 @@ import time
 
 import dns.exception
 
+from ipaddr import IPAddr
+
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
 
@@ -94,7 +96,7 @@ class DNSQueryTransportMeta:
         self.res_index = 0
 
     def _prepare_socket(self):
-        if ':' in self.dst:
+        if self.dst.version == 6:
             af = socket.AF_INET6
         else:
             af = socket.AF_INET
@@ -108,9 +110,9 @@ class DNSQueryTransportMeta:
             src = self.src
         else:
             if self.sock.family == socket.AF_INET6:
-                src = '::'
+                src = IPAddr('::')
             else:
-                src = '0.0.0.0'
+                src = IPAddr('0.0.0.0')
 
         if self.sport is not None:
             self.sock.bind((src, self.sport))
@@ -131,7 +133,9 @@ class DNSQueryTransportMeta:
         self.expiration = self.timeout + time.time()
         self.start_time = time.time()
         self._connect_socket()
-        self.src, self.sport = self.sock.getsockname()[:2]
+        src, sport = self.sock.getsockname()[:2]
+        self.src = IPAddr(src)
+        self.sport = sport
 
     def _connect_socket(self):
         try:

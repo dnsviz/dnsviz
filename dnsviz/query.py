@@ -1091,7 +1091,7 @@ class ExecutableDNSQuery(DNSQuery):
         request.find_rrset(request.question, self.qname, self.rdclass, self.rdtype, create=True, force_unique=True)
         request.use_edns(self.edns, self.edns_flags, self.edns_max_udp_payload, self.edns_options[:])
 
-        if ':' in server:
+        if server.version == 6:
             client = self.client_ipv6
         else:
             client = self.client_ipv4

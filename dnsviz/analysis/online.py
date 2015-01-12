@@ -77,7 +77,7 @@ ROOT_NS_IPS = set([
         IPAddr('202.12.27.33'), IPAddr('2001:dc3::35'),        # M
 ])
 
-ROOT_NS_IPS_6 = set(filter(lambda x: ':' in x, ROOT_NS_IPS))
+ROOT_NS_IPS_6 = set(filter(lambda x: x.version == 6, ROOT_NS_IPS))
 ROOT_NS_IPS_4 = ROOT_NS_IPS.difference(ROOT_NS_IPS_6)
 
 ARPA_NAME = dns.name.from_text('arpa')
@@ -97,7 +97,7 @@ PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 MAX_TTL = 100000000
 
 def _get_client_address(server):
-    if ':' in server:
+    if server.version == 6:
         af = socket.AF_INET6
     else:
         af = socket.AF_INET
@@ -106,7 +106,7 @@ def _get_client_address(server):
         s.connect((server, 53))
     except socket.error:
         return None
-    return s.getsockname()[0]
+    return IPAddr(s.getsockname()[0])
 
 def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logger=_logger):
     client_ipv4 = _get_client_address(list(ROOT_NS_IPS_4)[0])
@@ -116,15 +116,11 @@ def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logg
             raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
         elif warn:
             logger.warning('No IPv4 interfaces available for analysis!')
-    else:
-        client_ipv4 = IPAddr(client_ipv4)
     if client_ipv6 is None:
         if require_ipv6:
             raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
         elif warn:
             logger.warning('No IPv6 interfaces available for analysis!')
-    else:
-        client_ipv6 = IPAddr(client_ipv6)
     return client_ipv4, client_ipv6
 
 # create a standard recurisve DNS query with checking disabled
@@ -536,7 +532,7 @@ class OnlineDomainNameAnalysis(object):
                 response = query.responses[server][client]
 
                 # note clients used
-                if ':' in client:
+                if client.version == 6:
                     self.clients_ipv6.add(client)
                 else:
                     self.clients_ipv4.add(client)
@@ -649,10 +645,8 @@ class OnlineDomainNameAnalysis(object):
         NOERROR or NXDOMAIN) response.'''
 
         valid_servers = set([x[0] for x in self._valid_servers_clients])
-        if proto == 4:
-            return set(filter(lambda x: ':' not in x, valid_servers))
-        elif proto == 6:
-            return set(filter(lambda x: ':' in x, valid_servers))
+        if proto is not None:
+            return set(filter(lambda x: x.version == proto, valid_servers))
         else:
             return valid_servers
 
@@ -661,10 +655,8 @@ class OnlineDomainNameAnalysis(object):
         received from any client over UDP.'''
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_udp])
-        if proto == 4:
-            return set(filter(lambda x: ':' not in x, responsive_servers))
-        elif proto == 6:
-            return set(filter(lambda x: ':' in x, responsive_servers))
+        if proto is not None:
+            return set(filter(lambda x: x.version == proto, responsive_servers))
         else:
             return responsive_servers
 
@@ -673,10 +665,8 @@ class OnlineDomainNameAnalysis(object):
         received from any client over TCP.'''
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_tcp])
-        if proto == 4:
-            return set(filter(lambda x: ':' not in x, responsive_servers))
-        elif proto == 6:
-            return set(filter(lambda x: ':' in x, responsive_servers))
+        if proto is not None:
+            return set(filter(lambda x: x.version == proto, responsive_servers))
         else:
             return responsive_servers
 
@@ -691,10 +681,8 @@ class OnlineDomainNameAnalysis(object):
         else:
             servers = self._auth_or_designated_servers
 
-        if proto == 4:
-            return set(filter(lambda x: ':' not in x, servers))
-        elif proto == 6:
-            return set(filter(lambda x: ':' in x, servers))
+        if proto is not None:
+            return set(filter(lambda x: x.version == proto, servers))
         else:
             return servers
 
@@ -1227,9 +1215,9 @@ class Analyst(object):
 
     def _filter_servers(self, servers):
         if self.client_ipv6 is None:
-            servers = filter(lambda x: ':' not in x, servers)
-        elif self.client_ipv4 is None:
-            servers = filter(lambda x: ':' in x, servers)
+            servers = filter(lambda x: x.version != 6, servers)
+        if self.client_ipv4 is None:
+            servers = filter(lambda x: x.version != 4, servers)
         if not self.allow_loopback_query:
             servers = filter(lambda x: not LOOPBACK_IP_RE.match(x), servers)
         if not self.allow_private_query:
