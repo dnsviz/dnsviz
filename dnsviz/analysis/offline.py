@@ -922,7 +922,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
-        if not self.get_responsive_auth_or_designated_servers():
+        if not self.get_auth_or_designated_servers():
+            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_ERROR_RESOLVING_SERVER_NAMES] = set()
+            if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
+        elif not self.get_responsive_auth_or_designated_servers():
             self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_RESPONSIVE_SERVERS] = set()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
