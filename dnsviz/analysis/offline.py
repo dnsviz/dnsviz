@@ -1023,7 +1023,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
 
             if status.validation_status == Status.NSEC_STATUS_VALID:
-                statuses.append(status)
+                if status not in statuses:
+                    statuses.append(status)
 
             for server, client in nsec_set_info.servers_clients:
                 for response in nsec_set_info.servers_clients[(server,client)]:
@@ -1036,7 +1037,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         status_by_response[(server,client,response)] = status
 
         for (server,client,response), status in status_by_response.items():
-            statuses.append(status)
+            if status not in statuses:
+                statuses.append(status)
 
         for server, client, response in servers_missing_nsec:
             # report that no NSEC(3) records were returned
