@@ -530,13 +530,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         else:
             zone_name = qname_obj.zone.name
 
-        dnssec_algorithms_in_dnskey = qname_obj.zone.dnssec_algorithms_in_dnskey
-        if query.rdtype == dns.rdatatype.DLV:
+        if qname_obj is None:
+            dnssec_algorithms_in_dnskey = set()
             dnssec_algorithms_in_ds = set()
             dnssec_algorithms_in_dlv = set()
         else:
-            dnssec_algorithms_in_ds = qname_obj.zone.dnssec_algorithms_in_ds
-            dnssec_algorithms_in_dlv = qname_obj.zone.dnssec_algorithms_in_dlv
+            dnssec_algorithms_in_dnskey = qname_obj.zone.dnssec_algorithms_in_dnskey
+            if query.rdtype == dns.rdatatype.DLV:
+                dnssec_algorithms_in_ds = set()
+                dnssec_algorithms_in_dlv = set()
+            else:
+                dnssec_algorithms_in_ds = qname_obj.zone.dnssec_algorithms_in_ds
+                dnssec_algorithms_in_dlv = qname_obj.zone.dnssec_algorithms_in_dlv
 
         # handle DNAMEs
         has_dname = set()
