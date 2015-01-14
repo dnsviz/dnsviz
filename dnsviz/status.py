@@ -1208,13 +1208,6 @@ class NSEC3StatusNoAnswer(object):
                 self.errors.append(NSEC_ERROR_CNAME_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
-            if not self.closest_encloser:
-                self.validation_status = NSEC_STATUS_INVALID
-                valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
-                if valid_algs:
-                    self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
-                if invalid_algs:
-                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
             if not self.nsec_names_covering_qname:
                 self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
                 self.validation_status = NSEC_STATUS_INVALID
