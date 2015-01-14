@@ -1214,7 +1214,7 @@ class NSEC3StatusNoAnswer(object):
             if self.wildcard_has_rdtype:
                 self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
-        elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname and self.closest_encloser:
+        elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
             for digest_name, covering_names in self.nsec_names_covering_qname.items():
                 for nsec_name in covering_names:
                     if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
