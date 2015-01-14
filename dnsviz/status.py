@@ -180,6 +180,7 @@ NSEC_ERROR_CNAME_IN_BITMAP = 6
 NSEC_ERROR_NO_MATCHING_NSEC = 7
 NSEC_ERROR_WILDCARD_EXPANSION_INVALID = 8
 NSEC_ERROR_WILDCARD_COVERED = 9
+NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM = 10
 nsec_error_mapping = {
     NSEC_ERROR_QNAME_NOT_COVERED: 'QNAME_NOT_COVERED',
     NSEC_ERROR_WILDCARD_NOT_COVERED: 'WILDCARD_NOT_COVERED',
@@ -190,6 +191,7 @@ nsec_error_mapping = {
     NSEC_ERROR_NO_MATCHING_NSEC: 'NO_MATCHING_NSEC',
     NSEC_ERROR_WILDCARD_EXPANSION_INVALID: 'WILDCARD_EXPANSION_INVALID',
     NSEC_ERROR_WILDCARD_COVERED: 'WILDCARD_COVERED',
+    NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM: 'UNSUPPORTED_NSEC3_ALGORITHM',
 }
 
 RESPONSE_ERROR_NOT_AUTHORITATIVE = 1
@@ -884,9 +886,10 @@ class NSEC3StatusNXDOMAIN(object):
                 except KeyError:
                     digest_name = nsec_set_info.get_digest_name_for_nsec3(next_closest_encloser, self.origin, salt, alg, iterations)
 
-                covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
-                if covering_names:
-                    self.nsec_names_covering_qname[digest_name] = covering_names
+                if digest_name is not None:
+                    covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
+                    if covering_names:
+                        self.nsec_names_covering_qname[digest_name] = covering_names
 
                 if next_closest_encloser not in self.name_digest_map:
                     self.name_digest_map[next_closest_encloser] = {}
@@ -895,9 +898,10 @@ class NSEC3StatusNXDOMAIN(object):
                 wildcard_name = self._get_wildcard(encloser)
                 digest_name = nsec_set_info.get_digest_name_for_nsec3(wildcard_name, self.origin, salt, alg, iterations)
 
-                covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
-                if covering_names:
-                    self.nsec_names_covering_wildcard[digest_name] = covering_names
+                if digest_name is not None:
+                    covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
+                    if covering_names:
+                        self.nsec_names_covering_wildcard[digest_name] = covering_names
 
                 if wildcard_name not in self.name_digest_map:
                     self.name_digest_map[wildcard_name] = {}
@@ -928,7 +932,11 @@ class NSEC3StatusNXDOMAIN(object):
         self.validation_status = NSEC_STATUS_VALID
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
+            valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+            if valid_algs:
+                self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
+            if invalid_algs:
+                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
@@ -980,7 +988,11 @@ class NSEC3StatusNXDOMAIN(object):
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
                 d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
-                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map[next_closest_encloser].items()[0][1])
+                digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
+                if digest_name is not None:
+                    d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(digest_name)
+                else:
+                    d['meta']['next_closest_encloser_digest'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -995,7 +1007,10 @@ class NSEC3StatusNXDOMAIN(object):
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
-                d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                if wildcard_digest is not None:
+                    d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                else:
+                    d['meta']['wildcard_digest'] = None
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
@@ -1008,7 +1023,11 @@ class NSEC3StatusNXDOMAIN(object):
 
             else:
                 d['meta']['qname'] = fmt.humanize_name(self.qname)
-                d['meta']['qname_digest'] = fmt.format_nsec3_name(self.name_digest_map[self.qname].items()[0][1])
+                digest_name = self.name_digest_map[self.qname].items()[0][1]
+                if digest_name is not None:
+                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                else:
+                    d['meta']['qname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1050,7 +1069,11 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+            valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+            if valid_algs:
+                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+            if invalid_algs:
+                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
 
         if self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
@@ -1146,9 +1169,10 @@ class NSEC3StatusNoAnswer(object):
                         self.name_digest_map[next_closest_encloser] = {}
                     self.name_digest_map[next_closest_encloser][(salt, alg, iterations)] = digest_name
 
-                    covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
-                    if covering_names:
-                        self.nsec_names_covering_qname[digest_name] = covering_names
+                    if digest_name is not None:
+                        covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
+                        if covering_names:
+                            self.nsec_names_covering_qname[digest_name] = covering_names
 
         self._set_validation_status(nsec_set_info)
 
@@ -1185,8 +1209,12 @@ class NSEC3StatusNoAnswer(object):
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.closest_encloser:
-                self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
                 self.validation_status = NSEC_STATUS_INVALID
+                valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+                if valid_algs:
+                    self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
+                if invalid_algs:
+                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
             if not self.nsec_names_covering_qname:
                 self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
                 self.validation_status = NSEC_STATUS_INVALID
@@ -1202,8 +1230,12 @@ class NSEC3StatusNoAnswer(object):
                 self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
                 self.validation_status = NSEC_STATUS_INVALID
         else:
-            self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
             self.validation_status = NSEC_STATUS_INVALID
+            valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+            if valid_algs:
+                self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
+            if invalid_algs:
+                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1247,7 +1279,11 @@ class NSEC3StatusNoAnswer(object):
 
             if self.nsec_for_qname:
                 d['meta']['qname'] = fmt.humanize_name(self.qname)
-                d['meta']['qname_digest'] = fmt.format_nsec3_name(self.name_digest_map[self.qname].items()[0][1])
+                digest_name = self.name_digest_map[self.qname].items()[0][1]
+                if digest_name is not None:
+                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                else:
+                    d['meta']['qname_digest'] = None
                 d['meta']['nsec_matching_qname'] = collections.OrderedDict((
                     ('qname_digest', fmt.format_nsec3_name(list(self.nsec_for_qname)[0])),
                     #TODO - add rdtypes bitmap
@@ -1263,7 +1299,11 @@ class NSEC3StatusNoAnswer(object):
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
                 d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
-                d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(self.name_digest_map[next_closest_encloser].items()[0][1])
+                digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
+                if digest_name is not None:
+                    d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(digest_name)
+                else:
+                    d['meta']['next_closest_encloser_digest'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -1278,7 +1318,10 @@ class NSEC3StatusNoAnswer(object):
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
-                d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                if wildcard_digest is not None:
+                    d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                else:
+                    d['meta']['wildcard_digest'] = None
                 if self.nsec_for_wildcard_name:
                     d['meta']['nsec_matching_wildcard'] = collections.OrderedDict((
                         ('wildcard_digest', fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0])),
@@ -1287,7 +1330,11 @@ class NSEC3StatusNoAnswer(object):
 
             if not self.nsec_for_qname and not self.closest_encloser:
                 d['meta']['qname'] = fmt.humanize_name(self.qname)
-                d['meta']['qname_digest'] = fmt.format_nsec3_name(self.name_digest_map[self.qname].items()[0][1])
+                digest_name = self.name_digest_map[self.qname].items()[0][1]
+                if digest_name is not None:
+                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                else:
+                    d['meta']['qname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]

@@ -343,7 +343,7 @@ def validate_rrsig(alg, sig, msg, key):
 
 def get_digest_for_nsec3(val, salt, alg, iterations):
     if not nsec3_alg_is_supported(alg):
-        raise ValueError('NSEC3 digest algorithm not supported')
+        return None
 
     if alg == 1:
         hash_func = hashlib.sha1

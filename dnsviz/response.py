@@ -828,6 +828,16 @@ class NSECSet(DNSResponseComponent):
     def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response, is_referral):
         self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
 
+    def get_algorithm_support(self):
+        valid_algorithms = set()
+        invalid_algorithms = set()
+        for (salt, alg, iterations) in self.nsec3_params:
+            if crypto.nsec3_alg_is_supported(alg):
+                valid_algorithms.add(alg)
+            else:
+                invalid_algorithms.add(alg)
+        return valid_algorithms, invalid_algorithms
+
     def rdtype_exists_in_bitmap(self, nsec_name, rdtype):
         '''Return True if the rdtype exists in the bitmap of the NSEC(3) record
         corresponding to the name; False otherwise.'''
@@ -884,7 +894,10 @@ class NSECSet(DNSResponseComponent):
 
         val = name.canonicalize().to_wire()
         digest = crypto.get_digest_for_nsec3(val, salt, alg, iterations)
-        return dns.name.from_text(base32.b32encode(digest), origin)
+        if digest is None:
+            return None
+        else:
+            return dns.name.from_text(base32.b32encode(digest), origin)
 
     def nsec3_covering_name(self, name, salt, alg, iterations):
         '''Return the set of owner names corresponding to NSEC3 records in the
@@ -910,6 +923,10 @@ class NSECSet(DNSResponseComponent):
         flag = False
         while len(sname) >= len(origin):
             digest_name = self.get_digest_name_for_nsec3(sname, origin, salt, alg, iterations)
+
+            # unsupported algorithm
+            if digest_name is None:
+                return closest_enclosers
 
             if digest_name not in nsec3_names:
                 flag = False
