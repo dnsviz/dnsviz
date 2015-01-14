@@ -930,9 +930,9 @@ class NSEC3StatusNXDOMAIN(object):
             
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
+        valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
-            valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
             if valid_algs:
                 self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
             if invalid_algs:
@@ -940,10 +940,16 @@ class NSEC3StatusNXDOMAIN(object):
         else:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+                if valid_algs:
+                    self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+                if invalid_algs:
+                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
             if not self.nsec_names_covering_wildcard:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
+                if valid_algs:
+                    self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
+                if invalid_algs and NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM not in self.errors:
+                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1195,6 +1201,7 @@ class NSEC3StatusNoAnswer(object):
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
+        valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
         if self.nsec_for_qname:
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
@@ -1210,8 +1217,11 @@ class NSEC3StatusNoAnswer(object):
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
-                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
                 self.validation_status = NSEC_STATUS_INVALID
+                if valid_algs:
+                    self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+                if invalid_algs:
+                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
             if self.wildcard_has_rdtype:
                 self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
@@ -1221,11 +1231,13 @@ class NSEC3StatusNoAnswer(object):
                     if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
                         self.opt_out = True
             if not self.opt_out:
-                self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
                 self.validation_status = NSEC_STATUS_INVALID
+                if valid_algs:
+                    self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
+                if invalid_algs:
+                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
         else:
             self.validation_status = NSEC_STATUS_INVALID
-            valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
             if valid_algs:
                 self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
             if invalid_algs:
