@@ -820,7 +820,7 @@ class DNSAuthGraph:
         img_str = '<IMG SRC="%s"/>' % ERROR_ICON
 
         node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR><TR><TD><FONT POINT-SIZE="%d" FACE="%s" COLOR="%s"><I>%s/%s</I></FONT></TD></TR></TABLE>>' % \
-                (img_str, 12, 'Helvetica', '#b0b0b0', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), )
+                (img_str, 10, 'Helvetica', '#b0b0b0', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), )
 
         attr = {}
         attr['shape'] = 'none'
