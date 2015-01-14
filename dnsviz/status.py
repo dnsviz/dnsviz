@@ -937,12 +937,13 @@ class NSEC3StatusNXDOMAIN(object):
                 self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
             if invalid_algs:
                 self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
-        if not self.nsec_names_covering_qname:
-            self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
-        if not self.nsec_names_covering_wildcard:
-            self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
+        else:
+            if not self.nsec_names_covering_qname:
+                self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+            if not self.nsec_names_covering_wildcard:
+                self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
