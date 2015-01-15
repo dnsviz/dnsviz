@@ -274,7 +274,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         mx_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             for signer, signer_obj in self.external_signers.items():
-                signer_obj.populate_status(trusted_keys, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+                if signer_obj is not None:
+                    signer_obj.populate_status(trusted_keys, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
             for target, ns_obj in self.ns_dependencies.items():
                 if ns_obj is not None:
                     ns_obj.populate_status(trusted_keys, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
