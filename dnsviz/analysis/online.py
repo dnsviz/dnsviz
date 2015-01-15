@@ -94,8 +94,6 @@ DANE_PORT_RE = re.compile(r'^_(\d+)$')
 SRV_PORT_RE = re.compile(r'^_.*[^\d].*$')
 PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 
-MAX_TTL = 100000000
-
 def _get_client_address(server):
     if server.version == 6:
         af = socket.AF_INET6
@@ -187,10 +185,6 @@ class OnlineDomainNameAnalysis(object):
         self.ns_dependencies = {}
         self.mx_targets = {}
         self.external_signers = {}
-
-        # TTLs associated with individual record types and the minimum TTL of
-        # dependencies
-        self.ttl_mapping = {}
 
         ##################################################
         # Zone-specific attributes
@@ -391,8 +385,6 @@ class OnlineDomainNameAnalysis(object):
             except KeyError:
                 pass
 
-            self.ttl_mapping[rrset.rdtype] = min(self.ttl_mapping.get(rrset.rdtype, MAX_TTL), rrset.ttl)
-
         if rrset.rdtype == dns.rdatatype.CNAME:
             self._handle_cname_response(rrset)
 
@@ -445,7 +437,6 @@ class OnlineDomainNameAnalysis(object):
                 except KeyError:
                     pass
                 else:
-                    self.ttl_mapping[-dns.rdatatype.NS] = min(self.ttl_mapping.get(-dns.rdatatype.NS, MAX_TTL), rrset.ttl)
                     self._add_glue_ip_mapping(response)
                     self._handle_ns_response(rrset, False)
 
