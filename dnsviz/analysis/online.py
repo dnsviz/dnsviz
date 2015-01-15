@@ -218,17 +218,6 @@ class OnlineDomainNameAnalysis(object):
         self._auth_servers_clients = set()
         self._valid_servers_clients = set()
 
-        # Shortcuts to the values in the SOA record.
-        self.serial = None
-        self.rname = None
-        self.mname = None
-
-        self.dnssec_algorithms_in_dnskey = set()
-        self.dnssec_algorithms_in_ds = set()
-        self.dnssec_algorithms_in_dlv = set()
-        self.dnssec_algorithms_digest_in_ds = set()
-        self.dnssec_algorithms_digest_in_dlv = set()
-
     def __repr__(self):
         return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
 
@@ -284,10 +273,6 @@ class OnlineDomainNameAnalysis(object):
         else:
             return self.parent
     zone = property(_get_zone)
-
-    def _signed(self):
-        return bool(self.dnssec_algorithms_in_dnskey or self.dnssec_algorithms_in_ds or self.dnssec_algorithms_in_dlv)
-    signed = property(_signed)
 
     def single_client(self):
         return len(self.clients_ipv4) <= 1 and len(self.clients_ipv6) <= 1
@@ -352,16 +337,6 @@ class OnlineDomainNameAnalysis(object):
             if not ip_set:
                 self.ns_dependencies[name] = None
 
-    def _handle_soa_response(self, rrset):
-        '''Indicate that there exists an SOA record for the name which is the
-        subject of this analysis, and save the relevant parts.'''
-
-        self.has_soa = True
-        if self.serial is None or rrset[0].serial > self.serial:
-            self.serial = rrset[0].serial
-            self.rname = rrset[0].rname
-            self.mname = rrset[0].mname
-
     def _handle_mx_response(self, rrset):
         '''Save the targets from an MX RRset with the name which is the
         subject of this analysis.'''
@@ -393,33 +368,12 @@ class OnlineDomainNameAnalysis(object):
         for ns in self.get_ns_names_in_child().difference(self.get_ns_names_in_parent()):
             self.ns_dependencies[ns] = None
 
-    def _handle_dnskey_response(self, rrset):
-        for dnskey in rrset:
-            self.dnssec_algorithms_in_dnskey.add(dnskey.algorithm)
-
-    def _handle_ds_response(self, rrset):
-        if rrset.rdtype == dns.rdatatype.DS:
-            dnssec_algs = self.dnssec_algorithms_in_ds
-            digest_algs = self.dnssec_algorithms_digest_in_ds
-        else:
-            dnssec_algs = self.dnssec_algorithms_in_dlv
-            digest_algs = self.dnssec_algorithms_digest_in_dlv
-        for ds in rrset:
-            dnssec_algs.add(ds.algorithm)
-            digest_algs.add((ds.algorithm, ds.digest_type))
-
     def _process_response_answer_rrset(self, rrset, query, response):
         if query.qname in (self.name, self.dlv_name):
-            if rrset.rdtype == dns.rdatatype.SOA:
-                self._handle_soa_response(rrset)
-            elif rrset.rdtype == dns.rdatatype.MX:
+            if rrset.rdtype == dns.rdatatype.MX:
                 self._handle_mx_response(rrset)
             elif rrset.rdtype == dns.rdatatype.NS:
                 self._handle_ns_response(rrset, True)
-            elif rrset.rdtype == dns.rdatatype.DNSKEY:
-                self._handle_dnskey_response(rrset)
-            elif rrset.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
-                self._handle_ds_response(rrset)
 
             # check whether it is signed and whether the signer matches
             try:

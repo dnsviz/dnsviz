@@ -58,6 +58,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def __init__(self, name, stub=False):
         super(OfflineDomainNameAnalysis, self).__init__(name, stub=stub)
 
+        # Shortcuts to the values in the SOA record.
+        self.serial = None
+        self.rname = None
+        self.mname = None
+
+        self.dnssec_algorithms_in_dnskey = set()
+        self.dnssec_algorithms_in_ds = set()
+        self.dnssec_algorithms_in_dlv = set()
+        self.dnssec_algorithms_digest_in_ds = set()
+        self.dnssec_algorithms_digest_in_dlv = set()
+
         self.status = None
         self.yxdomain = None
         self.yxrrset = None
@@ -84,6 +95,45 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.revoked_keys = None
         self.zsks = None
         self.ksks = None
+
+    def _signed(self):
+        return bool(self.dnssec_algorithms_in_dnskey or self.dnssec_algorithms_in_ds or self.dnssec_algorithms_in_dlv)
+    signed = property(_signed)
+
+    def _handle_soa_response(self, rrset):
+        '''Indicate that there exists an SOA record for the name which is the
+        subject of this analysis, and save the relevant parts.'''
+
+        self.has_soa = True
+        if self.serial is None or rrset[0].serial > self.serial:
+            self.serial = rrset[0].serial
+            self.rname = rrset[0].rname
+            self.mname = rrset[0].mname
+
+    def _handle_dnskey_response(self, rrset):
+        for dnskey in rrset:
+            self.dnssec_algorithms_in_dnskey.add(dnskey.algorithm)
+
+    def _handle_ds_response(self, rrset):
+        if rrset.rdtype == dns.rdatatype.DS:
+            dnssec_algs = self.dnssec_algorithms_in_ds
+            digest_algs = self.dnssec_algorithms_digest_in_ds
+        else:
+            dnssec_algs = self.dnssec_algorithms_in_dlv
+            digest_algs = self.dnssec_algorithms_digest_in_dlv
+        for ds in rrset:
+            dnssec_algs.add(ds.algorithm)
+            digest_algs.add((ds.algorithm, ds.digest_type))
+
+    def _process_response_answer_rrset(self, rrset, query, response):
+        super(OfflineDomainNameAnalysis, self)._process_response_answer_rrset(rrset, query, response)
+        if query.qname in (self.name, self.dlv_name):
+            if rrset.rdtype == dns.rdatatype.SOA:
+                self._handle_soa_response(rrset)
+            elif rrset.rdtype == dns.rdatatype.DNSKEY:
+                self._handle_dnskey_response(rrset)
+            elif rrset.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                self._handle_ds_response(rrset)
 
     def _index_dnskeys(self):
         self._dnskey_sets = []
