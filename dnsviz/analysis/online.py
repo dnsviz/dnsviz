@@ -408,6 +408,40 @@ class OnlineDomainNameAnalysis(object):
             dnssec_algs.add(ds.algorithm)
             digest_algs.add((ds.algorithm, ds.digest_type))
 
+    def _process_response_answer_rrset(self, rrset, query, response):
+        if query.qname in (self.name, self.dlv_name):
+            if rrset.rdtype == dns.rdatatype.SOA:
+                self._handle_soa_response(rrset)
+            elif rrset.rdtype == dns.rdatatype.MX:
+                self._handle_mx_response(rrset)
+            elif rrset.rdtype == dns.rdatatype.NS:
+                self._handle_ns_response(rrset, True)
+            elif rrset.rdtype == dns.rdatatype.DNSKEY:
+                self._handle_dnskey_response(rrset)
+            elif rrset.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                self._handle_ds_response(rrset)
+
+            # check whether it is signed and whether the signer matches
+            try:
+                rrsig_rrset = response.message.find_rrset(response.message.answer, query.qname, query.rdclass, dns.rdatatype.RRSIG, rrset.rdtype)
+
+                for rrsig in rrsig_rrset:
+                    if rrsig_rrset.covers == dns.rdatatype.DS and rrsig.signer == self.parent_name():
+                        pass
+                    elif rrsig_rrset.covers == dns.rdatatype.DLV and rrsig.signer == self.dlv_parent_name():
+                        pass
+                    elif rrsig.signer == self.zone.name:
+                        pass
+                    else:
+                        self.external_signers[rrsig.signer] = None
+            except KeyError:
+                pass
+
+            self.ttl_mapping[rrset.rdtype] = min(self.ttl_mapping.get(rrset.rdtype, MAX_TTL), rrset.ttl)
+
+        if rrset.rdtype == dns.rdatatype.CNAME:
+            self._handle_cname_response(rrset)
+
     def _process_response(self, response, server, client, query, bailiwick):
         '''Process a DNS response from a query, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
@@ -438,38 +472,7 @@ class OnlineDomainNameAnalysis(object):
 
         # in the case where a corresponding RRset is found, analyze it here
         if rrset is not None:
-            if query.qname in (self.name, self.dlv_name):
-                if rrset.rdtype == dns.rdatatype.SOA:
-                    self._handle_soa_response(rrset)
-                elif rrset.rdtype == dns.rdatatype.MX:
-                    self._handle_mx_response(rrset)
-                elif rrset.rdtype == dns.rdatatype.NS:
-                    self._handle_ns_response(rrset, True)
-                elif rrset.rdtype == dns.rdatatype.DNSKEY:
-                    self._handle_dnskey_response(rrset)
-                elif rrset.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
-                    self._handle_ds_response(rrset)
-
-                # check whether it is signed and whether the signer matches
-                try:
-                    rrsig_rrset = response.message.find_rrset(response.message.answer, query.qname, query.rdclass, dns.rdatatype.RRSIG, rrset.rdtype)
-
-                    for rrsig in rrsig_rrset:
-                        if rrsig_rrset.covers == dns.rdatatype.DS and rrsig.signer == self.parent_name():
-                            pass
-                        elif rrsig_rrset.covers == dns.rdatatype.DLV and rrsig.signer == self.dlv_parent_name():
-                            pass
-                        elif rrsig.signer == self.zone.name:
-                            pass
-                        else:
-                            self.external_signers[rrsig.signer] = None
-                except KeyError:
-                    pass
-
-                self.ttl_mapping[rrset.rdtype] = min(self.ttl_mapping.get(rrset.rdtype, MAX_TTL), rrset.ttl)
-
-            if rrset.rdtype == dns.rdatatype.CNAME:
-                self._handle_cname_response(rrset)
+            self._process_response_answer_rrset(rrset, query, response)
 
         # look for SOA in authority section, in the case of negative responses
         try:
