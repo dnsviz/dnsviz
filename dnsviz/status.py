@@ -180,7 +180,8 @@ NSEC_ERROR_CNAME_IN_BITMAP = 6
 NSEC_ERROR_NO_MATCHING_NSEC = 7
 NSEC_ERROR_WILDCARD_EXPANSION_INVALID = 8
 NSEC_ERROR_WILDCARD_COVERED = 9
-NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM = 10
+NSEC_ERROR_ORIGIN_COVERED = 10
+NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM = 11
 nsec_error_mapping = {
     NSEC_ERROR_QNAME_NOT_COVERED: 'QNAME_NOT_COVERED',
     NSEC_ERROR_WILDCARD_NOT_COVERED: 'WILDCARD_NOT_COVERED',
@@ -191,6 +192,7 @@ nsec_error_mapping = {
     NSEC_ERROR_NO_MATCHING_NSEC: 'NO_MATCHING_NSEC',
     NSEC_ERROR_WILDCARD_EXPANSION_INVALID: 'WILDCARD_EXPANSION_INVALID',
     NSEC_ERROR_WILDCARD_COVERED: 'WILDCARD_COVERED',
+    NSEC_ERROR_ORIGIN_COVERED: 'ORIGIN_COVERED',
     NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM: 'UNSUPPORTED_NSEC3_ALGORITHM',
 }
 
@@ -557,6 +559,12 @@ class NSECStatusNXDOMAIN(object):
                 break
             wildcard_cover = wildcard_cover.parent()
 
+        # check for covering of the origin
+        self.nsec_names_covering_origin = {}
+        covering_names = nsec_set_info.nsec_covering_name(self.origin)
+        if covering_names:
+            self.nsec_names_covering_origin[self.origin] = covering_names
+
         self._set_validation_status(nsec_set_info)
 
     def __repr__(self):
@@ -574,6 +582,9 @@ class NSECStatusNXDOMAIN(object):
         if not self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
+        if self.nsec_names_covering_origin:
+            self.validation_status = NSEC_STATUS_INVALID
+            self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
     
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -678,6 +689,10 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
 
+        if self.nsec_names_covering_origin:
+            self.validation_status = NSEC_STATUS_INVALID
+            self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
+
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
         if self.validation_status == NSEC_STATUS_VALID:
@@ -747,6 +762,12 @@ class NSECStatusNoAnswer(object):
                 pass
             wildcard_cover = wildcard_cover.parent()
 
+        # check for covering of the origin
+        self.nsec_names_covering_origin = {}
+        covering_names = nsec_set_info.nsec_covering_name(self.origin)
+        if covering_names:
+            self.nsec_names_covering_origin[self.origin] = covering_names
+
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
@@ -781,6 +802,9 @@ class NSECStatusNoAnswer(object):
             if self.wildcard_has_rdtype:
                 self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
+            if self.nsec_names_covering_origin:
+                self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
                 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
