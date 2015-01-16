@@ -874,7 +874,7 @@ class NSECSet(DNSResponseComponent):
         if prev_name == next_name:
             return prev_name != name
         elif prev_name > next_name:
-            return not (next_name <= name <= prev_name) and not prev_name.is_subdomain(name)
+            return not (next_name <= name <= prev_name)
         else:
             return (prev_name < name < next_name) and not next_name.is_subdomain(name)
 
