@@ -41,7 +41,6 @@ import base32
 import crypto
 import format as fmt
 from ipaddr import IPAddr
-import status as Status
 from util import tuple_to_dict
 
 def _rr_cmp(a, b):
@@ -548,6 +547,8 @@ class DNSKEYMeta(DNSResponseComponent):
         return s.getvalue()
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG):
+        from analysis import status as Status
+
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR)
 
         d = collections.OrderedDict()

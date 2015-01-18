@@ -36,10 +36,10 @@ from dnsviz import crypto
 import dnsviz.format as fmt
 import dnsviz.query as Q
 from dnsviz.response import DNSKEYMeta
-import dnsviz.status as Status
 from dnsviz.util import tuple_to_dict
 
 from online import OnlineDomainNameAnalysis
+import status as Status
 
 _logger = logging.getLogger(__name__)
 

@@ -38,12 +38,12 @@ import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 
 from pygraphviz import AGraph
 
+from dnsviz.analysis import status as Status
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz import query as Q
 from dnsviz import response as Response
-from dnsviz import status as Status
 from dnsviz.util import tuple_to_dict
 
 COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',

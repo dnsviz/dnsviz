@@ -26,7 +26,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-import base32
 import base64
 import collections
 import datetime
@@ -34,9 +33,10 @@ import logging
 
 import dns.name, dns.rdatatype
 
-import crypto
-import format as fmt
-from util import tuple_to_dict
+from dnsviz import base32
+from dnsviz import crypto
+from dnsviz import format as fmt
+from dnsviz.util import tuple_to_dict
 
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1
