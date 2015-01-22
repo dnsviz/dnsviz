@@ -72,6 +72,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.status = None
         self.yxdomain = None
         self.yxrrset = None
+        self.nxrrset = None
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
@@ -313,6 +314,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
         self.yxrrset = set()
+        self.nxrrset = set()
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         
@@ -340,15 +342,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.yxrrset.add((cname_rrset_info.dname_info.rrset.name, cname_rrset_info.dname_info.rrset.rdtype))
                     self.yxrrset.add((cname_rrset_info.rrset.name, cname_rrset_info.rrset.rdtype))
             for neg_response_info in query.nodata_info:
-                try:
-                    for (server,client) in neg_response_info.servers_clients:
-                        for response in neg_response_info.servers_clients[(server,client)]:
+                for (server,client) in neg_response_info.servers_clients:
+                    for response in neg_response_info.servers_clients[(server,client)]:
+                        if neg_response_info.qname == qname or response.recursion_desired_and_available():
                             if not response.is_upward_referral(qname_obj.zone.name):
-                                if neg_response_info.qname == qname or response.recursion_desired_and_available():
-                                    self.yxdomain.add(neg_response_info.qname)
-                                    raise FoundYXDOMAIN
-                except FoundYXDOMAIN:
-                    break
+                                self.yxdomain.add(neg_response_info.qname)
+                            self.nxrrset.add((neg_response_info.qname, neg_response_info.rdtype))
+            for neg_response_info in query.nxdomain_info:
+                for (server,client) in neg_response_info.servers_clients:
+                    for response in neg_response_info.servers_clients[(server,client)]:
+                        if neg_response_info.qname == qname or response.recursion_desired_and_available():
+                            self.nxrrset.add((neg_response_info.qname, neg_response_info.rdtype))
 
             if level <= self.RDTYPES_DELEGATION:
                 # now check referrals (if name hasn't already been identified as YXDOMAIN)
