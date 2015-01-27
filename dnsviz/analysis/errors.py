@@ -1230,12 +1230,12 @@ class ServerNotAuthoritative(DelegationError):
 class DNAMEError(DomainNameAnalysisError):
     pass
 
-class NoCNAME(DNAMEError):
+class DNAMENoCNAME(DNAMEError):
     _abstract = False
     code = 'DNAME_NO_CNAME'
     description_template = "TODO"
 
-class TargetMismatch(DNAMEError):
+class DNAMETargetMismatch(DNAMEError):
     _abstract = False
     code = 'DNAME_TARGET_MISMATCH'
     description_template = "TODO"
