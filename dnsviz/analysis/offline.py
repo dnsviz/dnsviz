@@ -38,6 +38,7 @@ import dnsviz.query as Q
 from dnsviz.response import DNSKEYMeta
 from dnsviz.util import tuple_to_dict
 
+import errors as Errors
 from online import OnlineDomainNameAnalysis
 import status as Status
 
@@ -84,6 +85,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.nodata_status = None
         self.nodata_warnings = None
         self.nodata_errors = None
+        self.response_errors = None
 
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
@@ -398,7 +400,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
         # if the initial request used EDNS
         if response.query.edns >= 0:
-            error_code = None
+            err = None
             #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
             #TODO mark a slow response as well (over a certain threshold)
 
@@ -412,37 +414,37 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if response.responsive_cause_index is not None:
                         if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                             if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
+                                err = Errors.NetworkError(tcp=response.query.tcp_first, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=True)
                             else:
-                                error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.NetworkError(tcp=response.query.tcp_first, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=False))
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
+                                err = Errors.FormError(tcp=response.query.tcp_first, msg_size=response.msg_size, intermittent=True)
                             else:
-                                error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.FormError(tcp=response.query.tcp_first, msg_size=response.msg_size, intermittent=False))
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
                             if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
+                                err = Errors.Timeout(tcp=response.query.tcp_first, attempts=response.responsive_cause_index+1, intermittent=True)
                             else:
-                                error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.Timeout(tcp=response.query.tcp_first, attempts=response.responsive_cause_index+1, intermittent=False))
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
+                                err = Errors.UnknownResponseError(tcp=response.query.tcp_first, intermittent=True)
                             else:
-                                error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.query.tcp_first, intermittent=False))
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client):
-                                error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
+                                err = Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
                             else:
-                                error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False))
 
                 # if the ultimate request used EDNS, then it was simply ignored
                 # by the server
                 else:
-                    error_code = Status.RESPONSE_ERROR_EDNS_IGNORED
+                    err = Errors.EDNSIgnored()
 
                 #TODO handle this better
-                if error_code is None:
+                if err is None:
                     raise Exception('Unknown EDNS-related error')
 
             # the response did use EDNS
@@ -450,16 +452,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # check for EDNS version mismatch
                 if response.message.edns != response.query.edns:
-                    if Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION not in warnings:
-                        warnings[Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION] = set()
-                    warnings[Status.RESPONSE_UNSUPPORTED_EDNS_VERSION].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.UnsupportedEDNSVersion(version=response.query.edns), warnings, server, client, response)
 
                 # check for PMTU issues
                 #TODO need bounding here
                 if response.effective_edns_max_udp_payload != response.query.edns_max_udp_payload:
-                    if Status.RESPONSE_ERROR_PMTU_EXCEEDED not in warnings:
-                        warnings[Status.RESPONSE_ERROR_PMTU_EXCEEDED] = set()
-                    warnings[Status.RESPONSE_ERROR_PMTU_EXCEEDED].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None), warnings, server, client, response)
 
                 if response.query.edns_flags != response.effective_edns_flags:
                     for i in range(15, -1, -1):
@@ -473,42 +471,40 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             if response.responsive_cause_index is not None:
                                 if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
-                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR
+                                        err = Errors.NetworkError(tcp=response.query.tcp_first, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=True)
                                     else:
-                                        error_code = Status.RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_FLAG
+                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.NetworkError(tcp=response.query.tcp_first, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=False), flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
-                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_FORMERR
+                                        err = Errors.FormError(tcp=response.query.tcp_first, msg_size=response.msg_size, intermittent=True)
                                     else:
-                                        error_code = Status.RESPONSE_ERROR_FORMERR_WITH_EDNS_FLAG
+                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.FormError(tcp=response.query.tcp_first, msg_size=response.msg_size, intermittent=False), flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
-                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT
+                                        err = Errors.Timeout(tcp=response.query.tcp_first, attempts=response.responsive_cause_index+1, intermittent=True)
                                     else:
-                                        error_code = Status.RESPONSE_ERROR_TIMEOUT_WITH_EDNS_FLAG
+                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.Timeout(tcp=response.query.tcp_first, attempts=response.responsive_cause_index+1, intermittent=False), flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
-                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_ERROR
+                                        err = Errors.UnknownResponseError(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
                                     else:
-                                        error_code = Status.RESPONSE_ERROR_ERROR_WITH_EDNS_FLAG
+                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.UnknownResponseError(tcp=response.query.tcp_first, intermittent=False), flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,f):
-                                        error_code = Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE
+                                        err = Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
                                     else:
-                                        error_code = Status.RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_FLAG
+                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False), flag=dns.flags.edns_to_text(f))
 
                             #TODO handle this better
-                            if error_code is None:
+                            if err is None:
                                 raise Exception('Unknown EDNS-flag-related error')
 
-                        if error_code is not None:
+                        if err is not None:
                             break
 
-            if error_code is not None:
+            if err is not None:
                 # warn on intermittent errors
-                if error_code in (Status.RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR, Status.RESPONSE_ERROR_INTERMITTENT_FORMERR,
-                        Status.RESPONSE_ERROR_INTERMITTENT_TIMEOUT, Status.RESPONSE_ERROR_INTERMITTENT_ERROR,
-                        Status.RESPONSE_ERROR_INTERMITTENT_BAD_RCODE):
+                if isinstance(err, Errors.InvalidResponseError):
                     group = warnings
                 # if the error really matters (e.g., due to DNSSEC), note an error
                 elif qname_obj is not None and qname_obj.zone.signed:
@@ -517,15 +513,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 else:
                     group = warnings
 
-                if error_code not in group:
-                    group[error_code] = set()
-                group[error_code].add((server,client))
+                Errors.DomainNameAnalysisError.insert_into_list(err, group, server, client, response)
 
         if not response.is_authoritative() and \
                 not response.recursion_desired_and_available():
-            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE not in errors:
-                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE] = set()
-            errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].add((server,client))
+            Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
 
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
@@ -574,13 +566,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # by definition, DNSSEC was requested (otherwise we
                 # wouldn't know this was a wildcard), so no need to
                 # check for DO bit in request
-                if Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD not in self.rrset_errors[rrset_info]:
-                    self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD] = set()
-                self.rrset_errors[rrset_info][Status.RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD].add((server,client))
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingNSECForWildcard(), self.rrset_errors[rrset_info], server, client, response)
 
     def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs):
-        self.rrset_warnings[rrset_info] = {}
-        self.rrset_errors[rrset_info] = {}
+        self.rrset_warnings[rrset_info] = []
+        self.rrset_errors[rrset_info] = []
         self.rrsig_status[rrset_info] = {}
 
         if qname_obj is None:
@@ -702,27 +692,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # report an error if all RRSIGs are missing
             if not algs_signing_rrset[(server,client,response)]:
                 if response.dnssec_requested():
-                    if Status.RESPONSE_ERROR_MISSING_RRSIGS not in errors:
-                        errors[Status.RESPONSE_ERROR_MISSING_RRSIGS] = set()
-                    errors[Status.RESPONSE_ERROR_MISSING_RRSIGS].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIG(), errors, server, client, response)
                 elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
-                    if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
-                        errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                    errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
             else:
                 # report an error if RRSIGs for one or more algorithms are missing
-                if dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
-                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY not in errors:
-                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY] = set()
-                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY].add((server,client))
-                if dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
-                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS not in errors:
-                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS] = set()
-                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DS].add((server,client))
-                if dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
-                    if Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV not in errors:
-                        errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV] = set()
-                    errors[Status.RESPONSE_ERROR_MISSING_ALGS_FROM_DLV].add((server,client))
+                for alg in dnssec_algorithms_in_dnskey.difference(algs_signing_rrset[(server,client,response)]):
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDNSKEY(algorithm=alg), errors, server, client, response)
+                for alg in dnssec_algorithms_in_ds.difference(algs_signing_rrset[(server,client,response)]):
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDS(algorithm=alg), errors, server, client, response)
+                for alg in dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDLV(algorithm=alg), errors, server, client, response)
 
         self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs)
 
@@ -730,12 +710,34 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for response in rrset_info.servers_clients[(server,client)]:
                 self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
 
+    def _populate_invalid_response_status(self, query):
+        self.response_errors[query] = []
+        for error_info in query.error_info:
+            for server, client in error_info.servers_clients:
+                for response in error_info.servers_clients[(server, client)]:
+                    if error_info.code == Q.RESPONSE_ERROR_NETWORK_ERROR:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NetworkError(tcp=response.effective_tcp, intermittent=False, errno=errno.errorcode.get(error_info.arg, 'UNKNOWN')), self.response_errors[query], server, client, response)
+                    if error_info.code == Q.RESPONSE_ERROR_FORMERR:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.FormError(tcp=response.effective_tcp, intermittent=False, msg_size=response.msg_size), self.response_errors[query], server, client, response)
+                    if error_info.code == Q.RESPONSE_ERROR_TIMEOUT:
+                        attempts = 1
+                        for i in range(len(response.history) - 1, -1, -1):
+                            if response.history[i].action in (Q.RETRY_ACTION_USE_TCP, Q.RETRY_ACTION_USE_UDP):
+                                break
+                            attempts += 1
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.Timeout(tcp=response.effective_tcp, intermittent=False, attempts=attempts), self.response_errors[query], server, client, response)
+                    if error_info.code == Q.RESPONSE_ERROR_OTHER:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp, intermittent=False), self.response_errors[query], server, client, response)
+                    if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, intermittent=False, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
+
     def _populate_rrsig_status_all(self, supported_algs, level):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
         self.dname_status = {}
         self.wildcard_status = {}
+        self.response_errors = {}
 
         if self.is_zone():
             self.zsks = set()
@@ -769,6 +771,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs)
 
+            self._populate_invalid_response_status(query)
+
     def _finalize_key_roles(self):
         if self.is_zone():
             self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
@@ -800,8 +804,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         _logger.debug('Assessing delegation status of %s...' % (fmt.humanize_name(self.name)))
         self.ds_status_by_ds[rdtype] = {}
         self.ds_status_by_dnskey[rdtype] = {}
-        self.delegation_warnings[rdtype] = {}
-        self.delegation_errors[rdtype] = {}
+        self.delegation_warnings[rdtype] = []
+        self.delegation_errors[rdtype] = []
         self.delegation_status[rdtype] = None
 
         try:
@@ -945,18 +949,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
                             self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
                         elif supported_ds_algs:
-                            if Status.DELEGATION_ERROR_NO_SEP not in self.delegation_errors[rdtype]:
-                                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
-                            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP].add((server,client))
+                            Errors.DomainNameAnalysisError.insert_into_list(Errors.NoSEP(source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], server, client, response)
 
                 # report an error if one or more algorithms are incorrectly validated
                 for (server,client,response) in algs_signing_sep:
-                    if Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS not in self.delegation_errors[rdtype]:
-                        self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
-                    self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS].add((server,client))
-
+                    for alg in algs_signing_sep[(server,client,response)]:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingSEPForAlg(algorithm=alg, source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], server, client, response)
             else:
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.NoSEP(source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], None, None, None)
 
         if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:
@@ -980,19 +980,23 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
         if not self.get_auth_or_designated_servers():
-            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_ERROR_RESOLVING_SERVER_NAMES] = set()
+            #XXX implement this in NS analysis section
+            #Errors.ErrorResolvingNSName()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self.get_responsive_auth_or_designated_servers():
-            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_RESPONSIVE_SERVERS] = set()
+            #XXX implement this in NS analysis section
+            #Errors.ServerUnresponsive()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self.get_valid_auth_or_designated_servers():
-            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_VALID_RCODE_RESPONSE] = set()
+            #XXX implement this in NS analysis section
+            #Errors.ServerInvalidRcode()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self._auth_servers_clients:
-            self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_AUTHORITATIVE_RESPONSE] = set()
+            #XXX implement this in NS analysis section
+            #Errors.ServerNotAuthoritative()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
@@ -1002,12 +1006,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             except IndexError:
                 pass
             else:
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_NS_IN_PARENT] = ds_nxdomain_info.servers_clients.copy()
+                err = Errors.NoNSInParent()
+                err.servers_clients.update(ds_nxdomain_info.servers_clients)
+                self.delegation_errors[rdtype].append(err)
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
     def _populate_negative_response_status(self, query, neg_response_info, \
-            bad_soa_error, missing_soa_error, upward_referral_error, missing_nsec_error, \
+            bad_soa_error_cls, missing_soa_error_cls, upward_referral_error_cls, missing_nsec_error_cls, \
             nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs):
 
         qname_obj = self.get_name(neg_response_info.qname)
@@ -1033,43 +1039,41 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
 
             if soa_owner_name != qname_obj.zone.name:
+                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=soa_owner_name, zone_name=qname_obj.zone.name), errors, None, None, None)
                 if neg_response_info.qname == query.qname:
-                    if bad_soa_error not in errors:
-                        errors[bad_soa_error] = set()
-                    errors[bad_soa_error].update(soa_rrset_info.servers_clients)
+                    err.servers_clients.update(soa_rrset_info.servers_clients)
                 else:
                     for server,client in soa_rrset_info.servers_clients:
                         for response in soa_rrset_info.servers_clients[(server,client)]:
                             if response.recursion_desired_and_available():
-                                if bad_soa_error not in errors:
-                                    errors[bad_soa_error] = set()
-                                errors[bad_soa_error].add((server,client))
+                                err.add_server_client(server, client, response)
 
             self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs)
 
-        servers_missing_soa = set()
-        servers_upward_referral = set()
         for server,client,response in servers_without_soa:
             if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
                 # check for an upward referral
-                if upward_referral_error is not None and response.is_upward_referral(qname_obj.zone.name):
-                    servers_upward_referral.add((server,client))
+                if upward_referral_error_cls is not None and response.is_upward_referral(qname_obj.zone.name):
+                    Errors.DomainNameAnalysisError.insert_into_list(upward_referral_error_cls(), errors, server, client, response)
                 else:
-                    servers_missing_soa.add((server,client))
-        if servers_missing_soa:
-            errors[missing_soa_error] = servers_missing_soa
-        if servers_upward_referral:
-            errors[upward_referral_error] = servers_upward_referral
+                    Errors.DomainNameAnalysisError.insert_into_list(missing_soa_error_cls(), errors, server, client, response)
 
-            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE in errors:
-                errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].difference_update(errors[upward_referral_error])
-                if not errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]:
-                    del errors[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]
-            if Status.RESPONSE_ERROR_NOT_AUTHORITATIVE in warnings:
-                warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE].difference_update(errors[upward_referral_error])
-                if not warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]:
-                    del warnings[Status.RESPONSE_ERROR_NOT_AUTHORITATIVE]
-
+        if upward_referral_error_cls is not None:
+            try:
+                index = errors.index(upward_referral_error_cls())
+            except ValueError:
+                pass
+            else:
+                upward_referral_error = errors[index]
+                for notices in errors, warnings:
+                    not_auth_notices = filter(lambda x: isinstance(x, Errors.NotAuthoritative), notices)
+                    for notice in not_auth_notices:
+                        for server, client in upward_referral_error.servers_clients:
+                            for response in upward_referral_error.servers_clients[(server, client)]:
+                                notice.remove_server_client(server, client, response)
+                        if not notice.servers_clients:
+                            notices.remove(notice)
+                
         statuses = []
         status_by_response = {}
         for nsec_set_info in neg_response_info.nsec_set_info:
@@ -1105,13 +1109,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # report that no NSEC(3) records were returned
             if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
                 if response.dnssec_requested():
-                    if missing_nsec_error not in errors:
-                        errors[missing_nsec_error] = set()
-                    errors[missing_nsec_error].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(missing_nsec_error_cls(), errors, server, client, response)
                 elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
-                    if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
-                        errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
-                    errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
 
         return statuses
 
@@ -1133,25 +1133,28 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 continue
 
             for neg_response_info in query.nxdomain_info:
-                self.nxdomain_warnings[neg_response_info] = {}
-                self.nxdomain_errors[neg_response_info] = {}
+                self.nxdomain_warnings[neg_response_info] = []
+                self.nxdomain_errors[neg_response_info] = []
                 self.nxdomain_status[neg_response_info] = \
                         self._populate_negative_response_status(query, neg_response_info, \
-                                Status.RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN, None, \
-                                Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
+                                Errors.SOAOwnerNotZoneForNXDOMAIN, Errors.MissingSOAForNXDOMAIN, None, \
+                                Errors.MissingNSECForNXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
                                 self.nxdomain_warnings[neg_response_info], self.nxdomain_errors[neg_response_info], \
                                 supported_algs)
 
                 if neg_response_info.qname in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
-                    self.nxdomain_warnings[neg_response_info][Status.RESPONSE_ERROR_BAD_NXDOMAIN] = neg_response_info.servers_clients.copy()
+
+                    #XXX update this with proper rdtype type (instead of A)
+                    err = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror='A'), self.nxdomain_warnings[neg_response_info], None, None, None) 
+                    err.servers_clients.update(neg_response_info.servers_clients)
 
             for neg_response_info in query.nodata_info:
-                self.nodata_warnings[neg_response_info] = {}
-                self.nodata_errors[neg_response_info] = {}
+                self.nodata_warnings[neg_response_info] = []
+                self.nodata_errors[neg_response_info] = []
                 self.nodata_status[neg_response_info] = \
                         self._populate_negative_response_status(query, neg_response_info, \
-                                Status.RESPONSE_ERROR_BAD_SOA_FOR_NODATA, Status.RESPONSE_ERROR_MISSING_SOA_FOR_NODATA, Status.RESPONSE_ERROR_UPWARD_REFERRAL, \
-                                Status.RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
+                                Errors.SOAOwnerNotZoneForNODATA, Errors.MissingSOAForNODATA, Errors.UpwardReferral, \
+                                Errors.MissingNSECForNODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
                                 self.nodata_warnings[neg_response_info], self.nodata_errors[neg_response_info], \
                                 supported_algs)
 
@@ -1176,9 +1179,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if dnskey not in self.ksks:
                     trusted_keys_not_self_signing.add(dnskey)
             if dnskey in self.revoked_keys and dnskey not in self.ksks:
-                dnskey.errors[Status.DNSKEY_ERROR_REVOKED_NOT_SIGNING] = dnskey.servers_clients
+                err = Errors.RevokedNotSigning()
+                err.servers_clients = dnskey.servers_clients
+                dnskey.errors.append(err)
             if not self.is_zone():
-                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX] = dnskey.servers_clients
+                err = Errors.DNSKEYNotAtZoneApex()
+                err.servers_clients = dnskey.servers_clients
+                dnskey.errors.append(err)
 
             # if there were servers responsive for the query but that didn't return the dnskey
             servers_with_dnskey = set()
@@ -1187,11 +1194,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     servers_with_dnskey.add((server,client,response))
             servers_clients_without = servers_responsive.difference(servers_with_dnskey)
             if servers_clients_without:
-                dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = [(server,client) for (server,client,response) in servers_clients_without]
+                err = Errors.DNSKEYMissingFromServers()
+                dnskey.errors.append(err)
+                for (server,client,response) in servers_clients_without:
+                    err.add_server_client(server, client, response)
 
         if not trusted_keys_existing.difference(trusted_keys_not_self_signing):
             for dnskey in trusted_keys_not_self_signing:
-                dnskey.errors[Status.DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING] = dnskey.servers_clients
+                err = Errors.TrustAnchorNotSigning()
+                err.servers_clients = dnskey.servers_clients
+                dnskey.errors.append(err)
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
         d = collections.OrderedDict()
@@ -1243,26 +1255,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 del d['wildcard_proof']
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
-            d['warnings'] = collections.OrderedDict()
-            warnings = self.rrset_warnings[rrset_info].keys()
-            warnings.sort()
-            for warning in warnings:
-                servers = tuple_to_dict(self.rrset_warnings[rrset_info][warning])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['warnings'][Status.response_error_mapping[warning]] = servers
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.rrset_warnings[rrset_info]]
 
         if self.rrset_errors[rrset_info] and loglevel <= logging.ERROR:
-            d['errors'] = collections.OrderedDict()
-            errors = self.rrset_errors[rrset_info].keys()
-            errors.sort()
-            for error in errors:
-                servers = tuple_to_dict(self.rrset_errors[rrset_info][error])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['errors'][Status.response_error_mapping[error]] = servers
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.rrset_errors[rrset_info]]
 
         return d
 
@@ -1295,48 +1291,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['servers'] = servers
 
         if warnings[neg_response_info] and loglevel <= logging.WARNING:
-            d['warnings'] = collections.OrderedDict()
-            items = warnings[neg_response_info].keys()
-            items.sort()
-            for item in items:
-                servers = tuple_to_dict(warnings[neg_response_info][item])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['warnings'][Status.response_error_mapping[item]] = servers
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in warnings[neg_response_info]]
 
         if errors[neg_response_info] and loglevel <= logging.ERROR:
-            d['errors'] = collections.OrderedDict()
-            items = errors[neg_response_info].keys()
-            items.sort()
-            for item in items:
-                servers = tuple_to_dict(errors[neg_response_info][item])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['errors'][Status.response_error_mapping[item]] = servers
-
-        return d
-
-    def _serialize_response_error_info(self, error_info, consolidate_clients=False, loglevel=logging.DEBUG):
-        d = collections.OrderedDict()
-
-        d['error'] = Q.response_errors[error_info.code]
-
-        if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
-            d['description'] = dns.rcode.to_text(error_info.arg)
-        elif error_info.arg is not None:
-            try:
-                d['description'] = errno.errorcode[error_info.arg]
-            except KeyError:
-                #XXX find a good cross-platform way of handling this
-                pass
-
-        servers = tuple_to_dict(error_info.servers_clients)
-        if consolidate_clients:
-            servers = list(servers)
-            servers.sort()
-        d['servers'] = servers
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in errors[neg_response_info]]
 
         return d
 
@@ -1372,8 +1330,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if neg_response_serialized:
                     d['nodata'].append(neg_response_serialized)
 
-        for error_info in query.error_info:
-            error_serialized = self._serialize_response_error_info(error_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+        for error in self.response_errors[query]:
+            error_serialized = error.serialize(consolidate_clients=consolidate_clients)
             if error_serialized:
                 d['error'].append(error_serialized)
 
@@ -1434,26 +1392,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['status'] = Status.delegation_status_mapping[self.delegation_status[rdtype]]
 
         if self.delegation_warnings[rdtype] and loglevel <= logging.WARNING:
-            d['warnings'] = collections.OrderedDict()
-            warnings = self.delegation_warnings[rdtype].keys()
-            warnings.sort()
-            for warning in warnings:
-                servers = tuple_to_dict(self.delegation_warnings[rdtype][warning])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['warnings'][Status.delegation_error_mapping[warning]] = servers
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.delegation_warnings[rdtype]]
 
         if self.delegation_errors[rdtype] and loglevel <= logging.ERROR:
-            d['errors'] = collections.OrderedDict()
-            errors = self.delegation_errors[rdtype].keys()
-            errors.sort()
-            for error in errors:
-                servers = tuple_to_dict(self.delegation_errors[rdtype][error])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['errors'][Status.delegation_error_mapping[error]] = servers
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.delegation_errors[rdtype]]
 
         return d
 

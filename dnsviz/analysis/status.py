@@ -38,6 +38,8 @@ from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz.util import tuple_to_dict
 
+import errors as Errors
+
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1
 STATUS_INVALID = 2
@@ -137,193 +139,6 @@ dname_status_mapping = {
         DNAME_STATUS_INVALID: 'INVALID',
 }
 
-RRSIG_ERROR_SIGNER_NOT_ZONE = 1
-RRSIG_ERROR_RRSET_TTL_MISMATCH = 2
-RRSIG_ERROR_ORIGINAL_TTL_MISMATCH = 3
-RRSIG_ERROR_TTL_BEYOND_EXPIRY = 4
-RRSIG_ERROR_ALGORITHM_NOT_SUPPORTED = 5
-RRSIG_ERROR_DNSKEY_REVOKED = 6
-RRSIG_ERROR_PREMATURE = 7
-RRSIG_ERROR_EXPIRED = 8
-RRSIG_ERROR_NO_DNSKEY = 9
-RRSIG_ERROR_SIG_INVALID = 10
-rrsig_error_mapping = {
-        RRSIG_ERROR_SIGNER_NOT_ZONE: 'SIGNER_NOT_ZONE',
-        RRSIG_ERROR_RRSET_TTL_MISMATCH: 'RRSET_TTL_MISMATCH',
-        RRSIG_ERROR_ORIGINAL_TTL_MISMATCH: 'ORIGINAL_TTL_MISMATCH',
-        RRSIG_ERROR_TTL_BEYOND_EXPIRY: 'TTL_BEYOND_EXPIRY',
-        RRSIG_ERROR_ALGORITHM_NOT_SUPPORTED: 'ALGORITHM_NOT_SUPPORTED',
-        RRSIG_ERROR_DNSKEY_REVOKED: 'DNSKEY_REVOKED',
-        RRSIG_ERROR_PREMATURE: 'PREMATURE',
-        RRSIG_ERROR_EXPIRED: 'EXPIRED',
-        RRSIG_ERROR_NO_DNSKEY: 'NO_DNSKEY',
-        RRSIG_ERROR_SIG_INVALID: 'SIG_INVALID',
-}
-
-DS_ERROR_DIGEST_ALGORITHM_NOT_SUPPORTED = 1
-DS_ERROR_DNSKEY_REVOKED = 2
-DS_ERROR_NO_DNSKEY = 3
-DS_ERROR_DIGEST_INVALID = 4
-ds_error_mapping = {
-    DS_ERROR_DIGEST_ALGORITHM_NOT_SUPPORTED: 'DIGEST_ALGORITHM_NOT_SUPPORTED',
-    DS_ERROR_DNSKEY_REVOKED: 'DNSKEY_REVOKED',
-    DS_ERROR_NO_DNSKEY: 'NO_DNSKEY',
-    DS_ERROR_DIGEST_INVALID: 'DIGEST_INVALID',
-}
-
-NSEC_ERROR_QNAME_NOT_COVERED = 1
-NSEC_ERROR_WILDCARD_NOT_COVERED = 2
-NSEC_ERROR_NO_CLOSEST_ENCLOSER = 3
-NSEC_ERROR_REFERRAL_BAD_RDTYPES = 4
-NSEC_ERROR_RDTYPE_IN_BITMAP = 5
-NSEC_ERROR_CNAME_IN_BITMAP = 6
-NSEC_ERROR_NO_MATCHING_NSEC = 7
-NSEC_ERROR_WILDCARD_EXPANSION_INVALID = 8
-NSEC_ERROR_WILDCARD_COVERED = 9
-NSEC_ERROR_ORIGIN_COVERED = 10
-NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM = 11
-nsec_error_mapping = {
-    NSEC_ERROR_QNAME_NOT_COVERED: 'QNAME_NOT_COVERED',
-    NSEC_ERROR_WILDCARD_NOT_COVERED: 'WILDCARD_NOT_COVERED',
-    NSEC_ERROR_NO_CLOSEST_ENCLOSER: 'NO_CLOSEST_ENCLOSER',
-    NSEC_ERROR_REFERRAL_BAD_RDTYPES: 'REFERRAL_BAD_RDTYPES',
-    NSEC_ERROR_RDTYPE_IN_BITMAP: 'RDTYPE_IN_BITMAP',
-    NSEC_ERROR_CNAME_IN_BITMAP: 'CNAME_IN_BITMAP',
-    NSEC_ERROR_NO_MATCHING_NSEC: 'NO_MATCHING_NSEC',
-    NSEC_ERROR_WILDCARD_EXPANSION_INVALID: 'WILDCARD_EXPANSION_INVALID',
-    NSEC_ERROR_WILDCARD_COVERED: 'WILDCARD_COVERED',
-    NSEC_ERROR_ORIGIN_COVERED: 'ORIGIN_COVERED',
-    NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM: 'UNSUPPORTED_NSEC3_ALGORITHM',
-}
-
-RESPONSE_ERROR_NOT_AUTHORITATIVE = 1
-RESPONSE_ERROR_NETWORK_ERROR_WITH_FLAG = 2
-RESPONSE_ERROR_FORMERR_WITH_FLAG = 3
-RESPONSE_ERROR_TIMEOUT_WITH_FLAG = 4
-RESPONSE_ERROR_ERROR_WITH_FLAG = 5
-RESPONSE_ERROR_BAD_RCODE_WITH_FLAG = 6
-RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS = 7
-RESPONSE_ERROR_FORMERR_WITH_EDNS = 8
-RESPONSE_ERROR_TIMEOUT_WITH_EDNS = 9
-RESPONSE_ERROR_ERROR_WITH_EDNS = 10
-RESPONSE_ERROR_BAD_RCODE_WITH_EDNS = 11
-RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION = 12
-RESPONSE_ERROR_EDNS_IGNORED = 13
-RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_FLAG = 14
-RESPONSE_ERROR_FORMERR_WITH_EDNS_FLAG = 15
-RESPONSE_ERROR_TIMEOUT_WITH_EDNS_FLAG = 16
-RESPONSE_ERROR_ERROR_WITH_EDNS_FLAG = 17
-RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_FLAG = 18
-RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_OPTION = 19
-RESPONSE_ERROR_FORMERR_WITH_EDNS_OPTION = 20
-RESPONSE_ERROR_TIMEOUT_WITH_EDNS_OPTION = 21
-RESPONSE_ERROR_ERROR_WITH_EDNS_OPTION = 22
-RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_OPTION = 23
-RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS = 24
-RESPONSE_ERROR_MISSING_RRSIGS = 25
-RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY = 26
-RESPONSE_ERROR_MISSING_ALGS_FROM_DS = 27
-RESPONSE_ERROR_MISSING_ALGS_FROM_DLV = 28
-RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD = 29
-RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN = 30
-RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA = 31
-RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN = 32
-RESPONSE_ERROR_MISSING_SOA_FOR_NODATA = 33
-RESPONSE_ERROR_UPWARD_REFERRAL = 34
-RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN = 35
-RESPONSE_ERROR_BAD_SOA_FOR_NODATA = 36
-RESPONSE_ERROR_BAD_NXDOMAIN = 37
-RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR = 38
-RESPONSE_ERROR_INTERMITTENT_TIMEOUT = 39
-RESPONSE_ERROR_INTERMITTENT_FORMERR = 40
-RESPONSE_ERROR_INTERMITTENT_BAD_RCODE = 41
-RESPONSE_ERROR_INTERMITTENT_ERROR = 42
-RESPONSE_ERROR_PMTU_EXCEEDED = 43
-response_error_mapping = {
-    RESPONSE_ERROR_NOT_AUTHORITATIVE: 'NOT_AUTHORITATIVE',
-    RESPONSE_ERROR_NETWORK_ERROR_WITH_FLAG: 'NETWORK_ERROR_WITH_FLAG',
-    RESPONSE_ERROR_FORMERR_WITH_FLAG: 'FORMERR_WITH_FLAG',
-    RESPONSE_ERROR_TIMEOUT_WITH_FLAG: 'TIMEOUT_WITH_FLAG',
-    RESPONSE_ERROR_ERROR_WITH_FLAG: 'ERROR_WITH_FLAG',
-    RESPONSE_ERROR_BAD_RCODE_WITH_FLAG: 'BAD_RCODE_WITH_FLAG',
-    RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS: 'NETWORK_ERROR_WITH_EDNS',
-    RESPONSE_ERROR_FORMERR_WITH_EDNS: 'FORMERR_WITH_EDNS',
-    RESPONSE_ERROR_TIMEOUT_WITH_EDNS: 'TIMEOUT_WITH_EDNS',
-    RESPONSE_ERROR_ERROR_WITH_EDNS: 'ERROR_WITH_EDNS',
-    RESPONSE_ERROR_BAD_RCODE_WITH_EDNS: 'BAD_RCODE_WITH_EDNS',
-    RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION: 'UNSUPPORTED_EDNS_VERSION',
-    RESPONSE_ERROR_EDNS_IGNORED: 'EDNS_IGNORED',
-    RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_FLAG: 'NETWORK_ERROR_WITH_EDNS_FLAG',
-    RESPONSE_ERROR_FORMERR_WITH_EDNS_FLAG: 'FORMERR_WITH_EDNS_FLAG',
-    RESPONSE_ERROR_TIMEOUT_WITH_EDNS_FLAG: 'TIMEOUT_WITH_EDNS_FLAG',
-    RESPONSE_ERROR_ERROR_WITH_EDNS_FLAG: 'ERROR_WITH_EDNS_FLAG',
-    RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_FLAG: 'BAD_RCODE_WITH_EDNS_FLAG',
-    RESPONSE_ERROR_NETWORK_ERROR_WITH_EDNS_OPTION: 'NETWORK_ERROR_WITH_EDNS_OPTION',
-    RESPONSE_ERROR_FORMERR_WITH_EDNS_OPTION: 'FORMERR_WITH_EDNS_OPTION',
-    RESPONSE_ERROR_TIMEOUT_WITH_EDNS_OPTION: 'TIMEOUT_WITH_EDNS_OPTION',
-    RESPONSE_ERROR_ERROR_WITH_EDNS_OPTION: 'ERROR_WITH_EDNS_OPTION',
-    RESPONSE_ERROR_BAD_RCODE_WITH_EDNS_OPTION: 'BAD_RCODE_WITH_EDNS_OPTION',
-    RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS: 'UNABLE_TO_RETRIEVE_DNSSEC_RECORDS',
-    RESPONSE_ERROR_MISSING_RRSIGS: 'MISSING_RRSIGS',
-    RESPONSE_ERROR_MISSING_ALGS_FROM_DNSKEY: 'MISSING_ALGS_FROM_DNSKEY',
-    RESPONSE_ERROR_MISSING_ALGS_FROM_DS: 'MISSING_ALGS_FROM_DS',
-    RESPONSE_ERROR_MISSING_ALGS_FROM_DLV: 'MISSING_ALGS_FROM_DLV',
-    RESPONSE_ERROR_MISSING_NSEC_FOR_WILDCARD: 'MISSING_NSEC_FOR_WILDCARD',
-    RESPONSE_ERROR_MISSING_NSEC_FOR_NXDOMAIN: 'MISSING_NSEC_FOR_NXDOMAIN',
-    RESPONSE_ERROR_MISSING_NSEC_FOR_NODATA: 'MISSING_NSEC_FOR_NODATA',
-    RESPONSE_ERROR_MISSING_SOA_FOR_NXDOMAIN: 'MISSING_SOA_FOR_NXDOMAIN',
-    RESPONSE_ERROR_MISSING_SOA_FOR_NODATA: 'MISSING_SOA_FOR_NODATA',
-    RESPONSE_ERROR_UPWARD_REFERRAL: 'UPWARD_REFERRAL',
-    RESPONSE_ERROR_BAD_SOA_FOR_NXDOMAIN: 'BAD_SOA_FOR_NXDOMAIN',
-    RESPONSE_ERROR_BAD_SOA_FOR_NODATA: 'BAD_SOA_FOR_NODATA',
-    RESPONSE_ERROR_BAD_NXDOMAIN: 'BAD_NXDOMAIN',
-    RESPONSE_ERROR_INTERMITTENT_NETWORK_ERROR: 'INTERMITTENT_NETWORK_ERROR',
-    RESPONSE_ERROR_INTERMITTENT_TIMEOUT: 'INTERMITTENT_TIMEOUT',
-    RESPONSE_ERROR_INTERMITTENT_FORMERR: 'INTERMITTENT_FORMERR',
-    RESPONSE_ERROR_INTERMITTENT_BAD_RCODE: 'INTERMITTENT_BAD_RCODE',
-    RESPONSE_ERROR_INTERMITTENT_ERROR: 'INTERMITTENT_ERROR',
-    RESPONSE_ERROR_PMTU_EXCEEDED: 'PMTU_EXCEEDED',
-}
-
-DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS = 1
-DELEGATION_ERROR_NO_SEP = 2
-DELEGATION_ERROR_NO_NS_IN_PARENT = 3
-DELEGATION_ERROR_ERROR_RESOLVING_SERVER_NAMES = 4
-DELEGATION_ERROR_NO_RESPONSIVE_SERVERS = 5
-DELEGATION_ERROR_NO_VALID_RCODE_RESPONSE = 6
-DELEGATION_ERROR_NO_AUTHORITATIVE_RESPONSE = 7
-delegation_error_mapping = {
-    DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS: 'NO_SEP_FOR_SOME_ALGS',
-    DELEGATION_ERROR_NO_SEP: 'NO_SEP',
-    DELEGATION_ERROR_NO_NS_IN_PARENT: 'NO_NS_IN_PARENT',
-    DELEGATION_ERROR_ERROR_RESOLVING_SERVER_NAMES: 'ERROR_RESOLVING_SERVER_NAMES',
-    DELEGATION_ERROR_NO_RESPONSIVE_SERVERS: 'NO_RESPONSIVE_SERVERS',
-    DELEGATION_ERROR_NO_VALID_RCODE_RESPONSE: 'NO_VALID_RCODE_RESPONSE',
-    DELEGATION_ERROR_NO_AUTHORITATIVE_RESPONSE: 'NO_AUTHORITATIVE_RESPONSE',
-}
-
-DNAME_ERROR_NO_CNAME = 1
-DNAME_ERROR_TARGET_MISMATCH = 2
-DNAME_ERROR_TTL_ZERO = 3
-DNAME_ERROR_TTL_MISMATCH = 4
-dname_error_mapping = {
-    DNAME_ERROR_NO_CNAME: 'NO_CNAME',
-    DNAME_ERROR_TARGET_MISMATCH: 'TARGET_MISMATCH',
-    DNAME_ERROR_TTL_ZERO: 'TTL_ZERO',
-    DNAME_ERROR_TTL_MISMATCH: 'TTL_MISMATCH'
-}
-
-DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS = 1
-DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX = 2
-DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING = 3
-DNSKEY_ERROR_REVOKED_NOT_SIGNING = 4
-dnskey_error_mapping = {
-    DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS: 'DNSKEY_MISSING_FROM_SOME_SERVERS',
-    DNSKEY_ERROR_DNSKEY_NOT_AT_ZONE_APEX: 'DNSKEY_NOT_AT_ZONE_APEX',
-    DNSKEY_ERROR_TRUST_ANCHOR_NOT_SIGNING: 'TRUST_ANCHOR_NOT_SIGNING',
-    DNSKEY_ERROR_REVOKED_NOT_SIGNING: 'REVOKED_NOT_SIGNING',
-}
-
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, algorithm_unknown=False):
         self.rrset = rrset
@@ -348,13 +163,12 @@ class RRSIGStatus(object):
             else:
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(RRSIG_ERROR_ALGORITHM_NOT_SUPPORTED)
+                self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
 
         if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
-            self.warnings.append(RRSIG_ERROR_RRSET_TTL_MISMATCH)
-        #XXX consider taking into consideration RD/RA bits in request/response
+            self.warnings.append(Errors.RRsetTTLMismatch(rrset_ttl=self.rrset.rrset.ttl, rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl))
         if self.rrset.rrsig_info[self.rrsig].ttl > self.rrsig.original_ttl:
-            self.warnings.append(RRSIG_ERROR_ORIGINAL_TTL_MISMATCH)
+            self.errors.append(Errors.OriginalTTLExceeded(rrset_ttl=self.rrset.rrset.ttl, original_ttl=self.rrsig.original_ttl))
 
         min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
             
@@ -362,7 +176,11 @@ class RRSIGStatus(object):
                 (zone_name is None and not self.rrset.rrset.name.is_subdomain(self.rrsig.signer)):
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_INVALID
-            self.errors.append(RRSIG_ERROR_SIGNER_NOT_ZONE)
+            if zone_name is None:
+                zn = self.rrsig.signer
+            else:
+                zn = zone_name
+            self.errors.append(Errors.SignerNotZone(zone_name=zn.canonicalize().to_text(), signer_name=self.rrsig.signer.canonicalize().to_text()))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke'] and self.rrsig.covers() != dns.rdatatype.DNSKEY:
@@ -370,27 +188,27 @@ class RRSIGStatus(object):
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE
             else:
-                self.errors.append(RRSIG_ERROR_DNSKEY_REVOKED)
+                self.errors.append(Errors.DNSKEYRevokedRRSIG())
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INVALID
 
         if self.reference_ts < self.rrsig.inception: 
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_PREMATURE
-            self.errors.append(RRSIG_ERROR_PREMATURE)
+            self.errors.append(Errors.InceptionInFuture(inception=fmt.timestamp_to_datetime(self.rrsig.inception), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
         if self.reference_ts >= self.rrsig.expiration: 
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_EXPIRED
-            self.errors.append(RRSIG_ERROR_EXPIRED)
+            self.errors.append(Errors.ExpirationInPast(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
         elif self.reference_ts + min_ttl >= self.rrsig.expiration:
-            self.errors.append(RRSIG_ERROR_TTL_BEYOND_EXPIRY)
+            self.errors.append(Errors.TTLBeyondExpiration(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), rrsig_ttl=min_ttl, reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
 
         if not self.algorithm_unknown and self.signature_valid == False:
             # only report this if we're not referring to a key revoked post-sign
             if self.dnskey.key_tag == self.rrsig.key_tag:
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INVALID_SIG
-                self.errors.append(RRSIG_ERROR_SIG_INVALID)
+                self.errors.append(Errors.SignatureInvalid())
 
     def __unicode__(self):
         return u'RRSIG covering %s/%s' % (self.rrset.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
@@ -438,11 +256,12 @@ class RRSIGStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [rrsig_error_mapping[e] for e in self.warnings]
-        if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [rrsig_error_mapping[e] for e in self.errors]
-        return d
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
 
+        if self.errors and loglevel <= logging.ERROR:
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
+        return d
 
 class DSStatus(object):
     def __init__(self, ds, ds_meta, dnskey, digest_algorithm_unknown=False):
@@ -466,7 +285,7 @@ class DSStatus(object):
             else:
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(DS_ERROR_DIGEST_ALGORITHM_NOT_SUPPORTED)
+                self.warnings.append(Errors.DigestAlgorithmNotSupported(algorithm=ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
@@ -474,7 +293,7 @@ class DSStatus(object):
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE
             else:
-                self.errors.append(DS_ERROR_DNSKEY_REVOKED)
+                self.errors.append(Errors.DNSKEYRevokedDS())
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INVALID
 
@@ -483,7 +302,7 @@ class DSStatus(object):
             if self.dnskey.key_tag == self.ds.key_tag:
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INVALID_DIGEST
-                self.errors.append(DS_ERROR_DIGEST_INVALID)
+                self.errors.append(Errors.DigestInvalid())
 
     def __unicode__(self):
         return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), self.ds_meta.rrset.name.canonicalize().to_text(), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
@@ -527,9 +346,11 @@ class DSStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [ds_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [ds_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class NSECStatusNXDOMAIN(object):
@@ -578,13 +399,15 @@ class NSECStatusNXDOMAIN(object):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+            self.errors.append(Errors.SnameNotCoveredNameError(sname=self.qname))
         if not self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
+            self.errors.append(Errors.WildcardNotCoveredNSEC(wildcard=self.wildcard_name))
         if self.nsec_names_covering_origin:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
+            qname, nsec_names = self.nsec_names_covering_origin.items()[0]
+            nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
     
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -652,9 +475,11 @@ class NSECStatusNXDOMAIN(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [nsec_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [nsec_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
@@ -682,16 +507,19 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         self.validation_status = NSEC_STATUS_VALID
         if self.nsec_names_covering_qname:
             next_closest_encloser = self._next_closest_encloser()
-            if not nsec_set_info.nsec_covering_name(next_closest_encloser):
+            nsec_covering_next_closest_encloser = nsec_set_info.nsec_covering_name(next_closest_encloser)
+            if not nsec_covering_next_closest_encloser:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(NSEC_ERROR_WILDCARD_EXPANSION_INVALID)
+                self.errors.append(Errors.WildcardExpansionInvalid(sname=self.qname.canonicalize().to_text(), wildcard=self.wildcard_name.canonicalize().to_text(), next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
         else:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+            self.errors.append(Errors.SnameNotCoveredWildcardAnswer(sname=self.qname))
 
         if self.nsec_names_covering_origin:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
+            qname, nsec_names = self.nsec_names_covering_origin.items()[0]
+            nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -785,26 +613,34 @@ class NSECStatusNoAnswer(object):
         if self.nsec_for_qname is not None:
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
-                if not (self.has_ns and not self.has_ds and not self.has_soa):
-                    self.errors.append(NSEC_ERROR_REFERRAL_BAD_RDTYPES)
+                if not self.has_ns:
+                    self.errors.append(Errors.ReferralWithoutNSBitNSEC(sname=self.qname.canonicalize().to_text()))
                     self.validation_status = NSEC_STATUS_INVALID
-            if self.has_rdtype:
-                self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
-                self.validation_status = NSEC_STATUS_INVALID
-
-        else:
-            if self.nsec_for_wildcard_name is None:
-                self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
-                self.validation_status = NSEC_STATUS_INVALID
+                if self.has_ds:
+                    self.errors.append(Errors.ReferralWithDSBitNSEC(sname=self.qname.canonicalize().to_text()))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.has_soa:
+                    self.errors.append(Errors.ReferralWithSOABitNSEC(sname=self.qname.canonicalize().to_text()))
+                    self.validation_status = NSEC_STATUS_INVALID
+            else:
+                if self.has_rdtype:
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.validation_status = NSEC_STATUS_INVALID
+        elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
-                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
                 self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(Errors.SnameNotCoveredWildcardNoData(sname=self.qname.canonicalize().to_text()))
             if self.wildcard_has_rdtype:
-                self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=self.wildcard_name.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
             if self.nsec_names_covering_origin:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(NSEC_ERROR_ORIGIN_COVERED)
+                qname, nsec_names = self.nsec_names_covering_origin.items()[0]
+                nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
+                self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
+        else:
+            self.validation_status = NSEC_STATUS_INVALID
+            self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=self.qname.canonicalize().to_text()))
                 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -877,9 +713,11 @@ class NSECStatusNoAnswer(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [nsec_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [nsec_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class NSEC3StatusNXDOMAIN(object):
@@ -946,6 +784,12 @@ class NSEC3StatusNXDOMAIN(object):
     def _get_next_closest_encloser(self, encloser):
         return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
 
+    def get_next_closest_encloser(self):
+        if self.closest_encloser:
+            encloser_name, nsec_names = self.closest_encloser.items()[0]
+            return self._get_next_closest_encloser(encloser_name)
+        return None
+
     def _get_wildcard(self, encloser):
         return dns.name.from_text('*', encloser)
 
@@ -955,25 +799,30 @@ class NSEC3StatusNXDOMAIN(object):
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+        if invalid_algs:
+            invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
+        else:
+            invalid_alg_err = None
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
-                self.errors.append(NSEC_ERROR_NO_CLOSEST_ENCLOSER)
+                self.errors.append(Errors.NoClosestEncloserNameError(sname=self.qname.canonicalize().to_text()))
             if invalid_algs:
-                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                self.errors.append(invalid_alg_err)
         else:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+                    next_closest_encloser = self.get_next_closest_encloser()
+                    self.errors.append(Errors.NextClosestEncloserNotCoveredNameError(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
                 if invalid_algs:
-                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                    self.errors.append(invalid_alg_err)
             if not self.nsec_names_covering_wildcard:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(NSEC_ERROR_WILDCARD_NOT_COVERED)
-                if invalid_algs and NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM not in self.errors:
-                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                    self.errors.append(Errors.WildcardNotCoveredNSEC3(wildcard=self.wildcard_name))
+                if invalid_algs and invalid_alg_err not in self.errors:
+                    self.errors.append(invalid_alg_err)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1071,9 +920,11 @@ class NSEC3StatusNXDOMAIN(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [nsec_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [nsec_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
@@ -1101,14 +952,20 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
-            if valid_algs:
-                self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
             if invalid_algs:
-                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
+            else:
+                invalid_alg_err = None
+            if valid_algs:
+                next_closest_encloser = self.get_next_closest_encloser()
+                self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardAnswer(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+            if invalid_algs:
+                self.errors.append(invalid_alg_err)
 
         if self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(NSEC_ERROR_WILDCARD_COVERED)
+            next_closest_encloser = self.get_next_closest_encloser()
+            self.errors.append(Errors.WildcardCoveredAnswerNSEC3(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1220,35 +1077,52 @@ class NSEC3StatusNoAnswer(object):
     def _get_next_closest_encloser(self, encloser):
         return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
 
+    def get_next_closest_encloser(self):
+        if self.closest_encloser:
+            encloser_name, nsec_names = self.closest_encloser.items()[0]
+            return self._get_next_closest_encloser(encloser_name)
+        return None
+
     def _get_wildcard(self, encloser):
         return dns.name.from_text('*', encloser)
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
+        if invalid_algs:
+            invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
+        else:
+            invalid_alg_err = None
         if self.nsec_for_qname:
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
-                if not (self.has_ns and not self.has_ds and not self.has_soa):
-                    self.errors.append(NSEC_ERROR_REFERRAL_BAD_RDTYPES)
+                if not self.has_ns:
+                    self.errors.append(Errors.ReferralWithoutNSBitNSEC3(sname=self.qname.canonicalize().to_text()))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.has_ds:
+                    self.errors.append(Errors.ReferralWithDSBitNSEC3(sname=self.qname.canonicalize().to_text()))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.has_soa:
+                    self.errors.append(Errors.ReferralWithSOABitNSEC3(sname=self.qname.canonicalize().to_text()))
                     self.validation_status = NSEC_STATUS_INVALID
             # RFC 5155, section 8.5, 8.6
-            if self.has_rdtype:
-                self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
-                self.validation_status = NSEC_STATUS_INVALID
-            if self.has_cname:
-                self.errors.append(NSEC_ERROR_CNAME_IN_BITMAP)
-                self.validation_status = NSEC_STATUS_INVALID
+            else:
+                if self.has_rdtype:
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.has_cname:
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(dns.rdatatype.CNAME)))
+                    self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(NSEC_ERROR_QNAME_NOT_COVERED)
+                    self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNoData(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
                 if invalid_algs:
-                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                    self.errors.append(invalid_alg_err)
             if self.wildcard_has_rdtype:
-                self.errors.append(NSEC_ERROR_RDTYPE_IN_BITMAP)
                 self.validation_status = NSEC_STATUS_INVALID
+                self.errors.append(Errors.StypeInBitmapWildcardNoDataNSEC3(sname=self.wildcard_name.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
         elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
             for digest_name, covering_names in self.nsec_names_covering_qname.items():
                 for nsec_name in covering_names:
@@ -1257,15 +1131,19 @@ class NSEC3StatusNoAnswer(object):
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
+                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNoData(sname=self.qname.canonicalize().to_text()))
                 if invalid_algs:
-                    self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                    self.errors.append(invalid_alg_err)
         else:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
-                self.errors.append(NSEC_ERROR_NO_MATCHING_NSEC)
+                if self.rdtype == dns.rdatatype.DS:
+                    cls = Errors.NoNSEC3MatchingSnameDSNoData
+                else:
+                    cls = Errors.NoNSEC3MatchingSnameNoData
+                self.errors.append(cls(sname=self.qname.canonicalize().to_text()))
             if invalid_algs:
-                self.errors.append(NSEC_ERROR_UNSUPPORTED_NSEC3_ALGORITHM)
+                self.errors.append(invalid_alg_err)
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1377,9 +1255,11 @@ class NSEC3StatusNoAnswer(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [nsec_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [nsec_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class CNAMEFromDNAMEStatus(object):
@@ -1391,17 +1271,17 @@ class CNAMEFromDNAMEStatus(object):
 
         if self.included_cname is None:
             self.validation_status = DNAME_STATUS_INVALID
-            self.errors.append(DNAME_ERROR_NO_CNAME)
+            self.errors.append(Errors.DNAMENoCNAME())
         else:
             self.validation_status = DNAME_STATUS_VALID
             if self.included_cname.rrset[0].target != self.synthesized_cname.rrset[0].target:
-                self.errors.append(DNAME_ERROR_TARGET_MISMATCH)
+                self.errors.append(Errors.DNAMETargetMismatch())
                 self.validation_status = DNAME_STATUS_INVALID_TARGET
             if self.included_cname.rrset.ttl != self.synthesized_cname.rrset.ttl:
                 if self.included_cname.rrset.ttl == 0:
-                    self.warnings.append(DNAME_ERROR_TTL_ZERO)
+                    self.warnings.append(Errors.DNAMETTLZero())
                 else:
-                    self.warnings.append(DNAME_ERROR_TTL_MISMATCH)
+                    self.warnings.append(Errors.DNAMETTLMismatch())
 
     def __unicode__(self):
         return u'CNAME synthesis for %s from %s/%s' % (self.synthesized_cname.rrset.name.canonicalize().to_text(), self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
@@ -1439,7 +1319,9 @@ class CNAMEFromDNAMEStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [dname_error_mapping[e] for e in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [dname_error_mapping[e] for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d

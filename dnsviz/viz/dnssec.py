@@ -39,6 +39,7 @@ import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 from pygraphviz import AGraph
 
 from dnsviz.analysis import status as Status
+from dnsviz.analysis import errors as Errors
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
@@ -315,15 +316,12 @@ class DNSAuthGraph:
         if not self.G.has_node(node_str):
             rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], dnskey.rrset_info)
             rrset_info_with_warnings = filter(lambda x: name_obj.rrset_warnings[x], dnskey.rrset_info)
-            #XXX where do we put non-responses (e.g., timeout, formerr, etc.)?
 
             img_str = ''
             if dnskey.errors or rrset_info_with_errors:
                 img_str = '<IMG SRC="%s"/>' % ERROR_ICON
             elif dnskey.warnings or rrset_info_with_warnings:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
-
-            #XXX algorithms that aren't supported
 
             if img_str:
                 label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT></TD></TR></TABLE>>' % \
@@ -345,46 +343,27 @@ class DNSAuthGraph:
             consolidate_clients = name_obj.single_client()
             dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients)
 
-            #XXX move all this to a separate method
+            all_warnings = []
             if rrset_info_with_warnings:
-                aggregate_warnings = {}
-                for rrset_info in dnskey.rrset_info:
+                for rrset_info in rrset_info_with_warnings:
                     for warning in name_obj.rrset_warnings[rrset_info]:
-                        if warning not in aggregate_warnings:
-                            aggregate_warnings[warning] = set()
-                        aggregate_warnings[warning].update(name_obj.rrset_warnings[rrset_info][warning])
-
+                        servers_clients = warning.servers_clients
+                        warning = Errors.DomainNameAnalysisError.insert_into_list(warning.copy(), all_warnings, None, None, None)
+                        warning.servers_clients.update(servers_clients)
                 if 'warnings' not in dnskey_serialized:
-                    dnskey_serialized['warnings'] = collections.OrderedDict()
-                warnings = aggregate_warnings.keys()
-                warnings.sort()
-                for warning in warnings:
-                    warning_str = Status.response_error_mapping[warning]
-                    servers = tuple_to_dict(aggregate_warnings[warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    dnskey_serialized['warnings'][warning_str] = servers
+                    dnskey_serialized['warnings'] = []
+                dnskey_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in all_warnings]
 
+            all_errors = []
             if rrset_info_with_errors:
-                aggregate_errors = {}
-                for rrset_info in dnskey.rrset_info:
+                for rrset_info in rrset_info_with_errors:
                     for error in name_obj.rrset_errors[rrset_info]:
-                        if error not in aggregate_errors:
-                            aggregate_errors[error] = set()
-                        aggregate_errors[error].update(name_obj.rrset_errors[rrset_info][error])
-
+                        servers_clients = error.servers_clients
+                        error = Errors.DomainNameAnalysisError.insert_into_list(error.copy(), all_errors, None, None, None)
+                        error.servers_clients.update(servers_clients)
                 if 'errors' not in dnskey_serialized:
-                    dnskey_serialized['errors'] = collections.OrderedDict()
-                errors = aggregate_errors.keys()
-                errors.sort()
-                for error in errors:
-                    error_str = Status.response_error_mapping[error]
-                    servers = tuple_to_dict(aggregate_errors[error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    dnskey_serialized['errors'][error_str] = servers
+                    dnskey_serialized['errors'] = []
+                dnskey_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in all_errors]
 
             self.node_info[node_str] = [dnskey_serialized]
      
@@ -441,7 +420,6 @@ class DNSAuthGraph:
                 img_str = '<IMG SRC="%s"/>' % ERROR_ICON
             elif zone_obj.rrset_warnings[ds_info]:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
-            #XXX where do we put non-responses (e.g., timeout, formerr, etc.)?
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
             if img_str:
@@ -469,38 +447,15 @@ class DNSAuthGraph:
             consolidated_ds_serialized['rdata']['digest_type'] = digest_algs
             consolidated_ds_serialized['rdata']['digest'] = digests
 
-            #XXX move all this to a separate method
             if zone_obj.rrset_warnings[ds_info]:
-                warnings_serialized = collections.OrderedDict()
-                warnings = zone_obj.rrset_warnings[ds_info].keys()
-                warnings.sort()
-                for warning in warnings:
-                    warning_str = Status.response_error_mapping[warning]
-                    servers = tuple_to_dict(zone_obj.rrset_warnings[ds_info][warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    warnings_serialized[warning_str] = servers
-                if 'warnings' not in ds:
-                    consolidated_ds_serialized['warnings'] = warnings_serialized
-                else:
-                    consolidated_ds_serialized['warnings'].update(warnings_serialized)
+                if 'warnings' not in consolidated_ds_serialized:
+                    consolidated_ds_serialized['warnings'] = []
+                consolidated_ds_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in zone_obj.rrset_warnings[ds_info]]
 
             if zone_obj.rrset_errors[ds_info]:
-                errors_serialized = collections.OrderedDict()
-                errors = zone_obj.rrset_errors[ds_info].keys()
-                errors.sort()
-                for error in errors:
-                    error_str = Status.response_error_mapping[error]
-                    servers = tuple_to_dict(zone_obj.rrset_errors[ds_info][error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    errors_serialized[error_str] = servers
-                if 'errors' not in ds:
-                    consolidated_ds_serialized['errors'] = errors_serialized
-                else:
-                    consolidated_ds_serialized['errors'].update(errors_serialized)
+                if 'errors' not in consolidated_ds_serialized:
+                    consolidated_ds_serialized['errors'] = []
+                consolidated_ds_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in zone_obj.rrset_errors[ds_info]]
 
             self.node_info[node_str] = [consolidated_ds_serialized]
 
@@ -691,36 +646,14 @@ class DNSAuthGraph:
             rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
             
             if name_obj.rrset_warnings[rrset_info]:
-                warnings_serialized = collections.OrderedDict()
-                warnings = name_obj.rrset_warnings[rrset_info].keys()
-                warnings.sort()
-                for warning in warnings:
-                    warning_str = Status.response_error_mapping[warning]
-                    servers = tuple_to_dict(name_obj.rrset_warnings[rrset_info][warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    warnings_serialized[warning_str] = servers
                 if 'warnings' not in rrset_serialized:
-                    rrset_serialized['warnings'] = warnings_serialized
-                else:
-                    rrset_serialized['warnings'].update(warnings_serialized)
+                    rrset_serialized['warnings'] = []
+                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_warnings[rrset_info]]
 
             if name_obj.rrset_errors[rrset_info]:
-                errors_serialized = collections.OrderedDict()
-                errors = name_obj.rrset_errors[rrset_info].keys()
-                errors.sort()
-                for error in errors:
-                    error_str = Status.response_error_mapping[error]
-                    servers = tuple_to_dict(name_obj.rrset_errors[rrset_info][error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    errors_serialized[error_str] = servers
                 if 'errors' not in rrset_serialized:
-                    rrset_serialized['errors'] = errors_serialized
-                else:
-                    rrset_serialized['errors'].update(errors_serialized)
+                    rrset_serialized['errors'] = []
+                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_errors[rrset_info]]
 
             self.node_info[node_id] = [rrset_serialized]
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
@@ -736,14 +669,14 @@ class DNSAuthGraph:
 
         if not self.G.has_node(node_str):
             if wildcard:
-                warnings_map = errors_map = {}
+                warnings_list = errors_list = []
             else:
                 if nxdomain:
-                    warnings_map = name_obj.nxdomain_warnings[neg_response_info]
-                    errors_map = name_obj.nxdomain_errors[neg_response_info]
+                    warnings_list = name_obj.nxdomain_warnings[neg_response_info]
+                    errors_list = name_obj.nxdomain_errors[neg_response_info]
                 else:
-                    warnings_map = name_obj.nodata_warnings[neg_response_info]
-                    errors_map = name_obj.nodata_errors[neg_response_info]
+                    warnings_list = name_obj.nodata_warnings[neg_response_info]
+                    errors_list = name_obj.nodata_errors[neg_response_info]
 
             if nxdomain:
                 rdtype_str = ''
@@ -751,9 +684,9 @@ class DNSAuthGraph:
                 rdtype_str = '/%s' % dns.rdatatype.to_text(neg_response_info.rdtype)
 
             img_str = ''
-            if errors_map:
+            if errors_list:
                 img_str = '<IMG SRC="%s"/>' % ERROR_ICON
-            elif warnings_map:
+            elif warnings_list:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
 
             if img_str:
@@ -780,37 +713,23 @@ class DNSAuthGraph:
             consolidate_clients = name_obj.single_client()
             rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
 
-            if warnings_map:
+            if warnings_list:
                 if 'warnings' not in rrset_serialized:
-                    rrset_serialized['warnings'] = collections.OrderedDict()
-                warnings = warnings_map.keys()
-                warnings.sort()
-                for warning in warnings:
-                    servers = tuple_to_dict(warnings_map[warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    rrset_serialized['warnings'][Status.response_error_mapping[warning]] = servers
+                    rrset_serialized['warnings'] = []
+                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in warnings_list]
 
-            if errors_map:
+            if errors_list:
                 if 'errors' not in rrset_serialized:
-                    rrset_serialized['errors'] = collections.OrderedDict()
-                errors = errors_map.keys()
-                errors.sort()
-                for error in errors:
-                    servers = tuple_to_dict(errors_map[error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    rrset_serialized['errors'][Status.response_error_mapping[error]] = servers
+                    rrset_serialized['errors'] = []
+                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients) for w in errors_list]
 
             self.node_info[node_id] = [rrset_serialized]
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
 
         return self.G.get_node(node_str)
 
-    def add_errors(self, name_obj, name, rdtype, error_info_list):
-        if not error_info_list:
+    def add_errors(self, name_obj, name, rdtype, errors_list):
+        if not errors_list:
             return None
 
         zone_obj = name_obj.zone
@@ -836,28 +755,7 @@ class DNSAuthGraph:
         errors_serialized = collections.OrderedDict()
 
         errors_serialized['description'] = 'Response errors for %s/%s' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
-        errors_serialized['errors'] = []
-        for error_info in error_info_list:
-            err = collections.OrderedDict()
-            err['error'] = Q.response_errors[error_info.code]
-
-            if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
-                err['description'] = dns.rcode.to_text(error_info.arg)
-            elif error_info.arg is not None:
-                try:
-                    err['description'] = errno.errorcode[error_info.arg]
-                except KeyError:
-                    #XXX find a good cross-platform way of handling this
-                    pass
-
-            servers = tuple_to_dict(error_info.servers_clients)
-            if consolidate_clients:
-                servers = list(servers)
-                servers.sort()
-            err['servers'] = servers
-
-            errors_serialized['errors'].append(err)
-
+        errors_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in errors_list]
         errors_serialized['status'] = 'INVALID'
 
         self.node_info[node_id] = [errors_serialized]
@@ -1097,7 +995,7 @@ class DNSAuthGraph:
                 self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
-        error_node = self.add_errors(name_obj, name, rdtype, query.error_info)
+        error_node = self.add_errors(name_obj, name, rdtype, name_obj.response_errors[query])
         if error_node is not None:
             my_nodes_all.append(error_node)
 
@@ -1235,47 +1133,18 @@ class DNSAuthGraph:
             del_serialized = collections.OrderedDict()
             del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
             del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status[rdtype]]
-            if has_warnings:
-                del_serialized['warnings'] = collections.OrderedDict()
-                warnings = name_obj.delegation_warnings[rdtype].keys()
-                warnings.sort()
-                for warning in warnings:
-                    servers = tuple_to_dict(name_obj.delegation_warnings[rdtype][warning])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    del_serialized['warnings'][Status.delegation_error_mapping[warning]] = servers
 
-                for warnings_map in (name_obj.nxdomain_warnings.get(ds_nxdomain_info, {}), name_obj.nodata_warnings.get(ds_nodata_info, {})):
-                    warnings = warnings_map.keys()
-                    warnings.sort()
-                    for warning in warnings:
-                        servers = tuple_to_dict(warnings_map[warning])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        del_serialized['warnings'][Status.response_error_mapping[warning]] = servers
+            if has_warnings:
+                del_serialized['warnings'] = []
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.delegation_warnings[rdtype]]
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.nxdomain_warnings.get(ds_nxdomain_info, [])]
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.nodata_warnings.get(ds_nodata_info, [])]
 
             if has_errors:
-                del_serialized['errors'] = collections.OrderedDict()
-                errors = name_obj.delegation_errors[rdtype].keys()
-                errors.sort()
-                for error in errors:
-                    servers = tuple_to_dict(name_obj.delegation_errors[rdtype][error])
-                    if consolidate_clients:
-                        servers = list(servers)
-                        servers.sort()
-                    del_serialized['errors'][Status.delegation_error_mapping[error]] = servers
-
-                for errors_map in (name_obj.nxdomain_errors.get(ds_nxdomain_info, {}), name_obj.nodata_errors.get(ds_nodata_info, {})):
-                    errors = errors_map.keys()
-                    errors.sort()
-                    for error in errors:
-                        servers = tuple_to_dict(errors_map[error])
-                        if consolidate_clients:
-                            servers = list(servers)
-                            servers.sort()
-                        del_serialized['errors'][Status.response_error_mapping[error]] = servers
+                del_serialized['errors'] = []
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.delegation_errors[rdtype]]
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.nxdomain_errors.get(ds_nxdomain_info, [])]
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.nodata_errors.get(ds_nodata_info, [])]
 
             edge_id = 'del-%s|%s' % (fmt.humanize_name(zone_obj.name), fmt.humanize_name(parent_obj.name))
             self.node_info[edge_id] = [del_serialized]

@@ -1,0 +1,1275 @@
+#
+# This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
+# analysis, and visualization.
+# Created by Casey Deccio (casey@deccio.net)
+#
+# Copyright 2015 VeriSign, Inc.
+# 
+# DNSViz is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# DNSViz is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+
+import collections
+import datetime
+
+import dns.dnssec
+
+import dnsviz.format as fmt
+from dnsviz.util import tuple_to_dict
+
+class DomainNameAnalysisError(object):
+    _abstract = True
+    code = None
+    description_template = '%(code)s'
+    references = []
+    required_params = []
+
+    def __init__(self, **kwargs):
+        if self._abstract:
+            raise TypeError('Only subclasses may be instantiated.')
+
+        self.template_kwargs = { 'code': self.code }
+        self.servers_clients = {}
+        for param in self.required_params:
+            try:
+                self.template_kwargs[param] = kwargs[param]
+            except KeyError:
+                raise TypeError('The "%s" keyword argument is required for instantiation.' % param)
+
+    def __str__(self):
+        return self.code
+
+    def __unicode__(self):
+        return self.code
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.args == other.args
+
+    def copy(self):
+        return self.__class__(**dict(zip(self.required_params, self.args)))
+
+    @property
+    def args(self):
+        if not hasattr(self, '_args') or self._args is None:
+            self._args = [self.template_kwargs[p] for p in self.required_params]
+        return self._args
+
+    @property
+    def description(self):
+        return self.description_template % self.template_kwargs
+
+    def add_server_client(self, server, client, response):
+        if (server, client) not in self.servers_clients:
+            self.servers_clients[(server, client)] = []
+        self.servers_clients[(server, client)].append(response)
+
+    def remove_server_client(self, server, client, response):
+        if (server, client) in self.servers_clients:
+            try:
+                self.servers_clients[(server, client)].remove(response)
+            except ValueError:
+                pass
+            else:
+                if not self.servers_clients[(server, client)]:
+                    del self.servers_clients[(server, client)]
+
+    def serialize(self, consolidate_clients=False):
+        d = collections.OrderedDict()
+        d['description'] = self.description
+        d['code'] = self.code
+        if self.servers_clients:
+            servers = tuple_to_dict(self.servers_clients)
+            if consolidate_clients:
+                servers = list(servers)
+                servers.sort()
+            d['servers'] = servers
+        return d
+
+    @classmethod
+    def insert_into_list(cls, error, error_list, server, client, response):
+        try:
+            index = error_list.index(error)
+        except ValueError:
+            error_list.append(error)
+        else:
+            error = error_list[index]
+        if server is not None and client is not None and response is not None:
+            error.add_server_client(server, client, response)
+        return error
+
+class RRSIGError(DomainNameAnalysisError):
+    pass
+
+class SignerNotZone(RRSIGError):
+    '''
+    >>> e = SignerNotZone(zone_name='foo.', signer_name='bar.')
+    >>> e.args
+    ['foo.', 'bar.']
+    >>> e.description
+    "The Signer's Name field of the RRSIG RR (bar.) does not match the name of the zone containing the RRset (foo.)."
+    '''
+
+    _abstract = False
+    code = 'SIGNER_NOT_ZONE'
+    description_template = "The Signer's Name field of the RRSIG RR (%(signer_name)s) does not match the name of the zone containing the RRset (%(zone_name)s)."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['zone_name', 'signer_name']
+
+class RRsetTTLMismatch(RRSIGError):
+    '''
+    >>> e = RRsetTTLMismatch(rrset_ttl=50, rrsig_ttl=10)
+    >>> e.args
+    [50, 10]
+    >>> e.description
+    'The TTL of the RRSIG RR (10) does not match the TTL of the RRset it covers (50).'
+    '''
+
+    _abstract = False
+    code = 'RRSET_TTL_MISMATCH'
+    description_template = 'The TTL of the RRSIG RR (%(rrsig_ttl)d) does not match the TTL of the RRset it covers (%(rrset_ttl)d).'
+    references = ['RFC 4035, Sec. 2.2']
+    required_params = ['rrset_ttl', 'rrsig_ttl']
+
+class OriginalTTLExceeded(RRSIGError):
+    '''
+    >>> e = OriginalTTLExceeded(original_ttl=10, rrset_ttl=50)
+    >>> e.args
+    [10, 50]
+    >>> e.description
+    'The TTL of the RRset (50) exceeds the value of the Original TTL field of the RRSIG RR covering it (10).'
+    '''
+
+    _abstract = False
+    code = 'ORIGINAL_TTL_EXCEEDED'
+    description_template = 'The TTL of the RRset (%(rrset_ttl)d) exceeds the value of the Original TTL field of the RRSIG RR covering it (%(original_ttl)d).'
+    references = ['RFC 4035, Sec. 2.2']
+    required_params = ['original_ttl', 'rrset_ttl']
+
+class TTLBeyondExpiration(RRSIGError):
+    '''
+    >>> e = TTLBeyondExpiration(expiration=datetime.datetime(2015,1,10), rrsig_ttl=86401, reference_time=datetime.datetime(2015,1,9))
+    >>> e.args
+    [datetime.datetime(2015, 1, 10, 0, 0), 86401, datetime.datetime(2015, 1, 9, 0, 0)]
+    >>> e.description
+    'With a TTL of 86401 the RRSIG RR can be in the cache of a non-validating resolver until 1 second after it expires at 2015-01-10 00:00:00.'
+    '''
+
+    _abstract = False
+    code = 'TTL_BEYOND_EXPIRATION'
+    description_template = "With a TTL of %(rrsig_ttl)d the RRSIG RR can be in the cache of a non-validating resolver until %(difference)s after it expires at %(expiration)s."
+    references = ['RFC 4035, Sec. 5.3.3']
+    required_params = ['expiration', 'rrsig_ttl', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(TTLBeyondExpiration, self).__init__(**kwargs)
+        diff = self.template_kwargs['reference_time'] + datetime.timedelta(seconds=self.template_kwargs['rrsig_ttl']) - self.template_kwargs['expiration']
+        self.template_kwargs['difference'] = fmt.humanize_time(diff.seconds, diff.days)
+
+class AlgorithmNotSupported(RRSIGError):
+    '''
+    >>> e = AlgorithmNotSupported(algorithm=5)
+    >>> e.args
+    [5]
+    >>> e.description
+    'Validation of DNSSEC algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of this RRSIG is unknown.'
+    '''
+
+    _abstract = False
+    code = 'ALGORITHM_NOT_SUPPORTED'
+    description_template = "Validation of DNSSEC algorithm %(algorithm)d (%(algorithm_text)s) is not supported by this code, so the cryptographic status of this RRSIG is unknown."
+    references = ['RFC 4035, Sec. 5.2']
+    required_params = ['algorithm']
+
+    def __init__(self, **kwargs):
+        super(AlgorithmNotSupported, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+
+class DNSKEYRevokedRRSIG(RRSIGError):
+    '''
+    >>> e = DNSKEYRevokedRRSIG()
+    >>> e.description
+    'The DNSKEY RR corresponding to the RRSIG RR has the REVOKE bit set.  A revoked key cannot be used to validate RRSIGs.'
+    '''
+
+    _abstract = False
+    code = 'DNSKEY_REVOKED_RRSIG'
+    description_template = "The DNSKEY RR corresponding to the RRSIG RR has the REVOKE bit set.  A revoked key cannot be used to validate RRSIGs."
+    references = ['RFC 5011, Sec. 2.1']
+    required_params = []
+
+class InceptionInFuture(RRSIGError):
+    '''
+    >>> e = InceptionInFuture(inception=datetime.datetime(2015,1,10), reference_time=datetime.datetime(2015,1,9))
+    >>> e.args
+    [datetime.datetime(2015, 1, 10, 0, 0), datetime.datetime(2015, 1, 9, 0, 0)]
+    >>> e.description
+    'The Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the future.'
+    '''
+
+    _abstract = False
+    code = 'INCEPTION_IN_FUTURE'
+    description_template = "The Signature Inception field of the RRSIG RR (%(inception)s) is %(premature_time)s in the future."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['inception', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(InceptionInFuture, self).__init__(**kwargs)
+        diff = self.template_kwargs['inception'] - self.template_kwargs['reference_time']
+        self.template_kwargs['premature_time'] = fmt.humanize_time(diff.seconds, diff.days)
+
+class ExpirationInPast(RRSIGError):
+    '''
+    >>> e = ExpirationInPast(expiration=datetime.datetime(2015,1,10), reference_time=datetime.datetime(2015,1,11))
+    >>> e.args
+    [datetime.datetime(2015, 1, 10, 0, 0), datetime.datetime(2015, 1, 11, 0, 0)]
+    >>> e.description
+    'The Signature Expiration field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the past.'
+    '''
+
+    _abstract = False
+    code = 'EXPIRATION_IN_PAST'
+    description_template = "The Signature Expiration field of the RRSIG RR (%(expiration)s) is %(expired_time)s in the past."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['expiration', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(ExpirationInPast, self).__init__(**kwargs)
+        diff = self.template_kwargs['reference_time'] - self.template_kwargs['expiration']
+        self.template_kwargs['expired_time'] = fmt.humanize_time(diff.seconds, diff.days)
+
+class SignatureInvalid(RRSIGError):
+    '''
+    >>> e = SignatureInvalid()
+    >>> e.description
+    'The cryptographic signature of the RRSIG RR does not properly validate.'
+    '''
+
+    _abstract = False
+    code = 'SIGNATURE_INVALID'
+    description_template = "The cryptographic signature of the RRSIG RR does not properly validate."
+    references = ['RFC 4035, Sec. 5.3.3']
+    required_params = []
+
+class DSError(DomainNameAnalysisError):
+    pass
+
+class DigestAlgorithmNotSupported(DSError):
+    '''
+    >>> e = DigestAlgorithmNotSupported(algorithm=5)
+    >>> e.description
+    'Generating cryptographic hashes using algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
+    '''
+
+    _abstract = False
+    code = 'DIGEST_ALGORITHM_NOT_SUPPORTED'
+    description_template = "Generating cryptographic hashes using algorithm %(algorithm)d (%(algorithm_text)s) is not supported by this code, so the cryptographic status of the DS RR is unknown."
+    references = ['RFC 4035, Sec. 5.2']
+    required_params = ['algorithm']
+
+    def __init__(self, **kwargs):
+        super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+
+class DNSKEYRevokedDS(DSError):
+    '''
+    >>> e = DNSKEYRevokedDS()
+    >>> e.description
+    'The DNSKEY RR corresponding to the DS RR has the REVOKE bit set.  A revoked key cannot be used with DS records.'
+    '''
+
+    _abstract = False
+    code = 'DNSKEY_REVOKED_DS'
+    description_template = "The DNSKEY RR corresponding to the DS RR has the REVOKE bit set.  A revoked key cannot be used with DS records."
+    references = ['RFC 5011, Sec. 2.1']
+    required_params = []
+
+class DigestInvalid(DSError):
+    '''
+    >>> e = DigestInvalid()
+    >>> e.description
+    'The cryptographic hash in the Digest field of the DS RR does not match the computed value.'
+    '''
+
+    _abstract = False
+    code = 'DIGEST_INVALID'
+    description_template = "The cryptographic hash in the Digest field of the DS RR does not match the computed value."
+    references = ['RFC 4035, Sec. 5.2']
+    required_params = []
+
+class NSECError(DomainNameAnalysisError):
+    nsec_type = None
+
+    def __init__(self, *args, **kwargs):
+        super(NSECError, self).__init__(**kwargs)
+        self.template_kwargs['nsec_type'] = self.nsec_type
+
+class SnameNotCovered(NSECError):
+    code = 'SNAME_NOT_COVERED'
+    description_template = "No %(nsec_type)s RR covers the SNAME (%(sname)s)."
+    required_params = ['sname']
+    nsec_type = 'NSEC'
+
+class SnameNotCoveredNameError(SnameNotCovered):
+    '''
+    >>> e = SnameNotCoveredNameError(sname='foo.baz.')
+    >>> e.description
+    'No NSEC RR covers the SNAME (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.2']
+
+class SnameNotCoveredWildcardAnswer(SnameNotCovered):
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.3']
+
+class SnameNotCoveredWildcardNoData(SnameNotCovered):
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.4']
+
+class NextClosestEncloserNotCovered(NSECError):
+    code = 'NEXT_CLOSEST_ENCLOSER_NOT_COVERED'
+    description_template = "No %(nsec_type)s RR covers the next closest encloser (%(next_closest_encloser)s)."
+    required_params = ['next_closest_encloser']
+    nsec_type = 'NSEC3'
+
+class NextClosestEncloserNotCoveredNameError(NextClosestEncloserNotCovered):
+    '''
+    >>> e = NextClosestEncloserNotCoveredNameError(next_closest_encloser='foo.baz.')
+    >>> e.description
+    'No NSEC3 RR covers the next closest encloser (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.4']
+
+class NextClosestEncloserNotCoveredNoDataDS(NextClosestEncloserNotCovered):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
+
+class NextClosestEncloserNotCoveredWildcardNoData(NextClosestEncloserNotCovered):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.7']
+
+class NextClosestEncloserNotCoveredWildcardAnswer(NextClosestEncloserNotCovered):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.8']
+
+class WildcardNotCovered(NSECError):
+    code = 'WILDCARD_NOT_COVERED'
+    description_template = "No %(nsec_type)s RR covers the wildcard (%(wildcard)s)."
+    required_params = ['wildcard']
+
+class WildcardNotCoveredNSEC(WildcardNotCovered):
+    '''
+    >>> e = WildcardNotCoveredNSEC(wildcard='*.foo.baz.')
+    >>> e.description
+    'No NSEC RR covers the wildcard (*.foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.2']
+    nsec_type = 'NSEC'
+
+class WildcardNotCoveredNSEC3(WildcardNotCovered):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.4']
+    nsec_type = 'NSEC3'
+
+class NoClosestEncloser(NSECError):
+    code = 'NO_CLOSEST_ENCLOSER'
+    description_template = "No %(nsec_type)s RR corresponds to the closest encloser of the SNAME (%(sname)s)."
+    required_params = ['sname']
+    nsec_type = 'NSEC3'
+
+class NoClosestEncloserNameError(NoClosestEncloser):
+    '''
+    >>> e = NoClosestEncloserNameError(sname='foo.baz.')
+    >>> e.description
+    'No NSEC3 RR corresponds to the closest encloser of the SNAME (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.4']
+
+class NoClosestEncloserNoDataDS(NoClosestEncloser):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
+
+class NoClosestEncloserWildcardNoData(NoClosestEncloser):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.7']
+
+class NoClosestEncloserWildcardAnswer(NoClosestEncloser):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.8']
+
+class ReferralWithSOABit(NSECError):
+    code = 'REFERRAL_WITH_SOA'
+    description_template = "The SOA bit was set in the bitmap of the %(nsec_type)s RR corresponding to the delegated name (%(sname)s)."
+    required_params = ['sname']
+
+class ReferralWithSOABitNSEC(ReferralWithSOABit):
+    '''
+    >>> e = ReferralWithSOABitNSEC(sname='foo.baz.')
+    >>> e.description
+    'The SOA bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4034, Sec. 5.2'] 
+    nsec_type = 'NSEC'
+
+class ReferralWithSOABitNSEC3(ReferralWithSOABit):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.9'] 
+    nsec_type = 'NSEC3'
+
+class ReferralWithDSBit(NSECError):
+    code = 'REFERRAL_WITH_DS'
+    description_template = "The DS bit was set in the bitmap of the %(nsec_type)s RR corresponding to the delegated name (%(sname)s)."
+    required_params = ['sname']
+
+class ReferralWithDSBitNSEC(ReferralWithDSBit):
+    '''
+    >>> e = ReferralWithDSBitNSEC(sname='foo.baz.')
+    >>> e.description
+    'The DS bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4034, Sec. 5.2'] 
+    nsec_type = 'NSEC'
+
+class ReferralWithDSBitNSEC3(ReferralWithDSBit):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.9'] 
+    nsec_type = 'NSEC3'
+
+class ReferralWithoutNSBit(NSECError):
+    code = 'REFERRAL_WITHOUT_NS'
+    description_template = "The NS bit was not set in the bitmap of the %(nsec_type)s RR corresponding to the delegated name (%(sname)s)."
+    required_params = ['sname']
+
+class ReferralWithoutNSBitNSEC(ReferralWithoutNSBit):
+    '''
+    >>> e = ReferralWithoutNSBitNSEC(sname='foo.baz.')
+    >>> e.description
+    'The NS bit was not set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 6840, Sec. 4.4']
+    nsec_type = 'NSEC'
+
+class ReferralWithoutNSBitNSEC3(ReferralWithoutNSBit):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.9'] 
+    nsec_type = 'NSEC3'
+
+class StypeInBitmap(NSECError):
+    code = 'STYPE_IN_BITMAP'
+    description_template = "The %(stype)s bit was set in the bitmap of the %(nsec_type)s RR corresponding to the SNAME (%(sname)s)."
+    required_params = ['stype', 'sname']
+
+class StypeInBitmapNoData(StypeInBitmap):
+    pass
+
+class StypeInBitmapNoDataNSEC(StypeInBitmapNoData):
+    '''
+    >>> e = StypeInBitmapNoDataNSEC(stype='A', sname='foo.baz.')
+    >>> e.description
+    'The A bit was set in the bitmap of the NSEC RR corresponding to the SNAME (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.1']
+    nsec_type = 'NSEC'
+
+class StypeInBitmapNoDataNSEC3(StypeInBitmapNoData):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.5']
+    nsec_type = 'NSEC3'
+
+class StypeInBitmapNoDataDSNSEC3(StypeInBitmapNoDataNSEC3):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
+
+class StypeInBitmapWildcardNoData(StypeInBitmap):
+    pass
+
+class StypeInBitmapWildcardNoDataNSEC(StypeInBitmapWildcardNoData):
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.4']
+    nsec_type = 'NSEC'
+
+class StypeInBitmapWildcardNoDataNSEC3(StypeInBitmapWildcardNoData):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.7']
+    nsec_type = 'NSEC3'
+
+class NoNSECMatchingSname(NSECError):
+    code = 'NO_NSEC_MATCHING_SNAME'
+    description_template = "No %(nsec_type)s RR matches the SNAME (%(sname)s)."
+    required_params = ['sname']
+    nsec_type = 'NSEC'
+
+class NoNSECMatchingSnameNoData(NoNSECMatchingSname):
+    '''
+    >>> e = NoNSECMatchingSnameNoData(sname='foo.baz.')
+    >>> e.description
+    'No NSEC RR matches the SNAME (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.1']
+
+class NoNSECMatchingSnameWildcardNoData(NoNSECMatchingSname):
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.4']
+
+class NoNSEC3MatchingSname(NSECError):
+    code = 'NO_NSEC3_MATCHING_SNAME'
+    description_template = "No %(nsec_type)s RR matches the SNAME (%(sname)s)."
+    required_params = ['sname']
+    nsec_type = 'NSEC3'
+
+class NoNSEC3MatchingSnameNoData(NoNSEC3MatchingSname):
+    '''
+    >>> e = NoNSEC3MatchingSnameNoData(sname='foo.baz.')
+    >>> e.description
+    'No NSEC3 RR matches the SNAME (foo.baz.).'
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.5']
+
+class NoNSEC3MatchingSnameDSNoData(NoNSEC3MatchingSname):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
+
+class WildcardExpansionInvalid(NSECError):
+    '''
+    >>> e = WildcardExpansionInvalid(sname='a.b.c.foo.baz.', wildcard='*.foo.baz.', next_closest_encloser='b.c.foo.baz.')
+    >>> e.description
+    'The wildcard expansion of *.foo.baz. to a.b.c.foo.baz. is invalid, as the NSEC RR indicates that the next closest encloser (b.c.foo.baz.) exists.'
+    '''
+
+    _abstract = False
+    code = 'WILDCARD_EXPANSION_INVALID'
+    description_template = "The wildcard expansion of %(wildcard)s to %(sname)s is invalid, as the %(nsec_type)s RR indicates that the next closest encloser (%(next_closest_encloser)s) exists."
+    references = ['RFC 1034, Sec. 4.4']
+    required_params = ['sname','wildcard','next_closest_encloser']
+    nsec_type = 'NSEC'
+
+class WildcardCovered(NSECError):
+    code = 'WILDCARD_COVERED'
+    description_template = "The %(nsec_type)s RR covers the wildcard itself (%(wildcard)s), indicating that it doesn't exist."
+    required_params = ['wildcard']
+
+class WildcardCoveredAnswer(WildcardCovered):
+    pass
+
+class WildcardCoveredAnswerNSEC(WildcardCoveredAnswer):
+    '''
+    >>> e = WildcardCoveredAnswerNSEC(wildcard='*.foo.baz.')
+    >>> e.description
+    "The NSEC RR covers the wildcard itself (*.foo.baz.), indicating that it doesn't exist."
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.3']
+    nsec_type = 'NSEC'
+
+class WildcardCoveredAnswerNSEC3(WildcardCoveredAnswer):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.8']
+    nsec_type = 'NSEC3'
+
+class WildcardCoveredNoData(WildcardCovered):
+    pass
+
+class WildcardCoveredNoDataNSEC(WildcardCoveredNoData):
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.4']
+    nsec_type = 'NSEC'
+
+class WildcardCoveredNoDataNSEC3(WildcardCoveredNoData):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.7']
+    nsec_type = 'NSEC3'
+
+class LastNSECNextNotZone(NSECError):
+    '''
+    >>> e = LastNSECNextNotZone(nsec_owner='z.foo.baz.', next_name='a.foo.baz.', zone_name='foo.baz.')
+    >>> e.description
+    'The value of the Next Domain Name field in the NSEC RR with owner name z.foo.baz. indicates that it is the last NSEC RR in the zone, but the value (a.foo.baz.) did not match the name of the zone apex (foo.baz.).'
+    '''
+
+    _abstract = False
+    code = 'LAST_NSEC_NEXT_NOT_ZONE'
+    description_template = "The value of the Next Domain Name field in the %(nsec_type)s RR with owner name %(nsec_owner)s indicates that it is the last %(nsec_type)s RR in the zone, but the value (%(next_name)s) did not match the name of the zone apex (%(zone_name)s)."
+    references = ['RFC 4034, Sec. 4.1.1']
+    required_params = ['nsec_owner','next_name','zone_name']
+    nsec_type = 'NSEC'
+
+class UnsupportedNSEC3Algorithm(NSECError):
+    '''
+    >>> e = UnsupportedNSEC3Algorithm(algorithm=2)
+    >>> e.description
+    'Generating NSEC3 hashes using algorithm 2 is not supported by this code.'
+    '''
+
+    _abstract = False
+    code = 'UNSUPPORTED_NSEC3_ALGORITHM'
+    description_template = "Generating %(nsec_type)s hashes using algorithm %(algorithm)d is not supported by this code."
+    references = ['RFC 5155, Sec. 8.1']
+    required_params = ['algorithm']
+    nsec_type = 'NSEC3'
+
+class ResponseError(DomainNameAnalysisError):
+    pass
+
+class InvalidResponseError(ResponseError):
+    required_params = ['tcp', 'intermittent']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseError, self).__init__(**kwargs)
+        if self.template_kwargs['tcp']:
+            self.template_kwargs['proto'] = 'TCP'
+        else:
+            self.template_kwargs['proto'] = 'UDP'
+        if self.template_kwargs['intermittent']:
+            self.template_kwargs['intermittent_text'] = 'Intermittent: '
+        else:
+            self.template_kwargs['intermittent_text'] = ''
+
+class NetworkError(InvalidResponseError):
+    '''
+    >>> e = NetworkError(tcp=False, intermittent=False, errno='EHOSTUNREACH')
+    >>> e.description
+    'The server was not reachable over UDP (EHOSTUNREACH).'
+    >>> e = NetworkError(tcp=False, intermittent=False, errno='ECONNREFUSED')
+    >>> e.description
+    'The UDP connection was refused (ECONNREFUSED).'
+    '''
+
+    _abstract = False
+    code = 'NETWORK_ERROR'
+    description_template = '%(intermittent_text)s%(description)s'
+    required_params = InvalidResponseError.required_params + ['errno']
+
+    def __init__(self, *args, **kwargs):
+        super(NetworkError, self).__init__(**kwargs)
+        if self.template_kwargs['errno'] == 'ECONNRESET':
+            self.template_kwargs['description'] = 'The %s connection was interrupted (%s).' % (self.template_kwargs['proto'], self.template_kwargs['errno'])
+        elif self.template_kwargs['errno'] == 'ECONNREFUSED':
+            self.template_kwargs['description'] = 'The %s connection was refused (%s).' % (self.template_kwargs['proto'], self.template_kwargs['errno'])
+        elif self.template_kwargs['errno'] == 'EHOSTUNREACH':
+            self.template_kwargs['description'] = 'The server was not reachable over %s (%s).' % (self.template_kwargs['proto'], self.template_kwargs['errno'])
+        else:
+            self.template_kwargs['description'] = 'There was an error communicating with the server over %s (%s).' % (self.template_kwargs['proto'], self.template_kwargs['errno'])
+
+class FormError(InvalidResponseError):
+    '''
+    >>> e = FormError(tcp=False, intermittent=False, msg_size=30)
+    >>> e.description
+    'The response (30 bytes) was malformed.'
+    '''
+    
+    _abstract = False
+    code = 'FORMERR'
+    description_template = "%(intermittent_text)sThe response (%(msg_size)d bytes) was malformed."
+    required_params = InvalidResponseError.required_params + ['msg_size']
+
+class Timeout(InvalidResponseError):
+    '''
+    >>> e = Timeout(tcp=False, intermittent=False, attempts=3)
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times).'
+    '''
+    
+    _abstract = False
+    code = 'TIMEOUT'
+    description_template = "%(intermittent_text)sNo response was received from the server over %(proto)s (tried %(attempts)d times)."
+    required_params = InvalidResponseError.required_params + ['attempts']
+
+class UnknownResponseError(InvalidResponseError):
+    '''
+    >>> e = UnknownResponseError(tcp=False, intermittent=False)
+    >>> e.description
+    'An invalid response was received from the server over UDP.'
+    '''
+    
+    _abstract = False
+    code = 'RESPONSE_ERROR'
+    description_template = "%(intermittent_text)sAn invalid response was received from the server over %(proto)s."
+
+    def __init__(self, *args, **kwargs):
+        super(UnknownResponseError, self).__init__(**kwargs)
+        self.template_kwargs['description'] = "An invalid response was received from the server over %s" % (self.template_kwargs['proto'])
+
+class InvalidRcode(InvalidResponseError):
+    '''
+    >>> e = InvalidRcode(tcp=False, intermittent=False, rcode='SERVFAIL')
+    >>> e.description
+    'The response had an invalid RCODE (SERVFAIL).'
+    '''
+
+    _abstract = False
+    code = 'INVALID_RCODE'
+    description_template = "%(intermittent_text)sThe response had an invalid RCODE (%(rcode)s)."
+    required_params = InvalidResponseError.required_params + ['rcode']
+
+class NotAuthoritative(ResponseError):
+    '''
+    >>> e = NotAuthoritative(tcp=False, intermittent=False)
+    >>> e.description
+    'The Authoritative Answer (AA) flag was not set in the response.'
+    '''
+
+    _abstract = False
+    code = 'NOT_AUTHORITATVE'
+    description_template = "The Authoritative Answer (AA) flag was not set in the response."
+    references = ['RFC 1035, Sec. 4.1.1']
+    required_params = []
+
+class ResponseErrorWithCondition(ResponseError):
+    description_template = "%(response_error_description)s until %(change)s."
+    required_params = ['response_error']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithCondition, self).__init__(**kwargs)
+        self.template_kwargs['response_error_description'] = self.template_kwargs['response_error'].description[:-1]
+
+class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the RD flag was cleared.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITH_REQUEST_FLAG'
+    references = ['RFC 1035, Sec. 4.1.1']
+    required_params = ResponseErrorWithCondition.required_params + ['flag']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithRequestFlag, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s flag was cleared' % (self.template_kwargs['flag'])
+
+class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the RD flag was set.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITHOUT_REQUEST_FLAG'
+    references = ['RFC 1035, Sec. 4.1.1']
+    required_params = ResponseErrorWithCondition.required_params + ['flag']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithoutRequestFlag, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s flag was set' % (self.template_kwargs['flag'])
+
+class ResponseErrorWithEDNS(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITH_EDNS'
+    references = ['RFC 6891, Sec. 6.2.6']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithEDNS, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'EDNS was disabled'
+
+class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='DO')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was cleared.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITH_EDNS_FLAG'
+    references = ['RFC 6891, Sec. 6.1.4']
+    required_params = ResponseErrorWithCondition.required_params + ['flag']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithEDNSFlag, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s EDNS flag was cleared' % (self.template_kwargs['flag'])
+
+class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='DO')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was set.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITHOUT_EDNS_FLAG'
+    references = ['RFC 6891, Sec. 6.1.4']
+    required_params = ResponseErrorWithCondition.required_params + ['flag']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithoutEDNSFlag, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s EDNS flag was set' % (self.template_kwargs['flag'])
+
+class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, intermittent=False, attempts=3), option='NSID')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was removed.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITH_EDNS_OPTION'
+    references = ['RFC 6891, Sec. 6.1.2']
+    required_params = ResponseErrorWithCondition.required_params + ['option']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithEDNSOption, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s EDNS option was removed' % (self.template_kwargs['option'])
+
+class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, intermittent=False, attempts=3), option='NSID')
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was added.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITHOUT_EDNS_OPTION'
+    references = ['RFC 6891, Sec. 6.1.2']
+    required_params = ResponseErrorWithCondition.required_params + ['option']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithoutEDNSOption, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the %s EDNS option was added' % (self.template_kwargs['option'])
+
+class UnsupportedEDNSVersion(ResponseError):
+    '''
+    >>> e = UnsupportedEDNSVersion(version=1)
+    >>> e.description
+    "The server responded with RCODE BADVERS, indicating that it doesn't support EDNS version 1."
+    '''
+
+    _abstract = False
+    code = 'UNSUPPORTED_EDNS_VERSION'
+    description_template = "The server responded with RCODE BADVERS, indicating that it doesn't support EDNS version %(version)d."
+    references = ['RFC 6891, Sec. 6.1.3']
+    required_params = ['version']
+
+class EDNSVersionMismatch(ResponseError):
+    '''
+    >>> e = EDNSVersionMismatch(request_version=1, response_version=0)
+    >>> e.description
+    'The server responded with EDNS version 0 when a request with EDNS version 1 was sent, instead of responding with RCODE BADVERS.'
+    '''
+
+    _abstract = False
+    code = 'EDNS_VERSION_MISMATCH'
+    description_template = "The server responded with EDNS version %(response_version)d when a request with EDNS version %(request_version)d was sent, instead of responding with RCODE BADVERS."
+    references = ['RFC 6891, Sec. 6.1.3']
+    required_params = ['request_version', 'response_version']
+
+class EDNSIgnored(ResponseError):
+    '''
+    >>> e = EDNSIgnored()
+    >>> e.description
+    'The server responded with no OPT record, rather than with RCODE FORMERR (preferred), SERVFAIL, or NOTIMPL.'
+    '''
+
+    _abstract = False
+    code = 'EDNS_IGNORED'
+    description_template = 'The server responded with no OPT record, rather than with RCODE FORMERR (preferred), SERVFAIL, or NOTIMPL.'
+    references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
+    required_params = []
+
+class UnableToRetrieveDNSSECRecords(ResponseError):
+    '''
+    >>> e = UnableToRetrieveDNSSECRecords()
+    >>> e.description
+    'The DNSSEC records necessary to validate the response could not be retrieved from the server.'
+    '''
+
+    _abstract = False
+    code = 'EDNS_IGNORED'
+    description_template = 'The DNSSEC records necessary to validate the response could not be retrieved from the server.'
+    references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
+    required_params = []
+
+class MissingRRSIG(ResponseError):
+    '''
+    >>> e = MissingRRSIG()
+    >>> e.description
+    'No RRSIG covering the RRset was returned in the response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_RRSIG'
+    description_template = 'No RRSIG covering the RRset was returned in the response.'
+    references = ['RFC 4035, Sec. 3.1.1']
+    required_params = []
+
+class MissingRRSIGForAlg(ResponseError):
+    description_template = 'The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no RRSIG with algorithm %(algorithm)d covering the RRset was returned in the response.'
+    references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
+    required_params = ['algorithm']
+    source = None
+
+    def __init__(self, **kwargs):
+        super(MissingRRSIGForAlg, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        self.template_kwargs['source'] = self.source
+
+class MissingRRSIGForAlgDNSKEY(MissingRRSIGForAlg):
+    '''
+    >>> e = MissingRRSIGForAlgDNSKEY(algorithm=5)
+    >>> e.description
+    'The DNSKEY RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_RRSIG_FOR_ALG_DNSKEY'
+    source = 'DNSKEY'
+    
+class MissingRRSIGForAlgDS(MissingRRSIGForAlg):
+    '''
+    >>> e = MissingRRSIGForAlgDS(algorithm=5)
+    >>> e.description
+    'The DS RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_RRSIG_FOR_ALG_DS'
+    source = 'DS'
+
+class MissingRRSIGForAlgDLV(MissingRRSIGForAlg):
+    '''
+    >>> e = MissingRRSIGForAlgDLV(algorithm=5)
+    >>> e.description
+    'The DLV RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_RRSIG_FOR_ALG_DLV'
+    source = 'DLV'
+
+class MissingNSEC(ResponseError):
+    description_template = 'No NSEC RR(s) were returned to validate the %(response)s response.'
+    response = None
+
+    def __init__(self, **kwargs):
+        super(MissingNSEC, self).__init__(**kwargs)
+        self.template_kwargs['response'] = self.response
+
+class MissingNSECForNXDOMAIN(MissingNSEC):
+    '''
+    >>> e = MissingNSECForNXDOMAIN()
+    >>> e.description
+    'No NSEC RR(s) were returned to validate the NXDOMAIN response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_NSEC_FOR_NXDOMAIN'
+    references = ['RFC 4035, Sec. 3.1.3.2', 'RFC 5155, Sec. 7.2.2']
+    response = 'NXDOMAIN'
+
+class MissingNSECForNODATA(MissingNSEC):
+    '''
+    >>> e = MissingNSECForNODATA()
+    >>> e.description
+    'No NSEC RR(s) were returned to validate the NODATA response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_NSEC_FOR_NODATA'
+    references = ['RFC 4035, Sec. 3.1.3.1', 'RFC 5155, Sec. 7.2.3', 'RFC 5155, Sec. 7.2.4']
+    response = 'NODATA'
+
+class MissingNSECForWildcard(MissingNSEC):
+    '''
+    >>> e = MissingNSECForWildcard()
+    >>> e.description
+    'No NSEC RR(s) were returned to validate the wildcard response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_NSEC_FOR_WILDCARD'
+    references = ['RFC 4035, Sec. 3.1.3.3', 'RFC 4035, Sec. 3.1.3.4', 'RFC 5155, Sec. 7.2.5', 'RFC 5155, Sec. 7.2.6']
+    response = 'wildcard'
+
+class MissingSOA(ResponseError):
+    description_template = 'No SOA RR was returned with the %(response)s response.'
+    references = ['RFC 1034, Sec. 4.3.4']
+    response = None
+
+    def __init__(self, **kwargs):
+        super(MissingSOA, self).__init__(**kwargs)
+        self.template_kwargs['response'] = self.response
+
+class MissingSOAForNXDOMAIN(MissingSOA):
+    '''
+    >>> e = MissingSOAForNXDOMAIN()
+    >>> e.description
+    'No SOA RR was returned with the NXDOMAIN response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_SOA_FOR_NXDOMAIN'
+    references = MissingSOA.references + ['RFC 2308, Sec. 2.1']
+    response = 'NXDOMAIN'
+
+class MissingSOAForNODATA(MissingSOA):
+    '''
+    >>> e = MissingSOAForNODATA()
+    >>> e.description
+    'No SOA RR was returned with the NODATA response.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_SOA_FOR_NODATA'
+    references = MissingSOA.references + ['RFC 2308, Sec. 2.2']
+    response = 'NODATA'
+
+class UpwardReferral(ResponseError):
+    _abstract = False
+    code = 'UPWARD_REFERRAL'
+    description_template = 'The response was an upward referral.'
+    references = ['https://www.dns-oarc.net/oarc/articles/upward-referrals-considered-harmful']
+
+class SOAOwnerNotZone(ResponseError):
+    description_template = 'An SOA RR with owner name (%(soa_owner_name)s) not matching the zone name (%(zone_name)s) was returned with the %(response)s response.'
+    references = ['RFC 1034, Sec. 4.3.4']
+    required_params = ['soa_owner_name', 'zone_name']
+    response = None
+
+    def __init__(self, **kwargs):
+        super(SOAOwnerNotZone, self).__init__(**kwargs)
+        self.template_kwargs['response'] = self.response
+
+class SOAOwnerNotZoneForNXDOMAIN(SOAOwnerNotZone):
+    '''
+    >>> e = SOAOwnerNotZoneForNXDOMAIN(soa_owner_name='foo.baz.', zone_name='bar.')
+    >>> e.description
+    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NXDOMAIN response.'
+    '''
+
+    _abstract = False
+    code = 'SOA_NOT_OWNER_FOR_NXDOMAIN'
+    references = SOAOwnerNotZone.references + ['RFC 2308, Sec. 2.1']
+    response = 'NXDOMAIN'
+
+class SOAOwnerNotZoneForNODATA(SOAOwnerNotZone):
+    '''
+    >>> e = SOAOwnerNotZoneForNODATA(soa_owner_name='foo.baz.', zone_name='bar.')
+    >>> e.description
+    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NODATA response.'
+    '''
+
+    _abstract = False
+    code = 'SOA_NOT_OWNER_FOR_NODATA'
+    references = SOAOwnerNotZone.references + ['RFC 2308, Sec. 2.2']
+    response = 'NODATA'
+
+class InconsistentNXDOMAIN(ResponseError):
+    '''
+    >>> e = InconsistentNXDOMAIN(qname='foo.baz.', rdtype_nxdomain='NS', rdtype_noerror='A')
+    >>> e.description
+    'The server returned a no error (NOERROR) response when queried for foo.baz. having record data of type A, but returned a name error (NXDOMAIN) when queried for foo.baz. having record data of type NS.'
+    '''
+
+    _abstract = False
+    code = 'INCONSISTENT_NXDOMAIN'
+    description_template = 'The server returned a no error (NOERROR) response when queried for %(qname)s having record data of type %(rdtype_noerror)s, but returned a name error (NXDOMAIN) when queried for %(qname)s having record data of type %(rdtype_nxdomain)s.'
+    required_params = ['qname', 'rdtype_nxdomain', 'rdtype_noerror']
+    references = ['RFC 1034, Sec. 4.3.2']
+
+class PMTUExceeded(ResponseError):
+    '''
+    >>> e = PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None)
+    >>> e.description
+    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size.'
+    >>> e = PMTUExceeded(pmtu_lower_bound=511, pmtu_upper_bound=513)
+    >>> e.description
+    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size. The PMTU was bounded between 511 and 513 bytes.'
+    '''
+
+    _abstract = False
+    code = 'PMTU_EXCEEDED'
+    description_template = '%(description)s'
+    required_params = ['pmtu_lower_bound', 'pmtu_upper_bound']
+    references = ['RFC 6891, Sec. 6.2.4']
+
+    def __init__(self, **kwargs):
+        super(PMTUExceeded, self).__init__(**kwargs)
+        self.template_kwargs['description'] = 'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size.'
+        if self.template_kwargs['pmtu_lower_bound'] is not None and self.template_kwargs['pmtu_upper_bound'] is not None:
+            self.template_kwargs['description'] += ' The PMTU was bounded between %(pmtu_lower_bound)d and %(pmtu_upper_bound)d bytes.' % self.template_kwargs
+
+class DelegationError(DomainNameAnalysisError):
+    pass
+
+class MissingSEPForAlg(DelegationError):
+    '''
+    >>> e = MissingSEPForAlg(algorithm=5, source='DS')
+    >>> e.description
+    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no key with algorithm 5 was found signing the zone's DNSKEY RRset."
+    '''
+
+    _abstract = False
+    code = 'MISSING_SEP_FOR_ALG'
+    description_template = "The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no key with algorithm %(algorithm)d was found signing the zone's DNSKEY RRset."
+    references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
+    required_params = ['algorithm']
+
+    def __init__(self, **kwargs):
+        super(MissingSEPForAlg, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        try:
+            self.template_kwargs['source'] = kwargs['source']
+        except KeyError:
+            raise TypeError('The "source" keyword argument is required for instantiation.')
+
+class NoSEP(DelegationError):
+    '''
+    >>> e = NoSEP(source='DS')
+    >>> e.description
+    'No valid RRSIGs made by a key corresponding to a DS RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone.'
+    '''
+
+    _abstract = False
+    code = 'NO_SEP'
+    description_template = "No valid RRSIGs made by a key corresponding to a DS RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone."
+    references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
+    required_params = []
+
+    def __init__(self, **kwargs):
+        super(NoSEP, self).__init__(**kwargs)
+        try:
+            self.template_kwargs['source'] = kwargs['source']
+        except KeyError:
+            raise TypeError('The "source" keyword argument is required for instantiation.')
+
+class NoNSInParent(DelegationError):
+    '''
+    >>> e = NoNSInParent()
+    >>> e.description
+    'No delegation NS records were detected in the parent zone.  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
+    '''
+
+    _abstract = False
+    code = 'NO_NS_IN_PARENT'
+    description_template = "No delegation NS records were detected in the parent zone.  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child."
+    references = ['RFC 1034, Sec. 4.2.2']
+    required_params = []
+
+class ErrorResolvingNSName(DelegationError):
+    '''
+    >>> e = ErrorResolvingNSName(name='ns1.foo.baz.')
+    >>> e.description
+    'There was an error resolving NS target ns1.foo.baz. to an address.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_RESOLVING_NS_NAME'
+    description_template = "There was an error resolving NS target %(name)s to an address."
+    required_params = ['name']
+
+class ServerUnresponsive(DelegationError):
+    '''
+    >>> e = ServerUnresponsive()
+    >>> e.description
+    'The server was not responsive to UDP queries.'
+    '''
+
+    _abstract = False
+    code = 'SERVER_UNRESPONSIVE'
+    description_template = "The server was not responsive to UDP queries."
+
+class ServerInvalidRcode(DelegationError):
+    '''
+    >>> e = ServerInvalidRcode()
+    >>> e.description
+    'The server did not respond with a valid RCODE.'
+    '''
+
+    _abstract = False
+    code = 'SERVER_INVALID_RCODE'
+    description_template = "The server did not respond with a valid RCODE."
+
+class ServerNotAuthoritative(DelegationError):
+    '''
+    >>> e = ServerNotAuthoritative()
+    >>> e.description
+    'The server did not respond authoritatively for the namespace.'
+    '''
+
+    _abstract = False
+    code = 'SERVER_NOT_AUTHORITATIVE'
+    description_template = "The server did not respond authoritatively for the namespace."
+
+class DNAMEError(DomainNameAnalysisError):
+    pass
+
+class NoCNAME(DNAMEError):
+    _abstract = False
+    code = 'DNAME_NO_CNAME'
+    description_template = "TODO"
+
+class TargetMismatch(DNAMEError):
+    _abstract = False
+    code = 'DNAME_TARGET_MISMATCH'
+    description_template = "TODO"
+
+class DNAMETTLZero(DNAMEError):
+    _abstract = False
+    code = 'DNAME_TTL_ZERO'
+    description_template = "TODO"
+
+class DNAMETTLMismatch(DNAMEError):
+    _abstract = False
+    code = 'DNAME_TTL_MISMATCH'
+    description_template = "TODO"
+
+class DNSKEYError(DomainNameAnalysisError):
+    pass
+
+class DNSKEYMissingFromServers(DNSKEYError):
+    '''
+    >>> e = DNSKEYMissingFromServers()
+    >>> e.description
+    'DNSKEY_MISSING_FROM_SERVERS'
+    '''
+    _abstract = False
+    code = 'DNSKEY_MISSING_FROM_SERVERS'
+
+class DNSKEYNotAtZoneApex(DNSKEYError):
+    _abstract = False
+    code = 'DNSKEY_NOT_AT_ZONE_APEX'
+
+class TrustAnchorNotSigning(DNSKEYError):
+    _abstract = False
+    code = 'TRUST_ANCHOR_NOT_SIGNING'
+
+class RevokedNotSigning(DNSKEYError):
+    _abstract = False
+    code = 'REVOKED_NOT_SIGNING'

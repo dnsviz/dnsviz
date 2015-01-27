@@ -446,8 +446,8 @@ class DNSKEYMeta(DNSResponseComponent):
         self.name = name
         self.rdata = rdata
         self.ttl = ttl
-        self.warnings = {}
-        self.errors = {}
+        self.warnings = []
+        self.errors = []
         self.rrset_info = []
 
         self.key_tag = self.calc_key_tag(rdata)
@@ -582,25 +582,11 @@ class DNSKEYMeta(DNSResponseComponent):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = collections.OrderedDict()
-            warnings = self.warnings.keys()
-            warnings.sort()
-            for warning in warnings:
-                servers = tuple_to_dict(self.warnings[warning])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['warnings'][Status.dnskey_error_mapping[warning]] = servers
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = collections.OrderedDict()
-            errors = self.errors.keys()
-            errors.sort()
-            for error in errors:
-                servers = tuple_to_dict(self.errors[error])
-                if consolidate_clients:
-                    servers = list(servers)
-                    servers.sort()
-                d['errors'][Status.dnskey_error_mapping[error]] = servers
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+
         return d
 
 class RRsetInfo(DNSResponseComponent):
