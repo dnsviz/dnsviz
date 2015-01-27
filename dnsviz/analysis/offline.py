@@ -957,7 +957,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             else:
                 self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP] = set()
-                self.delegation_errors[rdtype][Status.DELEGATION_ERROR_NO_SEP_FOR_SOME_ALGS] = set()
 
         if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:
