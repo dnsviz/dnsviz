@@ -95,7 +95,17 @@ AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 				};
 				val = newval;
 			}
-			if (typeof val[0] in {'string':null,'number':null}) {
+			if (key.toLowerCase() in {'errors':null,'warnings':null}) {
+				s += '<ul>';
+				for (var i = 0; i < val.length; i++) {
+					s += '<li>' + val[i]['description'];
+					if (val[i]['servers'] != undefined) {
+						s += ' (' + val[i]['servers'].join(", ") + ')';
+					}
+					s += '</li>';
+				}
+				s += '</ul>';
+			} else if (typeof val[0] in {'string':null,'number':null}) {
 				if (key.toLowerCase() in {'servers':null,'digest_type':null}) {
 					s += val.join(", ");
 				} else {
