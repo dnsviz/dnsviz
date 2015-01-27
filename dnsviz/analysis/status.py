@@ -793,6 +793,12 @@ class NSEC3StatusNXDOMAIN(object):
     def _get_wildcard(self, encloser):
         return dns.name.from_text('*', encloser)
 
+    def get_wildcard(self):
+        if self.closest_encloser:
+            encloser_name, nsec_names = self.closest_encloser.items()[0]
+            return self._get_wildcard(encloser_name)
+        return None
+
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
             
@@ -820,7 +826,8 @@ class NSEC3StatusNXDOMAIN(object):
             if not self.nsec_names_covering_wildcard:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.WildcardNotCoveredNSEC3(wildcard=self.wildcard_name))
+                    wildcard_name = self.get_wildcard()
+                    self.errors.append(Errors.WildcardNotCoveredNSEC3(wildcard=wildcard_name))
                 if invalid_algs and invalid_alg_err not in self.errors:
                     self.errors.append(invalid_alg_err)
 
