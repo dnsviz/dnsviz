@@ -6,7 +6,8 @@
 	padding: 0pt;
 	margin: -8px;
 }
-.ui-tooltip-content ul { list-style:none; }
+.ui-tooltip-content ul { list-style:none; margin: 0; padding: 0; }
+.ui-tooltip-content ul li { margin: 0; padding: 0; }
 
 .dnsviz-secure { background-color: #8ffeff; }
 .dnsviz-insecure { background-color: #b7b7b7; }
