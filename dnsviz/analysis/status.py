@@ -971,8 +971,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
         if self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
-            next_closest_encloser = self.get_next_closest_encloser()
-            self.errors.append(Errors.WildcardCoveredAnswerNSEC3(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+            self.errors.append(Errors.WildcardCoveredAnswerNSEC3(wildcard=self.wildcard_name.canonicalize().to_text()))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
