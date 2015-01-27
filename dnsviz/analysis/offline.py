@@ -1108,7 +1108,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if missing_nsec_error not in errors:
                         errors[missing_nsec_error] = set()
                     errors[missing_nsec_error].add((server,client))
-                elif qname_obj.zone.server_responsive_with_do(server,client):
+                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
                     if Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS not in errors:
                         errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS] = set()
                     errors[Status.RESPONSE_ERROR_UNABLE_TO_RETRIEVE_DNSSEC_RECORDS].add((server,client))
