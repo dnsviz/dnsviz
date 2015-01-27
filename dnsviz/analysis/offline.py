@@ -449,7 +449,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             else:
 
                 # check for EDNS version mismatch
-                if response.effective_edns != response.message.edns:
+                if response.message.edns != response.query.edns:
                     if Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION not in warnings:
                         warnings[Status.RESPONSE_ERROR_UNSUPPORTED_EDNS_VERSION] = set()
                     warnings[Status.RESPONSE_UNSUPPORTED_EDNS_VERSION].add((server,client))
