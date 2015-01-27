@@ -1167,7 +1167,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         servers_responsive = set()
         for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
-            servers_responsive.update([(server,client,query) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick)])
+            servers_responsive.update([(server,client,query.responses[server][client]) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick)])
 
         # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():
@@ -1184,7 +1184,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             servers_with_dnskey = set()
             for (server,client) in dnskey.servers_clients:
                 for response in dnskey.servers_clients[(server,client)]:
-                    servers_with_dnskey.add((server,client,response.query))
+                    servers_with_dnskey.add((server,client,response))
             servers_clients_without = servers_responsive.difference(servers_with_dnskey)
             if servers_clients_without:
                 dnskey.errors[Status.DNSKEY_ERROR_DNSKEY_MISSING_FROM_SOME_SERVERS] = [(server,client) for (server,client,response) in servers_clients_without]
