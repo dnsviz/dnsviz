@@ -118,7 +118,7 @@ AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 				}
 				s += '</ul>';
 			}
-		} else if (typeof val == "object") {
+		} else {
 			s += this.infoToHtmlTable(val);
 		}
 		s += '</td></tr>';
