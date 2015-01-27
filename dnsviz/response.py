@@ -422,7 +422,7 @@ class DNSResponseComponent(object):
         self.servers_clients[(server, client)].append(response)
 
     @classmethod
-    def insert_into_list(self, component_info, component_info_list, server, client, response):
+    def insert_into_list(cls, component_info, component_info_list, server, client, response):
         try:
             index = component_info_list.index(component_info)
             component_info = component_info_list[index]
