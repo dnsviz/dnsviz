@@ -294,7 +294,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if level <= self.RDTYPES_SECURE_DELEGATION:
             self._index_dnskeys()
         self._populate_rrsig_status_all(supported_algs, level)
-        self._populate_nsec_status(supported_algs, level)
+        self._populate_nodata_status(supported_algs, level)
+        self._populate_nxdomain_status(supported_algs, level)
         self._finalize_key_roles()
         if level <= self.RDTYPES_SECURE_DELEGATION:
             if not is_dlv:
@@ -1115,15 +1116,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return statuses
 
-    def _populate_nsec_status(self, supported_algs, level):
+    def _populate_nxdomain_status(self, supported_algs, level):
         self.nxdomain_status = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
-        self.nodata_status = {}
-        self.nodata_warnings = {}
-        self.nodata_errors = {}
 
-        _logger.debug('Assessing negative responses status of %s...' % (fmt.humanize_name(self.name)))
+        _logger.debug('Assessing NXDOMAIN response status of %s...' % (fmt.humanize_name(self.name)))
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
             if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
@@ -1147,6 +1145,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     #XXX update this with proper rdtype type (instead of A)
                     err = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror='A'), self.nxdomain_warnings[neg_response_info], None, None, None) 
                     err.servers_clients.update(neg_response_info.servers_clients)
+
+    def _populate_nodata_status(self, supported_algs, level):
+        self.nodata_status = {}
+        self.nodata_warnings = {}
+        self.nodata_errors = {}
+
+        _logger.debug('Assessing NODATA response status of %s...' % (fmt.humanize_name(self.name)))
+        required_rdtypes = self._rdtypes_for_analysis_level(level)
+        for (qname, rdtype), query in self.queries.items():
+            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
+                continue
+
+            if required_rdtypes is not None and rdtype not in required_rdtypes:
+                continue
 
             for neg_response_info in query.nodata_info:
                 self.nodata_warnings[neg_response_info] = []
