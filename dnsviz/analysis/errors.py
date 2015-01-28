@@ -72,7 +72,8 @@ class DomainNameAnalysisError(object):
     def add_server_client(self, server, client, response):
         if (server, client) not in self.servers_clients:
             self.servers_clients[(server, client)] = []
-        self.servers_clients[(server, client)].append(response)
+        if response not in self.servers_clients[(server, client)]:
+            self.servers_clients[(server, client)].append(response)
 
     def remove_server_client(self, server, client, response):
         if (server, client) in self.servers_clients:
