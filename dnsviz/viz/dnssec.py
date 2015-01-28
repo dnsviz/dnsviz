@@ -810,7 +810,7 @@ class DNSAuthGraph:
     def get_nsec(self, nsec_rdtype, id, name, rdtype):
         return self.G.get_node(self.nsec_node_str(nsec_rdtype, id, name, rdtype))
 
-    def add_nsec(self, nsec_status, name, rdtype, zone_obj, covered_node):
+    def add_nsec(self, nsec_status, name, rdtype, name_obj, zone_obj, covered_node):
         if nsec_status.nsec_set_info.use_nsec3:
             nsec_rdtype = dns.rdatatype.NSEC3
         else:
@@ -818,7 +818,15 @@ class DNSAuthGraph:
         node_str = self.nsec_node_str(nsec_rdtype, self.id_for_nsec(name, rdtype, nsec_status.nsec_set_info), name, rdtype)
 
         if not self.G.has_node(node_str):
-            img_str = None
+            rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], nsec_status.nsec_set_info.rrsets.values())
+            rrset_info_with_warnings = filter(lambda x: name_obj.rrset_warnings[x], nsec_status.nsec_set_info.rrsets.values())
+
+            img_str = ''
+            if rrset_info_with_errors:
+                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+            elif rrset_info_with_warnings:
+                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+
             if img_str:
                 label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
                         (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype), img_str)
@@ -835,7 +843,25 @@ class DNSAuthGraph:
             S.add_node(node_str, id=node_str, label=label_str, **attr)
             self.node_subgraph_name[node_str] = zone_top_name
 
-            self.node_info[node_str] = [nsec_status.serialize()]
+            consolidate_clients = name_obj.single_client()
+
+            nsec_serialized = nsec_status.serialize(consolidate_clients=consolidate_clients)
+
+            nsec_serialized_edge = nsec_serialized.copy()
+            nsec_serialized_edge['description'] = 'Non-existence proof provided by %s' % (nsec_serialized['description'])
+
+            if rrset_info_with_warnings:
+                if 'warnings' not in nsec_serialized:
+                    nsec_serialized['warnings'] = []
+                for rrset_info in rrset_info_with_warnings:
+                    nsec_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_warnings[rrset_info]]
+            if rrset_info_with_errors:
+                if 'errors' not in nsec_serialized:
+                    nsec_serialized['errors'] = []
+                for rrset_info in rrset_info_with_errors:
+                    nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.rrset_errors[rrset_info]]
+
+            self.node_info[node_str] = [nsec_serialized]
 
             nsec_node = self.G.get_node(node_str)
 
@@ -853,8 +879,7 @@ class DNSAuthGraph:
             edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
             self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
 
-            self.node_info[edge_id] = [self.node_info[nsec_node][0].copy()]
-            self.node_info[edge_id][0]['description'] = 'Non-existence proof provided by %s' % (self.node_info[edge_id][0]['description'])
+            self.node_info[edge_id] = [nsec_serialized_edge]
 
         else:
             nsec_node = self.G.get_node(node_str)
@@ -869,7 +894,7 @@ class DNSAuthGraph:
         nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.wildcard_info[wildcard_name], True, True)
 
         if nsec_status is not None:
-            nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, zone_obj, nxdomain_node)
+            nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, name_obj, zone_obj, nxdomain_node)
             for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                 self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
 
@@ -969,7 +994,7 @@ class DNSAuthGraph:
             nxdomain_node = self.add_rrset_non_existent(name_obj, neg_response_info, True, False)
             my_nodes_all.append(nxdomain_node)
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
-                nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nxdomain_node)
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nxdomain_node)
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
@@ -986,7 +1011,7 @@ class DNSAuthGraph:
             nodata_node = self.add_rrset_non_existent(name_obj, neg_response_info, False, False)
             my_nodes_all.append(nodata_node)
             for nsec_status in name_obj.nodata_status[neg_response_info]:
-                nsec_node = self.add_nsec(nsec_status, name, rdtype, zone_obj, nodata_node)
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nodata_node)
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
@@ -1096,7 +1121,7 @@ class DNSAuthGraph:
 
             for nsec_status in nsec_statuses:
 
-                nsec_node = self.add_nsec(nsec_status, ds_name, rdtype, parent_obj, zone_top)
+                nsec_node = self.add_nsec(nsec_status, ds_name, rdtype, name_obj, parent_obj, zone_top)
                 # add a tail to the cluster
                 self.G.get_edge(zone_top, nsec_node).attr['ltail'] = zone_graph_name
                 # anchor NSEC node to bottom
