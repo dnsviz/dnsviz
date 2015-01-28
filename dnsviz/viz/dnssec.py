@@ -850,16 +850,27 @@ class DNSAuthGraph:
             nsec_serialized_edge = nsec_serialized.copy()
             nsec_serialized_edge['description'] = 'Non-existence proof provided by %s' % (nsec_serialized['description'])
 
+            all_warnings = []
             if rrset_info_with_warnings:
+                for rrset_info in rrset_info_with_warnings:
+                    for warning in name_obj.rrset_warnings[rrset_info]:
+                        servers_clients = warning.servers_clients
+                        warning = Errors.DomainNameAnalysisError.insert_into_list(warning.copy(), all_warnings, None, None, None)
+                        warning.servers_clients.update(servers_clients)
                 if 'warnings' not in nsec_serialized:
                     nsec_serialized['warnings'] = []
-                for rrset_info in rrset_info_with_warnings:
-                    nsec_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_warnings[rrset_info]]
+                nsec_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in all_warnings]
+
+            all_errors = []
             if rrset_info_with_errors:
+                for rrset_info in rrset_info_with_errors:
+                    for error in name_obj.rrset_errors[rrset_info]:
+                        servers_clients = error.servers_clients
+                        error = Errors.DomainNameAnalysisError.insert_into_list(error.copy(), all_errors, None, None, None)
+                        error.servers_clients.update(servers_clients)
                 if 'errors' not in nsec_serialized:
                     nsec_serialized['errors'] = []
-                for rrset_info in rrset_info_with_errors:
-                    nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.rrset_errors[rrset_info]]
+                nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in all_errors]
 
             self.node_info[node_str] = [nsec_serialized]
 
