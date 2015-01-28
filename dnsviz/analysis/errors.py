@@ -1233,22 +1233,18 @@ class DNAMEError(DomainNameAnalysisError):
 class DNAMENoCNAME(DNAMEError):
     _abstract = False
     code = 'DNAME_NO_CNAME'
-    description_template = "TODO"
 
 class DNAMETargetMismatch(DNAMEError):
     _abstract = False
     code = 'DNAME_TARGET_MISMATCH'
-    description_template = "TODO"
 
 class DNAMETTLZero(DNAMEError):
     _abstract = False
     code = 'DNAME_TTL_ZERO'
-    description_template = "TODO"
 
 class DNAMETTLMismatch(DNAMEError):
     _abstract = False
     code = 'DNAME_TTL_MISMATCH'
-    description_template = "TODO"
 
 class DNSKEYError(DomainNameAnalysisError):
     pass
