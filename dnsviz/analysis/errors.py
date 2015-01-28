@@ -279,7 +279,7 @@ class DigestAlgorithmNotSupported(DSError):
 
     def __init__(self, **kwargs):
         super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
 
 class DNSKEYRevokedDS(DSError):
     '''
