@@ -27,6 +27,7 @@
 #
 
 import base64
+import cgi
 import collections
 import datetime
 import logging
@@ -546,14 +547,20 @@ class DNSKEYMeta(DNSResponseComponent):
 
         return s.getvalue()
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         from analysis import status as Status
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR)
 
         d = collections.OrderedDict()
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
         if loglevel <= logging.DEBUG:
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
@@ -582,10 +589,10 @@ class DNSKEYMeta(DNSResponseComponent):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -680,12 +687,18 @@ class RRsetInfo(DNSResponseComponent):
             s.write(rdata_wire)
         return s.getvalue()
 
-    def serialize(self, include_rrsig_info=True, show_servers=True, consolidate_clients=True):
+    def serialize(self, include_rrsig_info=True, show_servers=True, consolidate_clients=True, html_format=False):
         d = collections.OrderedDict()
-        if self.rrset.rdtype == dns.rdatatype.NSEC3:
-            d['name'] = fmt.format_nsec3_name(self.rrset.name)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
         else:
-            d['name'] = self.rrset.name.canonicalize().to_text()
+            formatter = lambda x: x
+
+        if self.rrset.rdtype == dns.rdatatype.NSEC3:
+            d['name'] = formatter(fmt.format_nsec3_name(self.rrset.name))
+        else:
+            d['name'] = formatter(self.rrset.name.canonicalize().to_text())
         d['ttl'] = self.rrset.ttl
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
@@ -695,7 +708,7 @@ class RRsetInfo(DNSResponseComponent):
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
-                d['rdata'].append(rdata.to_text())
+                d['rdata'].append(formatter(rdata.to_text()))
 
         if include_rrsig_info:
             #TODO include RRSIG info...
