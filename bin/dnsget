@@ -187,15 +187,13 @@ Options:
                      resolve to the corresponding address (or resolve at all
                      for that matter).
     -p             - make json output pretty instead of minimal.
-    -y             - read in yaml, instead of json.
-    -Y             - write in yaml, instead of json.
     -o <filename>  - write the analysis to file <filename> instead of to
                      stdout, which is the default.
 ''' % sys.argv[0])
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:pyYo:a:x:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:')
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -288,11 +286,7 @@ def main():
             analysis_str = sys.stdin.read()
         else:
             analysis_str = open(opts['-r']).read()
-        if '-y' in opts:
-            import yaml
-            analysis_structured = yaml.load(analysis_str)
-        else:
-            analysis_structured = json.loads(analysis_str)
+        analysis_structured = json.loads(analysis_str)
         for name in names:
             name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
     else:
@@ -321,11 +315,7 @@ def main():
     else:
         fh = open(opts['-o'], 'w')
 
-    if '-Y' in opts:
-        import yaml
-        fh.write(yaml.dump(d))
-    else:
-        fh.write(json.dumps(d, **kwargs))
+    fh.write(json.dumps(d, **kwargs))
 
 if __name__ == "__main__":
     main()
