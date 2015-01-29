@@ -1040,7 +1040,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
 
             if soa_owner_name != qname_obj.zone.name:
-                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=soa_owner_name, zone_name=qname_obj.zone.name), errors, None, None, None)
+                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=soa_owner_name.canonicalize().to_text(), zone_name=qname_obj.zone.name.canonicalize().to_text()), errors, None, None, None)
                 if neg_response_info.qname == query.qname:
                     err.servers_clients.update(soa_rrset_info.servers_clients)
                 else:
