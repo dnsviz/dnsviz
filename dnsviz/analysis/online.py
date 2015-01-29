@@ -939,7 +939,7 @@ class Analyst(object):
     clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'analysis_cache_lock']
 
     def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, analysis_cache_lock=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -970,6 +970,7 @@ class Analyst(object):
             self.analysis_cache = {}
         else:
             self.analysis_cache = analysis_cache
+        self.cache_level = cache_level
         if analysis_cache_lock is None:
             self.analysis_cache_lock = threading.Lock()
         else:
@@ -1260,7 +1261,8 @@ class Analyst(object):
             name_obj.complete.set()
 
     def _cleanup_analysis_all(self, name_obj):
-        pass
+        if self.cache_level is not None and len(name_obj.name) > self.cache_level:
+            del self.analysis_cache[name_obj.name]
 
     def _handle_explicit_delegations(self, name_obj):
         if name_obj.name in self.explicit_delegations:
