@@ -241,10 +241,19 @@ class RRSIGStatus(object):
                 ))),
                 ('meta', collections.OrderedDict((
                     ('ttl', self.rrset.rrsig_info[self.rrsig].ttl),
-                    ('age', int(self.reference_ts - self.rrsig.inception)),
-                    ('remaining_lifetime', int(self.rrsig.expiration - self.reference_ts)),
                 ))),
             ))
+
+            if html_format:
+                d['rdata']['algorithm'] = '%d (%s)' % (self.rrsig.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rrsig.algorithm, self.rrsig.algorithm))
+                d['rdata']['original_ttl'] = '%d (%s)' % (self.rrsig.original_ttl, fmt.humanize_time(self.rrsig.original_ttl))
+                if self.rrset.is_wildcard(self.rrsig):
+                    d['rdata']['labels'] = '%d (wildcard)' % (self.rrsig.labels)
+                else:
+                    d['rdata']['labels'] = '%d (no wildcard)' % (self.rrsig.labels)
+                d['rdata']['inception'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.inception)))
+                d['rdata']['expiration'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.expiration)))
+                d['meta']['ttl'] = '%d (%s)' % (self.rrset.rrsig_info[self.rrsig].ttl, fmt.humanize_time(self.rrset.rrsig_info[self.rrsig].ttl))
 
         if loglevel <= logging.DEBUG and self.dnskey is not None:
             d['meta']['dnskey'] = self.dnskey.rdata.to_text()
@@ -337,8 +346,14 @@ class DSStatus(object):
                 ('meta', collections.OrderedDict()),
             ))
 
+            if html_format:
+                d['rdata']['algorithm'] = '%d (%s)' % (self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm))
+                d['rdata']['digest_type'] = '%d (%s)' % (self.ds.digest_type, fmt.DS_DIGEST_TYPES.get(self.ds.digest_type, self.ds.digest_type))
+
         if loglevel <= logging.DEBUG:
             d['meta']['ttl'] = self.ds_meta.rrset.ttl
+            if html_format:
+                d['meta']['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
             if self.dnskey is None:
                 d['meta']['dnskey'] = None
             else:
