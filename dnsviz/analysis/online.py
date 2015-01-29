@@ -984,6 +984,9 @@ class Analyst(object):
         if self.dlv_domain == self.name:
             return
 
+        if len(self.name) < 3:
+            return
+
         try:
             rdtype = self._rdtypes_to_query(self.name)[0]
         except IndexError:
