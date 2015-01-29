@@ -76,10 +76,14 @@ class BulkAnalyst(object):
         for name in names:
             yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.cache, self.cache_level, self.cache_lock)
 
-    def analyze(self, names):
+    def analyze(self, names, flush_func=None):
         name_objs = []
         for args in self._name_to_args_iter(names):
-            name_objs.append(_analyze(args))
+            name_obj = _analyze(args)
+            if flush_func is not None:
+                flush_func(name_obj)
+            else:
+                name_objs.append(name_obj)
         return name_objs
 
 class MultiProcessAnalyst(Analyst):
@@ -149,7 +153,7 @@ class ParallelAnalyst(BulkAnalyst):
         self.cache = self.manager.dict()
         self.cache_lock = self.manager.Lock()
 
-    def analyze(self, names):
+    def analyze(self, names, flush_func=None):
 
         pool = multiprocessing.Pool(self.processes)
         try:
@@ -193,7 +197,7 @@ Options:
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:F')
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -290,6 +294,16 @@ def main():
     else:
         fh = open(opts['-o'], 'w')
 
+    def _flush(name_obj):
+        d = collections.OrderedDict()
+        name_obj.serialize(d)
+        s = json.dumps(d, **kwargs)
+        lindex = s.index('{')
+        rindex = s.rindex('}')
+        fh.write(s[lindex+1:rindex]+',')
+
+    flush = '-F' in opts
+
     name_objs = []
     if '-r' in opts:
         if opts['-r'] == '-':
@@ -304,6 +318,12 @@ def main():
             a = ParallelAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain, processes)
         else:
             a = BulkAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain)
+            if flush:
+                fh.write('{')
+                a.analyze(names, _flush)
+                fh.write('"_last._dnsviz":null}')
+                sys.exit(0)
+
         name_objs = a.analyze(names)
 
     if name_objs is None:
