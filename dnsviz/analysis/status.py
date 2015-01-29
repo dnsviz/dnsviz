@@ -27,6 +27,7 @@
 #
 
 import base64
+import cgi
 import collections
 import datetime
 import logging
@@ -213,18 +214,23 @@ class RRSIGStatus(object):
     def __unicode__(self):
         return u'RRSIG covering %s/%s' % (self.rrset.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         if loglevel <= logging.DEBUG:
             d.update((
                 ('rdata', collections.OrderedDict((
-                    ('signer', self.rrsig.signer.canonicalize().to_text()),
+                    ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
                     ('algorithm', self.rrsig.algorithm),
                     ('key_tag', self.rrsig.key_tag),
                     ('original_ttl', self.rrsig.original_ttl),
@@ -256,10 +262,10 @@ class RRSIGStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -307,13 +313,18 @@ class DSStatus(object):
     def __unicode__(self):
         return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), self.ds_meta.rrset.name.canonicalize().to_text(), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         if loglevel <= logging.DEBUG:
             d.update((
@@ -346,10 +357,10 @@ class DSStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -422,46 +433,51 @@ class NSECStatusNXDOMAIN(object):
     def __unicode__(self):
         return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (self.qname.canonicalize().to_text())
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         d['nsec'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
-                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel)
+                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
                     d['nsec'].append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False))
+                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
         if not d['nsec']:
             del d['nsec']
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
-            d['meta']['qname'] = self.qname.canonicalize().to_text()
+            d['meta']['qname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['meta']['nsec_chain_covering_qname'] = collections.OrderedDict((
-                    ('qname', qname.canonicalize().to_text()),
-                    ('nsec_owner', nsec_name.canonicalize().to_text()),
-                    ('nsec_next', nsec_rr.next.canonicalize().to_text())
+                    ('qname', formatter(qname.canonicalize().to_text())),
+                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
-            d['meta']['wildcard'] = self.wildcard_name.canonicalize().to_text()
+            d['meta']['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
             if self.nsec_names_covering_wildcard:
                 wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['meta']['nsec_chain_covering_wildcard'] = collections.OrderedDict((
-                    ('wildcard', wildcard.canonicalize().to_text()),
-                    ('nsec_owner', nsec_name.canonicalize().to_text()),
-                    ('nsec_next', nsec_rr.next.canonicalize().to_text())
+                    ('wildcard', formatter(wildcard.canonicalize().to_text())),
+                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
         if loglevel <= logging.INFO or show_basic:
@@ -475,10 +491,10 @@ class NSECStatusNXDOMAIN(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -531,8 +547,8 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
-        d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel)
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+        d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
         try:
             del d['meta']['wildcard']
         except KeyError:
@@ -657,31 +673,36 @@ class NSECStatusNoAnswer(object):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
         
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         d['nsec'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
-                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel)
+                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
                     d['nsec'].append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False))
+                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
         if not d['nsec']:
             del d['nsec']
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
-            d['meta']['qname'] = self.qname.canonicalize().to_text()
+            d['meta']['qname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_for_qname is not None:
                 d['meta']['nsec_matching_qname'] = collections.OrderedDict((
-                    ('qname', self.nsec_for_qname.rrset.name.canonicalize().to_text()),
+                    ('qname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
                     #TODO - add rdtypes bitmap (when NSEC matches qname--not for empty non-terminal)
                 ))
 
@@ -690,15 +711,15 @@ class NSECStatusNoAnswer(object):
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['meta']['nsec_chain_covering_qname'] = collections.OrderedDict((
-                    ('qname', qname.canonicalize().to_text()),
-                    ('nsec_owner', nsec_name.canonicalize().to_text()),
-                    ('nsec_next', nsec_rr.next.canonicalize().to_text())
+                    ('qname', formatter(qname.canonicalize().to_text())),
+                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
-            d['meta']['wildcard'] = self.wildcard_name.canonicalize().to_text()
+            d['meta']['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
             if self.nsec_for_wildcard_name is not None:
                 d['meta']['nsec_matching_wildcard'] = collections.OrderedDict((
-                    ('wildcard', self.wildcard_name.canonicalize().to_text()),
+                    ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
                     #TODO - add rdtypes bitmap
                 ))
 
@@ -713,10 +734,10 @@ class NSECStatusNoAnswer(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -841,22 +862,27 @@ class NSEC3StatusNXDOMAIN(object):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
     
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
         
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         d['nsec3'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
-                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel)
+                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
                     d['nsec3'].append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False))
+                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
         if not d['nsec3']:
             del d['nsec3']
 
@@ -867,17 +893,17 @@ class NSEC3StatusNXDOMAIN(object):
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
                 d['meta']['closest_encloser'] = collections.OrderedDict((
-                    ('name', encloser_name.canonicalize().to_text()),
+                    ('name', formatter(encloser_name.canonicalize().to_text())),
                 ))
                 # could be inferred from wildcard
                 if nsec_name is not None:
-                    d['meta']['closest_encloser']['name_digest'] = fmt.format_nsec3_name(nsec_name)
+                    d['meta']['closest_encloser']['name_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
+                d['meta']['next_closest_encloser'] = formatter(fmt.humanize_name(next_closest_encloser))
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(digest_name)
+                    d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['meta']['next_closest_encloser_digest'] = None
 
@@ -886,16 +912,16 @@ class NSEC3StatusNXDOMAIN(object):
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('next_closest_encloser_digest', fmt.format_nsec3_name(qname)),
-                        ('nsec3_owner', fmt.format_nsec3_name(nsec_name)),
-                        ('nsec3_next', fmt.format_nsec3_name(next_name)),
+                        ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
+                        ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
+                        ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
-                d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
+                d['meta']['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                    d['meta']['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
                     d['meta']['wildcard_digest'] = None
                 if self.nsec_names_covering_wildcard:
@@ -903,16 +929,16 @@ class NSEC3StatusNXDOMAIN(object):
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_wildcard'] = collections.OrderedDict((
-                        ('wildcard_digest', fmt.format_nsec3_name(wildcard)),
-                        ('nsec3_owner', fmt.format_nsec3_name(nsec_name)),
-                        ('nsec3_next', fmt.format_nsec3_name(next_name)),
+                        ('wildcard_digest', formatter(fmt.format_nsec3_name(wildcard))),
+                        ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
+                        ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
 
             else:
-                d['meta']['qname'] = fmt.humanize_name(self.qname)
+                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['meta']['qname_digest'] = None
 
@@ -927,10 +953,10 @@ class NSEC3StatusNXDOMAIN(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -983,8 +1009,8 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
-        d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel)
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+        d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
         try:
             del d['meta']['wildcard']
         except KeyError:
@@ -1168,22 +1194,27 @@ class NSEC3StatusNoAnswer(object):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         d['nsec3'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
-                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel)
+                nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
                     d['nsec3'].append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False))
+                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
         if not d['nsec3']:
             del d['nsec3']
 
@@ -1192,14 +1223,14 @@ class NSEC3StatusNoAnswer(object):
             d['meta']['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
-                d['meta']['qname'] = fmt.humanize_name(self.qname)
+                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['meta']['qname_digest'] = None
                 d['meta']['nsec_matching_qname'] = collections.OrderedDict((
-                    ('qname_digest', fmt.format_nsec3_name(list(self.nsec_for_qname)[0])),
+                    ('qname_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))),
                     #TODO - add rdtypes bitmap
                 ))
 
@@ -1207,15 +1238,15 @@ class NSEC3StatusNoAnswer(object):
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
                 d['meta']['closest_encloser'] = collections.OrderedDict((
-                    ('name', encloser_name.canonicalize().to_text()),
-                    ('name_digest', fmt.format_nsec3_name(nsec_name)),
+                    ('name', formatter(encloser_name.canonicalize().to_text())),
+                    ('name_digest', formatter(fmt.format_nsec3_name(nsec_name))),
                 ))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = fmt.humanize_name(next_closest_encloser)
+                d['meta']['next_closest_encloser'] = formatter(fmt.humanize_name(next_closest_encloser))
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['next_closest_encloser_digest'] = fmt.format_nsec3_name(digest_name)
+                    d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['meta']['next_closest_encloser_digest'] = None
 
@@ -1224,29 +1255,29 @@ class NSEC3StatusNoAnswer(object):
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('qname_digest', fmt.format_nsec3_name(qname)),
-                        ('nsec3_owner', fmt.format_nsec3_name(nsec_name)),
-                        ('nsec3_next', fmt.format_nsec3_name(next_name)),
+                        ('qname_digest', formatter(fmt.format_nsec3_name(qname))),
+                        ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
+                        ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
-                d['meta']['wildcard'] = wildcard_name.canonicalize().to_text()
+                d['meta']['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['meta']['wildcard_digest'] = fmt.format_nsec3_name(wildcard_digest)
+                    d['meta']['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
                     d['meta']['wildcard_digest'] = None
                 if self.nsec_for_wildcard_name:
                     d['meta']['nsec_matching_wildcard'] = collections.OrderedDict((
-                        ('wildcard_digest', fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0])),
+                        ('wildcard_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))),
                         #TODO - add rdtypes bitmap
                     ))
 
             if not self.nsec_for_qname and not self.closest_encloser:
-                d['meta']['qname'] = fmt.humanize_name(self.qname)
+                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = fmt.format_nsec3_name(digest_name)
+                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['meta']['qname_digest'] = None
 
@@ -1261,10 +1292,10 @@ class NSEC3StatusNoAnswer(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
 
@@ -1292,27 +1323,32 @@ class CNAMEFromDNAMEStatus(object):
     def __unicode__(self):
         return u'CNAME synthesis for %s from %s/%s' % (self.synthesized_cname.rrset.name.canonicalize().to_text(), self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         values = []
         d = collections.OrderedDict()
 
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = unicode(self)
+            d['description'] = formatter(unicode(self))
 
         if rrset_info_serializer is not None:
-            dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel)
+            dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
             if dname_serialized:
                 d['dname'] = dname_serialized
         elif loglevel <= logging.DEBUG:
-            d['dname'] = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False)
+            d['dname'] = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
             if self.included_cname is not None:
-                d['meta']['cname_owner'] = self.included_cname.rrset.name.canonicalize().to_text()
-                d['meta']['cname_target'] = self.included_cname.rrset[0].target.canonicalize().to_text()
+                d['meta']['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
+                d['meta']['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
 
         if loglevel <= logging.INFO or self.validation_status != STATUS_VALID:
             d['status'] = dname_status_mapping[self.validation_status]
@@ -1325,9 +1361,9 @@ class CNAMEFromDNAMEStatus(object):
             d['servers'] = servers
 
         if self.warnings and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.warnings]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
         if self.errors and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.errors]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d

@@ -20,6 +20,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+import cgi
 import collections
 import datetime
 
@@ -69,6 +70,19 @@ class DomainNameAnalysisError(object):
     def description(self):
         return self.description_template % self.template_kwargs
 
+    @property
+    def html_description(self):
+        description_template_escaped = cgi.escape(self.description_template, True)
+        template_kwargs_escaped = {}
+        for n, v in self.template_kwargs.items():
+            if isinstance(v, (str, unicode)):
+                template_kwargs_escaped[n] = '<b>%s</b>' % cgi.escape(v)
+            elif isinstance(v, (int, long)):
+                template_kwargs_escaped[n] = v
+            else:
+                template_kwargs_escaped[n] = '<b>%s</b>' % cgi.escape(str(v))
+        return description_template_escaped % template_kwargs_escaped
+
     def add_server_client(self, server, client, response):
         if (server, client) not in self.servers_clients:
             self.servers_clients[(server, client)] = []
@@ -85,9 +99,14 @@ class DomainNameAnalysisError(object):
                 if not self.servers_clients[(server, client)]:
                     del self.servers_clients[(server, client)]
 
-    def serialize(self, consolidate_clients=False):
+    def serialize(self, consolidate_clients=False, html_format=False):
         d = collections.OrderedDict()
-        d['description'] = self.description
+
+        if html_format:
+            d['description'] = self.html_description
+        else:
+            d['description'] = self.description
+
         d['code'] = self.code
         if self.servers_clients:
             servers = tuple_to_dict(self.servers_clients)

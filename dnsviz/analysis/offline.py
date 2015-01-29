@@ -1237,14 +1237,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
 
-    def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG):
+    def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         if loglevel <= logging.INFO or (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR):
             d['description'] = unicode(rrset_info)
 
         if loglevel <= logging.DEBUG:
-            d['rrset'] = rrset_info.serialize(include_rrsig_info=False, show_servers=show_servers, consolidate_clients=consolidate_clients)
+            d['rrset'] = rrset_info.serialize(include_rrsig_info=False, show_servers=show_servers, consolidate_clients=consolidate_clients, html_format=html_format)
 
         if self.rrsig_status[rrset_info]:
             d['rrsig'] = []
@@ -1255,7 +1255,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
-                    rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                     if rrsig_serialized:
                         d['rrsig'].append(rrsig_serialized)
             if not d['rrsig']:
@@ -1264,7 +1264,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if rrset_info in self.dname_status:
             d['dname'] = []
             for dname_status in self.dname_status[rrset_info]:
-                dname_serialized = dname_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                dname_serialized = dname_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if dname_serialized:
                     d['dname'].append(dname_serialized)
             if not d['dname']:
@@ -1278,7 +1278,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
                 d['wildcard_proof'][wildcard_name_str] = []
                 for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
-                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                     if nsec_serialized:
                         d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
                 if not d['wildcard_proof'][wildcard_name_str]:
@@ -1287,19 +1287,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 del d['wildcard_proof']
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.rrset_warnings[rrset_info]]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
 
         if self.rrset_errors[rrset_info] and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.rrset_errors[rrset_info]]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.rrset_errors[rrset_info]]
 
         return d
 
-    def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG):
+    def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         d['proof'] = []
         for nsec_status in neg_status[neg_response_info]:
-            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if nsec_serialized:
                 d['proof'].append(nsec_serialized)
         if not d['proof']:
@@ -1307,7 +1307,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         d['soa'] = []
         for soa_rrset_info in neg_response_info.soa_rrset_info:
-            rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+            rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if rrset_serialized:
                 d['soa'].append(rrset_serialized)
         if not d['soa']:
@@ -1323,14 +1323,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['servers'] = servers
 
         if warnings[neg_response_info] and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in warnings[neg_response_info]]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in warnings[neg_response_info]]
 
         if errors[neg_response_info] and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in errors[neg_response_info]]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in errors[neg_response_info]]
 
         return d
 
-    def _serialize_query_status(self, query, consolidate_clients=False, loglevel=logging.DEBUG):
+    def _serialize_query_status(self, query, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
         d['answer'] = []
         d['nxdomain'] = []
@@ -1342,7 +1342,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # only look at qname
             #TODO fix this check for recursive
             if rrset_info.rrset.name == query.qname:
-                rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if rrset_serialized:
                     d['answer'].append(rrset_serialized)
 
@@ -1350,7 +1350,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # only look at qname
             #TODO fix this check for recursive
             if neg_response_info.qname == query.qname:
-                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if neg_response_serialized:
                     d['nxdomain'].append(neg_response_serialized)
 
@@ -1358,12 +1358,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # only look at qname
             #TODO fix this check for recursive
             if neg_response_info.qname == query.qname:
-                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nodata_status, self.nodata_warnings, self.nodata_errors, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nodata_status, self.nodata_warnings, self.nodata_errors, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if neg_response_serialized:
                     d['nodata'].append(neg_response_serialized)
 
         for error in self.response_errors[query]:
-            error_serialized = error.serialize(consolidate_clients=consolidate_clients)
+            error_serialized = error.serialize(consolidate_clients=consolidate_clients, html_format=html_format)
             if error_serialized:
                 d['error'].append(error_serialized)
 
@@ -1374,17 +1374,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
-    def _serialize_dnskey_status(self, consolidate_clients=False, loglevel=logging.DEBUG):
+    def _serialize_dnskey_status(self, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = []
 
         for dnskey in self.get_dnskeys():
-            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if dnskey_serialized:
                 d.append(dnskey_serialized)
 
         return d
 
-    def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG):
+    def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         dss = self.ds_status_by_ds[rdtype].keys()
@@ -1395,7 +1395,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             dnskeys.sort()
             for dnskey in dnskeys:
                 ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
-                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel)
+                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if ds_serialized:
                     d['ds'].append(ds_serialized)
         if not d['ds']:
@@ -1414,7 +1414,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if neg_response_info is not None:
             d['insecurity_proof'] = []
             for nsec_status in status[neg_response_info]:
-                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
                     d['insecurity_proof'].append(nsec_serialized)
             if not d['insecurity_proof']:
@@ -1424,14 +1424,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['status'] = Status.delegation_status_mapping[self.delegation_status[rdtype]]
 
         if self.delegation_warnings[rdtype] and loglevel <= logging.WARNING:
-            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients) for w in self.delegation_warnings[rdtype]]
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.delegation_warnings[rdtype]]
 
         if self.delegation_errors[rdtype] and loglevel <= logging.ERROR:
-            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in self.delegation_errors[rdtype]]
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.delegation_errors[rdtype]]
 
         return d
 
-    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True):
+    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True, html_format=False):
         if d is None:
             d = collections.OrderedDict()
 
@@ -1455,24 +1455,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if level <= self.RDTYPES_NS_TARGET:
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
-                    cname_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+                    cname_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], html_format=html_format)
             if follow_mx:
                 for target, mx_obj in self.mx_targets.items():
                     if mx_obj is not None:
-                        mx_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
+                        mx_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False, html_format=html_format)
         if level <= self.RDTYPES_SECURE_DELEGATION:
             for signer, signer_obj in self.external_signers.items():
-                signer_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+                signer_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
             for target, ns_obj in self.ns_dependencies.items():
                 if ns_obj is not None:
-                    ns_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
+                    ns_obj.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_NS_TARGET, trace=trace + [self], html_format=html_format)
 
         # serialize status of ancestry
         if level <= self.RDTYPES_SECURE_DELEGATION:
             if self.parent is not None:
-                self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+                self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
             if self.dlv_parent is not None:
-                self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+                self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
 
         consolidate_clients = self.single_client()
 
@@ -1492,7 +1492,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if required_rdtypes is not None and rdtype not in required_rdtypes:
                 continue
 
-            query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel)
+            query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if query_serialized:
                 qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
                 d[name_str]['queries'][qname_type_str] = query_serialized
@@ -1501,19 +1501,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             del d[name_str]['queries']
 
         if level <= self.RDTYPES_SECURE_DELEGATION and (self.name, dns.rdatatype.DNSKEY) in self.queries:
-            dnskey_serialized = self._serialize_dnskey_status(consolidate_clients=consolidate_clients, loglevel=loglevel)
+            dnskey_serialized = self._serialize_dnskey_status(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if dnskey_serialized:
                 d[name_str]['dnskey'] = dnskey_serialized
 
         if self.is_zone():
             if self.parent is not None and not is_dlv:
-                delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DS, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DS, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if delegation_serialized:
                     d[name_str]['delegation'] = delegation_serialized
 
             if self.dlv_parent is not None:
                 if (self.dlv_name, dns.rdatatype.DLV) in self.queries:
-                    delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DLV, consolidate_clients=consolidate_clients, loglevel=loglevel)
+                    delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DLV, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                     if delegation_serialized:
                         d[name_str]['dlv'] = delegation_serialized
 

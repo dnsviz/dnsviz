@@ -26,6 +26,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+import cgi
 import collections
 import errno
 import json
@@ -89,12 +90,18 @@ class RRsetNonExistent(object):
         self.nxdomain = nxdomain
         self.servers_clients = servers_clients
 
-    def serialize(self, consolidate_clients):
+    def serialize(self, consolidate_clients, html_format=False):
         d = collections.OrderedDict()
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
         if self.rdtype == dns.rdatatype.NSEC3:
             d['name'] = format.format_nsec3_name(self.name)
         else:
-            d['name'] = self.name.canonicalize().to_text()
+            d['name'] = formatter(self.name.canonicalize().to_text())
         d['ttl'] = None
         d['type'] = dns.rdatatype.to_text(self.rdtype)
         if self.nxdomain:
@@ -341,7 +348,7 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
-            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients)
+            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, html_format=True)
 
             all_warnings = []
             if rrset_info_with_warnings:
@@ -352,7 +359,7 @@ class DNSAuthGraph:
                         warning.servers_clients.update(servers_clients)
                 if 'warnings' not in dnskey_serialized:
                     dnskey_serialized['warnings'] = []
-                dnskey_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in all_warnings]
+                dnskey_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in all_warnings]
 
             all_errors = []
             if rrset_info_with_errors:
@@ -363,7 +370,7 @@ class DNSAuthGraph:
                         error.servers_clients.update(servers_clients)
                 if 'errors' not in dnskey_serialized:
                     dnskey_serialized['errors'] = []
-                dnskey_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in all_errors]
+                dnskey_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
             self.node_info[node_str] = [dnskey_serialized]
      
@@ -434,7 +441,7 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = parent_top_name
 
             consolidate_clients = zone_obj.single_client()
-            ds_serialized = [d.serialize(consolidate_clients=consolidate_clients) for d in ds_statuses]
+            ds_serialized = [d.serialize(consolidate_clients=consolidate_clients, html_format=True) for d in ds_statuses]
 
             digest_algs = []
             digests = []
@@ -450,12 +457,12 @@ class DNSAuthGraph:
             if zone_obj.rrset_warnings[ds_info]:
                 if 'warnings' not in consolidated_ds_serialized:
                     consolidated_ds_serialized['warnings'] = []
-                consolidated_ds_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in zone_obj.rrset_warnings[ds_info]]
+                consolidated_ds_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in zone_obj.rrset_warnings[ds_info]]
 
             if zone_obj.rrset_errors[ds_info]:
                 if 'errors' not in consolidated_ds_serialized:
                     consolidated_ds_serialized['errors'] = []
-                consolidated_ds_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in zone_obj.rrset_errors[ds_info]]
+                consolidated_ds_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in zone_obj.rrset_errors[ds_info]]
 
             self.node_info[node_str] = [consolidated_ds_serialized]
 
@@ -597,7 +604,7 @@ class DNSAuthGraph:
                 self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
 
         consolidate_clients = name_obj.single_client()
-        rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients)
+        rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
 
         if edge_id not in self.node_info:
             self.node_info[edge_id] = [rrsig_serialized]
@@ -643,17 +650,17 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
-            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
+            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True)
             
             if name_obj.rrset_warnings[rrset_info]:
                 if 'warnings' not in rrset_serialized:
                     rrset_serialized['warnings'] = []
-                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_warnings[rrset_info]]
+                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.rrset_warnings[rrset_info]]
 
             if name_obj.rrset_errors[rrset_info]:
                 if 'errors' not in rrset_serialized:
                     rrset_serialized['errors'] = []
-                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.rrset_errors[rrset_info]]
+                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.rrset_errors[rrset_info]]
 
             self.node_info[node_id] = [rrset_serialized]
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
@@ -711,17 +718,17 @@ class DNSAuthGraph:
             rrset_info = RRsetNonExistent(neg_response_info.qname, neg_response_info.rdtype, nxdomain, neg_response_info.servers_clients)
 
             consolidate_clients = name_obj.single_client()
-            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients)
+            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True)
 
             if warnings_list:
                 if 'warnings' not in rrset_serialized:
                     rrset_serialized['warnings'] = []
-                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in warnings_list]
+                rrset_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in warnings_list]
 
             if errors_list:
                 if 'errors' not in rrset_serialized:
                     rrset_serialized['errors'] = []
-                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients) for w in errors_list]
+                rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in errors_list]
 
             self.node_info[node_id] = [rrset_serialized]
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
@@ -755,7 +762,7 @@ class DNSAuthGraph:
         errors_serialized = collections.OrderedDict()
 
         errors_serialized['description'] = 'Response errors for %s/%s' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
-        errors_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients) for e in errors_list]
+        errors_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in errors_list]
         errors_serialized['status'] = 'INVALID'
 
         self.node_info[node_id] = [errors_serialized]
@@ -795,7 +802,7 @@ class DNSAuthGraph:
                 edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
-            self.node_info[edge_id] = [dname_status.serialize()]
+            self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
 
         self.add_rrsigs(name_obj, zone_obj, dname_rrset_info, dname_node)
 
@@ -845,7 +852,7 @@ class DNSAuthGraph:
 
             consolidate_clients = name_obj.single_client()
 
-            nsec_serialized = nsec_status.serialize(consolidate_clients=consolidate_clients)
+            nsec_serialized = nsec_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
 
             nsec_serialized_edge = nsec_serialized.copy()
             nsec_serialized_edge['description'] = 'Non-existence proof provided by %s' % (nsec_serialized['description'])
@@ -859,7 +866,7 @@ class DNSAuthGraph:
                         warning.servers_clients.update(servers_clients)
                 if 'warnings' not in nsec_serialized:
                     nsec_serialized['warnings'] = []
-                nsec_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in all_warnings]
+                nsec_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in all_warnings]
 
             all_errors = []
             if rrset_info_with_errors:
@@ -870,7 +877,7 @@ class DNSAuthGraph:
                         error.servers_clients.update(servers_clients)
                 if 'errors' not in nsec_serialized:
                     nsec_serialized['errors'] = []
-                nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in all_errors]
+                nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
             self.node_info[node_str] = [nsec_serialized]
 
@@ -1172,15 +1179,15 @@ class DNSAuthGraph:
 
             if has_warnings:
                 del_serialized['warnings'] = []
-                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.delegation_warnings[rdtype]]
-                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.nxdomain_warnings.get(ds_nxdomain_info, [])]
-                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients) for w in name_obj.nodata_warnings.get(ds_nodata_info, [])]
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.delegation_warnings[rdtype]]
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.nxdomain_warnings.get(ds_nxdomain_info, [])]
+                del_serialized['warnings'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.nodata_warnings.get(ds_nodata_info, [])]
 
             if has_errors:
                 del_serialized['errors'] = []
-                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.delegation_errors[rdtype]]
-                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.nxdomain_errors.get(ds_nxdomain_info, [])]
-                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients) for e in name_obj.nodata_errors.get(ds_nodata_info, [])]
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in name_obj.delegation_errors[rdtype]]
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in name_obj.nxdomain_errors.get(ds_nxdomain_info, [])]
+                del_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in name_obj.nodata_errors.get(ds_nodata_info, [])]
 
             edge_id = 'del-%s|%s' % (fmt.humanize_name(zone_obj.name), fmt.humanize_name(parent_obj.name))
             self.node_info[edge_id] = [del_serialized]
