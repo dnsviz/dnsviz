@@ -280,6 +280,16 @@ def main():
     else:
         names = map(dns.name.from_text, args)
 
+    if '-p' in opts:
+        kwargs = { 'indent': 4, 'separators': (',', ': ') }
+    else:
+        kwargs = {}
+
+    if '-o' not in opts or opts['-o'] == '-':
+        fh = sys.stdout
+    else:
+        fh = open(opts['-o'], 'w')
+
     name_objs = []
     if '-r' in opts:
         if opts['-r'] == '-':
@@ -304,16 +314,6 @@ def main():
         if name_obj is None:
             continue
         name_obj.serialize(d)
-
-    if '-p' in opts:
-        kwargs = { 'indent': 4, 'separators': (',', ': ') }
-    else:
-        kwargs = {}
-
-    if '-o' not in opts or opts['-o'] == '-':
-        fh = sys.stdout
-    else:
-        fh = open(opts['-o'], 'w')
 
     fh.write(json.dumps(d, **kwargs))
 
