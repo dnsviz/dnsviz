@@ -569,7 +569,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # check for DO bit in request
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingNSECForWildcard(), self.rrset_errors[rrset_info], server, client, response)
 
-    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs):
+    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, populate_response_errors=True):
         self.rrset_warnings[rrset_info] = []
         self.rrset_errors[rrset_info] = []
         self.rrsig_status[rrset_info] = {}
@@ -707,9 +707,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs)
 
-        for server,client in rrset_info.servers_clients:
-            for response in rrset_info.servers_clients[(server,client)]:
-                self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+        if populate_response_errors:
+            for server,client in rrset_info.servers_clients:
+                for response in rrset_info.servers_clients[(server,client)]:
+                    self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
 
     def _populate_invalid_response_status(self, query):
         self.response_errors[query] = []
@@ -1049,7 +1050,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             if response.recursion_desired_and_available():
                                 err.add_server_client(server, client, response)
 
-            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs)
+            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
 
         for server,client,response in servers_without_soa:
             if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
@@ -1086,7 +1087,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
 
             for nsec_rrset_info in nsec_set_info.rrsets.values():
-                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
+                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
 
             if status.validation_status == Status.NSEC_STATUS_VALID:
                 if status not in statuses:
