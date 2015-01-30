@@ -574,11 +574,23 @@ class DNSKEYMeta(DNSResponseComponent):
             if self.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
                 d['meta']['key_tag_pre_revoke'] = self.key_tag_no_revoke
 
+            if html_format:
+                flags = [t for (t,c) in fmt.DNSKEY_FLAGS.items() if c & self.rdata.flags]
+                d['flags'] = '%d (%s)' % (self.rdata.flags, ', '.join(flags))
+                d['protocol'] = '%d (%s)' % (self.rdata.protocol, fmt.DNSKEY_PROTOCOLS.get(self.rdata.protocol, self.rdata.protocol))
+                d['algorithm'] = '%d (%s)' % (self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm))
+                d['meta']['ttl'] = '%d (%s)' % (self.ttl, fmt.humanize_time(self.ttl))
+                d['meta']['key_length'] = '%d bits' % (self.key_len)
+
         elif show_basic:
             d['algorithm'] = self.rdata.algorithm
             d['meta'] = collections.OrderedDict((
                 ('key_tag', self.key_tag),
             ))
+
+            if html_format:
+                d['algorithm'] = '%d (%s)' % (self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm))
+
         #TODO: put DNSKEY roles in meta, if it makes sense
 
         if loglevel <= logging.DEBUG or show_basic:

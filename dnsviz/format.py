@@ -34,7 +34,7 @@ import time
 import dns.name, dns.rdatatype
 
 DNSKEY_FLAGS = {'ZONE': 0x0100, 'SEP': 0x0001, 'revoke': 0x0080}
-DNSKEY_PROTOCOLS = { 'DNSSEC': 3 }
+DNSKEY_PROTOCOLS = { 3: 'DNSSEC' }
 DNSKEY_ALGORITHMS = { 1: 'RSA/MD5', 2: 'Diffie-Hellman', 3: 'DSA/SHA1', 5: 'RSA/SHA-1', 6: 'DSA-NSEC3-SHA1', 7: 'RSASHA1-NSEC3-SHA1', \
         8: 'RSA/SHA-256', 10: 'RSA/SHA-512', 12: 'GOST R 34.10-2001', 13: 'ECDSA Curve P-256 with SHA-256', 14: 'ECDSA Curve P-384 with SHA-384' }
 DS_DIGEST_TYPES = { 1: 'SHA-1', 2: 'SHA-256', 3: 'GOST 34.11-94', 4: 'SHA-384' }

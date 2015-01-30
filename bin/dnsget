@@ -46,13 +46,13 @@ def _setattr_dummy(self, name, value):
     return super(dns.name.Name, self).__setattr__(name, value)
 dns.name.Name.__setattr__ = _setattr_dummy
 
-def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, cache, cache_lock)):
+def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, analysis_cache=cache, analysis_cache_lock=cache_lock)
+        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
     except:
         logger.exception('Error analyzing %s' % name.canonicalize().to_text())
@@ -60,11 +60,12 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
 class BulkAnalyst(object):
     analyst_cls = Analyst
 
-    def __init__(self, ceiling, explicit_delegations, dlv_domain):
+    def __init__(self, ceiling, cache_level, explicit_delegations, dlv_domain):
         self.client_ipv4, self.client_ipv6 = get_client_addresses()
         if self.client_ipv4 is None and self.client_ipv6 is None:
             raise NetworkConnectivityException('No network interfaces available for analysis!')
         self.ceiling = ceiling
+        self.cache_level = cache_level
         self.explicit_delegations = explicit_delegations
         self.dlv_domain = dlv_domain
 
@@ -73,12 +74,16 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.cache, self.cache_lock)
+            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.cache, self.cache_level, self.cache_lock)
 
-    def analyze(self, names):
+    def analyze(self, names, flush_func=None):
         name_objs = []
         for args in self._name_to_args_iter(names):
-            name_objs.append(_analyze(args))
+            name_obj = _analyze(args)
+            if flush_func is not None:
+                flush_func(name_obj)
+            else:
+                name_objs.append(name_obj)
         return name_objs
 
 class MultiProcessAnalyst(Analyst):
@@ -138,8 +143,8 @@ class MultiProcessAnalyst(Analyst):
 class ParallelAnalyst(BulkAnalyst):
     analyst_cls = MultiProcessAnalyst
 
-    def __init__(self, ceiling, explicit_delegations, dlv_domain, processes):
-        super(ParallelAnalyst, self).__init__(ceiling, explicit_delegations, dlv_domain)
+    def __init__(self, ceiling, cache_level, explicit_delegations, dlv_domain, processes):
+        super(ParallelAnalyst, self).__init__(ceiling, cache_level, explicit_delegations, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -148,7 +153,7 @@ class ParallelAnalyst(BulkAnalyst):
         self.cache = self.manager.dict()
         self.cache_lock = self.manager.Lock()
 
-    def analyze(self, names):
+    def analyze(self, names, flush_func=None):
 
         pool = multiprocessing.Pool(self.processes)
         try:
@@ -186,15 +191,13 @@ Options:
                      resolve to the corresponding address (or resolve at all
                      for that matter).
     -p             - make json output pretty instead of minimal.
-    -y             - read in yaml, instead of json.
-    -Y             - write in yaml, instead of json.
     -o <filename>  - write the analysis to file <filename> instead of to
                      stdout, which is the default.
 ''' % sys.argv[0])
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:r:t:pyYo:a:x:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:F')
     except getopt.GetoptError:
         usage()
         sys.exit(1)
@@ -228,6 +231,13 @@ def main():
         dlv_domain = dns.name.from_text(opts['-l'])
     else:
         dlv_domain = None
+
+    # the following option is not documented in usage, as they don't
+    # apply to most users
+    try:
+        cache_level = int(opts['-c'])
+    except (KeyError, ValueError):
+        cache_level = None
 
     try:
         processes = int(opts.get('-t', 1))
@@ -274,24 +284,46 @@ def main():
     else:
         names = map(dns.name.from_text, args)
 
+    if '-p' in opts:
+        kwargs = { 'indent': 4, 'separators': (',', ': ') }
+    else:
+        kwargs = {}
+
+    if '-o' not in opts or opts['-o'] == '-':
+        fh = sys.stdout
+    else:
+        fh = open(opts['-o'], 'w')
+
+    def _flush(name_obj):
+        d = collections.OrderedDict()
+        name_obj.serialize(d)
+        s = json.dumps(d, **kwargs)
+        lindex = s.index('{')
+        rindex = s.rindex('}')
+        fh.write(s[lindex+1:rindex]+',')
+
+    flush = '-F' in opts
+
     name_objs = []
     if '-r' in opts:
         if opts['-r'] == '-':
             analysis_str = sys.stdin.read()
         else:
             analysis_str = open(opts['-r']).read()
-        if '-y' in opts:
-            import yaml
-            analysis_structured = yaml.load(analysis_str)
-        else:
-            analysis_structured = json.loads(analysis_str)
+        analysis_structured = json.loads(analysis_str)
         for name in names:
             name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
     else:
         if '-t' in opts:
-            a = ParallelAnalyst(ceiling, explicit_delegations, dlv_domain, processes)
+            a = ParallelAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain, processes)
         else:
-            a = BulkAnalyst(ceiling, explicit_delegations, dlv_domain)
+            a = BulkAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain)
+            if flush:
+                fh.write('{')
+                a.analyze(names, _flush)
+                fh.write('"_last._dnsviz":null}')
+                sys.exit(0)
+
         name_objs = a.analyze(names)
 
     if name_objs is None:
@@ -303,21 +335,7 @@ def main():
             continue
         name_obj.serialize(d)
 
-    if '-p' in opts:
-        kwargs = { 'indent': 4, 'separators': (',', ': ') }
-    else:
-        kwargs = {}
-
-    if '-o' not in opts or opts['-o'] == '-':
-        fh = sys.stdout
-    else:
-        fh = open(opts['-o'], 'w')
-
-    if '-Y' in opts:
-        import yaml
-        fh.write(yaml.dump(d))
-    else:
-        fh.write(json.dumps(d, **kwargs))
+    fh.write(json.dumps(d, **kwargs))
 
 if __name__ == "__main__":
     main()
