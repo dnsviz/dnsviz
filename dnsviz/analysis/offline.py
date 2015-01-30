@@ -826,7 +826,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             if names_from_parent:
                 name_in_parent = name in names_from_parent
-            elif self.delegation_status == Status.DELEGATION_ERROR_NO_NS_IN_PARENT:
+            elif self.delegation_status == Status.DELEGATION_STATUS_INCOMPLETE:
                 name_in_parent = False
             else:
                 name_in_parent = None
