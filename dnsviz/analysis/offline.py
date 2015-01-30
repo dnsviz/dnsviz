@@ -1667,6 +1667,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         query_keys = self.queries.keys()
         query_keys.sort()
         required_rdtypes = self._rdtypes_for_analysis_level(level)
+
+        # don't serialize NS data in names for which delegation-only
+        # information is required
+        if level >= self.RDTYPES_SECURE_DELEGATION:
+            required_rdtypes.remove(dns.rdatatype.NS)
+
         for (qname, rdtype) in query_keys:
 
             if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
