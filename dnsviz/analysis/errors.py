@@ -124,7 +124,7 @@ class DomainNameAnalysisError(object):
             error_list.append(error)
         else:
             error = error_list[index]
-        if server is not None and client is not None and response is not None:
+        if server is not None and client is not None:
             error.add_server_client(server, client, response)
         return error
 
