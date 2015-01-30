@@ -1590,7 +1590,7 @@ class DNSAuthGraph:
 
                     if not retain_edge:
                         if show_redundant:
-                            self.G.get_edge(m, n).attr['contrain'] = 'false'
+                            self.G.get_edge(m, n).attr['constraint'] = 'false'
                         else:
                             try:
                                 del self.node_info[e.attr.get('id', None)]
