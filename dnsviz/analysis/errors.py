@@ -1248,23 +1248,23 @@ class ServerInvalidResponse(DelegationError):
     '''
     >>> e = ServerInvalidResponse()
     >>> e.description
-    'The server responded with a malformed response or an invalid RCODE.'
+    'The server(s) responded with a malformed response or with an invalid RCODE.'
     '''
 
     _abstract = False
     code = 'SERVER_INVALID_RESPONSE'
-    description_template = 'The server responded with a malformed response or an invalid RCODE.'
+    description_template = 'The server(s) responded with a malformed response or with an invalid RCODE.'
 
 class ServerNotAuthoritative(DelegationError):
     '''
     >>> e = ServerNotAuthoritative()
     >>> e.description
-    'The server did not respond authoritatively for the namespace.'
+    'The server(s) did not respond authoritatively for the namespace.'
     '''
 
     _abstract = False
     code = 'SERVER_NOT_AUTHORITATIVE'
-    description_template = "The server did not respond authoritatively for the namespace."
+    description_template = "The server(s) did not respond authoritatively for the namespace."
 
 class DNAMEError(DomainNameAnalysisError):
     pass
