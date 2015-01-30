@@ -839,21 +839,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # if glue is required and not supplied
                 if name.is_subdomain(self.name):
-                    missing_v4 = False
-                    missing_v6 = False
-                    if not ip4_glue_addrs and (warn_no_ipv4 or ip4_auth_addrs):
-                        missing_v4 = True
-                    if not ip6_glue_addrs and (warn_no_ipv6 or ip6_auth_addrs):
-                        missing_v6 = True
-
-                    if missing_v4:
-                        if missing_v6:
+                    if not ip4_glue_addrs:
+                        # if we warn on no IPv4 glue or if there is no IPv6
+                        # glue, then make it an error
+                        if warn_no_ipv4 or not ip6_glue_addrs:
                             names_missing_glue_v4_err.append(name)
-                            names_missing_glue_v6_err.append(name)
-                        else:
+                        # otherwise, if there are authoritative IPv4 addresses,
+                        # then make it a warning
+                        elif ip4_auth_addrs:
                             names_missing_glue_v4_warn.append(name)
-                    elif missing_v6:
-                        names_missing_glue_v6_warn.append(name)
+                    if not ip6_glue_addrs:
+                        # if we warn on no IPv6 glue or if there is no IPv4
+                        # glue, then make it an error
+                        if warn_no_ipv6 or not ip4_glue_addrs:
+                            names_missing_glue_v6_err.append(name)
+                        # otherwise, if there are authoritative IPv6 addresses,
+                        # then make it a warning
+                        elif ip6_auth_addrs:
+                            names_missing_glue_v6_warn.append(name)
 
                 # if glue is supplied, check that it is correct
                 if ip4_glue_addrs and ip4_auth_addrs and ip4_glue_addrs != ip4_auth_addrs:
