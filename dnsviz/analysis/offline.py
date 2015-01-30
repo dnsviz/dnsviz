@@ -790,6 +790,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+        self._populate_server_status()
 
     def _populate_ds_status(self, rdtype, supported_algs, supported_digest_algs):
         if rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
@@ -987,18 +988,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self.get_responsive_auth_or_designated_servers():
-            #XXX implement this in NS analysis section
-            #Errors.ServerUnresponsive()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self.get_valid_auth_or_designated_servers():
-            #XXX implement this in NS analysis section
-            #Errors.ServerInvalidRcode()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self._auth_servers_clients:
-            #XXX implement this in NS analysis section
-            #Errors.ServerNotAuthoritative()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
@@ -1013,6 +1008,44 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self.delegation_errors[rdtype].append(err)
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                     self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
+
+    def _populate_server_status(self):
+        if not self.is_zone():
+            return
+
+        designated_servers = self.get_designated_servers()
+        servers_queried_udp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried))
+        servers_queried_tcp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried_tcp))
+        servers_queried = servers_queried_udp.union(servers_queried_tcp)
+
+        unresponsive_udp = servers_queried_udp.difference(self._responsive_servers_clients_udp)
+        unresponsive_tcp = servers_queried_tcp.difference(self._responsive_servers_clients_tcp)
+        invalid_response = servers_queried.intersection(self._responsive_servers_clients_udp).difference(self._valid_servers_clients)
+        not_authoritative = servers_queried.intersection(self._valid_servers_clients).difference(self._auth_servers_clients)
+
+        if unresponsive_udp:
+            err = Errors.ServerUnresponsiveUDP()
+            for server, client in unresponsive_udp:
+                err.add_server_client(server, client, None)
+            self.delegation_errors[dns.rdatatype.DS].append(err)
+
+        if unresponsive_tcp:
+            err = Errors.ServerUnresponsiveTCP()
+            for server, client in unresponsive_tcp:
+                err.add_server_client(server, client, None)
+            self.delegation_errors[dns.rdatatype.DS].append(err)
+
+        if invalid_response:
+            err = Errors.ServerInvalidResponse()
+            for server, client in invalid_response:
+                err.add_server_client(server, client, None)
+            self.delegation_errors[dns.rdatatype.DS].append(err)
+
+        if not_authoritative:
+            err = Errors.ServerNotAuthoritative()
+            for server, client in not_authoritative:
+                err.add_server_client(server, client, None)
+            self.delegation_errors[dns.rdatatype.DS].append(err)
 
     def _populate_negative_response_status(self, query, neg_response_info, \
             bad_soa_error_cls, missing_soa_error_cls, upward_referral_error_cls, missing_nsec_error_cls, \
