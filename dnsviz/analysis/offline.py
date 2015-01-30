@@ -1104,8 +1104,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
         if not self.get_auth_or_designated_servers():
-            #XXX implement this in NS analysis section
-            #Errors.ErrorResolvingNSName()
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
         elif not self.get_responsive_auth_or_designated_servers():
