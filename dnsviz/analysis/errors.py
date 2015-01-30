@@ -1191,16 +1191,16 @@ class NoSEP(DelegationError):
 
 class NoNSInParent(DelegationError):
     '''
-    >>> e = NoNSInParent()
+    >>> e = NoNSInParent(parent='baz.')
     >>> e.description
-    'No delegation NS records were detected in the parent zone.  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
+    'No delegation NS records were detected in the parent zone (baz.).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
     '''
 
     _abstract = False
     code = 'NO_NS_IN_PARENT'
-    description_template = "No delegation NS records were detected in the parent zone.  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child."
+    description_template = "No delegation NS records were detected in the parent zone (%(parent)s).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child."
     references = ['RFC 1034, Sec. 4.2.2']
-    required_params = []
+    required_params = ['parent']
 
 class ErrorResolvingNSName(DelegationError):
     '''
