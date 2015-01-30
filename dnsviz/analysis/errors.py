@@ -288,7 +288,7 @@ class DigestAlgorithmNotSupported(DSError):
     '''
     >>> e = DigestAlgorithmNotSupported(algorithm=5)
     >>> e.description
-    'Generating cryptographic hashes using algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
+    'Generating cryptographic hashes using algorithm 5 (5) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
     '''
 
     _abstract = False
