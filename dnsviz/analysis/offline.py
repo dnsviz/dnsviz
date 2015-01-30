@@ -806,8 +806,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         names_error_resolving = []
         names_with_wrong_glue_v4 = []
         names_with_wrong_glue_v6 = []
-        names_missing_glue_v4 = []
-        names_missing_glue_v6 = []
+        names_missing_glue_v4_warn = []
+        names_missing_glue_v6_warn = []
+        names_missing_glue_v4_err = []
+        names_missing_glue_v6_err = []
         names_missing_auth_v4 = []
         names_missing_auth_v6 = []
 
@@ -837,10 +839,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # if glue is required and not supplied
                 if name.is_subdomain(self.name):
+                    missing_v4 = False
+                    missing_v6 = False
                     if not ip4_glue_addrs and (warn_no_ipv4 or ip4_auth_addrs):
-                        names_missing_glue_v4.append(name)
+                        missing_v4 = True
                     if not ip6_glue_addrs and (warn_no_ipv6 or ip6_auth_addrs):
-                        names_missing_glue_v6.append(name)
+                        missing_v6 = True
+
+                    if missing_v4:
+                        if missing_v6:
+                            names_missing_glue_v4_err.append(name)
+                            names_missing_glue_v6_err.append(name)
+                        else:
+                            names_missing_glue_v4_warn.append(name)
+                    elif missing_v6:
+                        names_missing_glue_v6_warn.append(name)
 
                 # if glue is supplied, check that it is correct
                 if ip4_glue_addrs and ip4_auth_addrs and ip4_glue_addrs != ip4_auth_addrs:
@@ -884,13 +897,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ip6_auth_addrs.sort()
                 self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchErrorIPv6(name=name.canonicalize().to_text(), glue_addresses=ip6_glue_addrs, auth_addresses=ip6_auth_addrs))
 
-        if names_missing_glue_v4:
-            names_missing_glue_v4.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv4GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v4)))
+        if names_missing_glue_v4_warn:
+            names_missing_glue_v4_warn.sort()
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingIPv4GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v4_warn)))
 
-        if names_missing_glue_v6:
-            names_missing_glue_v6.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv6GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v6)))
+        if names_missing_glue_v6_warn:
+            names_missing_glue_v6_warn.sort()
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingIPv6GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v6_warn)))
+
+        if names_missing_glue_v4_err:
+            names_missing_glue_v4_err.sort()
+            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv4GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v4_err)))
+
+        if names_missing_glue_v6_err:
+            names_missing_glue_v6_err.sort()
+            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv6GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v6_err)))
 
         if names_missing_auth_v4:
             names_missing_auth_v4.sort()
