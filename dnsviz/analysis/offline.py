@@ -1003,7 +1003,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             except IndexError:
                 pass
             else:
-                err = Errors.NoNSInParent()
+                err = Errors.NoNSInParent(parent=self.parent_name())
                 err.servers_clients.update(ds_nxdomain_info.servers_clients)
                 self.delegation_errors[rdtype].append(err)
                 if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
