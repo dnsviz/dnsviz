@@ -1323,7 +1323,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # check for NOERROR/NXDOMAIN inconsistencies
                 if neg_response_info.qname in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                     for (qname2, rdtype2), query2 in self.queries.items():
-                        if rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                        if rdtype2 in (dns.rdatatype.DS, dns.rdatatype.DLV):
                             continue
 
                         for rrset_info in filter(lambda x: x.rrset.name == neg_response_info.qname, query2.answer_info):
