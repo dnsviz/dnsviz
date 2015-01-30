@@ -1244,16 +1244,16 @@ class ServerUnresponsiveTCP(ServerUnresponsive):
     code = 'SERVER_UNRESPONSIVE_TCP'
     proto = 'TCP'
 
-class ServerInvalidRcode(DelegationError):
+class ServerInvalidResponse(DelegationError):
     '''
-    >>> e = ServerInvalidRcode()
+    >>> e = ServerInvalidResponse()
     >>> e.description
-    'The server did not respond with a valid RCODE.'
+    'The server responded with a malformed response or an invalid RCODE.'
     '''
 
     _abstract = False
-    code = 'SERVER_INVALID_RCODE'
-    description_template = "The server did not respond with a valid RCODE."
+    code = 'SERVER_INVALID_RESPONSE'
+    description_template = 'The server responded with a malformed response or an invalid RCODE.'
 
 class ServerNotAuthoritative(DelegationError):
     '''
