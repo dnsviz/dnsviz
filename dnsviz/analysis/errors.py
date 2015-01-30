@@ -1209,6 +1209,30 @@ class NSNameError(DelegationError):
         super(NSNameError, self).__init__(**kwargs)
         self.template_kwargs['names_text'] = ', '.join(self.template_kwargs['names'])
 
+class NSNameNotInChild(NSNameError):
+    '''
+    >>> e = NSNameNotInChild(names=('ns1.foo.baz.',), parent='baz.')
+    >>> e.description
+    'The following NS name(s) were found in the delegation NS RRset (i.e., in the baz. zone), but not in the authoritative NS RRset: ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'NS_NAME_NOT_IN_CHILD'
+    description_template = "The following NS name(s) were found in the delegation NS RRset (i.e., in the %(parent)s zone), but not in the authoritative NS RRset: %(names_text)s"
+    required_params = NSNameError.required_params + ['parent']
+
+class NSNameNotInParent(NSNameError):
+    '''
+    >>> e = NSNameNotInParent(names=('ns1.foo.baz.',), parent='baz.')
+    >>> e.description
+    'The following NS name(s) were found in the authoritative NS RRset, but not in the delegation NS RRset (i.e., in the baz. zone): ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'NS_NAME_NOT_IN_PARENT'
+    description_template = "The following NS name(s) were found in the authoritative NS RRset, but not in the delegation NS RRset (i.e., in the %(parent)s zone): %(names_text)s"
+    required_params = NSNameError.required_params + ['parent']
+
 class ErrorResolvingNSName(NSNameError):
     '''
     >>> e = ErrorResolvingNSName(names=('ns1.foo.baz.',))
@@ -1220,6 +1244,98 @@ class ErrorResolvingNSName(NSNameError):
     code = 'ERROR_RESOLVING_NS_NAME'
     description_template = 'There was an error resolving the following NS name(s) to address(es): %(names_text)s'
 
+class MissingGlueForNSName(NSNameError):
+    description_template = "The following NS name(s) required glue, but no IPv%(version)d glue was returned in the referral: %(names_text)s"
+    version = None
+
+    def __init__(self, **kwargs):
+        super(MissingGlueForNSName, self).__init__(**kwargs)
+        self.template_kwargs['version'] = self.version
+
+class MissingIPv4GlueForNSName(MissingGlueForNSName):
+    '''
+    >>> e = MissingIPv4GlueForNSName(names=('ns1.foo.baz.',))
+    >>> e.description
+    'The following NS name(s) required glue, but no IPv4 glue was returned in the referral: ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_FOR_NS_NAME_IPV4'
+    version = 4
+
+class MissingIPv6GlueForNSName(MissingGlueForNSName):
+    '''
+    >>> e = MissingIPv6GlueForNSName(names=('ns1.foo.baz.',))
+    >>> e.description
+    'The following NS name(s) required glue, but no IPv6 glue was returned in the referral: ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_FOR_NS_NAME_IPV6'
+    version = 6
+
+class NoAddressForNSName(NSNameError):
+    description_template = "The following NS name(s) did not resolve to IPv%(version)d address(es): %(names_text)s"
+    version = None
+
+    def __init__(self, **kwargs):
+        super(NoAddressForNSName, self).__init__(**kwargs)
+        self.template_kwargs['version'] = self.version
+
+class NoIPv4AddressForNSName(NoAddressForNSName):
+    '''
+    >>> e = NoIPv4AddressForNSName(names=('ns1.foo.baz.',))
+    >>> e.description
+    'The following NS name(s) did not resolve to IPv4 address(es): ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'NO_ADDRESS_FOR_NS_NAME_IPV4'
+    version = 4
+
+class NoIPv6AddressForNSName(NoAddressForNSName):
+    '''
+    >>> e = NoIPv6AddressForNSName(names=('ns1.foo.baz.',))
+    >>> e.description
+    'The following NS name(s) did not resolve to IPv6 address(es): ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'NO_ADDRESS_FOR_NS_NAME_IPV6'
+    version = 6
+
+class GlueMismatchError(DelegationError):
+    description_template = 'The glue IPv%(proto)d address(es) for %(name)s (%(glue_addresses_text)s) differed from their respective authoritative address(es) (%(auth_addresses_text)s).'
+    required_params = ['name', 'glue_addresses', 'auth_addresses']
+    proto = None
+
+    def __init__(self, **kwargs):
+        super(GlueMismatchError, self).__init__(**kwargs)
+        self.template_kwargs['proto'] = self.proto
+        self.template_kwargs['glue_addresses_text'] = ', '.join(self.template_kwargs['glue_addresses'])
+        self.template_kwargs['auth_addresses_text'] = ', '.join(self.template_kwargs['auth_addresses'])
+
+class GlueMismatchErrorIPv4(GlueMismatchError):
+    '''
+    >>> e = GlueMismatchErrorIPv4(name='ns1.foo.baz.', glue_addresses=('192.0.2.1',), auth_addresses=('192.0.2.2',))
+    >>> e.description
+    'The glue IPv4 address(es) for ns1.foo.baz. (192.0.2.1) differed from their respective authoritative address(es) (192.0.2.2).'
+    '''
+
+    _abstract = False
+    code = 'GLUE_MISMATCH_ERROR_IPV4'
+    proto = 4
+
+class GlueMismatchErrorIPv6(GlueMismatchError):
+    '''
+    >>> e = GlueMismatchErrorIPv6(name='ns1.foo.baz.', glue_addresses=('2001:db8::1',), auth_addresses=('2001:db8::2',))
+    >>> e.description
+    'The glue IPv6 address(es) for ns1.foo.baz. (2001:db8::1) differed from their respective authoritative address(es) (2001:db8::2).'
+    '''
+
+    _abstract = False
+    code = 'GLUE_MISMATCH_ERROR_IPV6'
+    proto = 6
 
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
