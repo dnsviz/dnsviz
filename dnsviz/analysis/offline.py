@@ -1013,6 +1013,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not self.is_zone():
             return
 
+        if self.parent is None:
+            return
+
         designated_servers = self.get_designated_servers()
         servers_queried_udp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried))
         servers_queried_tcp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried_tcp))
