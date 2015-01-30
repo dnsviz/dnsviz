@@ -911,6 +911,13 @@ class DNSQuery(object):
                     return True
         return False
     
+    def is_valid_complete_authoritative_response_any(self):
+        for server in self.responses:
+            for response in self.responses[server].values():
+                if response.is_valid_response() and response.is_complete_response() and response.is_authoritative():
+                    return True
+        return False
+    
     def servers_with_valid_complete_response(self, bailiwick_map, default_bailiwick):
         servers_clients = set()
         for server in self.responses:
@@ -1039,6 +1046,12 @@ class MultiQuery(object):
                 return False
         return True
 
+    def is_valid_complete_authoritative_response_any(self):
+        for params in self.queries:
+            if self.queries[params].is_valid_complete_authoritative_response_any():
+                return True
+        return False
+    
 class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
     def __init__(self, qname, rdtype, rdclass):
         MultiQuery.__init__(self, qname, rdtype, rdclass)
