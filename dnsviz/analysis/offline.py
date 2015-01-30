@@ -1330,21 +1330,29 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             shared_servers_clients = set(rrset_info.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
                                 err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None) 
-                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.rrset_warnings[rrset_info], None, None, None) 
+                                if rrset_info in self.rrset_warnings:
+                                    err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.rrset_warnings[rrset_info], None, None, None) 
+                                else:
+                                    err2 = None
                                 for server, client in shared_servers_clients:
                                     for response in neg_response_info.servers_clients[(server, client)]:
                                         err1.add_server_client(server, client, response)
-                                        err2.add_server_client(server, client, response)
+                                        if err2 is not None:
+                                            err2.add_server_client(server, client, response)
 
                         for neg_response_info2 in filter(lambda x: x.qname == neg_response_info.qname, query2.nodata_info):
                             shared_servers_clients = set(neg_response_info2.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
                                 err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None) 
-                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nodata_warnings[neg_response_info2], None, None, None) 
+                                if neg_response_info2 in self.nodata_warnings:
+                                    err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nodata_warnings[neg_response_info2], None, None, None) 
+                                else:
+                                    err2 = None
                                 for server, client in shared_servers_clients:
                                     for response in neg_response_info.servers_clients[(server, client)]:
                                         err1.add_server_client(server, client, response)
-                                        err2.add_server_client(server, client, response)
+                                        if err2 is not None:
+                                            err2.add_server_client(server, client, response)
 
     def _populate_nodata_status(self, supported_algs, level):
         self.nodata_status = {}
