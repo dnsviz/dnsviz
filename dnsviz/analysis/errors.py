@@ -1215,15 +1215,34 @@ class ErrorResolvingNSName(DelegationError):
     required_params = ['name']
 
 class ServerUnresponsive(DelegationError):
+    description_template = "The server(s) were not responsive to queries over %(proto)s."
+    proto = None
+
+    def __init__(self, **kwargs):
+        super(ServerUnresponsive, self).__init__(**kwargs)
+        self.template_kwargs['proto'] = self.proto
+
+class ServerUnresponsiveUDP(ServerUnresponsive):
     '''
-    >>> e = ServerUnresponsive()
+    >>> e = ServerUnresponsiveUDP()
     >>> e.description
-    'The server was not responsive to UDP queries.'
+    'The server(s) were not responsive to queries over UDP.'
     '''
 
     _abstract = False
-    code = 'SERVER_UNRESPONSIVE'
-    description_template = "The server was not responsive to UDP queries."
+    code = 'SERVER_UNRESPONSIVE_UDP'
+    proto = 'UDP'
+
+class ServerUnresponsiveTCP(ServerUnresponsive):
+    '''
+    >>> e = ServerUnresponsiveTCP()
+    >>> e.description
+    'The server(s) were not responsive to queries over TCP.'
+    '''
+
+    _abstract = False
+    code = 'SERVER_UNRESPONSIVE_TCP'
+    proto = 'TCP'
 
 class ServerInvalidRcode(DelegationError):
     '''
