@@ -1202,17 +1202,24 @@ class NoNSInParent(DelegationError):
     references = ['RFC 1034, Sec. 4.2.2']
     required_params = ['parent']
 
-class ErrorResolvingNSName(DelegationError):
+class NSNameError(DelegationError):
+    required_params = ['names']
+
+    def __init__(self, **kwargs):
+        super(NSNameError, self).__init__(**kwargs)
+        self.template_kwargs['names_text'] = ', '.join(self.template_kwargs['names'])
+
+class ErrorResolvingNSName(NSNameError):
     '''
-    >>> e = ErrorResolvingNSName(name='ns1.foo.baz.')
+    >>> e = ErrorResolvingNSName(names=('ns1.foo.baz.',))
     >>> e.description
-    'There was an error resolving NS target ns1.foo.baz. to an address.'
+    'There was an error resolving the following NS name(s) to address(es): ns1.foo.baz.'
     '''
 
     _abstract = False
     code = 'ERROR_RESOLVING_NS_NAME'
-    description_template = "There was an error resolving NS target %(name)s to an address."
-    required_params = ['name']
+    description_template = 'There was an error resolving the following NS name(s) to address(es): %(names_text)s'
+
 
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
