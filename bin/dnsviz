@@ -69,12 +69,18 @@ def finish_graph(G, trusted_keys, fmt, filename):
         if filename is None:
             return template_str
         else:
-            codecs.open(filename, 'w', 'utf-8').write(template_str)
+            try:
+                codecs.open(filename, 'w', 'utf-8').write(template_str)
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, filename))
     else:
         if filename is None:
             return G.draw(fmt)
         else:
-            G.draw(fmt, path=filename)
+            try:
+                G.draw(fmt, path=filename)
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, filename))
 
 def test_m2crypto():
     try:
