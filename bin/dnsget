@@ -389,9 +389,6 @@ def main():
 
         name_objs = a.analyze(names)
 
-    if name_objs is None:
-        sys.exit(1)
-
     d = collections.OrderedDict()
     for name_obj in name_objs:
         if name_obj is None:
