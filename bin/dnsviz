@@ -38,9 +38,12 @@ from dnsviz.util import get_trusted_keys
 MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
-def usage():
-    sys.stderr.write('''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
-
+def usage(err=None):
+    if err is not None:
+        err += '\n\n'
+    else:
+        err = ''
+    sys.stderr.write('''%sUsage: %s [ options ] ( -f <filename> | <domain name> [... ] )
 Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
     -r <filename>  - read analysis from a file, instead of from stdin
@@ -49,7 +52,7 @@ Options:
     -O             - derive the filename(s) from the format provided to -T and the domain name(s)
     -o <filename>  - save the image to filename instead of to stdout
     -T <format>    - the format of the output (dot, png, jpg, svg, html)
-''' % sys.argv[0])
+''' % (err, sys.argv[0]))
 
 def finish_graph(G, trusted_keys, fmt, filename):
     G.add_trust(trusted_keys)
@@ -80,8 +83,8 @@ def test_m2crypto():
 def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Oo:T:')
-    except getopt.GetoptError:
-        usage()
+    except getopt.GetoptError, e:
+        usage(str(e))
         sys.exit(1)
 
     opts = dict(opts)
