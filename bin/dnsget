@@ -308,8 +308,8 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(debug_level)
 
+    names = []
     if '-f' in opts:
-        names = []
         with codecs.open(opts['-f'], 'r', 'utf-8') as f:
             for line in f:
                 try:
@@ -319,7 +319,8 @@ def main():
                     continue
                 names.append(name)
     else:
-        names = map(dns.name.from_text, args)
+        for name in args:
+            names.append(dns.name.from_text(name))
 
     if '-p' in opts:
         kwargs = { 'indent': 4, 'separators': (',', ': ') }
