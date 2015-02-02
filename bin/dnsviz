@@ -28,7 +28,7 @@ import os
 import re
 import sys
 
-import dns.message, dns.name 
+import dns.message, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.config import DNSVIZ_SHARE_PATH
@@ -143,7 +143,11 @@ def main():
         except IOError, e:
             logger.error('%s: "%s"' % (e.strerror, opts['-r']))
             sys.exit(2)
-    analysis_structured = json.loads(analysis_str)
+    try:
+        analysis_structured = json.loads(analysis_str)
+    except ValueError:
+        logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
+        sys.exit(2)
 
     if '-t' in opts:
         trusted_keys = get_trusted_keys(open(opts['-t']).read())
