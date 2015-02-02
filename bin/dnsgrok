@@ -47,6 +47,7 @@ Options:
     -r <filename>  - read analysis from a file, instead of from stdin
     -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
     -o <filename>  - save the output to filename instead of to stdout
+    -p             - make json output pretty instead of minimal.
     -l <loglevel>  - set log level to one of: error, warning, info, debug
 ''' % (err, sys.argv[0]))
 
@@ -58,7 +59,7 @@ def test_m2crypto():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:l:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:')
     except getopt.GetoptError, e:
         usage(str(e))
         sys.exit(1)
@@ -117,6 +118,11 @@ def main():
             else:
                 names.append(name)
 
+    if '-p' in opts:
+        kwargs = { 'indent': 4, 'separators': (',', ': ') }
+    else:
+        kwargs = {}
+
     if '-o' not in opts or opts['-o'] == '-':
         fh = sys.stdout
     else:
@@ -164,7 +170,6 @@ def main():
         name_obj.serialize_status(d, loglevel=loglevel)
 
     if d:
-        kwargs = { 'indent': 4, 'separators': (',', ': ') }
         fh.write(json.dumps(d, **kwargs))
 
 if __name__ == "__main__":
