@@ -157,7 +157,11 @@ def main():
     if '-o' not in opts or opts['-o'] == '-':
         fh = sys.stdout
     else:
-        fh = open(opts['-o'], 'w')
+        try:
+            fh = open(opts['-o'], 'w')
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            sys.exit(2)
 
     if d:
         kwargs = { 'indent': 4, 'separators': (',', ': ') }
