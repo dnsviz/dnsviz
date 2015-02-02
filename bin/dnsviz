@@ -108,13 +108,14 @@ def main():
         usage('The -o and -O options may not be used together.')
         sys.exit(1)
 
+    names = []
     if '-f' in opts:
-        names = []
         with codecs.open(opts['-f'], 'r', 'utf-8') as f:
             for line in f:
                 names.append(dns.name.from_unicode(line.strip()))
     else:
-        names = map(dns.name.from_text, args)
+        for name in args:
+            names.append(dns.name.from_text(name))
 
     if '-r' not in opts or opts['-r'] == '-':
         analysis_str = sys.stdin.read()
