@@ -89,6 +89,8 @@ def test_m2crypto():
         sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
 
 def main():
+    test_m2crypto()
+
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
     except getopt.GetoptError, e:
@@ -172,8 +174,6 @@ def main():
             sys.exit(2)
     else:
         trusted_keys = ()
-
-    test_m2crypto()
 
     name_objs = []
     for name in names:
