@@ -121,11 +121,7 @@ def main():
         analysis_str = sys.stdin.read()
     else:
         analysis_str = open(opts['-r']).read()
-    if '-y' in opts:
-        import yaml
-        analysis_structured = yaml.load(analysis_str)
-    else:
-        analysis_structured = json.loads(analysis_str)
+    analysis_structured = json.loads(analysis_str)
 
     if '-t' in opts:
         trusted_keys = get_trusted_keys(open(opts['-t']).read())
