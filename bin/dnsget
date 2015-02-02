@@ -254,12 +254,19 @@ def main():
         sys.exit(1)
 
     if '-a' in opts:
-        ceiling = dns.name.from_text(opts['-a'])
+        try:
+            ceiling = dns.name.from_text(opts['-a'])
+        except dns.exception.DNSException:
+            usage('The domain name was invalid: "%s"' % opts['-a'])
+            sys.exit(1)
     else:
         ceiling = None
 
     if '-l' in opts:
-        dlv_domain = dns.name.from_text(opts['-l'])
+        try:
+            dlv_domain = dns.name.from_text(opts['-l'])
+        except dns.exception.DNSException:
+            usage('The domain name was invalid: "%s"' % opts['-l'])
     else:
         dlv_domain = None
 
