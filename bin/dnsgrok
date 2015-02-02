@@ -34,6 +34,8 @@ import dns.message, dns.name
 from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.util import get_trusted_keys
 
+logger = logging.getLogger('dnsviz.analysis.offline')
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -85,6 +87,10 @@ def main():
             sys.exit(1)
     else:
         loglevel = logging.DEBUG
+    handler = logging.StreamHandler()
+    handler.setLevel(loglevel)
+    logger.addHandler(handler)
+    logger.setLevel(loglevel)
 
     if '-f' in opts:
         names = []
