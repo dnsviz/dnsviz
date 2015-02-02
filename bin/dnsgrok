@@ -34,9 +34,12 @@ import dns.message, dns.name
 from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.util import get_trusted_keys
 
-def usage():
-    sys.stderr.write( '''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
-
+def usage(err=None):
+    if err is not None:
+        err += '\n\n'
+    else:
+        err = ''
+    sys.stderr.write( '''%sUsage: %s [ options ] ( -f <filename> | <domain name> [... ] )
 Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
     -r <filename>  - read analysis from a file, instead of from stdin
@@ -45,7 +48,7 @@ Options:
     -Y             - write in yaml, instead of json
     -o <filename>  - save the output to filename instead of to stdout
     -l <loglevel>  - set log level to one of: error, warning, info, debug
-''' % sys.argv[0])
+''' % (err, sys.argv[0]))
 
 def test_m2crypto():
     try:
@@ -56,8 +59,8 @@ def test_m2crypto():
 def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Yo:l:')
-    except getopt.GetoptError:
-        usage()
+    except getopt.GetoptError, e:
+        usage(str(e))
         sys.exit(1)
 
     opts = dict(opts)
