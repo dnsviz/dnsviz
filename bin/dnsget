@@ -167,9 +167,12 @@ class ParallelAnalyst(BulkAnalyst):
 
         return None
 
-def usage():
-    sys.stderr.write('''Usage: %s [ options ] ( -f <filename> | <domain name> [... ] )
-
+def usage(err=None):
+    if err is not None:
+        err += '\n\n'
+    else:
+        err = ''
+    sys.stderr.write('''%sUsage: %s [ options ] ( -f <filename> | <domain name> [... ] )
 Options:
     -f <filename>  - read names from a file (one name per line), instead of
                      from command line.
@@ -193,7 +196,7 @@ Options:
     -p             - make json output pretty instead of minimal.
     -o <filename>  - write the analysis to file <filename> instead of to
                      stdout, which is the default.
-''' % sys.argv[0])
+''' % (err, sys.argv[0]))
 
 def main():
     try:
