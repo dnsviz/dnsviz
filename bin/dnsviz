@@ -88,8 +88,11 @@ def main():
         sys.exit(1)
 
     opts = dict(opts)
-    if ('-f' in opts and args) or not ('-f' in opts or args):
-        usage()
+    if not ('-f' in opts or args):
+        usage('Either -f must be used or domain names must be supplied as command line arguments.')
+        sys.exit(1)
+    if '-f' in opts and args:
+        usage('If -f is used, then domain names may not supplied as command line arguments.')
         sys.exit(1)
 
     if '-T' in opts:
