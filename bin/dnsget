@@ -32,7 +32,7 @@ import multiprocessing.managers
 import threading
 import time
 
-import dns.name
+import dns.exception, dns.name
 
 from dnsviz.analysis import Analyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver
 import dnsviz.format as fmt
