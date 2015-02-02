@@ -280,20 +280,19 @@ def main():
     try:
         processes = int(opts.get('-t', 1))
     except ValueError:
-        usage()
+        usage('The number of threads used must be greater than 0.')
         sys.exit(1)
     if processes < 1:
-        usage()
+        usage('The number of threads used must be greater than 0.')
         sys.exit(1)
 
     try:
         val = int(opts.get('-d', 2))
     except ValueError:
-        usage()
+        usage('The debug value must be an integer between 0 and 3.')
         sys.exit(1)
-
     if val < 0 or val > 3:
-        usage()
+        usage('The debug value must be an integer between 0 and 3.')
         sys.exit(1)
 
     if val > 2:
