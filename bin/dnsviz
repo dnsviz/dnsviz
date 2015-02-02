@@ -29,7 +29,7 @@ import os
 import re
 import sys
 
-import dns.message, dns.name
+import dns.exception, dns.message, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.config import DNSVIZ_SHARE_PATH
