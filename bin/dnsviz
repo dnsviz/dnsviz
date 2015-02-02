@@ -159,7 +159,11 @@ def main():
         sys.exit(2)
 
     if '-t' in opts:
-        trusted_keys = get_trusted_keys(open(opts['-t']).read())
+        try:
+            trusted_keys = get_trusted_keys(open(opts['-t']).read())
+        except dns.exception.DNSException:
+            logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
+            sys.exit(2)
     else:
         trusted_keys = ()
 
