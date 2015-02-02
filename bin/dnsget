@@ -369,7 +369,11 @@ def main():
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-r']))
                 sys.exit(2)
-        analysis_structured = json.loads(analysis_str)
+        try:
+            analysis_structured = json.loads(analysis_str)
+        except ValueError:
+            logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
+            sys.exit(2)
         for name in names:
             name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
     else:
