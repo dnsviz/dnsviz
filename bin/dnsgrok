@@ -164,6 +164,9 @@ def main():
             continue
         name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
 
+    if not name_objs:
+        sys.exit(2)
+
     d = collections.OrderedDict()
     for name_obj in name_objs:
         name_obj.populate_status(trusted_keys)
