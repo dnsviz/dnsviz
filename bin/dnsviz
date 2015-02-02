@@ -182,10 +182,6 @@ def main():
         for qname, rdtype in name_obj.queries:
             if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                 continue
-            #XXX filter negative responses
-            #if (qname, rdtype) in name_obj.nxdomain_servers_clients or \
-            #        (qname, rdtype) in name_obj.noanswer_servers_clients:
-            #    continue
             G.graph_rrset_auth(name_obj, qname, rdtype)
 
         if '-O' in opts:
