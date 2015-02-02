@@ -120,7 +120,11 @@ def main():
     if '-r' not in opts or opts['-r'] == '-':
         analysis_str = sys.stdin.read()
     else:
-        analysis_str = open(opts['-r']).read()
+        try:
+            analysis_str = open(opts['-r']).read()
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+            sys.exit(2)
     analysis_structured = json.loads(analysis_str)
 
     if '-t' in opts:
