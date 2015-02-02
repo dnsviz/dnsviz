@@ -24,6 +24,7 @@
 import codecs
 import getopt
 import json
+import logging
 import os
 import re
 import sys
@@ -37,6 +38,8 @@ from dnsviz.util import get_trusted_keys
 
 MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
+
+logger = logging.getLogger('dnsviz.analysis.offline')
 
 def usage(err=None):
     if err is not None:
@@ -107,6 +110,12 @@ def main():
     if '-o' in opts and '-O' in opts:
         usage('The -o and -O options may not be used together.')
         sys.exit(1)
+
+    loglevel = logging.WARNING
+    handler = logging.StreamHandler()
+    handler.setLevel(loglevel)
+    logger.addHandler(handler)
+    logger.setLevel(loglevel)
 
     names = []
     if '-f' in opts:
