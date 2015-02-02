@@ -171,6 +171,9 @@ def main():
 
     name_objs = []
     for name in names:
+        if name.canonicalize().to_text() not in analysis_structured:
+            logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
+            continue
         name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
 
     G = DNSAuthGraph()
