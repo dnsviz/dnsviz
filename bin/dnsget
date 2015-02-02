@@ -201,8 +201,8 @@ Options:
 def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:F')
-    except getopt.GetoptError:
-        usage()
+    except getopt.GetoptError, e:
+        usage(str(e))
         sys.exit(1)
 
     # get all the -x options
