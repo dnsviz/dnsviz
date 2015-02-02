@@ -146,7 +146,7 @@ def main():
     try:
         analysis_structured = json.loads(analysis_str)
     except ValueError:
-        logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
+        logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
         sys.exit(2)
 
     if '-t' in opts:
