@@ -45,9 +45,7 @@ def usage(err=None):
 Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
     -r <filename>  - read analysis from a file, instead of from stdin
-    -y             - read in yaml, instead of json
     -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
-    -Y             - write in yaml, instead of json
     -o <filename>  - save the output to filename instead of to stdout
     -l <loglevel>  - set log level to one of: error, warning, info, debug
 ''' % (err, sys.argv[0]))
@@ -60,7 +58,7 @@ def test_m2crypto():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Yo:l:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:l:')
     except getopt.GetoptError, e:
         usage(str(e))
         sys.exit(1)
@@ -105,11 +103,7 @@ def main():
         analysis_str = sys.stdin.read()
     else:
         analysis_str = open(opts['-r']).read()
-    if '-y' in opts:
-        import yaml
-        analysis_structured = yaml.load(analysis_str)
-    else:
-        analysis_structured = json.loads(analysis_str)
+    analysis_structured = json.loads(analysis_str)
 
     if '-t' in opts:
         trusted_keys = get_trusted_keys(open(opts['-t']).read())
@@ -134,11 +128,7 @@ def main():
 
     if d:
         kwargs = { 'indent': 4, 'separators': (',', ': ') }
-        if '-Y' in opts:
-            import yaml
-            fh.write(yaml.dump(d))
-        else:
-            fh.write(json.dumps(d, **kwargs))
+        fh.write(json.dumps(d, **kwargs))
 
 if __name__ == "__main__":
     main()

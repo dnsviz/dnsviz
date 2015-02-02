@@ -47,7 +47,6 @@ def usage(err=None):
 Options:
     -f <filename>  - read names from a file (one name per line), instead of from command line
     -r <filename>  - read analysis from a file, instead of from stdin
-    -y             - read in yaml, instead of json
     -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
     -O             - derive the filename(s) from the format provided to -T and the domain name(s)
     -o <filename>  - save the image to filename instead of to stdout
@@ -82,7 +81,7 @@ def test_m2crypto():
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:r:yt:Oo:T:')
+        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
     except getopt.GetoptError, e:
         usage(str(e))
         sys.exit(1)
