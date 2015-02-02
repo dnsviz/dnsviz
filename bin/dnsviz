@@ -102,11 +102,11 @@ def main():
     else:
         fmt = 'dot'
     if fmt not in ('dot','png','jpg','svg','html'):
-        usage()
+        usage('Format unrecognized: "%s"' % fmt)
         sys.exit(1)
 
     if '-o' in opts and '-O' in opts:
-        usage()
+        usage('The -o and -O options may not be used together.')
         sys.exit(1)
 
     if '-f' in opts:
