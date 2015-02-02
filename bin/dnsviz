@@ -88,8 +88,24 @@ def test_m2crypto():
     except ImportError:
         sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
 
+def test_pygraphviz():
+    try:
+        from pygraphviz import release
+        try:
+            major, minor = map(int, release.version.split('.'))[:2]
+            if (major, minor) < (1,1):
+                sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+            sys.exit(3)
+        except ValueError:
+            sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+            sys.exit(3)
+    except ImportError:
+        sys.stderr.write('''pygraphviz is required, but not installed.\n''')
+        sys.exit(3)
+
 def main():
     test_m2crypto()
+    test_pygraphviz()
 
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
