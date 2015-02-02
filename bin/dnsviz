@@ -95,7 +95,7 @@ def test_pygraphviz():
             major, minor = map(int, release.version.split('.'))[:2]
             if (major, minor) < (1,1):
                 sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
-            sys.exit(3)
+                sys.exit(3)
         except ValueError:
             sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
             sys.exit(3)
