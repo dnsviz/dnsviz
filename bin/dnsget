@@ -209,16 +209,41 @@ def main():
     explicit_delegations = {}
     for opt, arg in opts:
         if opt == '-x':
-            domain, mappings = arg.split(':', 1)
-            domain = dns.name.from_text(domain)
+            try:
+                domain, mappings = arg.split(':', 1)
+            except ValueError:
+                usage('Incorrect usage of -x option: "%s"' % arg)
+                sys.exit(1)
+            try:
+                domain = dns.name.from_text(domain)
+            except dns.exception.DNSException:
+                usage('The domain name was invalid: "%s"' % domain)
+                sys.exit(1)
+            if not mappings:
+                usage('Incorrect usage of -x option: "%s"' % arg)
+                sys.exit(1)
             mappings = mappings.split(',')
             if domain not in explicit_delegations:
                 explicit_delegations[domain] = set()
             for mapping in mappings:
-                name, addr = mapping.split('=')
+                try:
+                    name, addr = mapping.split('=')
+                except ValueError:
+                    usage('Incorrect usage of -x option: "%s"' % arg)
+                    sys.exit(1)
                 if addr[0] == '[' and addr[-1] == ']':
                     addr = addr[1:-1]
-                explicit_delegations[domain].add((dns.name.from_text(name), IPAddr(addr)))
+                try:
+                    name = dns.name.from_text(name)
+                except dns.exception.DNSException:
+                    usage('The domain name was invalid: "%s"' % name)
+                    sys.exit(1)
+                try:
+                    addr = IPAddr(addr)
+                except ValueError:
+                    usage('The IP address was invalid: "%s"' % addr)
+                    sys.exit(1)
+                explicit_delegations[domain].add((name, addr))
 
     opts = dict(opts)
     if ('-f' in opts and args) or not ('-f' in opts or args):
