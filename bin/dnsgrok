@@ -117,6 +117,15 @@ def main():
             else:
                 names.append(name)
 
+    if '-o' not in opts or opts['-o'] == '-':
+        fh = sys.stdout
+    else:
+        try:
+            fh = open(opts['-o'], 'w')
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            sys.exit(2)
+
     if '-r' not in opts or opts['-r'] == '-':
         analysis_str = sys.stdin.read()
     else:
@@ -153,15 +162,6 @@ def main():
     for name_obj in name_objs:
         name_obj.populate_status(trusted_keys)
         name_obj.serialize_status(d, loglevel=loglevel)
-
-    if '-o' not in opts or opts['-o'] == '-':
-        fh = sys.stdout
-    else:
-        try:
-            fh = open(opts['-o'], 'w')
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
-            sys.exit(2)
 
     if d:
         kwargs = { 'indent': 4, 'separators': (',', ': ') }
