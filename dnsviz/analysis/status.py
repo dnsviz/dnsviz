@@ -630,7 +630,7 @@ class NSECStatusNoAnswer(object):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC record(s) proving non-existence (NXRRSET) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC record(s) proving non-existence (No Data) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)
@@ -1112,7 +1112,7 @@ class NSEC3StatusNoAnswer(object):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC3 record(s) proving non-existence (NXRRSET) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC3 record(s) proving non-existence (No Data) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)

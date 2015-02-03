@@ -107,7 +107,7 @@ class RRsetNonExistent(object):
         if self.nxdomain:
             d['rdata'] = ['NXDOMAIN']
         else:
-            d['rdata'] = ['NXRRSET']
+            d['rdata'] = ['No Data']
 
         servers = tuple_to_dict(self.servers_clients)
         if consolidate_clients:
