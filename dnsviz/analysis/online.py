@@ -1768,3 +1768,7 @@ class Analyst(object):
         except dns.exception.Timeout:
             pass
         return False
+
+class PrivateAnalyst(Analyst):
+    allow_loopback_query = True
+    allow_private_query = True
