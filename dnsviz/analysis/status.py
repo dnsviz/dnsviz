@@ -1270,7 +1270,7 @@ class NSEC3StatusNoAnswer(object):
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('sname_digest', formatter(fmt.format_nsec3_name(qname))),
+                        ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
