@@ -26,6 +26,7 @@ import collections
 import getopt
 import json
 import logging
+import signal
 import sys
 import multiprocessing
 import multiprocessing.managers
@@ -46,6 +47,15 @@ def _setattr_dummy(self, name, value):
     return super(dns.name.Name, self).__setattr__(name, value)
 dns.name.Name.__setattr__ = _setattr_dummy
 
+def _raise_eof(signum, frame):
+    # EOFError is raised instead of KeyboardInterrupt
+    # because the multiprocessing worker doesn't handle
+    # KeyboardInterrupt
+    raise EOFError
+
+def _init_interrupt_handler():
+    signal.signal(signal.SIGINT, _raise_eof)
+
 def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
@@ -54,8 +64,13 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
     try:
         a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
+    # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
         raise
+    # don't report EOFError, as that is what is raised if there is a
+    # KeyboardInterrupt in ParallelAnalyst
+    except EOFError:
+        pass
     except:
         logger.exception('Error analyzing %s' % name.canonicalize().to_text())
         return None
@@ -157,18 +172,23 @@ class ParallelAnalyst(BulkAnalyst):
         self.cache_lock = self.manager.Lock()
 
     def analyze(self, names, flush_func=None):
-
-        pool = multiprocessing.Pool(self.processes)
+        results = []
+        name_objs = []
+        pool = multiprocessing.Pool(self.processes, _init_interrupt_handler)
         try:
-            return pool.map(_analyze, self._name_to_args_iter(names))
+            for args in self._name_to_args_iter(names):
+                results.append(pool.apply_async(_analyze, (args,)))
+            # loop instead of just joining, so we can check for interrupt at
+            # main process
+            for result in results:
+                name_objs.append(result.get())
         except KeyboardInterrupt:
             pool.terminate()
-        else:
-            pool.close()
+            raise
 
+        pool.close()
         pool.join()
-
-        return None
+        return name_objs
 
 def usage(err=None):
     if err is not None:
