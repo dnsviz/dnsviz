@@ -1398,7 +1398,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
             if not self.is_zone():
-                err = Errors.DNSKEYNotAtZoneApex()
+                err = Errors.DNSKEYNotAtZoneApex(zone=self.zone.name.canonicalize().to_text(), name=self.name.canonicalize().to_text())
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
 

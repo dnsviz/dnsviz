@@ -1393,20 +1393,46 @@ class DNAMEError(DomainNameAnalysisError):
     pass
 
 class DNAMENoCNAME(DNAMEError):
+    '''
+    >>> e = DNAMENoCNAME()
+    >>> e.description
+    'No synthesized CNAME RR was found accompanying the DNAME record.'
+    '''
     _abstract = False
+    description_template = "No synthesized CNAME RR was found accompanying the DNAME record."
     code = 'DNAME_NO_CNAME'
 
 class DNAMETargetMismatch(DNAMEError):
+    '''
+    >>> e = DNAMETargetMismatch(included_target='foo.baz.', synthesized_target='bar.baz.')
+    >>> e.description
+    'The included CNAME RR is not a valid synthesis of the DNAME record (foo.baz. != bar.baz.).'
+    '''
     _abstract = False
+    description_template = "The included CNAME RR is not a valid synthesis of the DNAME record (%(included_target)s != %(synthesized_target)s)."
     code = 'DNAME_TARGET_MISMATCH'
+    required_params = ['included_target', 'synthesized_target']
 
 class DNAMETTLZero(DNAMEError):
+    '''
+    >>> e = DNAMETTLZero()
+    >>> e.description
+    'The TTL of the synthesized CNAME RR is 0.'
+    '''
     _abstract = False
+    description_template = "The TTL of the synthesized CNAME RR is 0."
     code = 'DNAME_TTL_ZERO'
 
 class DNAMETTLMismatch(DNAMEError):
+    '''
+    >>> e = DNAMETTLMismatch(cname_ttl=50, dname_ttl=60)
+    >>> e.description
+    'The TTL of the synthesized CNAME RR (50) does not match the TTL of the DNAME record (60).'
+    '''
     _abstract = False
+    description_template = "The TTL of the synthesized CNAME RR (%(cname_ttl)d) does not match the TTL of the DNAME record (%(dname_ttl)d)."
     code = 'DNAME_TTL_MISMATCH'
+    required_params = ['cname_ttl', 'dname_ttl']
 
 class DNSKEYError(DomainNameAnalysisError):
     pass
@@ -1415,19 +1441,39 @@ class DNSKEYMissingFromServers(DNSKEYError):
     '''
     >>> e = DNSKEYMissingFromServers()
     >>> e.description
-    'DNSKEY_MISSING_FROM_SERVERS'
+    'The DNSKEY RR was not found in the DNSKEY RRset returned by one or more servers.'
     '''
     _abstract = False
+    description_template = "The DNSKEY RR was not found in the DNSKEY RRset returned by one or more servers."
     code = 'DNSKEY_MISSING_FROM_SERVERS'
 
 class DNSKEYNotAtZoneApex(DNSKEYError):
+    '''
+    >>> e = DNSKEYNotAtZoneApex(zone='foo.baz.', name='bar.foo.baz.')
+    >>> e.description
+    'The owner name of the DNSKEY RRset (bar.foo.baz.) does not match the zone apex (foo.baz.).'
+    '''
     _abstract = False
+    description_template = "The owner name of the DNSKEY RRset (%(name)s) does not match the zone apex (%(zone)s)."
     code = 'DNSKEY_NOT_AT_ZONE_APEX'
+    required_params = ['zone', 'name']
 
 class TrustAnchorNotSigning(DNSKEYError):
+    '''
+    >>> e = TrustAnchorNotSigning()
+    >>> e.description
+    'The key was designated as a trust anchor but was not found signing the RRset.'
+    '''
     _abstract = False
+    description_template = "The key was designated as a trust anchor but was not found signing the RRset."
     code = 'TRUST_ANCHOR_NOT_SIGNING'
 
 class RevokedNotSigning(DNSKEYError):
+    '''
+    >>> e = RevokedNotSigning()
+    >>> e.description
+    'The key was revoked but was not found signing the RRset.'
+    '''
     _abstract = False
+    description_template = "The key was revoked but was not found signing the RRset."
     code = 'REVOKED_NOT_SIGNING'

@@ -1327,13 +1327,13 @@ class CNAMEFromDNAMEStatus(object):
         else:
             self.validation_status = DNAME_STATUS_VALID
             if self.included_cname.rrset[0].target != self.synthesized_cname.rrset[0].target:
-                self.errors.append(Errors.DNAMETargetMismatch())
+                self.errors.append(Errors.DNAMETargetMismatch(included_target=self.included_cname.rrset[0].target.canonicalize().to_text(), synthesized_target=self.synthesized_cname.rrset[0].target.canonicalize().to_text()))
                 self.validation_status = DNAME_STATUS_INVALID_TARGET
             if self.included_cname.rrset.ttl != self.synthesized_cname.rrset.ttl:
                 if self.included_cname.rrset.ttl == 0:
                     self.warnings.append(Errors.DNAMETTLZero())
                 else:
-                    self.warnings.append(Errors.DNAMETTLMismatch())
+                    self.warnings.append(Errors.DNAMETTLMismatch(cname_ttl=self.included_cname.rrset.ttl, dname_ttl=self.synthesized_cname.rrset.ttl))
 
     def __unicode__(self):
         return u'CNAME synthesis for %s from %s/%s' % (self.synthesized_cname.rrset.name.canonicalize().to_text(), self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
