@@ -85,7 +85,8 @@ IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
 E164_ARPA_NAME = dns.name.from_text('e164', ARPA_NAME)
 
-LOOPBACK_IP_RE = re.compile(r'^(127\.|::1$)')
+LOOPBACK_IPV4_RE = re.compile(r'^127')
+LOOPBACK_IPV6 = IPAddr('::1')
 RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
 LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
 UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
@@ -1171,7 +1172,7 @@ class Analyst(object):
         if self.client_ipv4 is None:
             servers = filter(lambda x: x.version != 4, servers)
         if not self.allow_loopback_query:
-            servers = filter(lambda x: not LOOPBACK_IP_RE.match(x), servers)
+            servers = filter(lambda x: not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6, servers)
         if not self.allow_private_query:
             servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
         return servers
