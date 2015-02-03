@@ -109,7 +109,7 @@ class Resolver:
                 for line in f:
                     line = line.strip()
                     words = line.split()
-                    if words[0] == 'nameserver':
+                    if len(words) > 1 and words[0] == 'nameserver':
                         servers.append(IPAddr(words[1]))
         except IOError:
             pass
