@@ -769,6 +769,7 @@ class NSEC3StatusNXDOMAIN(object):
 
         self.nsec_names_covering_qname = {}
         self.nsec_names_covering_wildcard = {}
+        self.opt_out = None
 
         for (salt, alg, iterations), nsec3_names in nsec_set_info.nsec3_params.items():
             digest_name = nsec_set_info.get_digest_name_for_nsec3(self.qname, self.origin, salt, alg, iterations)
@@ -788,6 +789,10 @@ class NSEC3StatusNXDOMAIN(object):
                     covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
                     if covering_names:
                         self.nsec_names_covering_qname[digest_name] = covering_names
+                        self.opt_out = False
+                        for nsec_name in covering_names:
+                            if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
+                                self.opt_out = True
 
                 if next_closest_encloser not in self.name_digest_map:
                     self.name_digest_map[next_closest_encloser] = {}
@@ -903,6 +908,8 @@ class NSEC3StatusNXDOMAIN(object):
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
+            if self.opt_out is not None:
+                d['meta']['opt_out'] = self.opt_out
 
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
@@ -1064,7 +1071,7 @@ class NSEC3StatusNoAnswer(object):
         self.has_ns = False
         self.has_ds = False
         self.has_soa = False
-        self.opt_out = False
+        self.opt_out = None
         self.wildcard_has_rdtype = False
         self.wildcard_has_cname = False
 
@@ -1108,6 +1115,10 @@ class NSEC3StatusNoAnswer(object):
                         covering_names = nsec_set_info.nsec3_covering_name(digest_name, salt, alg, iterations)
                         if covering_names:
                             self.nsec_names_covering_qname[digest_name] = covering_names
+                            self.opt_out = False
+                            for nsec_name in covering_names:
+                                if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
+                                    self.opt_out = True
 
         self._set_validation_status(nsec_set_info)
 
@@ -1171,10 +1182,6 @@ class NSEC3StatusNoAnswer(object):
                 self.validation_status = NSEC_STATUS_INVALID
                 self.errors.append(Errors.StypeInBitmapWildcardNoDataNSEC3(sname=self.wildcard_name.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
         elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
-            for digest_name, covering_names in self.nsec_names_covering_qname.items():
-                for nsec_name in covering_names:
-                    if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
-                        self.opt_out = True
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
@@ -1235,7 +1242,8 @@ class NSEC3StatusNoAnswer(object):
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
-            d['meta']['opt_out'] = self.opt_out
+            if self.opt_out is not None:
+                d['meta']['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
                 d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
