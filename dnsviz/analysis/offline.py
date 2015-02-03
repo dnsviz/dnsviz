@@ -1671,7 +1671,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # don't serialize NS data in names for which delegation-only
         # information is required
         if level >= self.RDTYPES_SECURE_DELEGATION:
-            required_rdtypes.remove(dns.rdatatype.NS)
+            required_rdtypes.difference([self.referral_rdtype, dns.rdatatype.NS])
 
         for (qname, rdtype) in query_keys:
 
