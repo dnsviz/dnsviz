@@ -474,13 +474,13 @@ class NSECStatusNXDOMAIN(object):
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
-            d['meta']['qname'] = formatter(self.qname.canonicalize().to_text())
+            d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['meta']['nsec_chain_covering_qname'] = collections.OrderedDict((
-                    ('qname', formatter(qname.canonicalize().to_text())),
+                d['meta']['nsec_chain_covering_sname'] = collections.OrderedDict((
+                    ('sname', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
@@ -714,10 +714,10 @@ class NSECStatusNoAnswer(object):
 
         if loglevel <= logging.DEBUG:
             d['meta'] = collections.OrderedDict()
-            d['meta']['qname'] = formatter(self.qname.canonicalize().to_text())
+            d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_for_qname is not None:
-                d['meta']['nsec_matching_qname'] = collections.OrderedDict((
-                    ('qname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
+                d['meta']['nsec_matching_sname'] = collections.OrderedDict((
+                    ('sname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
                     #TODO - add rdtypes bitmap (when NSEC matches qname--not for empty non-terminal)
                 ))
 
@@ -725,8 +725,8 @@ class NSECStatusNoAnswer(object):
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['meta']['nsec_chain_covering_qname'] = collections.OrderedDict((
-                    ('qname', formatter(qname.canonicalize().to_text())),
+                d['meta']['nsec_chain_covering_sname'] = collections.OrderedDict((
+                    ('sname', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
@@ -950,12 +950,12 @@ class NSEC3StatusNXDOMAIN(object):
                     ))
 
             else:
-                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['qname_digest'] = None
+                    d['meta']['sname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1238,14 +1238,14 @@ class NSEC3StatusNoAnswer(object):
             d['meta']['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
-                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['qname_digest'] = None
-                d['meta']['nsec_matching_qname'] = collections.OrderedDict((
-                    ('qname_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))),
+                    d['meta']['sname_digest'] = None
+                d['meta']['nsec_matching_sname'] = collections.OrderedDict((
+                    ('sname_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))),
                     #TODO - add rdtypes bitmap
                 ))
 
@@ -1270,7 +1270,7 @@ class NSEC3StatusNoAnswer(object):
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
                     d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('qname_digest', formatter(fmt.format_nsec3_name(qname))),
+                        ('sname_digest', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
@@ -1289,12 +1289,12 @@ class NSEC3StatusNoAnswer(object):
                     ))
 
             if not self.nsec_for_qname and not self.closest_encloser:
-                d['meta']['qname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['qname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['qname_digest'] = None
+                    d['meta']['sname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
