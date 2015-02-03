@@ -54,6 +54,8 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
     try:
         a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
+    except KeyboardInterrupt:
+        raise
     except:
         logger.exception('Error analyzing %s' % name.canonicalize().to_text())
         return None
@@ -360,49 +362,54 @@ def main():
 
     flush = '-F' in opts
 
-    name_objs = []
-    if '-r' in opts:
-        if opts['-r'] == '-':
-            analysis_str = sys.stdin.read()
-        else:
+    try:
+        name_objs = []
+        if '-r' in opts:
+            if opts['-r'] == '-':
+                analysis_str = sys.stdin.read()
+            else:
+                try:
+                    analysis_str = open(opts['-r']).read()
+                except IOError, e:
+                    logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                    sys.exit(2)
             try:
-                analysis_str = open(opts['-r']).read()
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                analysis_structured = json.loads(analysis_str)
+            except ValueError:
+                logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
                 sys.exit(2)
-        try:
-            analysis_structured = json.loads(analysis_str)
-        except ValueError:
-            logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
-            sys.exit(2)
-        for name in names:
-            if name.canonicalize().to_text() not in analysis_structured:
-                logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
-                continue
-            name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
-    else:
-        if '-t' in opts:
-            a = ParallelAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain, processes)
+            for name in names:
+                if name.canonicalize().to_text() not in analysis_structured:
+                    logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
+                    continue
+                name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
         else:
-            a = BulkAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain)
-            if flush:
-                fh.write('{')
-                a.analyze(names, _flush)
-                fh.write('"_last._dnsviz":null}')
-                sys.exit(0)
+            if '-t' in opts:
+                a = ParallelAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain, processes)
+            else:
+                a = BulkAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain)
+                if flush:
+                    fh.write('{')
+                    a.analyze(names, _flush)
+                    fh.write('"_last._dnsviz":null}')
+                    sys.exit(0)
 
-        name_objs = a.analyze(names)
+            name_objs = a.analyze(names)
 
-    name_objs = filter(lambda x: x is not None, name_objs)
+        name_objs = filter(lambda x: x is not None, name_objs)
 
-    if not name_objs:
-        sys.exit(2)
+        if not name_objs:
+            sys.exit(2)
 
-    d = collections.OrderedDict()
-    for name_obj in name_objs:
-        name_obj.serialize(d)
+        d = collections.OrderedDict()
+        for name_obj in name_objs:
+            name_obj.serialize(d)
 
-    fh.write(json.dumps(d, **kwargs))
+        fh.write(json.dumps(d, **kwargs))
+
+    except KeyboardInterrupt:
+        logger.error('Interrupted.')
+        sys.exit(4)
 
 if __name__ == "__main__":
     main()
