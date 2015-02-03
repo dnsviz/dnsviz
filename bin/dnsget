@@ -393,13 +393,13 @@ def main():
 
         name_objs = a.analyze(names)
 
+    name_objs = filter(lambda x: x is not None, name_objs)
+
     if not name_objs:
         sys.exit(2)
 
     d = collections.OrderedDict()
     for name_obj in name_objs:
-        if name_obj is None:
-            continue
         name_obj.serialize(d)
 
     fh.write(json.dumps(d, **kwargs))
