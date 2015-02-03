@@ -846,6 +846,10 @@ class DNSAuthGraph:
             attr['style'] = 'filled'
             attr['fillcolor'] = '#ffffff'
 
+            # if it is NXDOMAIN, not type DS
+            if isinstance(nsec_status, Status.NSEC3StatusNXDOMAIN) and nsec_status.opt_out and rdtype != dns.rdatatype.DS:
+                attr['style'] += ',diagonals'
+
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
             S.add_node(node_str, id=node_str, label=label_str, **attr)
             self.node_subgraph_name[node_str] = zone_top_name
@@ -1428,8 +1432,18 @@ class DNSAuthGraph:
                     n.attr['peripheries'] == 2):
                 continue
 
-            # if the name is already marked as secure, then leave it alone
+            # if the name is already marked as secure
             if n.attr['color'] == COLORS['secure']:
+
+                # if this is an authenticated negative response, and the NSEC3
+                # RR used opt out, then the node is actually insecure, rather
+                # than secure.
+                nsec_found = False
+                for n1 in self.G.out_neighbors(n):
+                    if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
+                        n.attr['color'] = COLORS['insecure_light']
+
+                # don't mark it as bogus
                 continue
 
             n.attr['color'] = COLORS['bogus']
