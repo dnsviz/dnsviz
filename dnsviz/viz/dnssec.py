@@ -847,7 +847,7 @@ class DNSAuthGraph:
             attr['fillcolor'] = '#ffffff'
 
             # if it is NXDOMAIN, not type DS
-            if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNoAnswer)) and nsec_status.opt_out and rdtype != dns.rdatatype.DS:
+            if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNoAnswer)) and nsec_status.opt_out:
                 attr['style'] += ',diagonals'
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
