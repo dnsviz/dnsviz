@@ -104,131 +104,136 @@ def test_pygraphviz():
         sys.exit(3)
 
 def main():
-    test_m2crypto()
-    test_pygraphviz()
-
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
-    except getopt.GetoptError, e:
-        usage(str(e))
-        sys.exit(1)
+        test_m2crypto()
+        test_pygraphviz()
 
-    opts = dict(opts)
-    if not ('-f' in opts or args):
-        usage('Either -f must be used or domain names must be supplied as command line arguments.')
-        sys.exit(1)
-    if '-f' in opts and args:
-        usage('If -f is used, then domain names may not supplied as command line arguments.')
-        sys.exit(1)
-
-    if '-T' in opts:
-        fmt = opts['-T']
-    elif '-o' in opts:
-        fmt = opts['-o'].split('.')[-1]
-    else:
-        fmt = 'dot'
-    if fmt not in ('dot','png','jpg','svg','html'):
-        usage('Format unrecognized: "%s"' % fmt)
-        sys.exit(1)
-
-    if '-o' in opts and '-O' in opts:
-        usage('The -o and -O options may not be used together.')
-        sys.exit(1)
-
-    loglevel = logging.WARNING
-    handler = logging.StreamHandler()
-    handler.setLevel(loglevel)
-    logger.addHandler(handler)
-    logger.setLevel(loglevel)
-
-    names = []
-    if '-f' in opts:
         try:
-            f = codecs.open(opts['-f'], 'r', 'utf-8')
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-f']))
-            sys.exit(2)
-        for line in f:
-            name = line.strip()
-            try:
-                name = dns.name.from_unicode(name)
-            except UnicodeDecodeError, e:
-                logger.error('%s: "%s"' % (e, name))
-            except dns.exception.DNSException:
-                logger.error('The domain name was invalid: "%s"' % name)
-            else:
-                names.append(name)
-        f.close()
-    else:
-        for name in args:
-            try:
-                name = dns.name.from_text(name)
-            except dns.exception.DNSException:
-                logger.error('The domain name was invalid: "%s"' % name)
-            else:
-                names.append(name)
+            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
+        except getopt.GetoptError, e:
+            usage(str(e))
+            sys.exit(1)
 
-    if '-r' not in opts or opts['-r'] == '-':
-        analysis_str = sys.stdin.read()
-    else:
-        try:
-            analysis_str = open(opts['-r']).read()
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-            sys.exit(2)
-    try:
-        analysis_structured = json.loads(analysis_str)
-    except ValueError:
-        logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
-        sys.exit(2)
+        opts = dict(opts)
+        if not ('-f' in opts or args):
+            usage('Either -f must be used or domain names must be supplied as command line arguments.')
+            sys.exit(1)
+        if '-f' in opts and args:
+            usage('If -f is used, then domain names may not supplied as command line arguments.')
+            sys.exit(1)
 
-    if '-t' in opts:
-        try:
-            tk_str = open(opts['-t']).read()
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-t']))
-            sys.exit(2)
-        try:
-            trusted_keys = get_trusted_keys(tk_str)
-        except dns.exception.DNSException:
-            logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
-            sys.exit(2)
-    else:
-        trusted_keys = ()
-
-    name_objs = []
-    for name in names:
-        if name.canonicalize().to_text() not in analysis_structured:
-            logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
-            continue
-        name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
-
-    if not name_objs:
-        sys.exit(2)
-
-    G = DNSAuthGraph()
-    for name_obj in name_objs:
-        name_obj.populate_status(trusted_keys)
-        for qname, rdtype in name_obj.queries:
-            if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
-                continue
-            G.graph_rrset_auth(name_obj, qname, rdtype)
-
-        if '-O' in opts:
-            if name_obj.name == dns.name.root:
-                name = 'root'
-            else:
-                name = name_obj.name.canonicalize().to_text().rstrip('.')
-            finish_graph(G, trusted_keys, fmt, '%s.%s' % (name, fmt))
-            G = DNSAuthGraph()
-
-    if '-O' not in opts:
-        if '-o' not in opts or opts['-o'] == '-':
-            filename = None
-            img = finish_graph(G, trusted_keys, fmt, filename)
-            sys.stdout.write(img)
+        if '-T' in opts:
+            fmt = opts['-T']
+        elif '-o' in opts:
+            fmt = opts['-o'].split('.')[-1]
         else:
-            finish_graph(G, trusted_keys, fmt, opts['-o'])
+            fmt = 'dot'
+        if fmt not in ('dot','png','jpg','svg','html'):
+            usage('Format unrecognized: "%s"' % fmt)
+            sys.exit(1)
+
+        if '-o' in opts and '-O' in opts:
+            usage('The -o and -O options may not be used together.')
+            sys.exit(1)
+
+        loglevel = logging.WARNING
+        handler = logging.StreamHandler()
+        handler.setLevel(loglevel)
+        logger.addHandler(handler)
+        logger.setLevel(loglevel)
+
+        names = []
+        if '-f' in opts:
+            try:
+                f = codecs.open(opts['-f'], 'r', 'utf-8')
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-f']))
+                sys.exit(2)
+            for line in f:
+                name = line.strip()
+                try:
+                    name = dns.name.from_unicode(name)
+                except UnicodeDecodeError, e:
+                    logger.error('%s: "%s"' % (e, name))
+                except dns.exception.DNSException:
+                    logger.error('The domain name was invalid: "%s"' % name)
+                else:
+                    names.append(name)
+            f.close()
+        else:
+            for name in args:
+                try:
+                    name = dns.name.from_text(name)
+                except dns.exception.DNSException:
+                    logger.error('The domain name was invalid: "%s"' % name)
+                else:
+                    names.append(name)
+
+        if '-r' not in opts or opts['-r'] == '-':
+            analysis_str = sys.stdin.read()
+        else:
+            try:
+                analysis_str = open(opts['-r']).read()
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                sys.exit(2)
+        try:
+            analysis_structured = json.loads(analysis_str)
+        except ValueError:
+            logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
+            sys.exit(2)
+
+        if '-t' in opts:
+            try:
+                tk_str = open(opts['-t']).read()
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-t']))
+                sys.exit(2)
+            try:
+                trusted_keys = get_trusted_keys(tk_str)
+            except dns.exception.DNSException:
+                logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
+                sys.exit(2)
+        else:
+            trusted_keys = ()
+
+        name_objs = []
+        for name in names:
+            if name.canonicalize().to_text() not in analysis_structured:
+                logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
+                continue
+            name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
+
+        if not name_objs:
+            sys.exit(2)
+
+        G = DNSAuthGraph()
+        for name_obj in name_objs:
+            name_obj.populate_status(trusted_keys)
+            for qname, rdtype in name_obj.queries:
+                if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                    continue
+                G.graph_rrset_auth(name_obj, qname, rdtype)
+
+            if '-O' in opts:
+                if name_obj.name == dns.name.root:
+                    name = 'root'
+                else:
+                    name = name_obj.name.canonicalize().to_text().rstrip('.')
+                finish_graph(G, trusted_keys, fmt, '%s.%s' % (name, fmt))
+                G = DNSAuthGraph()
+
+        if '-O' not in opts:
+            if '-o' not in opts or opts['-o'] == '-':
+                filename = None
+                img = finish_graph(G, trusted_keys, fmt, filename)
+                sys.stdout.write(img)
+            else:
+                finish_graph(G, trusted_keys, fmt, opts['-o'])
+
+    except KeyboardInterrupt:
+        logger.error('Interrupted.')
+        sys.exit(4)
 
 if __name__ == "__main__":
     main()

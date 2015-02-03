@@ -58,127 +58,132 @@ def test_m2crypto():
         sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
 
 def main():
-    test_m2crypto()
-
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:')
-    except getopt.GetoptError, e:
-        usage(str(e))
-        sys.exit(1)
+        test_m2crypto()
 
-    opts = dict(opts)
-    if not ('-f' in opts or args):
-        usage('Either -f must be used or domain names must be supplied as command line arguments.')
-        sys.exit(1)
-    if '-f' in opts and args:
-        usage('If -f is used, then domain names may not supplied as command line arguments.')
-        sys.exit(1)
-
-    if '-l' in opts:
-        if opts['-l'] == 'error':
-            loglevel = logging.ERROR
-        elif opts['-l'] == 'warning':
-            loglevel = logging.WARNING
-        elif opts['-l'] == 'info':
-            loglevel = logging.INFO
-        elif opts['-l'] == 'debug':
-            loglevel = logging.DEBUG
-        else:
-            usage('Invalid log level: "%s"' % opts['-l'])
+        try:
+            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:')
+        except getopt.GetoptError, e:
+            usage(str(e))
             sys.exit(1)
-    else:
-        loglevel = logging.DEBUG
-    handler = logging.StreamHandler()
-    handler.setLevel(loglevel)
-    logger.addHandler(handler)
-    logger.setLevel(loglevel)
 
-    names = []
-    if '-f' in opts:
-        try:
-            f = codecs.open(opts['-f'], 'r', 'utf-8')
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-f']))
-            sys.exit(2)
-        for line in f:
-            name = line.strip()
-            try:
-                name = dns.name.from_unicode(name)
-            except UnicodeDecodeError, e:
-                logger.error('%s: "%s"' % (e, name))
-            except dns.exception.DNSException:
-                logger.error('The domain name was invalid: "%s"' % name)
+        opts = dict(opts)
+        if not ('-f' in opts or args):
+            usage('Either -f must be used or domain names must be supplied as command line arguments.')
+            sys.exit(1)
+        if '-f' in opts and args:
+            usage('If -f is used, then domain names may not supplied as command line arguments.')
+            sys.exit(1)
+
+        if '-l' in opts:
+            if opts['-l'] == 'error':
+                loglevel = logging.ERROR
+            elif opts['-l'] == 'warning':
+                loglevel = logging.WARNING
+            elif opts['-l'] == 'info':
+                loglevel = logging.INFO
+            elif opts['-l'] == 'debug':
+                loglevel = logging.DEBUG
             else:
-                names.append(name)
-        f.close()
-    else:
-        for name in args:
+                usage('Invalid log level: "%s"' % opts['-l'])
+                sys.exit(1)
+        else:
+            loglevel = logging.DEBUG
+        handler = logging.StreamHandler()
+        handler.setLevel(loglevel)
+        logger.addHandler(handler)
+        logger.setLevel(loglevel)
+
+        names = []
+        if '-f' in opts:
             try:
-                name = dns.name.from_text(name)
+                f = codecs.open(opts['-f'], 'r', 'utf-8')
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-f']))
+                sys.exit(2)
+            for line in f:
+                name = line.strip()
+                try:
+                    name = dns.name.from_unicode(name)
+                except UnicodeDecodeError, e:
+                    logger.error('%s: "%s"' % (e, name))
+                except dns.exception.DNSException:
+                    logger.error('The domain name was invalid: "%s"' % name)
+                else:
+                    names.append(name)
+            f.close()
+        else:
+            for name in args:
+                try:
+                    name = dns.name.from_text(name)
+                except dns.exception.DNSException:
+                    logger.error('The domain name was invalid: "%s"' % name)
+                else:
+                    names.append(name)
+
+        if '-p' in opts:
+            kwargs = { 'indent': 4, 'separators': (',', ': ') }
+        else:
+            kwargs = {}
+
+        if '-o' not in opts or opts['-o'] == '-':
+            fh = sys.stdout
+        else:
+            try:
+                fh = open(opts['-o'], 'w')
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+                sys.exit(2)
+
+        if '-r' not in opts or opts['-r'] == '-':
+            analysis_str = sys.stdin.read()
+        else:
+            try:
+                analysis_str = open(opts['-r']).read()
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                sys.exit(2)
+        try:
+            analysis_structured = json.loads(analysis_str)
+        except ValueError:
+            logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
+            sys.exit(2)
+
+        if '-t' in opts:
+            try:
+                tk_str = open(opts['-t']).read()
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-t']))
+                sys.exit(2)
+            try:
+                trusted_keys = get_trusted_keys(tk_str)
             except dns.exception.DNSException:
-                logger.error('The domain name was invalid: "%s"' % name)
-            else:
-                names.append(name)
+                logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
+                sys.exit(2)
+        else:
+            trusted_keys = ()
 
-    if '-p' in opts:
-        kwargs = { 'indent': 4, 'separators': (',', ': ') }
-    else:
-        kwargs = {}
+        name_objs = []
+        for name in names:
+            if name.canonicalize().to_text() not in analysis_structured:
+                logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
+                continue
+            name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
 
-    if '-o' not in opts or opts['-o'] == '-':
-        fh = sys.stdout
-    else:
-        try:
-            fh = open(opts['-o'], 'w')
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+        if not name_objs:
             sys.exit(2)
 
-    if '-r' not in opts or opts['-r'] == '-':
-        analysis_str = sys.stdin.read()
-    else:
-        try:
-            analysis_str = open(opts['-r']).read()
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-            sys.exit(2)
-    try:
-        analysis_structured = json.loads(analysis_str)
-    except ValueError:
-        logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
-        sys.exit(2)
+        d = collections.OrderedDict()
+        for name_obj in name_objs:
+            name_obj.populate_status(trusted_keys)
+            name_obj.serialize_status(d, loglevel=loglevel)
 
-    if '-t' in opts:
-        try:
-            tk_str = open(opts['-t']).read()
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-t']))
-            sys.exit(2)
-        try:
-            trusted_keys = get_trusted_keys(tk_str)
-        except dns.exception.DNSException:
-            logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
-            sys.exit(2)
-    else:
-        trusted_keys = ()
+        if d:
+            fh.write(json.dumps(d, **kwargs))
 
-    name_objs = []
-    for name in names:
-        if name.canonicalize().to_text() not in analysis_structured:
-            logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
-            continue
-        name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
-
-    if not name_objs:
-        sys.exit(2)
-
-    d = collections.OrderedDict()
-    for name_obj in name_objs:
-        name_obj.populate_status(trusted_keys)
-        name_obj.serialize_status(d, loglevel=loglevel)
-
-    if d:
-        fh.write(json.dumps(d, **kwargs))
+    except KeyboardInterrupt:
+        logger.error('Interrupted.')
+        sys.exit(4)
 
 if __name__ == "__main__":
     main()
