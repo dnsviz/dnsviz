@@ -49,8 +49,8 @@ setup(name='dnsviz',
                 ('share/dnsviz/html', glob.glob(os.path.join('share', 'html', '*.html'))),
         ],
         requires=[
-                'pygraphviz (==1.1)',
+                'pygraphviz (>=1.1)',
                 'm2crypto (>=0.21.1)',
-                'dnspython (==1.11)',
+                'dnspython (>=1.11)',
         ],
 )
