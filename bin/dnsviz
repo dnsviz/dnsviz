@@ -92,7 +92,9 @@ def test_pygraphviz():
     try:
         from pygraphviz import release
         try:
-            major, minor = map(int, release.version.split('.'))[:2]
+            major, minor = release.version.split('.')[:2]
+            major = int(major)
+            minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
             if (major, minor) < (1,1):
                 sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
                 sys.exit(3)
