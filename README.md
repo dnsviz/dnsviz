@@ -97,8 +97,8 @@ dnsgrok example.com < example.com.json > example.com-assessed.json
 
 `dnsviz` takes serialized query results in JSON format (i.e., output from
 `dnsget`) as input and assesses specified domain names based on their
-corresponding content in the input.  The output is an image file or an HTML
-file, depending on the .
+corresponding content in the input.  The output is an image file, a `dot`
+(directed graph) file, or an HTML file, depending on the options passed.
 
 Example:
 ```
