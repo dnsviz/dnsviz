@@ -38,7 +38,7 @@ DNSViz is a tool suite for analysis and visualization of Domain Name System
   Note that support for the following DNSSEC algorithms is not yet available in
   stock releases of M2Crypto: 3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1),
   12 (GOST R 34.10-2001), 13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve
-  P-384 with SHA-384).  However, the patch included in `contrib/m2crypto.patch`
+  P-384 with SHA-384).  However, the patch included in "contrib/m2crypto.patch"
   can be applied to M2Crypto 0.21.1 or M2Crypto 0.22.3 to support these
   algorithms:
 
