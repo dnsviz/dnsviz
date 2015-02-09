@@ -4,7 +4,8 @@
 ## Description
 
 DNSViz is a tool suite for analysis and visualization of Domain Name System
-(DNS) behavior, including its security extensions (DNSSEC).
+(DNS) behavior, including its security extensions (DNSSEC).  This tool suite
+powers the Web-based analysis available at http://dnsviz.net/
 
 
 ## Installation
