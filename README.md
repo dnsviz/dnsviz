@@ -102,5 +102,5 @@ corresponding content in the input.  The output is an image file, a `dot`
 
 Example:
 ```
-$ dnsviz -Thtml -O example.com < example.com.json
+$ dnsviz -Thtml example.com < example.com.json > example.com.html
 ```
