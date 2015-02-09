@@ -74,9 +74,32 @@ to display all options associated with their usage.
 `dnsget` takes one or more domain names as input and performs a series of
 queries, the results of which are serialized into JSON format.
 
-Example:
+
+#### Examples
+
+Analyze the domain name example.com and store the queries and responses in the
+file named "example.com.json":
 ```
 $ dnsget example.com > example.com.json
+```
+
+Same thing:
+```
+$ dnsget -o example.com.json example.com
+```
+
+Analyze the domain name example.com by querying explicitly-defined
+authoritative servers, rather than learning the servers through referrals from
+the root zone:
+```
+$ dnsget -x example.com:server1=199.43.132.53,server1=2001:500:8c::53 \
+  -x example.com:server2=199.43.133.53,server2=2001:500:8d::53 \
+  -o example.com.json example.com
+```
+
+Analyze the domain name example.com with its entire ancestry:
+```
+$ dnsget -a . -o example.com.json example.com
 ```
 
 
@@ -87,9 +110,38 @@ $ dnsget example.com > example.com.json
 corresponding content in the input.  The output is also serialized into JSON
 format.
 
-Example:
+
+#### Examples
+
+Process the query/response output produced by `dnsget`, and store the
+serialized results in a file named "example.com-chk.json":
 ```
-dnsgrok example.com < example.com.json > example.com-assessed.json
+$ dnsgrok example.com < example.com.json > example.com-chk.json
+```
+
+Same thing:
+```
+$ dnsgrok -r example.com.json -o example.com-chk.json example.com
+```
+
+Same thing, but with "pretty", formatted JSON:
+```
+$ dnsgrok -p -r example.com.json -o example.com-chk.json example.com
+```
+
+Show only info-level information: descriptions, statuses, warnings, and errors:
+```
+$ dnsgrok -p -l info -r example.com.json -o example.com-chk.json example.com
+```
+
+Show descriptions only if there are related warnings or errors:
+```
+$ dnsgrok -p -l warning -r example.com.json -o example.com-chk.json example.com
+```
+
+Show descriptions only if there are related errors:
+```
+$ dnsgrok -p -l error -r example.com.json -o example.com-chk.json example.com
 ```
 
 
@@ -100,7 +152,28 @@ dnsgrok example.com < example.com.json > example.com-assessed.json
 corresponding content in the input.  The output is an image file, a `dot`
 (directed graph) file, or an HTML file, depending on the options passed.
 
-Example:
+
+#### Examples
+
+Process the query/response output produced by `dnsget`, and produce a graph
+visually representing the results in a png file named "example.com.png".
+```
+$ dnsviz -Tpng example.com < example.com.json > example.com.png
+```
+
+Same thing, but produce interactive HTML format:
+interactive HTML output in a file named "example.com.html":
 ```
 $ dnsviz -Thtml example.com < example.com.json > example.com.html
+```
+
+Same thing (filename is derived from domain name and output format):
+```
+$ dnsviz -Thtml -O -r example.com.json example.com
+```
+
+Add DNSSEC trust anchors to the graph:
+```
+$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dnsviz -Thtml -O -r example.com.json -t tk.txt example.com
 ```
