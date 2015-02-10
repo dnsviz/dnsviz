@@ -48,15 +48,12 @@ from dnsviz import query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
 
-COLORS = { 'secure': '#0a879a',
-        'secure_non_existent': '#9dcfd6',
-        'bogus': '#be1515',
-        'insecure_non_existent': '#d0d0d0',
-        'bogus_non_existent': '#e5a1a1',
-        'insecure': '#000000',
-        'expired': '#6131a3',
+COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
+        'bogus': '#be1515', 'bogus_non_existent': '#e5a1a1',
+        'insecure': '#000000', 'insecure_non_existent': '#d0d0d0',
         'misconfigured': '#f4b800',
         'indeterminate': '#f4b800',
+        'expired': '#6131a3',
         'invalid': '#be1515' }
 
 ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
