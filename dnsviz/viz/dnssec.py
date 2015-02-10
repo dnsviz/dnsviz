@@ -51,7 +51,7 @@ from dnsviz.util import tuple_to_dict
 COLORS = { 'secure': '#0a879a', 'secure_light': '#8ffeff',
         'secure_non_existent': '#9dcfd6',
         'bogus': '#be1515', 'bogus_light': '#f17b7b',
-        'non_existent': '#909090', 'non_existent_light': 'd0d0d0',
+        'non_existent': '#d0d0d0', 'non_existent_light': 'd0d0d0',
         'bogus_non_existent': '#e5a1a1',
         'insecure': '#000000', 'insecure_light': '#b7b7b7',
         'expired': '#6131a3', 'expired_light': '#ad7fed',
