@@ -56,7 +56,6 @@ COLORS = { 'secure': '#0a879a',
         'insecure': '#000000',
         'expired': '#6131a3',
         'misconfigured': '#f4b800',
-        'warnings': '#f4b800',
         'indeterminate': '#f4b800',
         'invalid': '#be1515' }
 
@@ -1170,7 +1169,7 @@ class DNSAuthGraph:
                 line_color = COLORS['insecure']
                 line_style = 'solid'
             elif name_obj.delegation_status[rdtype] in (Status.DELEGATION_STATUS_INCOMPLETE, Status.DELEGATION_STATUS_LAME):
-                line_color = COLORS['warnings']
+                line_color = COLORS['misconfigured']
                 line_style = 'dashed'
             elif name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_BOGUS:
                 line_color = COLORS['bogus']
