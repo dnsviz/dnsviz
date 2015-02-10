@@ -1441,7 +1441,7 @@ class DNSAuthGraph:
                 nsec_found = False
                 for n1 in self.G.out_neighbors(n):
                     if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
-                        n.attr['color'] = COLORS['insecure_light']
+                        n.attr['color'] = COLORS['non_existent']
 
                 # don't mark it as bogus
                 continue
