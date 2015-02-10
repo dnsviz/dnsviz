@@ -58,7 +58,7 @@ COLORS = { 'secure': '#0a879a',
         'misconfigured': '#f4b800',
         'warnings': '#f4b800',
         'indeterminate': '#f4b800',
-        'errors': '#be1515' }
+        'invalid': '#be1515' }
 
 ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
 WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
@@ -488,10 +488,10 @@ class DNSAuthGraph:
             line_color = COLORS['indeterminate']
             line_style = 'solid'
         elif ds_status.validation_status == Status.DS_STATUS_INVALID_DIGEST:
-            line_color = COLORS['errors']
+            line_color = COLORS['invalid']
             line_style = 'solid'
         elif ds_status.validation_status == Status.DS_STATUS_INVALID:
-            line_color = COLORS['errors']
+            line_color = COLORS['invalid']
             line_style = 'dashed'
 
         if ds_status.dnskey is None:
@@ -576,10 +576,10 @@ class DNSAuthGraph:
             line_color = COLORS['expired']
             line_style = 'solid'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INVALID_SIG:
-            line_color = COLORS['errors']
+            line_color = COLORS['invalid']
             line_style = 'solid'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INVALID:
-            line_color = COLORS['errors']
+            line_color = COLORS['invalid']
             line_style = 'dashed'
 
         #XXX cruft - is this needed? why?
@@ -782,7 +782,7 @@ class DNSAuthGraph:
             line_color = COLORS['indeterminate']
             line_style = 'solid'
         elif dname_status.validation_status == Status.DNAME_STATUS_INVALID:
-            line_color = COLORS['errors']
+            line_color = COLORS['invalid']
             line_style = 'solid'
 
         if dname_status.included_cname is None:
