@@ -485,7 +485,7 @@ class DNSAuthGraph:
             line_color = COLORS['non_existent']
             line_style = 'dashed'
         elif ds_status.validation_status == Status.DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
-            line_color = COLORS['warnings']
+            line_color = COLORS['indeterminate']
             line_style = 'solid'
         elif ds_status.validation_status == Status.DS_STATUS_INVALID_DIGEST:
             line_color = COLORS['errors']
@@ -567,7 +567,7 @@ class DNSAuthGraph:
             line_color = COLORS['non_existent']
             line_style = 'dashed'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
-            line_color = COLORS['warnings']
+            line_color = COLORS['indeterminate']
             line_style = 'solid'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_EXPIRED:
             line_color = COLORS['expired']
