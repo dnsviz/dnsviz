@@ -41,6 +41,7 @@ setup(name='dnsviz',
         scripts=['bin/dnsget', 'bin/dnsviz', 'bin/dnsgrok'],
         data_files=[
                 ('share/doc/dnsviz', ['README.md', 'LICENSE']),
+                ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png'))),
                 ('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
                 ('share/dnsviz/css', ['share/css/dnsviz.css']),
                 ('share/dnsviz/css/redmond', ['share/css/redmond/jquery-ui-1.10.4.custom.min.css']),
