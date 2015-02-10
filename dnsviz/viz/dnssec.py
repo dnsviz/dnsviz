@@ -57,7 +57,7 @@ COLORS = { 'secure': '#0a879a',
         'expired': '#6131a3',
         'misconfigured': '#f4b800',
         'warnings': '#f4b800',
-        'unknown': '#000000',
+        'indeterminate': '#f4b800',
         'errors': '#be1515' }
 
 ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
@@ -779,7 +779,7 @@ class DNSAuthGraph:
             line_color = COLORS['secure']
             line_style = 'solid'
         elif dname_status.validation_status == Status.DNAME_STATUS_INDETERMINATE:
-            line_color = COLORS['unknown']
+            line_color = COLORS['indeterminate']
             line_style = 'solid'
         elif dname_status.validation_status == Status.DNAME_STATUS_INVALID:
             line_color = COLORS['errors']
@@ -891,7 +891,7 @@ class DNSAuthGraph:
                 line_color = COLORS['secure']
                 line_style = 'solid'
             elif nsec_status.validation_status == Status.NSEC_STATUS_INDETERMINATE:
-                line_color = COLORS['unknown']
+                line_color = COLORS['indeterminate']
                 line_style = 'solid'
             elif nsec_status.validation_status == Status.NSEC_STATUS_INVALID:
                 line_color = COLORS['bogus']
