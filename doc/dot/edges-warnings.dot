@@ -1,0 +1,21 @@
+digraph {
+  graph [compound=true, rankdir=BT, ranksep=0.3];
+	node [label="\N",
+		penwidth=1.5
+	];
+	edge [penwidth=1.5];
+
+		bottom_left [shape=point, style=invis];
+		bottom_right [shape=point, style=invis];
+		top_left [shape=point, style=invis];
+		top_right [shape=point, style=invis];
+		bottom_left -> top_left [style=solid,
+			label=<<TABLE BORDER="0"><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+			dir=back,
+			color="#0a879a"];
+		bottom_right -> top_right [style=solid,
+			label=<<TABLE BORDER="0"><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+			dir=back,
+			color="#0a879a",
+			penwidth=5.0];
+}

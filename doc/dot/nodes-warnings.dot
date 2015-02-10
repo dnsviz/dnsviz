@@ -1,0 +1,42 @@
+digraph {
+  graph [compound=true, rankdir=BT, ranksep=0.3];
+	node [label="\N",
+		penwidth=1.5
+	];
+	edge [penwidth=1.5];
+
+	"DS-1_2|example.com|8|54321|1_2" [color="#000000",
+		fillcolor="#ffffff",
+		label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="12" FACE="Helvetica">DS</FONT></TD><TD VALIGN="bottom"><IMG SRC="images/warning.png"/></TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="10">digest algs=1,2</FONT></TD></TR></TABLE>>,
+		shape=ellipse,
+		style=filled];
+	"DNSKEY-0|example.com|8|12345"	 [color="#000000",
+		fillcolor="#ffffff",
+		label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT></TD><TD VALIGN="bottom"><IMG SRC="images/warning.png"/></TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="10">alg=8, id=12345</FONT></TD></TR></TABLE>>,
+		shape=ellipse,
+		style=filled];
+	"NSEC-0|foobar.example.com|A" [color="#000000",
+					fillcolor="#ffffff",
+					label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT></TD></TR><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+					shape=diamond,
+					style=filled];
+	"RRset-10|example.com|A" [color="#000000",
+					fillcolor="#ffffff",
+					label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="12" FACE="Helvetica">example.com/A</FONT></TD></TR><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+					shape=rectangle,
+					style="rounded,filled"];
+	"RRset-1|example.com|CNAME" [color="#d0d0d0",
+					fillcolor="#ffffff",
+					label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="12" FACE="Helvetica">example.com/CNAME</FONT></TD></TR><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+					shape=rectangle,
+					style="rounded,filled,dashed"];
+	"RRset-0|foobar.example.com|A" [color="#d0d0d0",
+					fillcolor="#ffffff",
+					label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="12" FACE="Helvetica">foobar.example.com</FONT></TD></TR><TR><TD><IMG SRC="images/warning.png"/></TD></TR></TABLE>>,
+					shape=rectangle,
+					style="rounded,filled,dashed,diagonals"];
+	"RRset-10|example.com|A" -> "DNSKEY-0|example.com|8|12345" [style=invis];
+	"NSEC-0|foobar.example.com|A" -> "DS-1_2|example.com|8|54321|1_2" [style=invis];
+	"RRset-1|example.com|CNAME" -> "RRset-10|example.com|A" [style=invis];
+	"RRset-0|foobar.example.com|A" ->  "NSEC-0|foobar.example.com|A" [style=invis];
+}

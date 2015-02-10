@@ -1,0 +1,28 @@
+digraph {
+  graph [compound=true, rankdir=BT, ranksep=0.3];
+	node [label="\N",
+		penwidth=1.5
+	];
+	edge [penwidth=1.5];
+
+  subgraph "cluster_example.com" {
+		graph [label=<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="12">example.com</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="10">(2015-02-06 12:55:32 UTC)</FONT></TD></TR></TABLE>>,
+				labeljust=l,
+				penwidth=0.5
+		];
+		"cluster_example.com_top" [shape=point, style=invis];
+		"cluster_example.com_bottom" [shape=point, style=invis];
+    "RRset-0|foobar.example.com|A" [color="#d0d0d0",
+						fillcolor="#ffffff",
+						label=<<FONT POINT-SIZE="12" FACE="Helvetica">foobar.example.com</FONT>>,
+						shape=rectangle,
+						style="rounded,filled,dashed,diagonals"];
+    "RRset-10|example.com|SOA" [color="#000000",
+						fillcolor="#ffffff",
+						label=<<FONT POINT-SIZE="12" FACE="Helvetica">example.com/SOA</FONT>>,
+						shape=rectangle,
+						style="rounded,filled"];
+  }
+	"cluster_example.com_bottom" -> "RRset-0|foobar.example.com|A" [style=invis];
+	"cluster_example.com_bottom" -> "RRset-10|example.com|SOA" [style=invis];
+}
