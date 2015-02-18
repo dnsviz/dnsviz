@@ -1101,7 +1101,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # report an error if one or more algorithms are incorrectly validated
                 for (server,client,response) in algs_signing_sep:
-                    for alg in algs_signing_sep[(server,client,response)]:
+                    for alg in ds_algs.difference(algs_signing_sep[(server,client,response)]):
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingSEPForAlg(algorithm=alg, source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], server, client, response)
             else:
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.NoSEP(source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], None, None, None)
