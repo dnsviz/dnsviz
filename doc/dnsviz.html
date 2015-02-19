@@ -24,8 +24,8 @@
 
 		<h4><a name="zones">Zones</a></h4>
 		<table>
-			<tr><td><img src="images/zone.png" alt="Zone
-					cluster" /></td><td><p>Nodes in DNSViz are clustered by the
+			<tr><td><img src="images/zone.png" alt="Zone" />
+					</td><td><p>Nodes in DNSViz are clustered by the
 					<strong>zone</strong> to which the represented information belongs.
 					Each zone is labeled with the name of the zone origin and the time at
 					which the zone was last analyzed.</p></td></tr>
@@ -42,22 +42,22 @@
 					sans DNSSEC). Other possible delegation statuses are described in the
 					following entries.</p></td></tr>
 			<tr><td><img src="images/delegation-lame.png"
-					alt="Delegation" /></td><td><p>If the designated name servers for a
+					alt="Lame delegation" /></td><td><p>If the designated name servers for a
 					zone cannot not be properly resolved or if the servers do not properly
 					respond to queries, then the delegation is considered
 					<strong>lame</strong> and is represented by a dashed, yellow
 					line.</p></td></tr>
 			<tr><td><img src="images/delegation-incomplete.png"
-					alt="Delegation" /></td><td><p>If the delegation is
+					alt="Incomplete delegation" /></td><td><p>If the delegation is
 					<strong>incomplete</strong>, as indicated by the presence of NS records
 					in the zone itself but not in its parent zone, then the delegation is
 					represented by a dashed, yellow line.</p></td></tr>
 			<tr><td><img src="images/delegation-secure.png"
-					alt="Delegation" /></td><td><p>If the delegation is
+					alt="Secure delegation" /></td><td><p>If the delegation is
 					<strong>secure</strong> by DNSSEC standards, then then the delegation
 					is represented by a solid, blue line.</p></td></tr>
 			<tr><td><img src="images/delegation-bogus.png"
-					alt="Delegation" /></td><td><p>If the delegation is
+					alt="Bogus delegation" /></td><td><p>If the delegation is
 					<strong>bogus</strong> by DNSSEC standards, then then the delegation
 					is represented by a dashed, red line.</p></td></tr>
 		</table>
@@ -65,7 +65,7 @@
 		<h4><a name="rrsets">RRsets</a></h4>
 		<table>
 			<tr><td><img src="images/rrset.png"
-					alt="RRset node" /></td><td><p><strong>Resource record sets
+					alt="RRset" /></td><td><p><strong>Resource record sets
 						(RRsets)</strong> returned in the response (usually in the answer
 					section) are represented as rectangular nodes with rounded corners.
 					Among the most common record types are SOA (start of authority), A
@@ -75,19 +75,19 @@
 					NSEC3 RR types, are represented as other node types, as specified
 					elsewhere in this guide.</p></td></tr>
 			<tr><td><img src="images/alias.png"
-					alt="Alias edge" /></td><td><p><strong>Aliases</strong> resulting from
+					alt="Alias" /></td><td><p><strong>Aliases</strong> resulting from
 					CNAME RRs are represented by a black edge from one RRset (with the
 					<strong>alias name</strong>) to another (with the <strong>canonical
 						name</strong>).</p></td></tr>
 			<tr><td><img src="images/dname.png"
-					alt="Alias edge" /></td><td><p>A DNAME RR is used to alias an entire
+					alt="DNAME" /></td><td><p>A DNAME RR is used to alias an entire
 					namespace into another.  DNAME responses include synthesized CNAME RRs
 					for the aliasing directed by the DNAME RR.</p><p>DNAME records are
 					shown in DNSViz with their respective CNAME records.  A solid, blue
 					line between DNAME node and CNAME node indicates that the DNAME
 					expansion was valid.</p></td></tr>
 			<tr><td><img src="images/dname-invalid.png"
-					alt="Alias edge" /></td><td><p> A solid, red line between DNAME node
+					alt="Invalid DNAME" /></td><td><p> A solid, red line between DNAME node
 					and CNAME node indicates that the DNAME expansion was
 					invalid.</p></td></tr>
 		</table>
@@ -101,7 +101,7 @@
 					border, lighter in color.  A node representing the SOA RR returned in
 					the negative response (if any) is also
 						included.</p></td></tr>
-			<tr><td><img src="images/nodata.png" alt="No data" /></td>
+			<tr><td><img src="images/nodata.png" alt="NO DATA" /></td>
 				<td><p>If the response to a query has a <strong>NOERROR status but
 						contains no answer data (NO DATA) for the type</strong>, this
 					negative response is represented by a rectangular node with rounded
@@ -113,7 +113,7 @@
 		<h4><a name="dnskey-rrs">DNSKEY RRs</a></h4>
 		<table>
 			<tr><td><img src="images/dnskey.png"
-					alt="DNSKEY node" /></td><td><p><strong>DNSKEY</strong> RRs
+					alt="DNSKEY" /></td><td><p><strong>DNSKEY</strong> RRs
 					include public key and meta information to enable resolvers to validate
 					signatures made by the corresponding private keys.</p><p>In DNSViz,
 					each DNSKEY RR is represented as an elliptical node in the zone
@@ -150,8 +150,8 @@
 			
 		<h4><a name="ds-rrs">DS RRs</a></h4>
 		<table>
-			<tr><td><img src="images/ds.png" alt="DS
-					node" /></td><td><p><strong>DS</strong> (delegation signer) RRs exist
+			<tr><td><img src="images/ds.png" alt="DS" />
+					</td><td><p><strong>DS</strong> (delegation signer) RRs exist
 					in the parent of a signed zone to establish a SEP into the zone.  Each
 					DS RR specifies an algorithm and key tag corresponding to a DNSKEY RR
 					in the signed zone and includes a cryptographic hash of that DNSKEY
@@ -166,7 +166,7 @@
 					<span class="domain">example.com</span>.  However, other circumstances
 					may exist, which are shown in the following entries.</p></td></tr>
 			<tr><td><img src="images/ds-invalid-digest.png"
-					alt="DS with bad digest" /></td><td><p>A solid red line from DS to
+					alt="DS with invalid digest" /></td><td><p>A solid red line from DS to
 					DNSKEY indicates that a DNSKEY exists matching the algorithm and key
 					tag of the DS RR, but <strong>the digest of the DNSKEY in the DS RR
 						does not match</strong>.</p></td></tr>
@@ -198,7 +198,7 @@
 					between DS and DNSKEY is yellow.  In the example at the left digest
 					algorithm 19 is unknown.</p></td></tr>
 			<tr><td><img src="images/ds-invalid.png"
-					alt="Invalid DS" /></td><td><p>When <strong>the use of a DS
+					alt="DS with invalid digest" /></td><td><p>When <strong>the use of a DS
 						corresponding to a DNSKEY is invalid</strong>, independent of the
 					correctness of its digest, the line between DS and DNSKEY is red and
 					dashed.  An example scenario is when the DNSKEY has the revoke bit set,
@@ -207,8 +207,8 @@
 
 		<h4><a name="nsecnsec3-rrs">NSEC/NSEC3 RRs</a></h4>
 		<table>
-			<tr><td><img src="images/nsec.png" alt="NSEC node" />
-					<img src="images/nsec3.png" alt="NSEC3 node" /></td>
+			<tr><td><img src="images/nsec.png" alt="NSEC" />
+					<img src="images/nsec3.png" alt="NSEC3" /></td>
 				<td><p>NSEC and NSEC3 RRs are
 					used within DNSSEC to prove the legitimacy of a negative response
 					(i.e., NXDOMAIN or NO DATA) using <strong>authenticated denial of
@@ -221,7 +221,7 @@
 					edge is solid blue, then the NSEC or NSEC3 RRs returned prove the
 					validity of the negative response.</p></td></tr>
 			<tr><td><img src="images/nsec-ds.png"
-					alt="NSEC covering" /></td><td><p>A special case of NSEC/NSEC3 RRs is
+					alt="NSEC covering DS" /></td><td><p>A special case of NSEC/NSEC3 RRs is
 					that in which they serve to prove the non-existence of Delegation
 					Signer (DS) records.  The proof of absence of DS records constitutes an
 					<strong>insecure delegation</strong>, in which any trust at the parent
@@ -229,7 +229,7 @@
 					involving DS records is graphically represented with an edge from the
 					NSEC/NSEC3 node to the box representing the child zone.</p></td></tr>
 			<tr><td><img src="images/nsec3-optout.png"
-					alt="NSEC3 covering" /></td><td><p>The <strong>opt-out</strong> flag is set
+					alt="NSEC3" /></td><td><p>The <strong>opt-out</strong> flag is set
 					in NSEC3 RRs to indicate that their presence is only sufficient to
 					prove insecure delegations (i.e., lack of DS records) and nothing more.
 					Thus, a name error (NXDOMAIN) response, for example, cannot be securely
@@ -237,7 +237,7 @@
 					opt-out flag set are denoted by diagonals within the corners of the
 					NSEC3 node.</p></td></tr>
 			<tr><td><img src="images/nsec-invalid.png"
-					alt="NSEC insufficient to prove non-existence" /></td><td><p>A solid
+					alt="Invalid NSEC" /></td><td><p>A solid
 					red edge from the NSEC or NSEC3 node to the negative response indicates
 					that the NSEC or NSEC3 RRs included in in the response do not prove the
 					validity of the negative response.</p></td></tr>
@@ -246,7 +246,7 @@
 		<h4><a name="rrsigs">RRSIGs</a></h4>
 		<table>
 			<tr><td><img src="images/rrsig-rrset.png"
-					alt="RRSIG edge" /></td><td><p>Each <strong>RRSIG</strong> RR contains
+					alt="RRSIG" /></td><td><p>Each <strong>RRSIG</strong> RR contains
 					the cryptographic signature made by a DNSKEY over an RRset.  Using the
 					DNSKEY with the same algorithm and key tag as the RRSIG, the RRset
 					which was signed, and the RRSIG itself, a resolver may determine the
@@ -268,7 +268,7 @@
 					<strong>inception</strong> and <strong>expiration</strong> date fields
 					in the RRSIG RR.</p></td></tr>
 			<tr><td><img src="images/rrsig-rrset-nodnskey.png"
-					alt="No DNSKEY" /></td><td><p>A dashed gray line stemming from a DNSKEY
+					alt="RRSIG with no matching DNSKEY" /></td><td><p>A dashed gray line stemming from a DNSKEY
 					with a dashed gray border indicates that <strong>no DNSKEY matching the
 						algorithm and key tag</strong> of the RRSIG RR could be found in the
 					DNSKEY RRset (or the DNSKEY RRset could not be
@@ -279,7 +279,7 @@
 					every <strong>algorithm</strong> in the DNSKEY RRset, as per RFC
 					4035.</p></td></tr>
 			<tr><td><img src="images/rrsig-rrset-pre-revoke.png"
-					alt="No DNSKEY" /></td><td><p>A special case of an RRSIG with no
+					alt="RRSIG matching DNSKEY prior to its revocation" /></td><td><p>A special case of an RRSIG with no
 					matching DNSKEY is when <strong>the RRSIG matched a DNSKEY prior to its
 						revocation</strong>, but the ramifications are the same as if it
 					didn't match any DNSKEY.  The line is simply drawn to help identify the
@@ -288,7 +288,7 @@
 					the new key tag resulting from having set the revoke bit in the DNSKEY
 					RR.</p></td></tr>
 			<tr><td><img src="images/rrsig-rrset-unknown-alg.png"
-					alt="" /></td><td><p>When the algorithm and key tag of an RRSIG RR
+					alt="DNSKEY with unknown algorithm" /></td><td><p>When the algorithm and key tag of an RRSIG RR
 					match those of a DNSKEY RR, but <strong>the cryptographic algorithm
 						associated with the RRSIG is unknown or unsupported</strong>, then
 					the line stemming from the DNSKEY is yellow.  In the example at the
@@ -315,7 +315,7 @@
 					represent a single RRSIG corresponding to the key with algorithm 8 and
 					key tag 54321.</p></td></tr>
 			<tr><td><img src="images/rrsig-dnskey-redundant.png"
-					alt="RRSIG covering a DNSKEY RRset" /></td><td><p>In some DNSSEC
+					alt="RRSIG covering a DNSKEY RRset, with redundant edges" /></td><td><p>In some DNSSEC
 					implementations, multiple DNSKEYs sign the DNSKEY RRset, even though
 					only a subset are designated to provide secure entry into the zone
 					(e.g., via matching DS records in the parent zone).  While there is
@@ -323,7 +323,7 @@
 					representing such scenarios can be visually complex because of the
 					cycles and redundancy created in the graph.</p></td></tr>
 			<tr><td><img src="images/rrsig-dnskey-pruned.png"
-					alt="RRSIG covering a DNSKEY RRset" /></td><td><p>In order to represent
+					alt="RRSIG covering a DNSKEY RRset, with redundant edges pruned" /></td><td><p>In order to represent
 					trust propagation in a simplified fashion, eliminating graphic
 					redundancies, DNSViz exhibits the following behavior.  For
 					<strong>every</strong> DNSKEY signing the DNSKEY RRset, a self-directed
@@ -336,7 +336,7 @@
 					siging DNSKEY RRset or other RRsets) and properties (e.g., SEP
 					bit).</p></td></tr>
 			<tr><td><img src="images/rrsig-ds.png"
-					alt="RRSIG covering a DNSKEY RRset" /></td><td><p>Like the DNSKEY
+					alt="RRSIG covering a DS RRset" /></td><td><p>Like the DNSKEY
 					RRset, a single DS RRset might be represented as several different
 					nodes.  As such a single RRSIG covering the DS RRset is represented by
 					edges drawn from the node representing the signing DNSKEY to the nodes
@@ -346,7 +346,7 @@
 					collectively represent a single RRSIG corresponding to the key with
 					algorithm 8 and key tag 12345.</p></td></tr>
 			<tr><td><img src="images/rrsig-nsec.png"
-					alt="RRSIG covering a DNSKEY RRset" /></td><td><p>Because an NSEC or
+					alt="RRSIGs covering NSEC RRsets" /></td><td><p>Because an NSEC or
 					NSEC3 node represents one or more RRsets and at least one RRSIG per
 					RRset is anticipated, the RRSIG edges from DNSKEY to NSEC or NSEC3
 					nodes are aggregated into a single edge.  The color of this edge is
@@ -360,7 +360,7 @@
 		<h4><a name="wildcards">Wildcards</a></h4>
 		<table>
 			<tr><td><img src="images/wildcard.png"
-					alt="wildcard" /></td><td><p>When the RRSIG covering an RRset has a
+					alt="Wildcard" /></td><td><p>When the RRSIG covering an RRset has a
 					labels field with value greater than the number of labels in the name,
 					it is indicative that the resulting RRset was formed by a wildcard
 					expansion.  The server must additionally include an NSEC or NSEC3 proof
@@ -374,7 +374,7 @@
 		<h4><a name="node-status">Node Status</a></h4>
 		<table>
 			<tr><td><img src="images/nodes-secure.png"
-					alt="Secure node" /></td><td><p>Beginning at the DNSKEYs designated as
+					alt="Secure nodes" /></td><td><p>Beginning at the DNSKEYs designated as
 					trust anchors, DNSViz traverses the nodes and edges in the graph to
 					classify each node as having one of three DNSSEC statuses, depending on
 					the status of the RRset which it represents: <strong>secure</strong>,
@@ -387,11 +387,11 @@
 					outline indicate that they are <strong>secure</strong>, that there is
 					an unbroken chain of trust from anchor to RRset.</p></td></tr>
 			<tr><td><img src="images/nodes-bogus.png"
-					alt="Bogus node" /></td><td><p>Nodes with red outline indicate that
+					alt="Bogus nodes" /></td><td><p>Nodes with red outline indicate that
 					they are <strong>bogus</strong>, that the chain of trust from an anchor
 					has been broken.</p></td></tr>
 			<tr><td><img src="images/nodes-insecure.png"
-					alt="Insecure node" /></td><td><p>Nodes with black outline indicate
+					alt="Insecure nodes" /></td><td><p>Nodes with black outline indicate
 					that they are <strong>insecure</strong>, that no chain of trust exists;
 					if any anchors exist then an insecure delegation is demonstrated to
 					prove that no chain should exist from the anchors.  This is equivalent
@@ -405,20 +405,20 @@
 					detected with the data represented by a node in the graph, then a
 					warning icon is displayed in the node.</p></td></tr>
 			<tr><td><img src="images/edges-warnings.png"
-					alt="Nodes with warnings" /></td><td><p>Similarly, the warning icon is
+					alt="Edges with warnings" /></td><td><p>Similarly, the warning icon is
 					displayed alongside edges whose represented data has
 					warnings.</p></td></tr>
 			<tr><td><img src="images/nodes-errors.png"
-					alt="Nodes with warnings" /></td><td><p>If one or more errors (more
+					alt="Nodes with errors" /></td><td><p>If one or more errors (more
 					severe than warnings) are detected with the data represented by a node
 					in the graph, then an error icon is displayed in the
 					node.</p></td></tr>
 			<tr><td><img src="images/edges-errors.png"
-					alt="Nodes with warnings" /></td><td><p>Similarly, the error icon is
+					alt="Edges with errors" /></td><td><p>Similarly, the error icon is
 					displayed alongside edges whose represented data has
 					errors.</p></td></tr>
 			<tr><td><img src="images/response-error.png"
-					alt="Nodes with warnings" /></td><td><p>An error icon with an italicized
+					alt="Response error" /></td><td><p>An error icon with an italicized
 					label denotes a response error, e.g., due to timeout, malformed response,
 					or invalid RCODE.</p></td></tr>
 		</table>
