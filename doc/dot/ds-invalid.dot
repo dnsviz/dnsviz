@@ -28,11 +28,15 @@ digraph {
 			fillcolor="lightgray",
 			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=8, id=54321</FONT>>,
 			shape=ellipse,
-			style=filled];
+			style=filled,
+			penwidth=4.0];
 		"cluster_example.com_top" [shape=point, style=invis];
 		"cluster_example.com_bottom" [shape=point, style=invis];
   }
 	"cluster_com_bottom" -> "DS-1_2|example.com|8|54321|1_2" [style=invis];
+	"DNSKEY-0|example.com|8|54321" -> "DNSKEY-0|example.com|8|54321" [dir=back,
+		color="#0a879a",
+		style="solid"];
 	"DNSKEY-0|example.com|8|54321"-> "DS-1_2|example.com|8|54321|1_2" [style=dashed,
 		color="#be1515",
 		dir=back];
