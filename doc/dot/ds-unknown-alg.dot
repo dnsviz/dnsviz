@@ -10,9 +10,9 @@ digraph {
 				penwidth=0.5
 		];
 
-		"DS-1_2|example.com|8|54321|1_2" [color="#000000",
+		"DS-19|example.com|8|54321|19" [color="#000000",
 			fillcolor="#ffffff",
-			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DS</FONT><BR/><FONT POINT-SIZE="10">digest algs=1,2</FONT>>,
+			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DS</FONT><BR/><FONT POINT-SIZE="10">digest alg=19</FONT>>,
 			shape=ellipse,
 			style=filled];
 		"cluster_com_top" [shape=point, style=invis];
@@ -32,8 +32,8 @@ digraph {
 		"cluster_example.com_top" [shape=point, style=invis];
 		"cluster_example.com_bottom" [shape=point, style=invis];
   }
-	"cluster_com_bottom" -> "DS-1_2|example.com|8|54321|1_2" [style=invis];
-	"DNSKEY-0|example.com|8|54321"-> "DS-1_2|example.com|8|54321|1_2" [style=solid,
+	"cluster_com_bottom" -> "DS-19|example.com|8|54321|19" [style=invis];
+	"DNSKEY-0|example.com|8|54321"-> "DS-19|example.com|8|54321|19" [style=solid,
 		color="#f4b800",
 		dir=back];
 	"cluster_example.com_top" -> cluster_com_bottom [color="#000000",

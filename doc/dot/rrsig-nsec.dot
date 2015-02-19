@@ -16,20 +16,22 @@ digraph {
 			fillcolor="#ffffff",
 			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=8, id=12345</FONT>>,
 			shape=ellipse,
-			style=filled,
-			penwidth=4.0];
-    "RRset-10|example.com|A" [color="#000000",
+			style=filled];
+    "RRset-0|foobar.example.com|A" [color="#d0d0d0",
 						fillcolor="#ffffff",
-						label=<<FONT POINT-SIZE="12" FACE="Helvetica">example.com/A</FONT>>,
+						label=<<FONT POINT-SIZE="12" FACE="Helvetica">foobar.example.com</FONT>>,
 						shape=rectangle,
-						style="rounded,filled"];
+						style="rounded,filled,dashed,diagonals"];
+		"NSEC-0|foobar.example.com|A" [color="#000000",
+						fillcolor="#ffffff",
+						label=<<FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT>>,
+						shape=diamond,
+						style=filled];
   }
-	"cluster_example.com_bottom" -> "RRset-10|example.com|A" [style=invis];
-	"DNSKEY-0|example.com|8|12345" -> "DNSKEY-0|example.com|8|12345" [dir=back,
+	"cluster_example.com_bottom" -> "RRset-0|foobar.example.com|A" [style=invis];
+	"NSEC-0|foobar.example.com|A" -> "DNSKEY-0|example.com|8|12345" [dir=back,
 		color="#0a879a",
 		style="solid"];
-	"RRset-10|example.com|A" -> "DNSKEY-0|example.com|8|12345" [dir=back,
-		color="#be1515",
-		style="dashed"];
+	"RRset-0|foobar.example.com|A" -> "NSEC-0|foobar.example.com|A" [color="#0a879a", dir=back, style=solid];
 	"DNSKEY-0|example.com|8|12345" -> "cluster_example.com_top" [style=invis];
 }
