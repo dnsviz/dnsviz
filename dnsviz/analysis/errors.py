@@ -1152,12 +1152,12 @@ class MissingSEPForAlg(DelegationError):
     '''
     >>> e = MissingSEPForAlg(algorithm=5, source='DS')
     >>> e.description
-    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no key with algorithm 5 was found signing the zone's DNSKEY RRset."
+    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no DS RR matched a DNSKEY with algorithm 5 that signs the zone's DNSKEY RRset."
     '''
 
     _abstract = False
     code = 'MISSING_SEP_FOR_ALG'
-    description_template = "The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no key with algorithm %(algorithm)d was found signing the zone's DNSKEY RRset."
+    description_template = "The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no %(source)s RR matched a DNSKEY with algorithm %(algorithm)d that signs the zone's DNSKEY RRset."
     references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
     required_params = ['algorithm']
 
