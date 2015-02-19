@@ -12,9 +12,9 @@ digraph {
 		];
 		"cluster_example.com_top" [shape=point, style=invis];
 		"cluster_example.com_bottom" [shape=point, style=invis];
-		"DNSKEY-0|example.com|8|12345"	 [color="#000000",
+		"DNSKEY-0|example.com|22|12345"	 [color="#000000",
 			fillcolor="#ffffff",
-			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=8, id=12345</FONT>>,
+			label=<<FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT><BR/><FONT POINT-SIZE="10">alg=22, id=12345</FONT>>,
 			shape=ellipse,
 			style=filled];
     "RRset-10|example.com|A" [color="#000000",
@@ -24,8 +24,8 @@ digraph {
 						style="rounded,filled"];
   }
 	"cluster_example.com_bottom" -> "RRset-10|example.com|A" [style=invis];
-	"RRset-10|example.com|A" -> "DNSKEY-0|example.com|8|12345" [dir=back,
+	"RRset-10|example.com|A" -> "DNSKEY-0|example.com|22|12345" [dir=back,
 		color="#f4b800",
 		style="solid"];
-	"DNSKEY-0|example.com|8|12345" -> "cluster_example.com_top" [style=invis];
+	"DNSKEY-0|example.com|22|12345" -> "cluster_example.com_top" [style=invis];
 }
