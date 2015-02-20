@@ -131,7 +131,7 @@ def main():
         else:
             fmt = 'dot'
         if fmt not in ('dot','png','jpg','svg','html'):
-            usage('Format unrecognized: "%s"' % fmt)
+            usage('Image format unrecognized: "%s"' % fmt)
             sys.exit(1)
 
         if '-o' in opts and '-O' in opts:
