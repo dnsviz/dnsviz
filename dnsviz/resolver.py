@@ -90,7 +90,7 @@ class DNSAnswerNoAnswerAllowed(DNSAnswer):
 class Resolver:
     '''A simple stub DNS resolver.'''
 
-    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False):
+    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False, client_ipv4=None, client_ipv6=None, port=53):
         if lifetime is None and max_attempts is None:
             raise ValueError("At least one of lifetime or max_attempts must be specified for a Resolver instance.")
 
@@ -100,6 +100,9 @@ class Resolver:
         self._max_attempts = max_attempts
         self._lifetime = lifetime
         self._shuffle = shuffle
+        self._client_ipv4 = client_ipv4
+        self._client_ipv6 = client_ipv6
+        self._port = port
 
     @classmethod
     def from_file(cls, resolv_conf, query_cls):
@@ -204,7 +207,7 @@ class Resolver:
                     server = servers[server_index]
                     if server in valid_servers[query_tuple]:
                         timeout = min(self._timeout, max((start + self._lifetime) - now, 0))
-                        q = self._query_cls(query_tuple[0], query_tuple[1], query_tuple[2], server, None, query_timeout=timeout, max_attempts=1)
+                        q = self._query_cls(query_tuple[0], query_tuple[1], query_tuple[2], server, None, client_ipv4=self._client_ipv4, client_ipv6=self._client_ipv6, port=self._port, query_timeout=timeout, max_attempts=1)
                         queries[query_tuple] = q
 
                     attempts[query_tuple] += 1
