@@ -181,8 +181,10 @@ class Resolver:
                     except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
                         answers[query_tuple] = e
                 # if we received a message that was invalid or if there was
-                # some error other than a timeout then label the server invalid
-                elif response.message is not None or response.error != query.RESPONSE_ERROR_TIMEOUT:
+                # some error other than a timeout or network error, then label
+                # the server invalid
+                elif response.message is not None or \
+                        response.error not in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):
                     valid_servers[query_tuple].remove(server)
 
             tuples_to_query = query_tuples.difference(answers)
