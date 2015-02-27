@@ -120,6 +120,9 @@ class Resolver:
             servers.append(IPAddr('127.0.0.1'))
         return Resolver(servers, query_cls)
 
+    def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
+        return self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values()[0]
+
     def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
         answer = self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
         if isinstance(answer, DNSAnswer):
