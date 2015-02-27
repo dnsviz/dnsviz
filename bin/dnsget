@@ -35,7 +35,7 @@ import time
 
 import dns.exception, dns.name
 
-from dnsviz.analysis import PrivateAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver
+from dnsviz.analysis import PrivateAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 
