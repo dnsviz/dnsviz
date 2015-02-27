@@ -120,22 +120,46 @@ class Resolver:
             servers.append(IPAddr('127.0.0.1'))
         return Resolver(servers, query_cls)
 
-    def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
-        answer = self.query_multiple((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
+    def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
+        answer = self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
         if isinstance(answer, DNSAnswer):
             return answer
         else:
             raise answer
 
-    def query_multiple(self, *query_tuples, **kwargs):
-        valid_servers = {}
-        answers = {}
-        attempts = {}
-
-        if kwargs.get('allow_noanswer', False):
+    def query_multiple_for_answer(self, *query_tuples, **kwargs):
+        if kwargs.pop('allow_noanswer', False):
             answer_cls = DNSAnswerNoAnswerAllowed
         else:
             answer_cls = DNSAnswer
+
+        responses = self.query_multiple(*query_tuples)
+
+        answers = {}
+        for query_tuple, (server, response) in responses.items():
+            # no servers were queried
+            if response is None:
+                answers[query_tuple] = dns.resolver.NoNameservers()
+            # response was valid
+            elif response.is_complete_response() and response.is_valid_response():
+                try:
+                    answers[query_tuple] = answer_cls(query_tuple[0], query_tuple[1], response.message, server)
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
+                    answers[query_tuple] = e
+            # response was timeout or network error
+            elif response.error in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):
+                answers[query_tuple] = dns.exception.Timeout()
+            # there was a response, but it was invalid for some reason
+            else:
+                answers[query_tuple] = dns.resolver.NoNameservers()
+
+        return answers
+
+    def query_multiple(self, *query_tuples, **kwargs):
+        valid_servers = {}
+        responses = {}
+        last_responses = {}
+        attempts = {}
 
         query_tuples = set(query_tuples)
         for query_tuple in query_tuples:
@@ -148,21 +172,27 @@ class Resolver:
         else:
             servers = self._servers
 
-        tuples_to_query = query_tuples.difference(answers)
+        tuples_to_query = query_tuples.difference(last_responses)
         start = time.time()
         while tuples_to_query and (self._lifetime is None or time.time() - start < self._lifetime):
             now = time.time()
             queries = {}
             for query_tuple in tuples_to_query:
                 if not valid_servers[query_tuple]:
-                    answers[query_tuple] = dns.resolver.NoNameservers()
+                    try:
+                        last_responses[query_tuple] = responses[query_tuple]
+                    except KeyError:
+                        last_responses[query_tuple] = None
                     continue
 
                 while query_tuple not in queries:
                     cycle_num, server_index = divmod(attempts[query_tuple], len(servers))
                     # if we've exceeded our maximum attempts, then break out
                     if cycle_num >= self._max_attempts:
-                        answers[query_tuple] = dns.exception.Timeout()
+                        try:
+                            last_responses[query_tuple] = responses[query_tuple]
+                        except KeyError:
+                            last_responses[query_tuple] = None
                         break
 
                     server = servers[server_index]
@@ -178,24 +208,24 @@ class Resolver:
             for query_tuple, q in queries.items():
                 server, client_response = q.responses.items()[0]
                 client, response = client_response.items()[0]
+                responses[query_tuple] = (server, response)
+                # if we received a complete message with an acceptable rcode,
+                # then accept it as the last response
                 if response.is_complete_response() and response.is_valid_response():
-                    try:
-                        answers[query_tuple] = answer_cls(query_tuple[0], query_tuple[1], response.message, server)
-                    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
-                        answers[query_tuple] = e
-                # if we received a message that was invalid or if there was
-                # some error other than a timeout or network error, then label
-                # the server invalid
+                    last_responses[query_tuple] = responses[query_tuple]
+                # if we received a message that was incomplete (i.e.,
+                # truncated), had an invalid rcode, was malformed, or was
+                # otherwise invalid, then invalidate the server
                 elif response.message is not None or \
                         response.error not in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):
                     valid_servers[query_tuple].remove(server)
 
-            tuples_to_query = query_tuples.difference(answers)
+            tuples_to_query = query_tuples.difference(last_responses)
 
         for query_tuple in tuples_to_query:
-            answers[query_tuple] = dns.exception.Timeout()
+            last_responses[query_tuple] = responses[query_tuple]
 
-        return answers
+        return last_responses
 
 def main():
     import sys
@@ -218,7 +248,7 @@ def main():
         r = get_standard_resolver()
     else:
         r = Resolver(map(IPAddr, sys.argv[3:]), query.StandardRecursiveQuery)
-    a = r.query(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]))
+    a = r.query_for_answer(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]))
 
     print 'Response for %s/%s:' % (args[0], args[1])
     print '   from %s: %s (%d bytes)' % (a.server, repr(a.response), len(a.response.to_wire()))
