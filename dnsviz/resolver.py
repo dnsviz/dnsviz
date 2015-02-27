@@ -133,7 +133,7 @@ class Resolver:
         else:
             answer_cls = DNSAnswer
 
-        responses = self.query_multiple(*query_tuples)
+        responses = self.query_multiple(*query_tuples, accept_first_response=False, continue_on_servfail=True)
 
         answers = {}
         for query_tuple, (server, response) in responses.items():
@@ -160,6 +160,9 @@ class Resolver:
         responses = {}
         last_responses = {}
         attempts = {}
+
+        accept_first_response = kwargs.get('accept_first_response', False)
+        continue_on_servfail = kwargs.get('continue_on_servfail', True)
 
         query_tuples = set(query_tuples)
         for query_tuple in query_tuples:
@@ -215,9 +218,18 @@ class Resolver:
                     last_responses[query_tuple] = responses[query_tuple]
                 # if we received a message that was incomplete (i.e.,
                 # truncated), had an invalid rcode, was malformed, or was
-                # otherwise invalid, then invalidate the server
+                # otherwise invalid, then accept the response (if directed),
+                # and invalidate the server
                 elif response.message is not None or \
                         response.error not in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):
+                    # accept_first_response is true, then accept the response
+                    if accept_first_response:
+                        last_responses[query_tuple] = responses[query_tuple]
+                    # if the response was SERVFAIL, and we were not directed to
+                    # continue, then accept the response
+                    elif response.message is not None and \
+                            response.message.rcode() == dns.rcode.SERVFAIL and not continue_on_servfail:
+                        last_responses[query_tuple] = responses[query_tuple]
                     valid_servers[query_tuple].remove(server)
 
             tuples_to_query = query_tuples.difference(last_responses)
