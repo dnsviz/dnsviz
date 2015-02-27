@@ -214,7 +214,7 @@ def main():
     if len(args) < 3:
         r = get_standard_resolver()
     else:
-        r = Resolver(sys.argv[3:], query.StandardRecursiveQuery)
+        r = Resolver(map(IPAddr, sys.argv[3:]), query.StandardRecursiveQuery)
     a = r.query(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]))
 
     print 'Response for %s/%s:' % (args[0], args[1])
