@@ -110,7 +110,10 @@ class Resolver:
                     line = line.strip()
                     words = line.split()
                     if len(words) > 1 and words[0] == 'nameserver':
-                        servers.append(IPAddr(words[1]))
+                        try:
+                            servers.append(IPAddr(words[1]))
+                        except ValueError:
+                            pass
         except IOError:
             pass
         if not servers:
