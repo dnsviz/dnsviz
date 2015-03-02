@@ -206,7 +206,10 @@ class Resolver:
 
                     server = servers[server_index]
                     if server in valid_servers[query_tuple]:
-                        timeout = min(self._timeout, max((start + self._lifetime) - now, 0))
+                        if self._lifetime is not None:
+                            timeout = min(self._timeout, max((start + self._lifetime) - now, 0))
+                        else:
+                            timeout = self._timeout
                         q = self._query_cls(query_tuple[0], query_tuple[1], query_tuple[2], server, None, client_ipv4=self._client_ipv4, client_ipv6=self._client_ipv6, port=self._port, query_timeout=timeout, max_attempts=1)
                         queries[query_tuple] = q
 
