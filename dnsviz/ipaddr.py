@@ -19,6 +19,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+import binascii
 import socket
 
 class IPAddr(str):
@@ -80,3 +81,16 @@ class IPAddr(str):
 
     def __hash__(self):
         return hash(self._ipaddr_bytes)
+
+    def arpa_name(self):
+        if self.version == 6:
+            nibbles = [n for n in binascii.hexlify(self._ipaddr_bytes)]
+            nibbles.reverse()
+            name = '.'.join(nibbles)
+            name += '.ip6.arpa.'
+        else:
+            octets = self.split('.')
+            octets.reverse()
+            name = '.'.join(octets)
+            name += '.in-addr.arpa.'
+        return name
