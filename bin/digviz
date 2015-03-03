@@ -359,7 +359,10 @@ class DigCommandLineQuery:
             if self.show_comments:
                 s += ';; Got answer:\n'
                 s += ';; ->>HEADER<<- opcode: %s, status: %s, id: %d\n' % (dns.opcode.to_text(response.message.opcode()), dns.rcode.to_text(response.message.rcode()), response.message.id)
-                s += ';; flags: %s; QUERY: %d, ANSWER: %d, AUTHORITY: %d, ADDITIONAL: %d\n\n' % (dns.flags.to_text(response.message.flags).lower(), question_ct, answer_ct, authority_ct, additional_ct)
+                s += ';; flags: %s; QUERY: %d, ANSWER: %d, AUTHORITY: %d, ADDITIONAL: %d\n' % (dns.flags.to_text(response.message.flags).lower(), question_ct, answer_ct, authority_ct, additional_ct)
+                if (self.flags & dns.flags.RD) and not (response.message.flags & dns.flags.RA):
+                    s += ';; WARNING: recursion requested but not available\n'
+                s += '\n'
                 if response.message.edns >= 0:
                     s += ';; OPT PSEUDOSECTION:\n'
                     s += '; EDNS: version: %d, flags: %s; udp: %d\n' % (response.message.edns, dns.flags.edns_to_text(response.message.ednsflags).lower(), response.message.payload)
