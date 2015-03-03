@@ -438,7 +438,7 @@ class DigCommandLine:
         self._process_nameservers()
 
         if not self.queries:
-            self.queries.append(DigCommandLineQuery('.', dns.rdatatype.A, dns.rdataclass.IN))
+            self.queries.append(DigCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
         for q in self.queries:
             q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
