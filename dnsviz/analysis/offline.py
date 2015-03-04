@@ -439,13 +439,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             else:
                                 err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False))
 
+                    # if EDNS was disabled in the request, but the response was
+                    # still bad (indicated by the lack of a value for
+                    # responsive_cause_index), then don't report this as an
+                    # EDNS error
+                    else:
+                        pass
+
                 # if the ultimate request used EDNS, then it was simply ignored
                 # by the server
                 else:
                     err = Errors.EDNSIgnored()
 
                 #TODO handle this better
-                if err is None:
+                if err is None and response.responsive_cause_index is not None:
                     raise Exception('Unknown EDNS-related error')
 
             # the response did use EDNS
