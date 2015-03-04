@@ -439,6 +439,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             else:
                                 err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False))
 
+                        #XXX is there another (future) reason why  we would
+                        # have disabled EDNS?
+                        else:
+                            pass
+
                     # if EDNS was disabled in the request, but the response was
                     # still bad (indicated by the lack of a value for
                     # responsive_cause_index), then don't report this as an
@@ -502,6 +507,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         err = Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
                                     else:
                                         err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False), flag=dns.flags.edns_to_text(f))
+
+                                #XXX is there another (future) reason why we would
+                                # have disabled an EDNS flag?
+                                else:
+                                    pass
 
                             # if an EDNS flag was disabled in the request,
                             # but the response was still bad (indicated by
