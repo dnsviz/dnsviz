@@ -480,7 +480,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if ((response.query.edns_flags & f) != (response.effective_edns_flags & f)):
                             # find out if this really appears to be a flag issue,
                             # by seeing if any other queries to this server with
-                            # the DO bit were also unsuccessful 
+                            # the specified flag were also unsuccessful 
                             if response.responsive_cause_index is not None:
                                 if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
