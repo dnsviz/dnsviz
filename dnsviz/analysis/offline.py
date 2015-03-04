@@ -503,12 +503,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                     else:
                                         err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.query.tcp_first, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False), flag=dns.flags.edns_to_text(f))
 
+                            # if an EDNS flag was disabled in the request,
+                            # but the response was still bad (indicated by
+                            # the lack of a value for
+                            # responsive_cause_index), then don't report
+                            # this as an EDNS flag error
+                            else:
+                                pass
 
                         if err is not None:
                             break
-                        
+
                     #TODO handle this better
-                    if err is None:
+                    if err is None and response.responsive_cause_index is not None:
                         raise Exception('Unknown EDNS-flag-related error')
 
             if err is not None:
