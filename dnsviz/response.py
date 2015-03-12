@@ -620,7 +620,7 @@ class RRsetInfo(DNSResponseComponent):
         return self.rrset == other.rrset and self.rrset.ttl == other.rrset.ttl and self.dname_info == other.dname_info
             
     @classmethod
-    def _rr_cmp(cls, a, b):
+    def rdata_cmp(cls, a, b):
         '''Compare the wire value of rdata a and rdata b.'''
 
         #XXX This is necessary because of a bug in dnspython
@@ -689,7 +689,7 @@ class RRsetInfo(DNSResponseComponent):
         rrsig.signer.canonicalize().to_wire(s)
 
         rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=self._rr_cmp)
+        rdata_list.sort(cmp=self.rdata_cmp)
 
         rrset_name = self.reduce_wildcard(rrsig).canonicalize()
         for rdata in rdata_list:
@@ -719,7 +719,7 @@ class RRsetInfo(DNSResponseComponent):
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
         rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=self._rr_cmp)
+        rdata_list.sort(cmp=self.rdata_cmp)
         for rdata in rdata_list:
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
