@@ -66,7 +66,7 @@ class DigCommandLineQuery:
         self.edns_max_udp_payload = 4096
         self.edns_flags = 0
         self.edns_options = []
-        self.tcp_first = False
+        self.tcp = False
         self.query_timeout = 5.0
         self.max_attempts = 3
         self.lifetime = None
@@ -226,9 +226,9 @@ class DigCommandLineQuery:
                 self.show_stats = False
             #TODO +[no]subnet=addr/prefix
             elif arg in ('+tcp', '+vc'):
-                self.tcp_first = True
+                self.tcp = True
             elif arg in ('+notcp', '+novc'):
-                self.tcp_first = False
+                self.tcp = False
             elif arg.startswith('+time') and \
                     (len(arg) <= 5 or arg[5] == '='):
                 try:
@@ -291,7 +291,7 @@ class DigCommandLineQuery:
             edns_max_udp_payload = self.edns_max_udp_payload
             edns_flags = self.edns_flags
             edns_options = self.edns_options
-            tcp_first = self.tcp_first
+            tcp = self.tcp
             response_handlers = self.handlers
         
         return Resolver.Resolver(self.nameservers, CustomQuery,

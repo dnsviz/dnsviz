@@ -114,7 +114,7 @@ class DNSResponse:
         edns_options = self.query.edns_options[:]
 
         # mark whether TCP or UDP was attempted initially
-        tcp_attempted = tcp = self.query.tcp_first
+        tcp_attempted = tcp = self.query.tcp
         udp_attempted = not tcp
 
         tcp_responsive = False

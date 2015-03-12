@@ -772,7 +772,7 @@ class DNSQuery(object):
     '''An simple DNS Query and its responses.'''
 
     def __init__(self, qname, rdtype, rdclass,
-            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first):
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp):
 
         self.qname = qname
         self.rdtype = rdtype
@@ -782,7 +782,7 @@ class DNSQuery(object):
         self.edns_max_udp_payload = edns_max_udp_payload
         self.edns_flags = edns_flags
         self.edns_options = edns_options
-        self.tcp_first = tcp_first
+        self.tcp = tcp
 
         self.responses = {}
 
@@ -793,7 +793,7 @@ class DNSQuery(object):
         future use, then these will need to be copies.'''
 
         clone = DNSQuery(self.qname, self.rdtype, self.rdclass,
-                self.flags, self.edns, self.edns_max_udp_payload, self.edns_flags, self.edns_options, self.tcp_first)
+                self.flags, self.edns, self.edns_max_udp_payload, self.edns_flags, self.edns_options, self.tcp)
 
         if with_responses:
             for server in self.responses:
@@ -813,7 +813,7 @@ class DNSQuery(object):
                 self.rdclass == query.rdclass and self.flags == query.flags and \
                 self.edns == query.edns and self.edns_max_udp_payload == query.edns_max_udp_payload and \
                 self.edns_flags == query.edns_flags and self.edns_options == query.edns_options and \
-                self.tcp_first == query.tcp_first):
+                self.tcp == query.tcp):
             raise ValueError('DNS query parameters for DNSQuery instances being joined must be the same.')
 
         clone = self.copy(bailiwick_map, default_bailiwick)
@@ -952,7 +952,7 @@ class DNSQuery(object):
                 s = StringIO.StringIO()
                 o.to_wire(s)
                 d['edns_options'].append(base64.b64encode(s.getvalue()))
-            d['tcp_first'] = self.tcp_first
+            d['tcp'] = self.tcp
 
         d['responses'] = collections.OrderedDict()
         servers = self.responses.keys()
@@ -986,10 +986,15 @@ class DNSQuery(object):
             edns_max_udp_payload = None
             edns_flags = None
             edns_options = []
-        tcp_first = d['tcp_first']
+
+        #XXX backwards compatibility with previous version
+        if 'tcp_first' in d:
+            tcp = d['tcp_first']
+        else:
+            tcp = d['tcp']
 
         q = DNSQuery(qname, rdtype, rdclass,
-                flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first)
+                flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
 
         for server in d['responses']:
             bailiwick = bailiwick_map.get(IPAddr(server), default_bailiwick)
@@ -999,9 +1004,9 @@ class DNSQuery(object):
 
 class DNSQueryAggregateDNSResponse(DNSQuery, AggregateDNSResponse):
     def __init__(self, qname, rdtype, rdclass,
-            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first):
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp):
         DNSQuery.__init__(self, qname, rdtype, rdclass,
-            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first)
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
         AggregateDNSResponse.__init__(self)
 
     def add_response(self, server, client, response, bailiwick):
@@ -1027,7 +1032,7 @@ class MultiQuery(object):
             s = StringIO.StringIO()
             o.to_wire(s)
             edns_options_str += o.getvalue()
-        params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp_first)
+        params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp)
         if params in self.queries:
             self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
         else:
@@ -1069,11 +1074,11 @@ class ExecutableDNSQuery(DNSQuery):
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
             client_ipv4, client_ipv6, port,
-            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first,
+            flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
         super(ExecutableDNSQuery, self).__init__(qname, rdtype, rdclass,
-                flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp_first)
+                flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
 
         if not isinstance(servers, set):
             if isinstance(servers, (list, tuple)):
@@ -1109,7 +1114,7 @@ class ExecutableDNSQuery(DNSQuery):
         else:
             client = self.client_ipv4
 
-        params = { 'tcp': self.tcp_first, 'sport': None, 'wait': 0, 'timeout': self.query_timeout }
+        params = { 'tcp': self.tcp, 'sport': None, 'wait': 0, 'timeout': self.query_timeout }
 
         response_handlers = [RetryOnNetworkErrorHandler(3).build()] + [h.build() for h in self.response_handlers] + \
             [RetryOnTimeoutHandler().build(), DefaultAcceptHandler().build()]
@@ -1257,7 +1262,7 @@ class DNSQueryFactory(object):
     edns_flags = 0
     edns_options = []
 
-    tcp_first = False
+    tcp = False
 
     query_timeout = 3.0
     max_attempts = 5
@@ -1280,12 +1285,12 @@ class DNSQueryFactory(object):
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
                 client_ipv4, client_ipv6, port,
-                cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp_first,
+                cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 
         else:
             return DNSQuery(qname, rdtype, rdclass,
-                cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp_first)
+                cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp)
 
     def __init__(self, *args, **kwargs):
         raise NotImplemented()
@@ -1385,7 +1390,7 @@ class TCPDiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
     compatibility and connectivity issues over TCP.'''
 
-    tcp_first = True
+    tcp = True
 
     response_handlers = [
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]
@@ -1398,7 +1403,7 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
     compatibility and connectivity issues, beginning with TCP.'''
 
-    tcp_first = True
+    tcp = True
 
     response_handlers = [
             DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler()]
