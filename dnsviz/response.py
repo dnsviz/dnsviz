@@ -634,6 +634,25 @@ class RRsetInfo(DNSResponseComponent):
         else:
             return 0
 
+    @classmethod
+    def rrset_canonicalized_to_wire(cls, rrset, name, ttl):
+        s = StringIO.StringIO()
+
+        rdata_list = list(rrset)
+        rdata_list.sort(cmp=cls.rdata_cmp)
+
+        for rdata in rdata_list:
+            rdata_wire = rdata.to_digestable()
+            rdata_len = len(rdata_wire)
+
+            name.to_wire(s)
+            stuff = struct.pack("!HHIH", rrset.rdtype, rrset.rdclass,
+                                ttl, rdata_len)
+            s.write(stuff)
+            s.write(rdata_wire)
+
+        return s.getvalue()
+
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
 
@@ -687,21 +706,12 @@ class RRsetInfo(DNSResponseComponent):
                              rrsig.inception, rrsig.key_tag)
         s.write(rdata_wire)
         rrsig.signer.canonicalize().to_wire(s)
-
-        rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=self.rdata_cmp)
+        rrsig_canonicalized_wire = s.getvalue()
 
         rrset_name = self.reduce_wildcard(rrsig).canonicalize()
-        for rdata in rdata_list:
-            rdata_wire = rdata.to_digestable()
-            rdata_len = len(rdata_wire)
+        rrset_canonicalized_wire = self.rrset_canonicalized_to_wire(self.rrset, rrset_name, rrsig.original_ttl)
 
-            rrset_name.to_wire(s)
-            stuff = struct.pack("!HHIH", self.rrset.rdtype, self.rrset.rdclass,
-                                rrsig.original_ttl, rdata_len)
-            s.write(stuff)
-            s.write(rdata_wire)
-        return s.getvalue()
+        return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
     def serialize(self, include_rrsig_info=True, show_servers=True, consolidate_clients=True, html_format=False):
         d = collections.OrderedDict()
