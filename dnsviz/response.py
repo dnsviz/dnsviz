@@ -44,20 +44,6 @@ import format as fmt
 from ipaddr import IPAddr
 from util import tuple_to_dict
 
-def _rr_cmp(a, b):
-    '''Compare the wire value of rdata a and rdata b.'''
-
-    #XXX This is necessary because of a bug in dnspython
-    a_val = a.to_digestable()
-    b_val = b.to_digestable()
-
-    if a_val < b_val:
-        return -1
-    elif a_val > b_val:
-        return 1
-    else:
-        return 0
-
 class DNSResponse:
     '''A DNS response, including meta information'''
 
@@ -633,6 +619,21 @@ class RRsetInfo(DNSResponseComponent):
     def __eq__(self, other):
         return self.rrset == other.rrset and self.rrset.ttl == other.rrset.ttl and self.dname_info == other.dname_info
             
+    @classmethod
+    def _rr_cmp(cls, a, b):
+        '''Compare the wire value of rdata a and rdata b.'''
+
+        #XXX This is necessary because of a bug in dnspython
+        a_val = a.to_digestable()
+        b_val = b.to_digestable()
+
+        if a_val < b_val:
+            return -1
+        elif a_val > b_val:
+            return 1
+        else:
+            return 0
+
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
 
@@ -688,7 +689,7 @@ class RRsetInfo(DNSResponseComponent):
         rrsig.signer.canonicalize().to_wire(s)
 
         rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=_rr_cmp)
+        rdata_list.sort(cmp=self._rr_cmp)
 
         rrset_name = self.reduce_wildcard(rrsig).canonicalize()
         for rdata in rdata_list:
@@ -718,7 +719,7 @@ class RRsetInfo(DNSResponseComponent):
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
         rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=_rr_cmp)
+        rdata_list.sort(cmp=self._rr_cmp)
         for rdata in rdata_list:
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
