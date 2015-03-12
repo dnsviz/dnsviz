@@ -772,14 +772,12 @@ class OnlineDomainNameAnalysis(object):
         if self.stub:
             return
 
-        d['queries'] = collections.OrderedDict()
+        d['queries'] = []
         query_keys = self.queries.keys()
         query_keys.sort()
         for (qname, rdtype) in query_keys:
-            qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            d['queries'][qname_type_str] = []
             for query in self.queries[(qname, rdtype)].queries.values():
-                d['queries'][qname_type_str].append(query.serialize())
+                d['queries'].append(query.serialize())
 
     def _serialize_dependencies(self, d, trace):
         if self.stub:
@@ -866,6 +864,25 @@ class OnlineDomainNameAnalysis(object):
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
 
+        query_map = {}
+        #XXX backwards compatibility with previous version
+        if isinstance(d['queries'], list):
+            for query in d['queries']:
+                key = (dns.name.from_text(query['qname']), dns.rdatatype.from_text(query['qtype']), dns.rdataclass.from_text(query['qclass']))
+                if key not in query_map:
+                    query_map[key] = []
+                query_map[key].append(query)
+        else:
+            for query_str in d['queries']:
+                vals = query_str.split('/')
+                qname = dns.name.from_text('/'.join(vals[:-2]))
+                rdtype = dns.rdatatype.from_text(vals[-1])
+                rdclass = dns.rdataclass.from_text(vals[-2])
+                key = (qname, rdtype, rdclass)
+                query_map[key] = []
+                for query in d['queries'][query_str]:
+                    query_map[key].append(query)
+
         # import delegation NS queries first
         delegation_types = set([dns.rdatatype.NS])
         if self.referral_rdtype is not None:
@@ -875,19 +892,17 @@ class OnlineDomainNameAnalysis(object):
             # don't re-import
             if (self.name, rdtype) in self.queries:
                 continue
-            query_str = '%s/%s/%s' % (self.name.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
-            if query_str in d['queries']:
+            key = (self.name, rdtype, dns.rdataclass.IN)
+            if key in query_map:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
-                for query in d['queries'][query_str]:
+                for query in query_map[key]:
                     self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
         # set the NS dependencies for the name
         if self.is_zone():
             self.set_ns_dependencies()
 
-        for query_str in d['queries']:
-            vals = query_str.split('/')
-            qname = dns.name.from_text('/'.join(vals[:-2]))
-            rdtype = dns.rdatatype.from_text(vals[-1])
+        for key in query_map:
+            qname, rdtype, rdclass = key
             # if the query has already been imported, then
             # don't re-import
             if (qname, rdtype) in self.queries:
@@ -901,7 +916,7 @@ class OnlineDomainNameAnalysis(object):
             else:
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
-            for query in d['queries'][query_str]:
+            for query in query_map[key]:
                 self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
 
     def _deserialize_dependencies(self, d, cache):
