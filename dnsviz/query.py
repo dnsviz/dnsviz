@@ -941,18 +941,20 @@ class DNSQuery(object):
             ('qname', self.qname.to_text()),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
             ('qtype', dns.rdatatype.to_text(self.rdtype)),
+        ))
+        d['options'] = collections.OrderedDict((
             ('flags', self.flags),
         ))
         if self.edns >= 0:
-            d['edns_version'] = self.edns
-            d['edns_max_udp_payload'] = self.edns_max_udp_payload
-            d['edns_flags'] = self.edns_flags
-            d['edns_options'] = []
+            d['options']['edns_version'] = self.edns
+            d['options']['edns_max_udp_payload'] = self.edns_max_udp_payload
+            d['options']['edns_flags'] = self.edns_flags
+            d['options']['edns_options'] = []
             for o in self.edns_options:
                 s = StringIO.StringIO()
                 o.to_wire(s)
-                d['edns_options'].append(base64.b64encode(s.getvalue()))
-            d['tcp'] = self.tcp
+                d['options']['edns_options'].append(base64.b64encode(s.getvalue()))
+            d['options']['tcp'] = self.tcp
 
         d['responses'] = collections.OrderedDict()
         servers = self.responses.keys()
@@ -971,13 +973,20 @@ class DNSQuery(object):
         qname = dns.name.from_text(d['qname'])
         rdclass = dns.rdataclass.from_text(d['qclass'])
         rdtype = dns.rdatatype.from_text(d['qtype'])
-        flags = d['flags']
-        if 'edns_version' in d:
-            edns = d['edns_version']
-            edns_max_udp_payload = d['edns_max_udp_payload']
-            edns_flags = d['edns_flags']
+
+        if 'options' in d:
+            d1 = d['options']
+        #XXX backwards compatibility with previous version
+        else:
+            d1 = d
+
+        flags = d1['flags']
+        if 'edns_version' in d1:
+            edns = d1['edns_version']
+            edns_max_udp_payload = d1['edns_max_udp_payload']
+            edns_flags = d1['edns_flags']
             edns_options = []
-            for o in d['edns_options']:
+            for o in d1['edns_options']:
                 #XXX from_wire
                 #edns_options.append(foo)
                 pass
@@ -988,10 +997,10 @@ class DNSQuery(object):
             edns_options = []
 
         #XXX backwards compatibility with previous version
-        if 'tcp_first' in d:
-            tcp = d['tcp_first']
+        if 'tcp_first' in d1:
+            tcp = d1['tcp_first']
         else:
-            tcp = d['tcp']
+            tcp = d1['tcp']
 
         q = DNSQuery(qname, rdtype, rdclass,
                 flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
