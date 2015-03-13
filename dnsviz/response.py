@@ -411,6 +411,13 @@ class DNSResponse:
                 ('count', self.section_rr_count(self.message.additional)),
                 ('digest', self.section_digest(self.message.additional)),
             ))
+            if not d['answer']['count']:
+                del d['answer']['digest']
+            if not d['authority']['count']:
+                del d['authority']['digest']
+            if not d['additional']['count']:
+                del d['additional']['digest']
+
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['response_time'] = self.response_time
