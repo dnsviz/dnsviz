@@ -30,6 +30,7 @@ import base64
 import cgi
 import collections
 import datetime
+import hashlib
 import logging
 import StringIO
 import socket
@@ -82,6 +83,35 @@ class DNSResponse:
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
+
+    def section_rr_count(self, section):
+        if self.message is None:
+            return None
+        n = 0
+        for i in section:
+            n += len(i)
+        if section is self.message.additional and self.message.edns >= 0:
+            n += 1
+        return n
+
+    def section_digest(self, section):
+        if self.message is None:
+            return None
+        d = ''
+        rrsets = section[:]
+        rrsets.sort()
+        for rrset in rrsets:
+            d += RRsetInfo.rrset_canonicalized_to_wire(rrset, rrset.name, rrset.ttl)
+        return 'md5'+hashlib.md5(d).hexdigest()
+
+    def retries(self):
+        return len(self.history)
+
+    def total_response_time(self):
+        t = self.response_time
+        for retry in self.history:
+            t += retry.response_time
+        return t
 
     def copy(self):
         clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, review_history=False)
@@ -351,6 +381,63 @@ class DNSResponse:
                 ip_mapping[ns_rr.target].update([IPAddr(a_rr.to_text()) for a_rr in a_rrset])
 
         return ip_mapping
+
+    def serialize_meta(self):
+        import query as Q
+
+        d = collections.OrderedDict()
+
+        # populate history, if not already populated
+        if self.effective_flags is None:
+            self._review_history()
+
+        if self.message is None:
+            d['error'] = Q.response_errors[self.error]
+            if self.errno:
+                d['errno'] = self.errno
+        else:
+            d['rcode'] = dns.rcode.to_text(self.message.rcode())
+            if self.message.edns >= 0:
+                d['edns_version'] = self.message.edns
+            d['answer'] = collections.OrderedDict((
+                ('count', self.section_rr_count(self.message.answer)),
+                ('digest', self.section_digest(self.message.answer)),
+            ))
+            d['authority'] = collections.OrderedDict((
+                ('count', self.section_rr_count(self.message.authority)),
+                ('digest', self.section_digest(self.message.authority)),
+            ))
+            d['additional'] = collections.OrderedDict((
+                ('count', self.section_rr_count(self.message.additional)),
+                ('digest', self.section_digest(self.message.additional)),
+            ))
+        if self.msg_size is not None:
+            d['msg_size'] = self.msg_size
+        d['response_time'] = self.response_time
+        if self.history:
+            d['retries'] = self.retries()
+            d['cumulative_response_time'] = self.total_response_time()
+
+            d['effective_request_options'] = collections.OrderedDict((
+                ('flags', self.effective_flags),
+                ('edns_version', self.effective_edns),
+                ('edns_max_udp_payload', self.effective_edns_max_udp_payload),
+                ('edns_flags', self.effective_edns_flags),
+                ('edns_options', []),
+            ))
+            for o in self.effective_edns_options:
+                s = StringIO.StringIO()
+                o.to_wire(s)
+                d['effective_query_options']['edns_options'].append(base64.b64encode(s.getvalue()))
+            d['effective_query_options']['tcp'] = self.effective_tcp
+
+            if self.responsive_cause_index is not None:
+                d['responsiveness_impediment'] = collections.OrderedDict((
+                    ('cause', Q.retry_causes[self.history[self.responsive_cause_index].cause],)
+                    ('action', Q.retry_actions[self.history[self.responsive_cause_index].action],)
+                ))
+
+        return d
 
     def serialize(self):
         import query as Q
