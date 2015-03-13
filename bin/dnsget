@@ -216,6 +216,9 @@ Options:
                      identification, and it is not necessary for the names to
                      resolve to the corresponding address (or resolve at all
                      for that matter).
+    -m             - just output meta information, not full query/response
+                     information (Note that this meta output cannot be used
+                     for input to dnsget, dnsgrok, or dnsviz).
     -p             - make json output pretty instead of minimal.
     -o <filename>  - write the analysis to file <filename> instead of to
                      stdout, which is the default.
@@ -224,7 +227,7 @@ Options:
 def main():
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:po:a:x:F')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:mpo:a:x:F')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -364,6 +367,8 @@ def main():
         else:
             kwargs = {}
 
+        meta_only = '-m' in opts
+
         if '-o' not in opts or opts['-o'] == '-':
             fh = sys.stdout
         else:
@@ -423,7 +428,7 @@ def main():
 
         d = collections.OrderedDict()
         for name_obj in name_objs:
-            name_obj.serialize(d)
+            name_obj.serialize(d, meta_only)
 
         fh.write(json.dumps(d, **kwargs))
 

@@ -936,7 +936,7 @@ class DNSQuery(object):
                     return True
         return False
 
-    def serialize(self):
+    def serialize(self, meta_only=False):
         d = collections.OrderedDict((
             ('qname', self.qname.to_text()),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
@@ -964,7 +964,10 @@ class DNSQuery(object):
             clients = self.responses[server].keys()
             clients.sort()
             for client in clients:
-                d['responses'][server][client] = self.responses[server][client].serialize()
+                if meta_only:
+                    d['responses'][server][client] = self.responses[server][client].serialize_meta()
+                else:
+                    d['responses'][server][client] = self.responses[server][client].serialize()
 
         return d
 
