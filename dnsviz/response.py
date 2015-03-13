@@ -414,10 +414,9 @@ class DNSResponse:
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['response_time'] = self.response_time
+        d['retries'] = self.retries()
         if self.history:
-            d['retries'] = self.retries()
             d['cumulative_response_time'] = self.total_response_time()
-
             d['effective_request_options'] = collections.OrderedDict((
                 ('flags', self.effective_flags),
                 ('edns_version', self.effective_edns),
