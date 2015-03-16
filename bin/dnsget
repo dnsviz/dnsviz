@@ -403,11 +403,12 @@ def main():
             except ValueError:
                 logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
                 sys.exit(2)
+            cache = {}
             for name in names:
                 if name.canonicalize().to_text() not in analysis_structured:
                     logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
                     continue
-                name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured))
+                name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
                 a = ParallelAnalyst(ceiling, cache_level, explicit_delegations, dlv_domain, processes)
