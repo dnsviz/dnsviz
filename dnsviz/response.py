@@ -439,8 +439,8 @@ class DNSResponse:
 
             if self.responsive_cause_index is not None:
                 d['responsiveness_impediment'] = collections.OrderedDict((
-                    ('cause', Q.retry_causes[self.history[self.responsive_cause_index].cause],)
-                    ('action', Q.retry_actions[self.history[self.responsive_cause_index].action],)
+                    ('cause', Q.retry_causes[self.history[self.responsive_cause_index].cause]),
+                    ('action', Q.retry_actions[self.history[self.responsive_cause_index].action])
                 ))
 
         return d
