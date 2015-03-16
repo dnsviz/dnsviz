@@ -719,7 +719,7 @@ class OnlineDomainNameAnalysis(object):
 
         # serialize dependencies first because their version of the analysis
         # might be the most complete (considering re-dos)
-        self._serialize_dependencies(d, trace)
+        self._serialize_dependencies(d, meta_only, trace)
 
         if self.parent is not None:
             self.parent.serialize(d, meta_only, trace + [self])
@@ -779,7 +779,7 @@ class OnlineDomainNameAnalysis(object):
             for query in self.queries[(qname, rdtype)].queries.values():
                 d['queries'].append(query.serialize(meta_only))
 
-    def _serialize_dependencies(self, d, trace):
+    def _serialize_dependencies(self, d, meta_only, trace):
         if self.stub:
             return
 
