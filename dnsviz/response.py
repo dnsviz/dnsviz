@@ -424,7 +424,7 @@ class DNSResponse:
         d['retries'] = self.retries()
         if self.history:
             d['cumulative_response_time'] = self.total_response_time()
-            d['effective_request_options'] = collections.OrderedDict((
+            d['effective_query_options'] = collections.OrderedDict((
                 ('flags', self.effective_flags),
                 ('edns_version', self.effective_edns),
                 ('edns_max_udp_payload', self.effective_edns_max_udp_payload),
