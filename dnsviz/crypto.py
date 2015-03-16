@@ -31,14 +31,12 @@ import struct
 import hashlib
 
 try:
-    import M2Crypto
-except ImportError:
+    from M2Crypto import EVP, RSA
+    from M2Crypto.m2 import hex_to_bn, bn_to_mpi
+except:
     _supported_algs = set()
     _supported_digest_algs = set()
 else:
-    from M2Crypto import DSA, EC, Engine, EVP, m2, RSA
-    from M2Crypto.m2 import hex_to_bn, bn_to_mpi
-
     _supported_algs = set([1,5,7,8,10])
     _supported_digest_algs = set([1,2,4])
 
@@ -59,10 +57,11 @@ def _check_gost_support():
         _gost_init()
         try:
             m2.get_digestbyname(GOST_DIGEST_NAME)
-            _supported_algs.add(12) 
-            _supported_digest_algs.add(3) 
         except AttributeError:
             pass
+        else:
+            _supported_algs.add(12)
+            _supported_digest_algs.add(3)
         _gost_cleanup()
     except Engine.EngineError:
         pass
@@ -95,19 +94,31 @@ def _gost_cleanup():
     Engine.cleanup()
 
 try:
-    import M2Crypto
-except ImportError:
+    from M2Crypto import DSA
+except:
     pass
 else:
     _check_dsa_support()
+
+try:
+    from M2Crypto import Engine, m2
+except:
+    pass
+else:
     _check_gost_support()
-    _check_ec_support()
 
     class GostMessageDigest(EVP.MessageDigest):
         def __init__(self, md):
             self.md=md
             self.ctx=m2.md_ctx_new()
             m2.digest_init(self.ctx, self.md)
+
+try:
+    from M2Crypto import EC
+except:
+    pass
+else:
+    _check_ec_support()
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
     if not digest_alg_is_supported(digest_alg):
