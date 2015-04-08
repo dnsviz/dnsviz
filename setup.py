@@ -41,6 +41,7 @@ setup(name='dnsviz',
         scripts=['bin/dnsget', 'bin/dnsviz', 'bin/dnsgrok', 'bin/digviz'],
         data_files=[
                 ('share/doc/dnsviz', ['README.md', 'LICENSE']),
+                ('share/doc/dnsviz', ['doc/dnsviz.html']),
                 ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png'))),
                 ('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
                 ('share/dnsviz/css', ['share/css/dnsviz.css']),
