@@ -1228,7 +1228,15 @@ class ExecutableDNSQuery(DNSQuery):
                         else:
                             errno1 = None
                     response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query)
-                    query.add_response(IPAddr(qtm.dst), IPAddr(qtm.src), response_obj, query.bailiwick)
+
+                    # if client IP is not specified, and there is a socket
+                    # failure, then src might be None
+                    if qtm.src is not None:
+                        src = IPAddr(qtm.src)
+                    else:
+                        src = qtm.src
+
+                    query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
 
                     if not query.servers.difference(query.responses):
                         queries_to_execute.remove(query)
