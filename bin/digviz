@@ -524,8 +524,13 @@ class DigCommandLine:
             except ValueError:
                 raise SemanticException('Invalid IP address: "%s"' % arg)
 
+            if addr.version == 6:
+                family = socket.AF_INET6
+            else:
+                family = socket.AF_INET
+
             try:
-                s = socket.socket()
+                s = socket.socket(family)
                 s.bind((addr, 0))
             except socket.error, e:
                 if e.errno == errno.EADDRNOTAVAIL:
