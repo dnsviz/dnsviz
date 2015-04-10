@@ -107,18 +107,18 @@ def _get_client_address(server):
         return None
     return IPAddr(s.getsockname()[0])
 
-def get_client_addresses(require_ipv4=False, require_ipv6=False, warn=True, logger=_logger):
+def get_client_addresses(require_ipv4=False, require_ipv6=False, warn_ipv4=True, warn_ipv6=True, logger=_logger):
     client_ipv4 = _get_client_address(list(ROOT_NS_IPS_4)[0])
-    client_ipv6 = _get_client_address(list(ROOT_NS_IPS_6)[0])
     if client_ipv4 is None:
         if require_ipv4:
             raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
-        elif warn:
+        elif warn_ipv4:
             logger.warning('No IPv4 interfaces available for analysis!')
+    client_ipv6 = _get_client_address(list(ROOT_NS_IPS_6)[0])
     if client_ipv6 is None:
         if require_ipv6:
             raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
-        elif warn:
+        elif warn_ipv6:
             logger.warning('No IPv6 interfaces available for analysis!')
     return client_ipv4, client_ipv6
 
