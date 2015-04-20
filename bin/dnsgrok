@@ -43,12 +43,14 @@ def usage(err=None):
         err = ''
     sys.stderr.write( '''%sUsage: %s [ options ] ( -f <filename> | <domain name> [... ] )
 Options:
-    -f <filename>  - read names from a file (one name per line), instead of from command line
-    -r <filename>  - read analysis from a file, instead of from stdin
-    -t <filename>  - use filename as a file containing trusted keys, each as DNSKEY RRs in zone file format
-    -o <filename>  - save the output to filename instead of to stdout
+    -f <filename>  - read names from a file (one name per line), instead of
+                     from command line.
+    -r <filename>  - read analysis from a file, instead of from stdin.
+    -t <filename>  - use filename as a file containing trusted keys, each as
+                     a DNSKEY RR, in zone file format.
+    -o <filename>  - save the output to filename instead of to stdout.
     -p             - make json output pretty instead of minimal.
-    -l <loglevel>  - set log level to one of: error, warning, info, debug
+    -l <loglevel>  - set log level to one of: error, warning, info, debug.
 ''' % (err, sys.argv[0]))
 
 def test_m2crypto():
