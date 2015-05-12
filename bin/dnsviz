@@ -57,6 +57,7 @@ Options:
                      the domain name(s).
     -o <filename>  - save the image to filename instead of to stdout.
     -T <format>    - the format of the output (dot, png, jpg, svg, html).
+    -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
 def finish_graph(G, trusted_keys, fmt, filename):
@@ -114,12 +115,16 @@ def main():
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
 
         opts = dict(opts)
+        if '-h' in opts:
+            usage()
+            sys.exit(0)
+
         if not ('-f' in opts or args):
             usage('Either -f must be used or domain names must be supplied as command line arguments.')
             sys.exit(1)

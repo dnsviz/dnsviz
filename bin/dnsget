@@ -230,12 +230,13 @@ Options:
     -p             - make json output pretty instead of minimal.
     -o <filename>  - write the analysis to file <filename> instead of to
                      stdout, which is the default.
+    -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
 def main():
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:x:F')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:x:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -281,6 +282,10 @@ def main():
                     explicit_delegations[domain].add((name, addr))
 
         opts = dict(opts)
+        if '-h' in opts:
+            usage()
+            sys.exit(0)
+
         if not ('-f' in opts or args):
             usage('Either -f must be used or domain names must be supplied as command line arguments.')
             sys.exit(1)

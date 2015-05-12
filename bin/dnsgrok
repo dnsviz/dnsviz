@@ -51,6 +51,7 @@ Options:
     -o <filename>  - save the output to filename instead of to stdout.
     -p             - make json output pretty instead of minimal.
     -l <loglevel>  - set log level to one of: error, warning, info, debug.
+    -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
 def test_m2crypto():
@@ -64,12 +65,16 @@ def main():
         test_m2crypto()
 
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
 
         opts = dict(opts)
+        if '-h' in opts:
+            usage()
+            sys.exit(0)
+
         if not ('-f' in opts or args):
             usage('Either -f must be used or domain names must be supplied as command line arguments.')
             sys.exit(1)
