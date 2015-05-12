@@ -812,16 +812,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.parent is None:
             return
 
-        assert warn_no_ipv4 or warn_no_ipv6, 'At least one of warn_no_ipv4 and warn_no_ipv6 must be True when calling _populate_ns_status()'
-
         all_names = self.get_ns_names()
         names_from_child = self.get_ns_names_in_child()
         names_from_parent = self.get_ns_names_in_parent()
 
         auth_ns_response = self.queries[(self.name, dns.rdatatype.NS)].is_valid_complete_authoritative_response_any()
-
-        ips_from_child = self.get_servers_in_child()
-        ips_from_parent = self.get_servers_in_parent()
 
         glue_mapping = self.get_glue_ip_mapping()
         auth_mapping = self.get_auth_ns_ip_mapping()
@@ -829,27 +824,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         ns_names_not_in_child = []
         ns_names_not_in_parent = []
         names_error_resolving = []
-        names_with_wrong_glue_v4 = []
-        names_with_wrong_glue_v6 = []
-        names_missing_glue_v4_warn = []
-        names_missing_glue_v6_warn = []
-        names_missing_glue_v4_err = []
-        names_missing_glue_v6_err = []
-        names_missing_auth_v4 = []
-        names_missing_auth_v6 = []
+        names_with_glue_mismatch = []
+        names_missing_glue = []
+        names_missing_auth = []
 
         for name in all_names:
-            if name in auth_mapping:
-                ip4_auth_addrs = set(filter(lambda x: x.version == 4, auth_mapping[name]))
-                ip6_auth_addrs = set(filter(lambda x: x.version == 6, auth_mapping[name]))
-                if not ip4_auth_addrs and warn_no_ipv4:
-                    names_missing_auth_v4.append(name)
-                if not ip6_auth_addrs and warn_no_ipv6:
-                    names_missing_auth_v6.append(name)
-            else:
-                ip4_auth_addrs = set()
-                ip6_auth_addrs = set()
+            # if name resolution resulted in an error (other than NXDOMAIN)
+            if name not in auth_mapping:
+                auth_addrs = set()
                 names_error_resolving.append(name)
+            else:
+                auth_addrs = auth_mapping[name]
+                # if name resolution completed successfully, but the response was
+                # negative for both A and AAAA (NXDOMAIN or NODATA)
+                if not auth_mapping[name]:
+                    names_missing_auth.append(name)
 
             if names_from_parent:
                 name_in_parent = name in names_from_parent
@@ -859,35 +848,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 name_in_parent = None
 
             if name_in_parent:
-                ip4_glue_addrs = set(filter(lambda x: x.version == 4, glue_mapping[name]))
-                ip6_glue_addrs = set(filter(lambda x: x.version == 6, glue_mapping[name]))
-
                 # if glue is required and not supplied
-                if name.is_subdomain(self.name):
-                    if not ip4_glue_addrs:
-                        # if we warn on no IPv4 glue or if there is no IPv6
-                        # glue, then make it an error
-                        if warn_no_ipv4 or not ip6_glue_addrs:
-                            names_missing_glue_v4_err.append(name)
-                        # otherwise, if there are authoritative IPv4 addresses,
-                        # then make it a warning
-                        elif ip4_auth_addrs:
-                            names_missing_glue_v4_warn.append(name)
-                    if not ip6_glue_addrs:
-                        # if we warn on no IPv6 glue or if there is no IPv4
-                        # glue, then make it an error
-                        if warn_no_ipv6 or not ip4_glue_addrs:
-                            names_missing_glue_v6_err.append(name)
-                        # otherwise, if there are authoritative IPv6 addresses,
-                        # then make it a warning
-                        elif ip6_auth_addrs:
-                            names_missing_glue_v6_warn.append(name)
+                if name.is_subdomain(self.name) and not glue_mapping[name]:
+                    names_missing_glue.append(name)
 
-                # if glue is supplied, check that it is correct
-                if ip4_glue_addrs and ip4_auth_addrs and ip4_glue_addrs != ip4_auth_addrs:
-                    names_with_wrong_glue_v4.append((name,ip4_glue_addrs,ip4_auth_addrs))
-                if ip6_glue_addrs and ip6_auth_addrs and ip6_glue_addrs != ip6_auth_addrs:
-                    names_with_wrong_glue_v6.append((name,ip6_glue_addrs,ip6_auth_addrs))
+                # if glue is supplied, check that it matches the authoritative response
+                if glue_mapping[name] and auth_addrs and glue_mapping[name] != auth_addrs:
+                    names_with_glue_mismatch.append((name,glue_mapping[name],auth_addrs))
 
             elif name_in_parent is False:
                 ns_names_not_in_parent.append(name)
@@ -907,47 +874,48 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             names_error_resolving.sort()
             self.delegation_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: x.canonicalize().to_text(), names_error_resolving)))
 
-        if names_with_wrong_glue_v4:
-            names_with_wrong_glue_v4.sort()
-            for name, ip4_glue_addrs, ip4_auth_addrs in names_with_wrong_glue_v4:
-                ip4_glue_addrs = list(ip4_glue_addrs)
-                ip4_glue_addrs.sort()
-                ip4_auth_addrs = list(ip4_auth_addrs)
-                ip4_auth_addrs.sort()
-                self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchErrorIPv4(name=name.canonicalize().to_text(), glue_addresses=ip4_glue_addrs, auth_addresses=ip4_auth_addrs))
+        if names_with_glue_mismatch:
+            names_with_glue_mismatch.sort()
+            for name, glue_addrs, auth_addrs in names_with_glue_mismatch:
+                glue_addrs = list(glue_addrs)
+                glue_addrs.sort()
+                auth_addrs = list(auth_addrs)
+                auth_addrs.sort()
+                self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchError(name=name.canonicalize().to_text(), glue_addresses=glue_addrs, auth_addresses=auth_addrs))
 
-        if names_with_wrong_glue_v6:
-            names_with_wrong_glue_v6.sort()
-            for name, ip6_glue_addrs, ip6_auth_addrs in names_with_wrong_glue_v6:
-                ip6_glue_addrs = list(ip6_glue_addrs)
-                ip6_glue_addrs.sort()
-                ip6_auth_addrs = list(ip6_auth_addrs)
-                ip6_auth_addrs.sort()
-                self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchErrorIPv6(name=name.canonicalize().to_text(), glue_addresses=ip6_glue_addrs, auth_addresses=ip6_auth_addrs))
+        if names_missing_glue:
+            names_missing_glue.sort()
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue)))
 
-        if names_missing_glue_v4_warn:
-            names_missing_glue_v4_warn.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingIPv4GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v4_warn)))
+        if names_missing_auth:
+            names_missing_auth.sort()
+            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_auth)))
 
-        if names_missing_glue_v6_warn:
-            names_missing_glue_v6_warn.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingIPv6GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v6_warn)))
+        ips_from_parent = self.get_servers_in_parent()
+        ips_from_parent_ipv4 = filter(lambda x: x.version == 4, ips_from_parent)
+        ips_from_parent_ipv6 = filter(lambda x: x.version == 6, ips_from_parent)
 
-        if names_missing_glue_v4_err:
-            names_missing_glue_v4_err.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv4GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v4_err)))
+        ips_from_child = self.get_servers_in_child()
+        ips_from_child_ipv4 = filter(lambda x: x.version == 4, ips_from_child)
+        ips_from_child_ipv6 = filter(lambda x: x.version == 6, ips_from_child)
 
-        if names_missing_glue_v6_err:
-            names_missing_glue_v6_err.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.MissingIPv6GlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue_v6_err)))
+        if not (ips_from_parent_ipv4 or ips_from_child_ipv4) and warn_no_ipv4:
+            if ips_from_parent_ipv4:
+                reference = 'child'
+            elif ips_from_child_ipv4:
+                reference = 'parent'
+            else:
+                reference = 'parent or child'
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv4(reference=reference))
 
-        if names_missing_auth_v4:
-            names_missing_auth_v4.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoIPv4AddressForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_auth_v4)))
-
-        if names_missing_auth_v6:
-            names_missing_auth_v6.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoIPv6AddressForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_auth_v6)))
+        if not (ips_from_parent_ipv6 or ips_from_child_ipv6) and warn_no_ipv6:
+            if ips_from_parent_ipv6:
+                reference = 'child'
+            elif ips_from_child_ipv6:
+                reference = 'parent'
+            else:
+                reference = 'parent or child'
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv6(reference=reference))
 
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
