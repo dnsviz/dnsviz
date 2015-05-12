@@ -657,6 +657,8 @@ class NSECStatusNoAnswer(object):
                 if self.has_rdtype:
                     self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
                     self.validation_status = NSEC_STATUS_INVALID
+            if self.nsec_names_covering_qname:
+                self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=self.qname.canonicalize().to_text()))
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
@@ -679,7 +681,7 @@ class NSECStatusNoAnswer(object):
             covering_names = set()
             if self.nsec_for_qname is not None:
                 covering_names.add(self.nsec_for_qname.rrset.name)
-            else:
+            if self.nsec_names_covering_qname:
                 for names in self.nsec_names_covering_qname.values():
                     covering_names.update(names)
             if self.nsec_for_wildcard_name is not None:

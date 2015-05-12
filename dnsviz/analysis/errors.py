@@ -630,6 +630,21 @@ class WildcardCoveredNoDataNSEC3(WildcardCoveredNoData):
     references = ['RFC 5155, Sec. 8.7']
     nsec_type = 'NSEC3'
 
+class SnameCoveredNoAnswerNSEC(NSECError):
+    '''
+    >>> e = SnameCoveredNoAnswerNSEC(sname='foo.baz.')
+    >>> e.description
+    "The NSEC RR covers the SNAME (foo.baz.), indicating that it doesn't exist."
+    '''
+
+    _abstract = False
+    code = 'SNAME_COVERED'
+    description_template = "The %(nsec_type)s RR covers the SNAME (%(sname)s), indicating that it doesn't exist."
+    references = ['RFC 4035, Sec. 3.1.3.1']
+    required_params = ['sname']
+    nsec_type = 'NSEC'
+
+
 class LastNSECNextNotZone(NSECError):
     '''
     >>> e = LastNSECNextNotZone(nsec_owner='z.foo.baz.', next_name='a.foo.baz.', zone_name='foo.baz.')
