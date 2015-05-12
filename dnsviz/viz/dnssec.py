@@ -287,19 +287,19 @@ class DNSAuthGraph:
         id_list.sort()
         return '_'.join(map(str, id_list))
 
-    def id_for_nsec(self, name, rdtype, nsec_set_info):
+    def id_for_nsec(self, name, rdtype, cls, nsec_set_info):
         try:
-            nsec_set_info_list = self.nsec_ids[(name,rdtype)]
+            nsec_set_info_list = self.nsec_ids[(name,rdtype,cls)]
         except KeyError:
-            self.nsec_ids[(name,rdtype)] = []
-            nsec_set_info_list = self.nsec_ids[(name,rdtype)]
+            self.nsec_ids[(name,rdtype,cls)] = []
+            nsec_set_info_list = self.nsec_ids[(name,rdtype,cls)]
 
         for nsec_set_info1, id in nsec_set_info_list:
             if nsec_set_info == nsec_set_info1:
                 return id
 
         id = self.next_nsec_id
-        self.nsec_ids[(name,rdtype)].append((nsec_set_info, id))
+        self.nsec_ids[(name,rdtype,cls)].append((nsec_set_info, id))
         self.next_nsec_id += 1
         return id
 
@@ -818,7 +818,7 @@ class DNSAuthGraph:
             nsec_rdtype = dns.rdatatype.NSEC3
         else:
             nsec_rdtype = dns.rdatatype.NSEC
-        node_str = self.nsec_node_str(nsec_rdtype, self.id_for_nsec(name, rdtype, nsec_status.nsec_set_info), name, rdtype)
+        node_str = self.nsec_node_str(nsec_rdtype, self.id_for_nsec(name, rdtype, nsec_status.__class__, nsec_status.nsec_set_info), name, rdtype)
 
         if not self.G.has_node(node_str):
             rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], nsec_status.nsec_set_info.rrsets.values())
