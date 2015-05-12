@@ -659,6 +659,7 @@ class NSECStatusNoAnswer(object):
                     self.validation_status = NSEC_STATUS_INVALID
             if self.nsec_names_covering_qname:
                 self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=self.qname.canonicalize().to_text()))
+                self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
