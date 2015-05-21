@@ -32,6 +32,7 @@ import dns.message, dns.rdatatype
 
 import format as fmt
 
+CR_RE = re.compile(r'\r\n', re.MULTILINE)
 ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
 BLANK_LINES_RE = re.compile(r'\n\s*\n')
 
@@ -46,6 +47,7 @@ def tuple_to_dict(t):
 def get_trusted_keys(s):
     trusted_keys = []
 
+    s = CR_RE.sub('\n', s)
     s = ZONE_COMMENTS_RE.sub('', s)
     s = BLANK_LINES_RE.sub(r'\n', s)
     s = s.strip()
