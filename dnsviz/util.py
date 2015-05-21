@@ -52,10 +52,10 @@ def get_trusted_keys(s):
     m = dns.message.from_text(str(';ANSWER\n'+s))
     for rrset in m.answer:
         if rrset.rdtype != dns.rdatatype.DNSKEY:
-            pass
+            continue
         for dnskey in rrset:
             if dnskey.flags & fmt.DNSKEY_FLAGS['revoke']:
-                pass
+                continue
             trusted_keys.append((rrset.name,dnskey))
 
     return trusted_keys
