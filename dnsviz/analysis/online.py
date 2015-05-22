@@ -358,6 +358,7 @@ class OnlineDomainNameAnalysis(object):
                 self._ns_names_in_child.add(ns.target)
 
     def set_ns_dependencies(self):
+        # the following check includes explicit delegations
         if self.parent is None:
             return
         for ns in self.get_ns_names_in_child().difference(self.get_ns_names_in_parent()):
@@ -368,7 +369,7 @@ class OnlineDomainNameAnalysis(object):
             if rrset.rdtype == dns.rdatatype.MX:
                 self._handle_mx_response(rrset)
             elif rrset.rdtype == dns.rdatatype.NS:
-                self._handle_ns_response(rrset, True)
+                self._handle_ns_response(rrset, not self.explicit_delegation)
 
             # check whether it is signed and whether the signer matches
             try:
@@ -445,7 +446,7 @@ class OnlineDomainNameAnalysis(object):
             else:
                 try:
                     rrset = response.message.find_rrset(response.message.authority, query.qname, dns.rdataclass.IN, dns.rdatatype.NS)
-                    self._handle_ns_response(rrset, is_authoritative)
+                    self._handle_ns_response(rrset, is_authoritative and not self.explicit_delegation)
                 except KeyError:
                     pass
 
@@ -672,6 +673,12 @@ class OnlineDomainNameAnalysis(object):
                 auth_names = set(auth_ips)
             else:
                 auth_names = self.get_ns_names()
+
+            # if there are no names from glue or from authoritative responses,
+            # then use the authoritative IP.  Such is the case with explicit
+            # delegation
+            if not auth_names:
+                auth_names = auth_ips
 
             for name in auth_names:
                 if name in auth_ips:
