@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -175,7 +175,7 @@ class OnlineDomainNameAnalysis(object):
         self.nxdomain_ancestor = None
 
         # The clients used for queries (serialized - for convenience)
-        self.clients_ipv4 = set() 
+        self.clients_ipv4 = set()
         self.clients_ipv6 = set()
 
         # Meta information associated with the domain name.  These are
@@ -806,7 +806,7 @@ class OnlineDomainNameAnalysis(object):
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
         stub = d['stub']
-        
+
         if 'parent' in d:
             parent_name = dns.name.from_text(d['parent'])
             parent = cls.deserialize(parent_name, d1, cache=cache)
@@ -1050,7 +1050,7 @@ class Analyst(object):
     def _is_referral_of_type(self, rdtype):
         '''Return True if analysis of this name was invoked as a dependency (specified by
         rdtype) for another name; False otherwise.  Examples are CNAME, NS, MX.'''
-        
+
         try:
             return self.trace[-1][1] == rdtype
         except IndexError:
@@ -1302,7 +1302,7 @@ class Analyst(object):
             if not name_obj.explicit_delegation:
                 try:
                     ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
-                    
+
                     # resolve every name in the NS RRset
                     query_tuples = []
                     for rr in ans.rrset:
@@ -1368,7 +1368,7 @@ class Analyst(object):
             dlv_parent_obj = self.analysis_cache[self.dlv_domain]
         else:
             dlv_parent_obj = None
-        
+
         # get or create the name
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
@@ -1526,7 +1526,7 @@ class Analyst(object):
                 rdtype = dns.rdatatype.A
                 self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
                 queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-        
+
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
         Q.ExecutableDNSQuery.execute_queries(*queries.values())

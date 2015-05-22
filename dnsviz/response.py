@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -166,7 +166,7 @@ class DNSResponse:
                 udp_attempted = True
 
             # Mark responsiveness if this retry wasn't caused by network error
-            # or timeout. 
+            # or timeout.
             if retry.cause not in (Q.RETRY_CAUSE_NETWORK_ERROR, Q.RETRY_CAUSE_TIMEOUT):
                 if tcp:
                     tcp_responsive = True
@@ -340,7 +340,7 @@ class DNSResponse:
 
     def is_delegation(self, qname, rdtype):
         '''Return True if this response (from a request to a server
-        authoritative for the immediate parent) yields NS records for the name 
+        authoritative for the immediate parent) yields NS records for the name
         or provides a referral or NXDOMAIN or no data response.'''
 
         # if NS or SOA records were found in the answer or authority section
@@ -519,7 +519,7 @@ class RDataMeta(DNSResponseComponent):
         self.rdtype = rdtype
         self.rdata = rdata
         self.rrset_info = set()
-    
+
 class DNSKEYMeta(DNSResponseComponent):
     def __init__(self, name, rdata, ttl):
         super(DNSKEYMeta, self).__init__()
@@ -585,7 +585,7 @@ class DNSKEYMeta(DNSResponseComponent):
                 e_len, = struct.unpack('!H',key_str[1:3])
                 offset = 3
 
-            # get the exponent 
+            # get the exponent
             offset += e_len
 
             # get the modulus
@@ -711,7 +711,7 @@ class RRsetInfo(DNSResponseComponent):
 
     def __eq__(self, other):
         return self.rrset == other.rrset and self.rrset.ttl == other.rrset.ttl and self.dname_info == other.dname_info
-            
+
     @classmethod
     def rdata_cmp(cls, a, b):
         '''Compare the wire value of rdata a and rdata b.'''
@@ -873,7 +873,7 @@ class NegativeResponseInfo(DNSResponseComponent):
         except IndexError:
             soa_rrset = None
 
-        if soa_rrset is None: 
+        if soa_rrset is None:
             return None
 
         soa_rrset_info = RRsetInfo(soa_rrset)
@@ -979,7 +979,7 @@ class NSECSet(DNSResponseComponent):
         next_name_txt = base32.b32encode(next_name)
         origin = dns.name.Name(nsec_name.labels[1:])
         return dns.name.from_text(next_name_txt, origin)
-                    
+
     def _nsec_covers_name(self, name, nsec_name):
         '''Return True if the NSEC record corresponding to NSEC name provided
         covers a name (i.e., proves its non-existence); False otherwise.'''

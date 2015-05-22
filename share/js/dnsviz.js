@@ -9,9 +9,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -68,7 +68,7 @@ function AuthGraph(anchorElement, maxPaperWidth, imageScale) {
 AuthGraph.prototype.infoToHtmlTable = function (obj) {
 	return '<table class="obj">' + this.infoToHtmlTableComponents(obj) + '</table>';
 }
-		
+
 AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 	s = '';
 	for (var key in obj) {
@@ -151,7 +151,7 @@ AuthGraph.prototype.addNodeEvent = function (nodeObj, infoObj) {
 
 if (typeof String.prototype.trim !== 'function') {
 	String.prototype.trim = function() {
-		return this.replace(/^\s+|\s+$/g, ''); 
+		return this.replace(/^\s+|\s+$/g, '');
 	}
 }
 

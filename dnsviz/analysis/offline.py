@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -32,7 +32,7 @@ import logging
 
 import dns.flags, dns.rdataclass, dns.rdatatype
 
-from dnsviz import crypto 
+from dnsviz import crypto
 import dnsviz.format as fmt
 import dnsviz.query as Q
 from dnsviz.response import DNSKEYMeta
@@ -320,7 +320,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.nxrrset = set()
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
-        
+
         required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
 
@@ -411,7 +411,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if response.effective_edns < 0:
                     # find out if this really appears to be an EDNS issue, by
                     # seeing if any other queries to this server with EDNS were
-                    # actually successful 
+                    # actually successful
                     if response.responsive_cause_index is not None:
                         if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                             if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client):
@@ -480,7 +480,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if ((response.query.edns_flags & f) != (response.effective_edns_flags & f)):
                             # find out if this really appears to be a flag issue,
                             # by seeing if any other queries to this server with
-                            # the specified flag were also unsuccessful 
+                            # the specified flag were also unsuccessful
                             if response.responsive_cause_index is not None:
                                 if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,f):
@@ -1038,7 +1038,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             # move along if DNSKEY is not self-signing
                             if dnskey not in self.rrsig_status[dnskey_info][rrsig]:
                                 continue
-                            
+
                             # move along if key tag is not the same (i.e., revoke)
                             if dnskey.key_tag != rrsig.key_tag:
                                 continue
@@ -1247,7 +1247,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 notice.remove_server_client(server, client, response)
                         if not notice.servers_clients:
                             notices.remove(notice)
-                
+
         statuses = []
         status_by_response = {}
         for nsec_set_info in neg_response_info.nsec_set_info:
@@ -1325,8 +1325,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         for rrset_info in filter(lambda x: x.rrset.name == neg_response_info.qname, query2.answer_info):
                             shared_servers_clients = set(rrset_info.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
-                                err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None) 
-                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.rrset_warnings[rrset_info], None, None, None) 
+                                err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None)
+                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.rrset_warnings[rrset_info], None, None, None)
                                 for server, client in shared_servers_clients:
                                     for response in neg_response_info.servers_clients[(server, client)]:
                                         err1.add_server_client(server, client, response)
@@ -1335,8 +1335,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         for neg_response_info2 in filter(lambda x: x.qname == neg_response_info.qname, query2.nodata_info):
                             shared_servers_clients = set(neg_response_info2.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
-                                err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None) 
-                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nodata_warnings[neg_response_info2], None, None, None) 
+                                err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None)
+                                err2 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=neg_response_info.qname, rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nodata_warnings[neg_response_info2], None, None, None)
                                 for server, client in shared_servers_clients:
                                     for response in neg_response_info.servers_clients[(server, client)]:
                                         err1.add_server_client(server, client, response)

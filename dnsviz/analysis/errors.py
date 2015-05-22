@@ -4,7 +4,7 @@
 # Created by Casey Deccio (casey@deccio.net)
 #
 # Copyright 2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -448,12 +448,12 @@ class ReferralWithSOABitNSEC(ReferralWithSOABit):
     '''
 
     _abstract = False
-    references = ['RFC 4034, Sec. 5.2'] 
+    references = ['RFC 4034, Sec. 5.2']
     nsec_type = 'NSEC'
 
 class ReferralWithSOABitNSEC3(ReferralWithSOABit):
     _abstract = False
-    references = ['RFC 5155, Sec. 8.9'] 
+    references = ['RFC 5155, Sec. 8.9']
     nsec_type = 'NSEC3'
 
 class ReferralWithDSBit(NSECError):
@@ -469,12 +469,12 @@ class ReferralWithDSBitNSEC(ReferralWithDSBit):
     '''
 
     _abstract = False
-    references = ['RFC 4034, Sec. 5.2'] 
+    references = ['RFC 4034, Sec. 5.2']
     nsec_type = 'NSEC'
 
 class ReferralWithDSBitNSEC3(ReferralWithDSBit):
     _abstract = False
-    references = ['RFC 5155, Sec. 8.9'] 
+    references = ['RFC 5155, Sec. 8.9']
     nsec_type = 'NSEC3'
 
 class ReferralWithoutNSBit(NSECError):
@@ -495,7 +495,7 @@ class ReferralWithoutNSBitNSEC(ReferralWithoutNSBit):
 
 class ReferralWithoutNSBitNSEC3(ReferralWithoutNSBit):
     _abstract = False
-    references = ['RFC 5155, Sec. 8.9'] 
+    references = ['RFC 5155, Sec. 8.9']
     nsec_type = 'NSEC3'
 
 class StypeInBitmap(NSECError):
@@ -722,7 +722,7 @@ class FormError(InvalidResponseError):
     >>> e.description
     'The response (30 bytes) was malformed.'
     '''
-    
+
     _abstract = False
     code = 'FORMERR'
     description_template = "%(intermittent_text)sThe response (%(msg_size)d bytes) was malformed."
@@ -734,7 +734,7 @@ class Timeout(InvalidResponseError):
     >>> e.description
     'No response was received from the server over UDP (tried 3 times).'
     '''
-    
+
     _abstract = False
     code = 'TIMEOUT'
     description_template = "%(intermittent_text)sNo response was received from the server over %(proto)s (tried %(attempts)d times)."
@@ -746,7 +746,7 @@ class UnknownResponseError(InvalidResponseError):
     >>> e.description
     'An invalid response was received from the server over UDP.'
     '''
-    
+
     _abstract = False
     code = 'RESPONSE_ERROR'
     description_template = "%(intermittent_text)sAn invalid response was received from the server over %(proto)s."
@@ -985,7 +985,7 @@ class MissingRRSIGForAlgDNSKEY(MissingRRSIGForAlg):
     _abstract = False
     code = 'MISSING_RRSIG_FOR_ALG_DNSKEY'
     source = 'DNSKEY'
-    
+
 class MissingRRSIGForAlgDS(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDS(algorithm=5)

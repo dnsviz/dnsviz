@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -179,7 +179,7 @@ class DNSResponseHandlerFactory(object):
         self._cls = cls
         self._args = args
         self._kwargs = kwargs
-    
+
     def build(self):
         '''Instantiate a DNSResponseHandler with the args and kwargs saved with the
         initialization of this factory.'''
@@ -910,14 +910,14 @@ class DNSQuery(object):
                 if response.is_valid_response() and response.is_complete_response():
                     return True
         return False
-    
+
     def is_valid_complete_authoritative_response_any(self):
         for server in self.responses:
             for response in self.responses[server].values():
                 if response.is_valid_response() and response.is_complete_response() and response.is_authoritative():
                     return True
         return False
-    
+
     def servers_with_valid_complete_response(self, bailiwick_map, default_bailiwick):
         servers_clients = set()
         for server in self.responses:
@@ -1068,7 +1068,7 @@ class MultiQuery(object):
             if self.queries[params].is_valid_complete_authoritative_response_any():
                 return True
         return False
-    
+
 class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
     def __init__(self, qname, rdtype, rdclass):
         MultiQuery.__init__(self, qname, rdtype, rdclass)
@@ -1130,14 +1130,14 @@ class ExecutableDNSQuery(DNSQuery):
 
         response_handlers = [RetryOnNetworkErrorHandler(3).build()] + [h.build() for h in self.response_handlers] + \
             [RetryOnTimeoutHandler().build(), DefaultAcceptHandler().build()]
-        
+
         if self.max_attempts is not None:
             response_handlers.append(MaxTimeoutsHandler(self.max_attempts).build())
         if self.lifetime is not None:
             response_handlers.append(LifetimeHandler(self.lifetime).build())
 
         return DNSQueryHandler(request, params, response_handlers, self.lifetime, server, client, self.port)
-        
+
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
         '''Excecute the query to a given server, and handle it appropriately.'''
@@ -1365,7 +1365,7 @@ class DiagnosticQuery(DNSSECQuery):
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
             ChangeTimeoutOnTimeoutHandler(2.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4), 
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 5)]
     # For timeouts:
     #  1 - no change
@@ -1390,7 +1390,7 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
             ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
             ChangeTimeoutOnTimeoutHandler(2.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4), 
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 5)]
     # For timeouts:
     #  1 - no change
@@ -1433,12 +1433,12 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     lifetime = 8.0
 
 class PMTUDiagnosticQuery(DNSSECQuery):
-    
+
     response_handlers = [PMTUBoundingHandler(512, 4, 1.0,
             (MaxTimeoutsHandler(8),
                 LifetimeHandler(15.0),
                 ChangeTimeoutOnTimeoutHandler(2.0, 3),
-                ChangeTimeoutOnTimeoutHandler(1.0, 4), 
+                ChangeTimeoutOnTimeoutHandler(1.0, 4),
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
@@ -1454,7 +1454,7 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
             (MaxTimeoutsHandler(8),
                 LifetimeHandler(15.0),
                 ChangeTimeoutOnTimeoutHandler(2.0, 3),
-                ChangeTimeoutOnTimeoutHandler(1.0, 4), 
+                ChangeTimeoutOnTimeoutHandler(1.0, 4),
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),

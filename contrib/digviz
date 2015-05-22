@@ -5,7 +5,7 @@
 # Created by Casey Deccio (casey@deccio.net)
 #
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -283,7 +283,7 @@ class DigCommandLineQuery:
             processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
 
         self.nameservers = nameservers + processed_nameservers
-        
+
     def _get_resolver(self, options):
         class CustomQuery(Q.DNSQueryFactory):
             flags = self.flags
@@ -293,7 +293,7 @@ class DigCommandLineQuery:
             edns_options = self.edns_options
             tcp = self.tcp
             response_handlers = self.handlers
-        
+
         return Resolver.Resolver(self.nameservers, CustomQuery,
                 timeout=self.query_timeout, max_attempts=self.max_attempts,
                 lifetime=self.lifetime, shuffle=False, client_ipv4=options['client_ipv4'],
@@ -635,7 +635,7 @@ class DigCommandLine:
             processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
 
         self.nameservers = processed_nameservers
-        
+
 def main():
     try:
         q = DigCommandLine(sys.argv[1:])

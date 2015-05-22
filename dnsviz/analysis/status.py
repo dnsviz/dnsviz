@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -172,7 +172,7 @@ class RRSIGStatus(object):
             self.errors.append(Errors.OriginalTTLExceeded(rrset_ttl=self.rrset.rrset.ttl, original_ttl=self.rrsig.original_ttl))
 
         min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
-            
+
         if (zone_name is not None and self.rrsig.signer != zone_name) or \
                 (zone_name is None and not self.rrset.rrset.name.is_subdomain(self.rrsig.signer)):
             if self.validation_status == RRSIG_STATUS_VALID:
@@ -193,11 +193,11 @@ class RRSIGStatus(object):
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INVALID
 
-        if self.reference_ts < self.rrsig.inception: 
+        if self.reference_ts < self.rrsig.inception:
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_PREMATURE
             self.errors.append(Errors.InceptionInFuture(inception=fmt.timestamp_to_datetime(self.rrsig.inception), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
-        if self.reference_ts >= self.rrsig.expiration: 
+        if self.reference_ts >= self.rrsig.expiration:
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_EXPIRED
             self.errors.append(Errors.ExpirationInPast(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
@@ -434,7 +434,7 @@ class NSECStatusNXDOMAIN(object):
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
             nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
             self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
-    
+
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
         if self.validation_status == NSEC_STATUS_VALID:
@@ -527,7 +527,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
-            
+
     def _next_closest_encloser(self):
         return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
 
@@ -638,7 +638,7 @@ class NSECStatusNoAnswer(object):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
-            
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if self.nsec_for_qname is not None:
@@ -675,7 +675,7 @@ class NSECStatusNoAnswer(object):
         else:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=self.qname.canonicalize().to_text()))
-                
+
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
         if self.validation_status == NSEC_STATUS_VALID:
@@ -693,7 +693,7 @@ class NSECStatusNoAnswer(object):
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
-        
+
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
         if html_format:
@@ -845,7 +845,7 @@ class NSEC3StatusNXDOMAIN(object):
 
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
-            
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
@@ -884,10 +884,10 @@ class NSEC3StatusNXDOMAIN(object):
             self.nsec_set_info = nsec_set_info.project(*list(covering_names))
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
-    
+
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
-        
+
         show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
 
         if html_format:
@@ -992,7 +992,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
     def _set_closest_encloser(self, nsec_set_info):
         super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
-            
+
         if not self.closest_encloser:
             self.closest_encloser = { self.wildcard_name.parent(): set([None]) }
             # fill in a dummy value for wildcard_name_digest_map
@@ -1004,7 +1004,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 super(NSEC3StatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
-            
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
@@ -1050,7 +1050,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
             else:
                 d['meta']['closest_encloser']['inferred_from_wildcard'] = False
         return d
-    
+
 class NSEC3StatusNoAnswer(object):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname

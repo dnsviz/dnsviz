@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -48,7 +48,7 @@ GOST_DIGEST_NAME = 'GOST R 34.11-94'
 def _check_dsa_support():
     try:
         DSA.pub_key_from_params
-        _supported_algs.update((3,6)) 
+        _supported_algs.update((3,6))
     except AttributeError:
         pass
 
@@ -69,7 +69,7 @@ def _check_gost_support():
 def _check_ec_support():
     try:
         EC.pub_key_from_params
-        _supported_algs.update((13,14)) 
+        _supported_algs.update((13,14))
     except AttributeError:
         pass
 
@@ -198,7 +198,7 @@ def _dnskey_to_rsa(key):
         e_len, = struct.unpack('!H',key[1:3])
         offset = 3
 
-    # get the exponent 
+    # get the exponent
     e = ''
     for c in key[offset:offset+e_len]:
         e += '%02x' % struct.unpack('B',c)[0]

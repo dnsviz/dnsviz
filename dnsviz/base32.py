@@ -5,7 +5,7 @@
 # The contents of this module are derived the base64 module of python 2.7, with
 # the value of _b32tab modified to use the Base 32 Encoding with Extended Hex
 # Alphabet, as specified in RFC 4648.
-# 
+#
 
 import struct
 

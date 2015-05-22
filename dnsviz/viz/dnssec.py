@@ -8,9 +8,9 @@
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
-# 
+#
 # Copyright 2014-2015 VeriSign, Inc.
-# 
+#
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
@@ -156,7 +156,7 @@ class DNSAuthGraph:
                 else:
                     t += 't%s,0,' % (self._raphael_unit_mapping_expression(coords[0][0], coords[0][1]))
         return t
-        
+
     def _write_raphael_node(self, node, node_id, transform):
         required_attrs = { 'path': set(['d']), 'ellipse': set(['cx','cy','rx','ry']),
             'polygon': set(['points']), 'polyline': set(['points']),
@@ -369,7 +369,7 @@ class DNSAuthGraph:
                 dnskey_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
             self.node_info[node_str] = [dnskey_serialized]
-     
+
         return self.G.get_node(node_str)
 
     def add_dnskey_non_existent(self, name, zone, algorithm, key_tag):
@@ -647,7 +647,7 @@ class DNSAuthGraph:
 
             consolidate_clients = name_obj.single_client()
             rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True)
-            
+
             if name_obj.rrset_warnings[rrset_info]:
                 if 'warnings' not in rrset_serialized:
                     rrset_serialized['warnings'] = []
@@ -1312,7 +1312,7 @@ class DNSAuthGraph:
 
             #XXX revisit if we want to do this here
             if is_revoked and n.attr['color'] == COLORS['secure'] and not valid_self_loop:
-                n.attr['color'] = COLORS['bogus'] 
+                n.attr['color'] = COLORS['bogus']
 
             # mark the zone as "secure" as there is a secure entry point;
             # descendants will be so marked by following the delegation edges
@@ -1340,7 +1340,7 @@ class DNSAuthGraph:
 
             # if this is an edge used for formatting node (invis), then don't
             # follow it
-            if 'invis' in style: 
+            if 'invis' in style:
                 continue
 
             prev_top_name = self.G.get_node(self.node_subgraph_name[p])
@@ -1358,9 +1358,9 @@ class DNSAuthGraph:
             # as insecure through previous trust traversal (not because of
             # a local trust anchor, which case is handled above)
             if is_dlv:
-                if prev_top_name.attr['color'] not in ('', COLORS['insecure']): 
+                if prev_top_name.attr['color'] not in ('', COLORS['insecure']):
                     continue
-                
+
                 # reset the security of this top_name
                 prev_top_name.attr['color'] = ''
 
@@ -1416,7 +1416,7 @@ class DNSAuthGraph:
         for n in S.nodes():
             style = n.attr['style'].split(',')
 
-            # don't mark invisible nodes (zone marking as secure/insecure is handled in the 
+            # don't mark invisible nodes (zone marking as secure/insecure is handled in the
             # traversal at the delegation point below).
             if 'invis' in style:
                 continue
@@ -1551,7 +1551,7 @@ class DNSAuthGraph:
                     revoked_dnskeys.add(n)
                 if non_existent:
                     non_existent_dnskeys.add(n)
-                
+
             seps = ds_dnskeys.union(ta_dnskeys).intersection(ksks).difference(revoked_dnskeys)
             ksk_only = ksks.difference(zsks).difference(revoked_dnskeys)
             zsk_only = zsks.difference(revoked_dnskeys)
