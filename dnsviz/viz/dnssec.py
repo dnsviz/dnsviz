@@ -1267,6 +1267,7 @@ class DNSAuthGraph:
                     for n1 in self.G.out_neighbors(n):
                         if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
                             n.attr['color'] = COLORS['insecure_non_existent']
+                            status = Status.RRSET_STATUS_INSECURE
 
             elif n.attr['color'] == COLORS['bogus']:
                 status = Status.RRSET_STATUS_BOGUS
