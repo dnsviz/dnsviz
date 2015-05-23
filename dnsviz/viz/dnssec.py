@@ -1468,6 +1468,9 @@ class DNSAuthGraph:
                     for n in self.G.out_neighbors(p):
                         if not n.startswith('NSEC'):
                             continue
+                        # check that this node is in the zone we're coming from
+                        if self.node_subgraph_name[n] != top_name:
+                            continue
                         nsec_found = True
                         if n.attr['color'] == COLORS['secure']:
                             nsec_authenticated = True
@@ -1487,6 +1490,9 @@ class DNSAuthGraph:
                         # we're looking for DS records
                         for d in self.G.out_neighbors(n):
                             if not (d.startswith('DS-') or d.startswith('DLV-')):
+                                continue
+                            # check that this node is in the zone we're coming from
+                            if self.node_subgraph_name[d] != top_name:
                                 continue
                             ds_found = True
                             if d.attr['color'] == COLORS['secure']:
