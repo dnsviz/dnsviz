@@ -1260,6 +1260,14 @@ class DNSAuthGraph:
                 status = Status.RRSET_STATUS_SECURE
                 if 'dashed' in style:
                     n.attr['color'] = COLORS['secure_non_existent']
+
+                    # if this is an authenticated negative response, and the NSEC3
+                    # RR used opt out, then the node is actually insecure, rather
+                    # than secure.
+                    for n1 in self.G.out_neighbors(n):
+                        if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
+                            n.attr['color'] = COLORS['insecure_non_existent']
+
             elif n.attr['color'] == COLORS['bogus']:
                 status = Status.RRSET_STATUS_BOGUS
                 if 'dashed' in style:
@@ -1430,15 +1438,6 @@ class DNSAuthGraph:
 
             # if the name is already marked as secure
             if n.attr['color'] == COLORS['secure']:
-
-                # if this is an authenticated negative response, and the NSEC3
-                # RR used opt out, then the node is actually insecure, rather
-                # than secure.
-                nsec_found = False
-                for n1 in self.G.out_neighbors(n):
-                    if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
-                        n.attr['color'] = COLORS['insecure_non_existent']
-
                 # don't mark it as bogus
                 continue
 
