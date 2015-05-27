@@ -433,7 +433,7 @@ class NSECStatusNXDOMAIN(object):
             self.validation_status = NSEC_STATUS_INVALID
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
             nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=fmt.humanize_name(self.origin)))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -550,7 +550,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             self.validation_status = NSEC_STATUS_INVALID
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
             nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=fmt.humanize_name(self.origin)))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -671,7 +671,7 @@ class NSECStatusNoAnswer(object):
                 self.validation_status = NSEC_STATUS_INVALID
                 qname, nsec_names = self.nsec_names_covering_origin.items()[0]
                 nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-                self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
+                self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=fmt.humanize_name(self.origin)))
         else:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=fmt.humanize_name(self.qname)))
