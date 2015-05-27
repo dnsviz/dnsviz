@@ -253,6 +253,8 @@ def main():
                 except ValueError:
                     usage('Incorrect usage of -x option: "%s"' % arg)
                     sys.exit(1)
+                domain = domain.strip()
+                mappings = mappings.strip()
                 try:
                     domain = dns.name.from_text(domain)
                 except dns.exception.DNSException:
@@ -270,6 +272,8 @@ def main():
                     except ValueError:
                         name = mapping
                         addr = None
+                    name = name.strip()
+                    addr = addr.strip()
                     try:
                         name = dns.name.from_text(name)
                     except dns.exception.DNSException:
