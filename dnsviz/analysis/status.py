@@ -181,7 +181,7 @@ class RRSIGStatus(object):
                 zn = self.rrsig.signer
             else:
                 zn = zone_name
-            self.errors.append(Errors.SignerNotZone(zone_name=zn.canonicalize().to_text(), signer_name=self.rrsig.signer.canonicalize().to_text()))
+            self.errors.append(Errors.SignerNotZone(zone_name=fmt.humanize_name(zn), signer_name=fmt.humanize_name(self.rrsig.signer)))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke'] and self.rrsig.covers() != dns.rdatatype.DNSKEY:
@@ -212,7 +212,7 @@ class RRSIGStatus(object):
                 self.errors.append(Errors.SignatureInvalid())
 
     def __unicode__(self):
-        return u'RRSIG covering %s/%s' % (self.rrset.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
+        return u'RRSIG covering %s/%s' % (fmt.humanize_name(self.rrset.rrset.name), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -320,7 +320,7 @@ class DSStatus(object):
                 self.errors.append(Errors.DigestInvalid())
 
     def __unicode__(self):
-        return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), self.ds_meta.rrset.name.canonicalize().to_text(), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
+        return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -433,7 +433,7 @@ class NSECStatusNXDOMAIN(object):
             self.validation_status = NSEC_STATUS_INVALID
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
             nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -446,7 +446,7 @@ class NSECStatusNXDOMAIN(object):
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
     def __unicode__(self):
-        return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (self.qname.canonicalize().to_text())
+        return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -541,7 +541,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             nsec_covering_next_closest_encloser = nsec_set_info.nsec_covering_name(next_closest_encloser)
             if not nsec_covering_next_closest_encloser:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.WildcardExpansionInvalid(sname=self.qname.canonicalize().to_text(), wildcard=self.wildcard_name.canonicalize().to_text(), next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+                self.errors.append(Errors.WildcardExpansionInvalid(sname=fmt.humanize_name(self.qname), wildcard=fmt.humanize_name(self.wildcard_name), next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
         else:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.SnameNotCoveredWildcardAnswer(sname=self.qname))
@@ -550,7 +550,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             self.validation_status = NSEC_STATUS_INVALID
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
             nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
+            self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -630,7 +630,7 @@ class NSECStatusNoAnswer(object):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC record(s) proving non-existence (No Data) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)
@@ -645,36 +645,36 @@ class NSECStatusNoAnswer(object):
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
                 if not self.has_ns:
-                    self.errors.append(Errors.ReferralWithoutNSBitNSEC(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithoutNSBitNSEC(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_ds:
-                    self.errors.append(Errors.ReferralWithDSBitNSEC(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithDSBitNSEC(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_soa:
-                    self.errors.append(Errors.ReferralWithSOABitNSEC(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithSOABitNSEC(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
             else:
                 if self.has_rdtype:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
                     self.validation_status = NSEC_STATUS_INVALID
             if self.nsec_names_covering_qname:
-                self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=self.qname.canonicalize().to_text()))
+                self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=fmt.humanize_name(self.qname)))
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.SnameNotCoveredWildcardNoData(sname=self.qname.canonicalize().to_text()))
+                self.errors.append(Errors.SnameNotCoveredWildcardNoData(sname=fmt.humanize_name(self.qname)))
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=self.wildcard_name.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
             if self.nsec_names_covering_origin:
                 self.validation_status = NSEC_STATUS_INVALID
                 qname, nsec_names = self.nsec_names_covering_origin.items()[0]
                 nsec_rrset = nsec_set_info.rrsets[list(nsec_names)[0]].rrset
-                self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=nsec_rrset.name.canonicalize().to_text(), next_name=nsec_rrset[0].next.canonicalize().to_text(), zone_name=self.origin))
+                self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=self.origin))
         else:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=self.qname.canonicalize().to_text()))
+            self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=fmt.humanize_name(self.qname)))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -816,7 +816,7 @@ class NSEC3StatusNXDOMAIN(object):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (self.qname.canonicalize().to_text())
+        return u'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, self.qname)
@@ -856,7 +856,7 @@ class NSEC3StatusNXDOMAIN(object):
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
-                self.errors.append(Errors.NoClosestEncloserNameError(sname=self.qname.canonicalize().to_text()))
+                self.errors.append(Errors.NoClosestEncloserNameError(sname=fmt.humanize_name(self.qname)))
             if invalid_algs:
                 self.errors.append(invalid_alg_err)
         else:
@@ -864,7 +864,7 @@ class NSEC3StatusNXDOMAIN(object):
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
                     next_closest_encloser = self.get_next_closest_encloser()
-                    self.errors.append(Errors.NextClosestEncloserNotCoveredNameError(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+                    self.errors.append(Errors.NextClosestEncloserNotCoveredNameError(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
             if not self.nsec_names_covering_wildcard:
@@ -925,7 +925,7 @@ class NSEC3StatusNXDOMAIN(object):
                     d['meta']['closest_encloser']['name_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = formatter(fmt.humanize_name(next_closest_encloser))
+                d['meta']['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
                     d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -960,7 +960,7 @@ class NSEC3StatusNXDOMAIN(object):
                     ))
 
             else:
-                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1016,13 +1016,13 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
                 invalid_alg_err = None
             if valid_algs:
                 next_closest_encloser = self.get_next_closest_encloser()
-                self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardAnswer(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+                self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardAnswer(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
             if invalid_algs:
                 self.errors.append(invalid_alg_err)
 
         if self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.WildcardCoveredAnswerNSEC3(wildcard=self.wildcard_name.canonicalize().to_text()))
+            self.errors.append(Errors.WildcardCoveredAnswerNSEC3(wildcard=fmt.humanize_name(self.wildcard_name)))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1126,7 +1126,7 @@ class NSEC3StatusNoAnswer(object):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC3 record(s) proving non-existence (No Data) of %s/%s' % (self.qname.canonicalize().to_text(), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC3 record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, self.qname)
@@ -1158,37 +1158,37 @@ class NSEC3StatusNoAnswer(object):
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
                 if not self.has_ns:
-                    self.errors.append(Errors.ReferralWithoutNSBitNSEC3(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithoutNSBitNSEC3(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_ds:
-                    self.errors.append(Errors.ReferralWithDSBitNSEC3(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithDSBitNSEC3(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_soa:
-                    self.errors.append(Errors.ReferralWithSOABitNSEC3(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.ReferralWithSOABitNSEC3(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
             # RFC 5155, section 8.5, 8.6
             else:
                 if self.has_rdtype:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_cname:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=self.qname.canonicalize().to_text(), stype=dns.rdatatype.to_text(dns.rdatatype.CNAME)))
+                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(dns.rdatatype.CNAME)))
                     self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNoData(next_closest_encloser=next_closest_encloser.canonicalize().to_text()))
+                    self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNoData(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.StypeInBitmapWildcardNoDataNSEC3(sname=self.wildcard_name.canonicalize().to_text(), stype=dns.rdatatype.to_text(self.rdtype)))
+                self.errors.append(Errors.StypeInBitmapWildcardNoDataNSEC3(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
         elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNoData(sname=self.qname.canonicalize().to_text()))
+                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNoData(sname=fmt.humanize_name(self.qname)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
         else:
@@ -1198,7 +1198,7 @@ class NSEC3StatusNoAnswer(object):
                     cls = Errors.NoNSEC3MatchingSnameDSNoData
                 else:
                     cls = Errors.NoNSEC3MatchingSnameNoData
-                self.errors.append(cls(sname=self.qname.canonicalize().to_text()))
+                self.errors.append(cls(sname=fmt.humanize_name(self.qname)))
             if invalid_algs:
                 self.errors.append(invalid_alg_err)
 
@@ -1249,7 +1249,7 @@ class NSEC3StatusNoAnswer(object):
                 d['meta']['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
-                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1269,7 +1269,7 @@ class NSEC3StatusNoAnswer(object):
                 ))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = formatter(fmt.humanize_name(next_closest_encloser))
+                d['meta']['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
                     d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1300,7 +1300,7 @@ class NSEC3StatusNoAnswer(object):
                     ))
 
             if not self.nsec_for_qname and not self.closest_encloser:
-                d['meta']['sname'] = formatter(fmt.humanize_name(self.qname))
+                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1338,7 +1338,7 @@ class CNAMEFromDNAMEStatus(object):
         else:
             self.validation_status = DNAME_STATUS_VALID
             if self.included_cname.rrset[0].target != self.synthesized_cname.rrset[0].target:
-                self.errors.append(Errors.DNAMETargetMismatch(included_target=self.included_cname.rrset[0].target.canonicalize().to_text(), synthesized_target=self.synthesized_cname.rrset[0].target.canonicalize().to_text()))
+                self.errors.append(Errors.DNAMETargetMismatch(included_target=fmt.humanize_name(self.included_cname.rrset[0].target), synthesized_target=fmt.humanize_name(self.synthesized_cname.rrset[0].target)))
                 self.validation_status = DNAME_STATUS_INVALID_TARGET
             if self.included_cname.rrset.ttl != self.synthesized_cname.rrset.ttl:
                 if self.included_cname.rrset.ttl == 0:
@@ -1347,7 +1347,7 @@ class CNAMEFromDNAMEStatus(object):
                     self.warnings.append(Errors.DNAMETTLMismatch(cname_ttl=self.included_cname.rrset.ttl, dname_ttl=self.synthesized_cname.rrset.ttl))
 
     def __unicode__(self):
-        return u'CNAME synthesis for %s from %s/%s' % (self.synthesized_cname.rrset.name.canonicalize().to_text(), self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
+        return u'CNAME synthesis for %s from %s/%s' % (fmt.humanize_name(self.synthesized_cname.rrset.name), fmt.humanize_name(self.synthesized_cname.dname_info.rrset.name), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         values = []

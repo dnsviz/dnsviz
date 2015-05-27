@@ -864,15 +864,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if ns_names_not_in_child:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=map(lambda x: x.canonicalize().to_text(), ns_names_not_in_child), parent=self.parent_name().canonicalize().to_text()))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_child), parent=fmt.humanize_name(self.parent_name())))
 
         if ns_names_not_in_parent:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=map(lambda x: x.canonicalize().to_text(), ns_names_not_in_parent), parent=self.parent_name().canonicalize().to_text()))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_parent), parent=fmt.humanize_name(self.parent_name())))
 
         if names_error_resolving:
             names_error_resolving.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: x.canonicalize().to_text(), names_error_resolving)))
+            self.delegation_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
 
         if names_with_glue_mismatch:
             names_with_glue_mismatch.sort()
@@ -881,15 +881,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 glue_addrs.sort()
                 auth_addrs = list(auth_addrs)
                 auth_addrs.sort()
-                self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchError(name=name.canonicalize().to_text(), glue_addresses=glue_addrs, auth_addresses=auth_addrs))
+                self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchError(name=fmt.humanize_name(name), glue_addresses=glue_addrs, auth_addresses=auth_addrs))
 
         if names_missing_glue:
             names_missing_glue.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_glue)))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_glue)))
 
         if names_missing_auth:
             names_missing_auth.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: x.canonicalize().to_text(), names_missing_auth)))
+            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
 
         ips_from_parent = self.get_servers_in_parent()
         ips_from_parent_ipv4 = filter(lambda x: x.version == 4, ips_from_parent)
@@ -1213,7 +1213,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
 
             if soa_owner_name != qname_obj.zone.name:
-                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=soa_owner_name.canonicalize().to_text(), zone_name=qname_obj.zone.name.canonicalize().to_text()), errors, None, None, None)
+                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=fmt.humanize_name(soa_owner_name), zone_name=fmt.humanize_name(qname_obj.zone.name)), errors, None, None, None)
                 if neg_response_info.qname == query.qname:
                     err.servers_clients.update(soa_rrset_info.servers_clients)
                 else:
@@ -1391,7 +1391,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
             if not self.is_zone():
-                err = Errors.DNSKEYNotAtZoneApex(zone=self.zone.name.canonicalize().to_text(), name=self.name.canonicalize().to_text())
+                err = Errors.DNSKEYNotAtZoneApex(zone=fmt.humanize_name(self.zone.name), name=fmt.humanize_name(self.name))
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
 

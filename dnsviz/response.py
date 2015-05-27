@@ -535,7 +535,7 @@ class DNSKEYMeta(DNSResponseComponent):
         self.key_len = self.calc_key_len(rdata)
 
     def __unicode__(self):
-        return 'DNSKEY for %s (algorithm %d (%s), key tag %d)' % (self.name.canonicalize().to_text(), self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm), self.key_tag)
+        return 'DNSKEY for %s (algorithm %d (%s), key tag %d)' % (fmt.humanize_name(self.name), self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm), self.key_tag)
 
     @classmethod
     def calc_key_tag(cls, rdata, clear_revoke=False):
@@ -704,7 +704,7 @@ class RRsetInfo(DNSResponseComponent):
         self.cname_info_from_dname = []
 
     def __unicode__(self):
-        return 'RRset for %s/%s' % (self.rrset.name.canonicalize().to_text(), dns.rdatatype.to_text(self.rrset.rdtype))
+        return 'RRset for %s/%s' % (fmt.humanize_name(self.rrset.name), dns.rdatatype.to_text(self.rrset.rdtype))
 
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))

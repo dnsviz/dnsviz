@@ -74,7 +74,7 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
     except EOFError:
         pass
     except:
-        logger.exception('Error analyzing %s' % name.canonicalize().to_text())
+        logger.exception('Error analyzing %s' % fmt.humanize_name(name))
         return None
 
 class BulkAnalyst(object):
