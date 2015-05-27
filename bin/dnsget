@@ -268,7 +268,7 @@ def main():
                     explicit_delegations[domain] = set()
                 for mapping in mappings:
                     try:
-                        name, addr = mapping.split('=')
+                        name, addr = mapping.rsplit('=', 1)
                     except ValueError:
                         name = mapping
                         addr = None
