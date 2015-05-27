@@ -37,9 +37,10 @@ import time
 
 import dns.exception, dns.name
 
-from dnsviz.analysis import PrivateAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException
+from dnsviz.analysis import PrivateAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
+from dnsviz.resolver import DNSAnswer
 
 logger = logging.getLogger('dnsviz.analysis.online')
 
@@ -216,10 +217,12 @@ Options:
     -a <ancestor>  - analyze ancestry of name through specified ancestor,
                      instead of just name itself (use "-a ." or full ancestral
                      analysis) (default: analyze only the name itself).
-    -x <domain>:<name>=<addr>(,<name>=<addr>[...])
+    -x <domain>:<name>[=<addr>][,<name>[=<addr>] ...]
                    - set explicit delegation for <domain>, using servers with
-                     specified names (<name>) and addresses (<addr>).  This option
-                     may be used multiple times for different domains or
+                     specified names (<name>) and (optionally) addresses
+                     (<addr>).  If an address is not supplied, then it will be
+                     looked up using the standard resolution process.  This
+                     option may be used multiple times for different domains or
                      servers.  Note that the names are simply for
                      identification, and it is not necessary for the names to
                      resolve to the corresponding address (or resolve at all
@@ -265,21 +268,49 @@ def main():
                     try:
                         name, addr = mapping.split('=')
                     except ValueError:
-                        usage('Incorrect usage of -x option: "%s"' % arg)
-                        sys.exit(1)
-                    if addr[0] == '[' and addr[-1] == ']':
-                        addr = addr[1:-1]
+                        name = mapping
+                        addr = None
                     try:
                         name = dns.name.from_text(name)
                     except dns.exception.DNSException:
                         usage('The domain name was invalid: "%s"' % name)
                         sys.exit(1)
-                    try:
-                        addr = IPAddr(addr)
-                    except ValueError:
-                        usage('The IP address was invalid: "%s"' % addr)
+
+                    # no address is provided, so query A/AAAA records for the name
+                    if addr is None:
+                        query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
+                        answer_map = resolver.query_multiple_for_answer(*query_tuples)
+                        found_answer = False
+                        for a in answer_map.values():
+                            if isinstance(a, DNSAnswer):
+                                found_answer = True
+                                for a_rr in a.rrset:
+                                    explicit_delegations[domain].add((name, IPAddr(a_rr.to_text())))
+                            # negative responses
+                            elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
+                                pass
+                            # error responses
+                            elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
+                                usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+                                sys.exit(1)
+
+                        if not found_answer:
+                            usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+                            sys.exit(1)
+
+                    # otherwise, add the address
+                    elif not addr:
+                        usage('No IP address was supplied.')
                         sys.exit(1)
-                    explicit_delegations[domain].add((name, addr))
+                    else:
+                        if addr and addr[0] == '[' and addr[-1] == ']':
+                            addr = addr[1:-1]
+                        try:
+                            addr = IPAddr(addr)
+                        except ValueError:
+                            usage('The IP address was invalid: "%s"' % addr)
+                            sys.exit(1)
+                        explicit_delegations[domain].add((name, addr))
 
         opts = dict(opts)
         if '-h' in opts:
