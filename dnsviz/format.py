@@ -151,7 +151,10 @@ def format_nsec3_rrset_text(nsec3_rrset_text):
 
 def humanize_name(name, idn=False):
     if idn:
-        name = name.canonicalize().to_unicode()
+        try:
+            name = name.canonicalize().to_unicode()
+        except UnicodeError:
+            name = name.canonicalize().to_text()
     else:
         name = name.canonicalize().to_text()
     if name == '.':
