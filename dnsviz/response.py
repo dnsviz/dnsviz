@@ -639,8 +639,9 @@ class DNSKEYMeta(DNSResponseComponent):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = '%d/%d' % (self.rdata.algorithm, self.key_tag)
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm

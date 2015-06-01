@@ -1417,9 +1417,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d = collections.OrderedDict()
 
         if loglevel <= logging.INFO or (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR):
-            d['description'] = unicode(rrset_info)
+            if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
+                d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
+            else:
+                d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
 
         if loglevel <= logging.DEBUG:
+            d['description'] = unicode(rrset_info)
             d['rrset'] = rrset_info.serialize(include_rrsig_info=False, show_servers=show_servers, consolidate_clients=consolidate_clients, html_format=html_format)
 
         if self.rrsig_status[rrset_info]:

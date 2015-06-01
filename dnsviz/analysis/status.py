@@ -225,10 +225,11 @@ class RRSIGStatus(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = '%s/%d/%d' % (self.rrsig.signer.canonicalize().to_text(), self.rrsig.algorithm, self.rrsig.key_tag)
 
         if loglevel <= logging.DEBUG:
             d.update((
+                ('description', formatter(unicode(self))),
                 ('rdata', collections.OrderedDict((
                     ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
                     ('algorithm', self.rrsig.algorithm),
@@ -333,9 +334,10 @@ class DSStatus(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = '%d/%d/%d' % (self.ds.algorithm, self.ds.key_tag, self.ds.digest_type)
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d.update((
                 ('rdata', collections.OrderedDict((
                     ('algorithm', self.ds.algorithm),
@@ -459,7 +461,7 @@ class NSECStatusNXDOMAIN(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = 'NSEC'
 
         d['nsec'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -473,6 +475,7 @@ class NSECStatusNXDOMAIN(object):
             del d['nsec']
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['meta'] = collections.OrderedDict()
             d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_names_covering_qname:
@@ -702,7 +705,7 @@ class NSECStatusNoAnswer(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = 'NSEC'
 
         d['nsec'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -716,6 +719,7 @@ class NSECStatusNoAnswer(object):
             del d['nsec']
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['meta'] = collections.OrderedDict()
             d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_for_qname is not None:
@@ -896,7 +900,7 @@ class NSEC3StatusNXDOMAIN(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = 'NSEC3'
 
         d['nsec3'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -910,6 +914,7 @@ class NSEC3StatusNXDOMAIN(object):
             del d['nsec3']
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['meta'] = collections.OrderedDict()
             if self.opt_out is not None:
                 d['meta']['opt_out'] = self.opt_out
@@ -1230,7 +1235,7 @@ class NSEC3StatusNoAnswer(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = 'NSEC3'
 
         d['nsec3'] = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -1244,6 +1249,7 @@ class NSEC3StatusNoAnswer(object):
             del d['nsec3']
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['meta'] = collections.OrderedDict()
             if self.opt_out is not None:
                 d['meta']['opt_out'] = self.opt_out
