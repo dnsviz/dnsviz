@@ -1367,7 +1367,7 @@ class CNAMEFromDNAMEStatus(object):
             formatter = lambda x: x
 
         if loglevel <= logging.INFO or show_basic:
-            d['description'] = formatter(unicode(self))
+            d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
 
         if rrset_info_serializer is not None:
             dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
@@ -1377,6 +1377,7 @@ class CNAMEFromDNAMEStatus(object):
             d['dname'] = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
 
         if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
             d['meta'] = collections.OrderedDict()
             if self.included_cname is not None:
                 d['meta']['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
