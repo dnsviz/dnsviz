@@ -252,11 +252,6 @@ class RRSIGStatus(object):
                 d['expiration'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.expiration)))
                 d['ttl'] = '%d (%s)' % (self.rrset.rrsig_info[self.rrsig].ttl, fmt.humanize_time(self.rrset.rrsig_info[self.rrsig].ttl))
 
-        if loglevel <= logging.DEBUG and self.dnskey is not None:
-            d['dnskey'] = self.dnskey.rdata.to_text()
-            if self.rrsig.key_tag != self.dnskey.key_tag:
-                d['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
-
         if loglevel <= logging.INFO or show_basic:
             d['status'] = rrsig_status_mapping[self.validation_status]
 
@@ -349,12 +344,6 @@ class DSStatus(object):
             d['ttl'] = self.ds_meta.rrset.ttl
             if html_format:
                 d['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
-            if self.dnskey is None:
-                d['dnskey'] = None
-            else:
-                d['dnskey'] = self.dnskey.rdata.to_text()
-                if self.ds.key_tag != self.dnskey.key_tag:
-                    d['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = ds_status_mapping[self.validation_status]
