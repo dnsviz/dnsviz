@@ -807,7 +807,7 @@ class RRsetInfo(DNSResponseComponent):
 
         return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
-    def serialize(self, include_rrsig_info=True, show_servers=True, consolidate_clients=True, html_format=False):
+    def serialize(self, include_rrsig_info=True, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         if html_format:
