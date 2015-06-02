@@ -663,13 +663,6 @@ class DNSKEYMeta(DNSResponseComponent):
                 else:
                     d['key_length'] = '%d bits' % (self.key_len)
 
-        elif show_basic:
-            d['algorithm'] = self.rdata.algorithm
-            d['key_tag'] = self.key_tag
-
-            if html_format:
-                d['algorithm'] = '%d (%s)' % (self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm))
-
         #TODO: put DNSKEY roles in meta, if it makes sense
 
         if loglevel <= logging.DEBUG or show_basic:
