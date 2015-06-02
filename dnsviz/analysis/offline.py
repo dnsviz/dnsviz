@@ -1424,7 +1424,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if loglevel <= logging.DEBUG:
             d['description'] = unicode(rrset_info)
-            d['rrset'] = rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, show_servers=show_servers, html_format=html_format)
+            d.update(rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, show_servers=show_servers, html_format=html_format))
 
         if self.rrsig_status[rrset_info]:
             d['rrsig'] = []
