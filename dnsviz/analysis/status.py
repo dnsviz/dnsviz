@@ -340,7 +340,6 @@ class DSStatus(object):
                 d['algorithm'] = '%d (%s)' % (self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm))
                 d['digest_type'] = '%d (%s)' % (self.ds.digest_type, fmt.DS_DIGEST_TYPES.get(self.ds.digest_type, self.ds.digest_type))
 
-        if loglevel <= logging.DEBUG:
             d['ttl'] = self.ds_meta.rrset.ttl
             if html_format:
                 d['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
