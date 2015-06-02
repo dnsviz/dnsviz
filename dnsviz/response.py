@@ -646,30 +646,26 @@ class DNSKEYMeta(DNSResponseComponent):
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm
             d['key'] = base64.b64encode(self.rdata.key)
-            d['meta'] = collections.OrderedDict((
-                ('ttl', self.ttl),
-                ('key_length', self.key_len),
-                ('key_tag', self.key_tag)
-            ))
+            d['ttl'] = self.ttl
+            d['key_length'] = self.key_len
+            d['key_tag'] = self.key_tag
             if self.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
-                d['meta']['key_tag_pre_revoke'] = self.key_tag_no_revoke
+                d['key_tag_pre_revoke'] = self.key_tag_no_revoke
 
             if html_format:
                 flags = [t for (t,c) in fmt.DNSKEY_FLAGS.items() if c & self.rdata.flags]
                 d['flags'] = '%d (%s)' % (self.rdata.flags, ', '.join(flags))
                 d['protocol'] = '%d (%s)' % (self.rdata.protocol, fmt.DNSKEY_PROTOCOLS.get(self.rdata.protocol, self.rdata.protocol))
                 d['algorithm'] = '%d (%s)' % (self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm))
-                d['meta']['ttl'] = '%d (%s)' % (self.ttl, fmt.humanize_time(self.ttl))
+                d['ttl'] = '%d (%s)' % (self.ttl, fmt.humanize_time(self.ttl))
                 if self.key_len is None:
-                    d['meta']['key_length'] = 'unknown'
+                    d['key_length'] = 'unknown'
                 else:
-                    d['meta']['key_length'] = '%d bits' % (self.key_len)
+                    d['key_length'] = '%d bits' % (self.key_len)
 
         elif show_basic:
             d['algorithm'] = self.rdata.algorithm
-            d['meta'] = collections.OrderedDict((
-                ('key_tag', self.key_tag),
-            ))
+            d['key_tag'] = self.key_tag
 
             if html_format:
                 d['algorithm'] = '%d (%s)' % (self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm))

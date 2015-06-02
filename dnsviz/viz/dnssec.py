@@ -72,11 +72,9 @@ class DNSKEYNonExistent(object):
         d['protocol'] = None
         d['algorithm'] = self.algorithm
         d['key'] = None
-        d['meta'] = collections.OrderedDict((
-            ('ttl', None),
-            ('key_length', None),
-            ('key_tag', self.key_tag)
-        ))
+        d['ttl'] = None
+        d['key_length'] = None
+        d['key_tag'] = self.key_tag
         return d
 
 class RRsetNonExistent(object):
@@ -442,13 +440,13 @@ class DNSAuthGraph:
             digest_algs = []
             digests = []
             for d in ds_serialized:
-                digest_algs.append(d['rdata']['digest_type'])
-                digests.append(d['rdata']['digest'])
+                digest_algs.append(d['digest_type'])
+                digests.append(d['digest'])
             digest_algs.sort()
             digests.sort()
             consolidated_ds_serialized = ds_serialized[0]
-            consolidated_ds_serialized['rdata']['digest_type'] = digest_algs
-            consolidated_ds_serialized['rdata']['digest'] = digests
+            consolidated_ds_serialized['digest_type'] = digest_algs
+            consolidated_ds_serialized['digest'] = digests
 
             if zone_obj.rrset_warnings[ds_info]:
                 if 'warnings' not in consolidated_ds_serialized:

@@ -230,36 +230,32 @@ class RRSIGStatus(object):
         if loglevel <= logging.DEBUG:
             d.update((
                 ('description', formatter(unicode(self))),
-                ('rdata', collections.OrderedDict((
-                    ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
-                    ('algorithm', self.rrsig.algorithm),
-                    ('key_tag', self.rrsig.key_tag),
-                    ('original_ttl', self.rrsig.original_ttl),
-                    ('labels', self.rrsig.labels),
-                    ('inception', fmt.timestamp_to_str(self.rrsig.inception)),
-                    ('expiration', fmt.timestamp_to_str(self.rrsig.expiration)),
-                    ('signature', base64.b64encode(self.rrsig.signature)),
-                ))),
-                ('meta', collections.OrderedDict((
-                    ('ttl', self.rrset.rrsig_info[self.rrsig].ttl),
-                ))),
+                ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
+                ('algorithm', self.rrsig.algorithm),
+                ('key_tag', self.rrsig.key_tag),
+                ('original_ttl', self.rrsig.original_ttl),
+                ('labels', self.rrsig.labels),
+                ('inception', fmt.timestamp_to_str(self.rrsig.inception)),
+                ('expiration', fmt.timestamp_to_str(self.rrsig.expiration)),
+                ('signature', base64.b64encode(self.rrsig.signature)),
+                ('ttl', self.rrset.rrsig_info[self.rrsig].ttl),
             ))
 
             if html_format:
-                d['rdata']['algorithm'] = '%d (%s)' % (self.rrsig.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rrsig.algorithm, self.rrsig.algorithm))
-                d['rdata']['original_ttl'] = '%d (%s)' % (self.rrsig.original_ttl, fmt.humanize_time(self.rrsig.original_ttl))
+                d['algorithm'] = '%d (%s)' % (self.rrsig.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rrsig.algorithm, self.rrsig.algorithm))
+                d['original_ttl'] = '%d (%s)' % (self.rrsig.original_ttl, fmt.humanize_time(self.rrsig.original_ttl))
                 if self.rrset.is_wildcard(self.rrsig):
-                    d['rdata']['labels'] = '%d (wildcard)' % (self.rrsig.labels)
+                    d['labels'] = '%d (wildcard)' % (self.rrsig.labels)
                 else:
-                    d['rdata']['labels'] = '%d (no wildcard)' % (self.rrsig.labels)
-                d['rdata']['inception'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.inception)))
-                d['rdata']['expiration'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.expiration)))
-                d['meta']['ttl'] = '%d (%s)' % (self.rrset.rrsig_info[self.rrsig].ttl, fmt.humanize_time(self.rrset.rrsig_info[self.rrsig].ttl))
+                    d['labels'] = '%d (no wildcard)' % (self.rrsig.labels)
+                d['inception'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.inception)))
+                d['expiration'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.expiration)))
+                d['ttl'] = '%d (%s)' % (self.rrset.rrsig_info[self.rrsig].ttl, fmt.humanize_time(self.rrset.rrsig_info[self.rrsig].ttl))
 
         if loglevel <= logging.DEBUG and self.dnskey is not None:
-            d['meta']['dnskey'] = self.dnskey.rdata.to_text()
+            d['dnskey'] = self.dnskey.rdata.to_text()
             if self.rrsig.key_tag != self.dnskey.key_tag:
-                d['meta']['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
+                d['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = rrsig_status_mapping[self.validation_status]
@@ -339,29 +335,26 @@ class DSStatus(object):
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
             d.update((
-                ('rdata', collections.OrderedDict((
-                    ('algorithm', self.ds.algorithm),
-                    ('key_tag', self.ds.key_tag),
-                    ('digest_type', self.ds.digest_type),
-                    ('digest', base64.b64encode(self.ds.digest)),
-                ))),
-                ('meta', collections.OrderedDict()),
+                ('algorithm', self.ds.algorithm),
+                ('key_tag', self.ds.key_tag),
+                ('digest_type', self.ds.digest_type),
+                ('digest', base64.b64encode(self.ds.digest)),
             ))
 
             if html_format:
-                d['rdata']['algorithm'] = '%d (%s)' % (self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm))
-                d['rdata']['digest_type'] = '%d (%s)' % (self.ds.digest_type, fmt.DS_DIGEST_TYPES.get(self.ds.digest_type, self.ds.digest_type))
+                d['algorithm'] = '%d (%s)' % (self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm))
+                d['digest_type'] = '%d (%s)' % (self.ds.digest_type, fmt.DS_DIGEST_TYPES.get(self.ds.digest_type, self.ds.digest_type))
 
         if loglevel <= logging.DEBUG:
-            d['meta']['ttl'] = self.ds_meta.rrset.ttl
+            d['ttl'] = self.ds_meta.rrset.ttl
             if html_format:
-                d['meta']['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
+                d['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
             if self.dnskey is None:
-                d['meta']['dnskey'] = None
+                d['dnskey'] = None
             else:
-                d['meta']['dnskey'] = self.dnskey.rdata.to_text()
+                d['dnskey'] = self.dnskey.rdata.to_text()
                 if self.ds.key_tag != self.dnskey.key_tag:
-                    d['meta']['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
+                    d['dnskey_key_tag_pre_revoke'] = self.dnskey.key_tag_no_revoke
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = ds_status_mapping[self.validation_status]
@@ -476,23 +469,22 @@ class NSECStatusNXDOMAIN(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['meta'] = collections.OrderedDict()
-            d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
+            d['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['meta']['nsec_chain_covering_sname'] = collections.OrderedDict((
+                d['nsec_chain_covering_sname'] = collections.OrderedDict((
                     ('sname', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
-            d['meta']['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
+            d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
             if self.nsec_names_covering_wildcard:
                 wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['meta']['nsec_chain_covering_wildcard'] = collections.OrderedDict((
+                d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
                     ('wildcard', formatter(wildcard.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
@@ -568,7 +560,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
         try:
-            del d['meta']['wildcard']
+            del d['wildcard']
         except KeyError:
             pass
         return d
@@ -720,10 +712,9 @@ class NSECStatusNoAnswer(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['meta'] = collections.OrderedDict()
-            d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
+            d['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_for_qname is not None:
-                d['meta']['nsec_matching_sname'] = collections.OrderedDict((
+                d['nsec_matching_sname'] = collections.OrderedDict((
                     ('sname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
                     #TODO - add rdtypes bitmap (when NSEC matches qname--not for empty non-terminal)
                 ))
@@ -732,15 +723,15 @@ class NSECStatusNoAnswer(object):
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['meta']['nsec_chain_covering_sname'] = collections.OrderedDict((
+                d['nsec_chain_covering_sname'] = collections.OrderedDict((
                     ('sname', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
-            d['meta']['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
+            d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
             if self.nsec_for_wildcard_name is not None:
-                d['meta']['nsec_matching_wildcard'] = collections.OrderedDict((
+                d['nsec_matching_wildcard'] = collections.OrderedDict((
                     ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
                     #TODO - add rdtypes bitmap
                 ))
@@ -915,33 +906,32 @@ class NSEC3StatusNXDOMAIN(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['meta'] = collections.OrderedDict()
             if self.opt_out is not None:
-                d['meta']['opt_out'] = self.opt_out
+                d['opt_out'] = self.opt_out
 
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
-                d['meta']['closest_encloser'] = collections.OrderedDict((
+                d['closest_encloser'] = collections.OrderedDict((
                     ('name', formatter(encloser_name.canonicalize().to_text())),
                 ))
                 # could be inferred from wildcard
                 if nsec_name is not None:
-                    d['meta']['closest_encloser']['name_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
+                    d['closest_encloser']['name_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
+                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['next_closest_encloser_digest'] = None
+                    d['next_closest_encloser_digest'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
+                    d['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
                         ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
@@ -949,28 +939,28 @@ class NSEC3StatusNXDOMAIN(object):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
-                d['meta']['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
+                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['meta']['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
+                    d['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
-                    d['meta']['wildcard_digest'] = None
+                    d['wildcard_digest'] = None
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['meta']['nsec_chain_covering_wildcard'] = collections.OrderedDict((
+                    d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
                         ('wildcard_digest', formatter(fmt.format_nsec3_name(wildcard))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
 
             else:
-                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
+                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['sname_digest'] = None
+                    d['sname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1042,18 +1032,18 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
         try:
-            del d['meta']['wildcard']
+            del d['wildcard']
         except KeyError:
             pass
         try:
-            del d['meta']['wildcard_digest']
+            del d['wildcard_digest']
         except KeyError:
             pass
         if loglevel <= logging.DEBUG:
             if None in self.closest_encloser.values()[0]:
-                d['meta']['closest_encloser']['inferred_from_wildcard'] = True
+                d['closest_encloser']['inferred_from_wildcard'] = True
             else:
-                d['meta']['closest_encloser']['inferred_from_wildcard'] = False
+                d['closest_encloser']['inferred_from_wildcard'] = False
         return d
 
 class NSEC3StatusNoAnswer(object):
@@ -1250,18 +1240,17 @@ class NSEC3StatusNoAnswer(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['meta'] = collections.OrderedDict()
             if self.opt_out is not None:
-                d['meta']['opt_out'] = self.opt_out
+                d['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
-                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
+                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['sname_digest'] = None
-                d['meta']['nsec_matching_sname'] = collections.OrderedDict((
+                    d['sname_digest'] = None
+                d['nsec_matching_sname'] = collections.OrderedDict((
                     ('sname_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))),
                     #TODO - add rdtypes bitmap
                 ))
@@ -1269,24 +1258,24 @@ class NSEC3StatusNoAnswer(object):
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
-                d['meta']['closest_encloser'] = collections.OrderedDict((
+                d['closest_encloser'] = collections.OrderedDict((
                     ('name', formatter(encloser_name.canonicalize().to_text())),
                     ('name_digest', formatter(fmt.format_nsec3_name(nsec_name))),
                 ))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['meta']['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
+                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['next_closest_encloser_digest'] = None
+                    d['next_closest_encloser_digest'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['meta']['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
+                    d['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
                         ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
@@ -1294,24 +1283,24 @@ class NSEC3StatusNoAnswer(object):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
-                d['meta']['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
+                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['meta']['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
+                    d['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
-                    d['meta']['wildcard_digest'] = None
+                    d['wildcard_digest'] = None
                 if self.nsec_for_wildcard_name:
-                    d['meta']['nsec_matching_wildcard'] = collections.OrderedDict((
+                    d['nsec_matching_wildcard'] = collections.OrderedDict((
                         ('wildcard_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))),
                         #TODO - add rdtypes bitmap
                     ))
 
             if not self.nsec_for_qname and not self.closest_encloser:
-                d['meta']['sname'] = formatter(self.qname.canonicalize().to_text())
+                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['meta']['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['meta']['sname_digest'] = None
+                    d['sname_digest'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1378,10 +1367,9 @@ class CNAMEFromDNAMEStatus(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['meta'] = collections.OrderedDict()
             if self.included_cname is not None:
-                d['meta']['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
-                d['meta']['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
+                d['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
+                d['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
 
         if loglevel <= logging.INFO or self.validation_status != STATUS_VALID:
             d['status'] = dname_status_mapping[self.validation_status]
