@@ -328,8 +328,8 @@ class DSStatus(object):
             d['id'] = '%d/%d/%d' % (self.ds.algorithm, self.ds.key_tag, self.ds.digest_type)
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
             d.update((
+                ('description', formatter(unicode(self))),
                 ('algorithm', self.ds.algorithm),
                 ('key_tag', self.ds.key_tag),
                 ('digest_type', self.ds.digest_type),
