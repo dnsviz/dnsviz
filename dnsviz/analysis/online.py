@@ -1853,7 +1853,7 @@ class RecursiveAnalyst(Analyst):
         super(RecursiveAnalyst, self).__init__(name, **kwargs)
 
     def _set_recursive_servers(self, name_obj):
-        name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text(str(s)), s) for s in self.recursive_servers])
+        name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text('_r%d' % i), s) for i, s in enumerate(self.recursive_servers)])
         name_obj.explicit_delegation = True
 
     def _analyze(self, name):
