@@ -517,6 +517,23 @@ class OnlineDomainNameAnalysis(object):
 
                 self._process_response(query.responses[server][client], server, client, query, bailiwick)
 
+    def remove_query_negative_response(self, qname, rdtype):
+        '''Remove the query with the given qname and rdtype if there is not
+        ultimate (i.e., not alias) positive response associated with it.  It
+        will also discard CNAME queries, as they have no use, other than
+        diagnostics.'''
+
+        found_answer = False
+        if rdtype != dns.rdatatype.CNAME:
+            for query in self.queries[(qname, rdtype)].queries.values():
+                for server in query.responses:
+                    for response in query.responses[server].values():
+                        if response.is_answer(qname, rdtype, include_cname=False):
+                            found_answer = True
+
+        if not found_answer:
+            del self.queries[(qname, rdtype)]
+
     def get_glue_ip_mapping(self):
         '''Return a reference to the mapping of targets of delegation records
         (i.e., NS records in the parent zone) and their corresponding IPv4 or
