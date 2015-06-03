@@ -1852,6 +1852,9 @@ class RecursiveAnalyst(Analyst):
             raise TypeError('recursive_servers is a required keyword argument for instantiating RecursiveAnalyst')
         super(RecursiveAnalyst, self).__init__(name, **kwargs)
 
+    def _detect_ceiling(self, ceiling):
+        return ceiling, False
+
     def _set_recursive_servers(self, name_obj):
         name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text('_r%d' % i), s) for i, s in enumerate(self.recursive_servers)])
         name_obj.explicit_delegation = True
@@ -1914,8 +1917,13 @@ class RecursiveAnalyst(Analyst):
         finally:
             self._cleanup_analysis_all(name_obj)
 
-        # analyze the parent if the name is not root
-        if name != dns.name.root:
+        # only analyze the parent if the name is not root and if there is no
+        # ceiling or the name is a subdomain of the ceiling
+        if name == dns.name.root:
+            parent_obj = None
+        elif self.ceiling is not None and self.ceiling.is_subdomain(name) and name_obj.has_ns:
+            parent_obj = None
+        else:
             parent_obj = self._analyze(name.parent())
 
             if parent_obj is not None:
