@@ -1843,6 +1843,8 @@ class RecursiveAnalyst(Analyst):
     truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
+    clone_attrnames = Analyst.clone_attrnames + ['recursive_servers']
+
     def __init__(self, name, *args, **kwargs):
         try:
             self.recursive_servers = kwargs.pop('recursive_servers')
