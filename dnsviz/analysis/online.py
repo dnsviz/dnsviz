@@ -95,6 +95,8 @@ DANE_PORT_RE = re.compile(r'^_(\d+)$')
 SRV_PORT_RE = re.compile(r'^_.*[^\d].*$')
 PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 
+WILDCARD_EXPLICIT_DELEGATION = dns.name.from_text('*')
+
 ANALYSIS_TYPE_AUTHORITATIVE = 0
 ANALYSIS_TYPE_RECURSIVE = 1
 ANALYSIS_TYPE_CACHE = 2
@@ -1331,8 +1333,13 @@ class Analyst(object):
             del self.analysis_cache[name_obj.name]
 
     def _handle_explicit_delegations(self, name_obj):
+        key = None
         if name_obj.name in self.explicit_delegations:
-            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[name_obj.name])
+            key = name_obj.name
+        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+            key = WILDCARD_EXPLICIT_DELEGATION
+        if key is not None:
+            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[key])
             name_obj.explicit_delegation = True
 
     def _analyze_stub(self, name):
@@ -1843,21 +1850,8 @@ class RecursiveAnalyst(Analyst):
     truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
-    clone_attrnames = Analyst.clone_attrnames + ['recursive_servers']
-
-    def __init__(self, name, *args, **kwargs):
-        try:
-            self.recursive_servers = kwargs.pop('recursive_servers')
-        except KeyError:
-            raise TypeError('recursive_servers is a required keyword argument for instantiating RecursiveAnalyst')
-        super(RecursiveAnalyst, self).__init__(name, **kwargs)
-
     def _detect_ceiling(self, ceiling):
         return ceiling, False
-
-    def _set_recursive_servers(self, name_obj):
-        name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text('_r%d' % i), s) for i, s in enumerate(self.recursive_servers)])
-        name_obj.explicit_delegation = True
 
     def _finalize_analysis_proper(self, name_obj):
         # if there aren't NS records, then it's not really a zone, so delete
@@ -1894,8 +1888,8 @@ class RecursiveAnalyst(Analyst):
         try:
             self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
 
-            self._set_recursive_servers(name_obj)
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            self._handle_explicit_delegations(name_obj)
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
             self._finalize_analysis_proper(name_obj)
@@ -1969,7 +1963,7 @@ class RecursiveAnalyst(Analyst):
     def _analyze_name(self, name_obj):
         self.logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
 
-        self._set_recursive_servers(name_obj)
+        self._handle_explicit_delegations(name_obj)
 
         servers = name_obj.zone.get_auth_or_designated_servers()
         servers = self._filter_servers(servers)
