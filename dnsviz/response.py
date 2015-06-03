@@ -311,15 +311,19 @@ class DNSResponse:
         return bool(not self.is_authoritative() and \
                 filter(lambda x: x.name != qname and qname.is_subdomain(x.name), self.message.authority))
 
-    def is_answer(self, qname, rdtype):
+    def is_answer(self, qname, rdtype, include_cname=True):
         '''Return True if this response yields an answer for the queried name
-        and type in the answer section.'''
+        and type in the answer section.  If include_cname is False, then only
+        non-CNAME records count.'''
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
         if rdtype == dns.rdatatype.ANY and filter(lambda x: x.name == qname, self.message.answer):
             return True
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
+        rdtypes = [rdtype]
+        if include_cname:
+            rdtypes.append(dns.rdatatype.CNAME)
+        if filter(lambda x: x.name == qname and x.rdtype in rdtypes, self.message.answer):
             return True
         return False
 
