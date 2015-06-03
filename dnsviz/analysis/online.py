@@ -1843,8 +1843,11 @@ class RecursiveAnalyst(Analyst):
     truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
-    def __init__(self, name, recursive_servers, *args, **kwargs):
-        self.recursive_servers = recursive_servers
+    def __init__(self, name, *args, **kwargs):
+        try:
+            self.recursive_servers = kwargs.pop('recursive_servers')
+        except KeyError:
+            raise TypeError('recursive_servers is a required keyword argument for instantiating RecursiveAnalyst')
         super(RecursiveAnalyst, self).__init__(name, **kwargs)
 
     def _set_recursive_servers(self, name_obj):
