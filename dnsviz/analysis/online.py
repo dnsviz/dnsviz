@@ -1860,8 +1860,6 @@ class RecursiveAnalyst(Analyst):
         name_obj.explicit_delegation = True
 
     def _finalize_analysis_proper(self, name_obj):
-        rdtypes_to_query = self._rdtypes_to_query(name_obj.name)
-
         # if there aren't NS records, then it's not really a zone, so delete
         # unnecessary queries/responses
         if name_obj.has_ns:
@@ -1870,6 +1868,8 @@ class RecursiveAnalyst(Analyst):
         # if it's a stub, then no need to do anything
         if name_obj.stub:
             return
+
+        rdtypes_to_query = self._rdtypes_to_query(name_obj.name)
 
         for name, rdtype in ((name_obj.nxdomain_name, name_obj.nxdomain_rdtype), (name_obj.nxrrset_name, name_obj.nxrrset_rdtype),
                 (name_obj.name, dns.rdatatype.MX), (name_obj.name, dns.rdatatype.TXT), (name_obj.name, dns.rdatatype.SOA),
