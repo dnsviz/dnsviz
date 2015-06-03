@@ -1883,6 +1883,11 @@ class RecursiveAnalyst(Analyst):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
 
+        # determine immediately if we need to do anything
+        name_obj = self._get_name_for_analysis(name, lock=False)
+        if name_obj is not None and name_obj.analysis_end is not None:
+            return name_obj
+
         # get or create the name
         name_obj = self._get_name_for_analysis(name)
         if name_obj.analysis_end is not None:
@@ -1901,6 +1906,9 @@ class RecursiveAnalyst(Analyst):
                 self._finalize_analysis_proper(name_obj)
             finally:
                 self._cleanup_analysis_proper(name_obj)
+
+            # analyze dependencies
+            self._analyze_dependencies(name_obj)
 
             self._finalize_analysis_all(name_obj)
         finally:
