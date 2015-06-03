@@ -1859,7 +1859,7 @@ class RecursiveAnalyst(Analyst):
         name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text('_r%d' % i), s) for i, s in enumerate(self.recursive_servers)])
         name_obj.explicit_delegation = True
 
-    def _remove_non_zone_queries(self, name_obj):
+    def _finalize_analysis_proper(self, name_obj):
         rdtypes_to_query = self._rdtypes_to_query(name_obj.name)
 
         # if there aren't NS records, then it's not really a zone, so delete
@@ -1971,9 +1971,6 @@ class RecursiveAnalyst(Analyst):
         query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
         query.execute()
         name_obj.add_query(query)
-
-        # if the name isn't a zone, then remove queries specific to zones
-        self._remove_non_zone_queries(name_obj)
 
         return name_obj
 
