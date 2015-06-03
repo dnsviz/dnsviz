@@ -56,8 +56,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
 
-    def __init__(self, name, stub=False):
-        super(OfflineDomainNameAnalysis, self).__init__(name, stub=stub)
+    def __init__(self, *args, **kwargs):
+        super(OfflineDomainNameAnalysis, self).__init__(name, *args, **kwargs)
 
         # Shortcuts to the values in the SOA record.
         self.serial = None
