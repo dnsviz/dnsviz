@@ -1886,10 +1886,17 @@ class RecursiveAnalyst(Analyst):
 
         self._set_recursive_servers(name_obj)
 
-        self._analyze_queries(name_obj)
-
         servers = name_obj.zone.get_auth_or_designated_servers()
         servers = self._filter_servers(servers)
+
+        # make A queries first
+        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.A)))
+        query = self.diagnostic_query(name_obj.name, dns.rdatatype.A, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+        query.execute()
+        name_obj.add_query(query)
+
+        # now query most other queries
+        self._analyze_queries(name_obj)
 
         if name_obj.name != dns.name.root:
             # make DS queries
@@ -1898,7 +1905,7 @@ class RecursiveAnalyst(Analyst):
             query.execute()
             name_obj.add_query(query)
 
-        # make NS queries, after all others
+        # finally, make NS queries, after all others
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
         query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
         query.execute()
