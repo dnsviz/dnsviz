@@ -1867,6 +1867,10 @@ class RecursiveAnalyst(Analyst):
         if name_obj.has_ns:
             return
 
+        # if it's a stub, then no need to do anything
+        if name_obj.stub:
+            return
+
         for name, rdtype in ((name_obj.nxdomain_name, name_obj.nxdomain_rdtype), (name_obj.nxrrset_name, name_obj.nxrrset_rdtype),
                 (name_obj.name, dns.rdatatype.MX), (name_obj.name, dns.rdatatype.TXT), (name_obj.name, dns.rdatatype.SOA),
                 (name_obj.name, dns.rdatatype.DNSKEY), (name_obj.name, dns.rdatatype.DS), (name_obj.name, dns.rdatatype.NS)):
@@ -1881,6 +1885,26 @@ class RecursiveAnalyst(Analyst):
 
         # also, unset negative response references
         name_obj._auth_ns_ip_mapping = {}
+
+    def _analyze_stub(self, name):
+        name_obj = self._get_name_for_analysis(name, stub=True)
+        if name_obj.analysis_end is not None:
+            return name_obj
+
+        try:
+            self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
+
+            self._set_recursive_servers(name_obj)
+            name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+            name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+            self._finalize_analysis_proper(name_obj)
+            self._finalize_analysis_all(name_obj)
+        finally:
+            self._cleanup_analysis_proper(name_obj)
+            self._cleanup_analysis_all(name_obj)
+
+        return name_obj
 
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
@@ -1922,23 +1946,23 @@ class RecursiveAnalyst(Analyst):
         if name == dns.name.root:
             parent_obj = None
         elif self.ceiling is not None and self.ceiling.is_subdomain(name) and name_obj.has_ns:
-            parent_obj = None
+            parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
 
-            if parent_obj is not None:
-                nxdomain_ancestor = None
+        if parent_obj is not None:
+            nxdomain_ancestor = None
 
-                # for zones other than the root assign parent_obj to the zone apex,
-                # rather than the simply the domain formed by dropping its lower
-                # leftmost label
-                parent_obj = parent_obj.zone
+            # for zones other than the root assign parent_obj to the zone apex,
+            # rather than the simply the domain formed by dropping its lower
+            # leftmost label
+            parent_obj = parent_obj.zone
 
-            else:
-                nxdomain_ancestor = None
+        else:
+            nxdomain_ancestor = None
 
-            name_obj.parent = parent_obj
-            name_obj.nxdomain_ancestor = nxdomain_ancestor
+        name_obj.parent = parent_obj
+        name_obj.nxdomain_ancestor = nxdomain_ancestor
 
         return name_obj
 
