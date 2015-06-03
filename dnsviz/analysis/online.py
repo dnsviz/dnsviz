@@ -95,6 +95,21 @@ DANE_PORT_RE = re.compile(r'^_(\d+)$')
 SRV_PORT_RE = re.compile(r'^_.*[^\d].*$')
 PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 
+ANALYSIS_TYPE_AUTHORITATIVE = 0
+ANALYSIS_TYPE_RECURSIVE = 1
+ANALYSIS_TYPE_CACHE = 2
+
+analysis_types = {
+        ANALYSIS_TYPE_AUTHORITATIVE: 'authoritative',
+        ANALYSIS_TYPE_RECURSIVE: 'recursive',
+        ANALYSIS_TYPE_CACHE: 'cache',
+}
+analysis_type_codes = {
+        'authoritative': ANALYSIS_TYPE_AUTHORITATIVE,
+        'recursive': ANALYSIS_TYPE_RECURSIVE,
+        'cache': ANALYSIS_TYPE_CACHE,
+}
+
 def _get_client_address(server):
     if server.version == 6:
         af = socket.AF_INET6
@@ -133,7 +148,7 @@ _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.Simpl
 class OnlineDomainNameAnalysis(object):
     QUERY_CLASS = Q.MultiQuery
 
-    def __init__(self, name, stub=False):
+    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE):
 
         ##################################################
         # General attributes
@@ -141,6 +156,7 @@ class OnlineDomainNameAnalysis(object):
 
         # The name that is the focus of the analysis (serialized).
         self.name = name
+        self.analysis_type = analysis_type
         self.stub = stub
 
         # A unique identifier for the analysis
@@ -376,7 +392,9 @@ class OnlineDomainNameAnalysis(object):
                 rrsig_rrset = response.message.find_rrset(response.message.answer, query.qname, query.rdclass, dns.rdatatype.RRSIG, rrset.rdtype)
 
                 for rrsig in rrsig_rrset:
-                    if rrsig_rrset.covers == dns.rdatatype.DS and rrsig.signer == self.parent_name():
+                    if rrsig_rrset.covers == dns.rdatatype.DS and self.parent is None:
+                        pass
+                    elif rrsig_rrset.covers == dns.rdatatype.DS and rrsig.signer == self.parent_name():
                         pass
                     elif rrsig_rrset.covers == dns.rdatatype.DLV and rrsig.signer == self.dlv_parent_name():
                         pass
@@ -741,6 +759,7 @@ class OnlineDomainNameAnalysis(object):
         clients_ipv6.sort()
 
         d[name_str] = collections.OrderedDict()
+        d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
@@ -812,6 +831,9 @@ class OnlineDomainNameAnalysis(object):
 
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
+
+        # use a default analysis type to support previous version
+        analysis_type = analysis_type_codes[d.get('type', 'authoritative')]
         stub = d['stub']
 
         if 'parent' in d:
@@ -836,7 +858,7 @@ class OnlineDomainNameAnalysis(object):
 
         _logger.info('Loading %s' % fmt.humanize_name(name))
 
-        cache[name] = a = cls(name, stub=stub)
+        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
@@ -958,6 +980,7 @@ class Analyst(object):
     allow_loopback_query = False
     allow_private_query = False
     qname_only = True
+    analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
     clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
 
@@ -1205,7 +1228,7 @@ class Analyst(object):
                 name_obj = self.analysis_cache[name]
             except KeyError:
                 if lock:
-                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub)
+                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub, analysis_type=self.analysis_type)
                     return name_obj
                 # if not locking, then return None
                 else:
@@ -1793,5 +1816,94 @@ class Analyst(object):
         return False
 
 class PrivateAnalyst(Analyst):
+    allow_loopback_query = True
+    allow_private_query = True
+
+class RecursiveAnalyst(Analyst):
+    diagnostic_query = Q.RecursiveDiagnosticQuery
+    tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
+    pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
+    truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
+    analysis_type = ANALYSIS_TYPE_RECURSIVE
+
+    def __init__(self, name, recursive_servers, *args, **kwargs):
+        self.recursive_servers = recursive_servers
+        super(RecursiveAnalyst, self).__init__(name, **kwargs)
+
+    def _set_recursive_servers(self, name_obj):
+        name_obj.add_auth_ns_ip_mappings(*[(dns.name.from_text(str(s)), s) for s in self.recursive_servers])
+        name_obj.explicit_delegation = True
+
+    def _analyze(self, name):
+        '''Analyze a DNS name to learn about its health using introspective
+        queries.'''
+
+        # get or create the name
+        name_obj = self._get_name_for_analysis(name)
+        if name_obj.analysis_end is not None:
+            return name_obj
+
+        try:
+            try:
+                name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+                # perform the actual analysis on this name
+                self._analyze_name(name_obj)
+
+                # set analysis_end
+                name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
+                self._finalize_analysis_proper(name_obj)
+            finally:
+                self._cleanup_analysis_proper(name_obj)
+
+            self._finalize_analysis_all(name_obj)
+        finally:
+            self._cleanup_analysis_all(name_obj)
+
+        # analyze the parent if the name is not root
+        if name != dns.name.root:
+            parent_obj = self._analyze(name.parent())
+
+            if parent_obj is not None:
+                # for zones other than the root assign parent_obj to the zone apex,
+                # rather than the simply the domain formed by dropping its lower
+                # leftmost label
+                parent_obj = parent_obj.zone
+
+            else:
+                nxdomain_ancestor = None
+
+            name_obj.parent = parent_obj
+            name_obj.nxdomain_ancestor = nxdomain_ancestor
+
+        return name_obj
+
+    def _analyze_name(self, name_obj):
+        self.logger.info('Analyzing %s' % fmt.humanize_name(name_obj.name))
+
+        self._set_recursive_servers(name_obj)
+
+        self._analyze_queries(name_obj)
+
+        servers = name_obj.zone.get_auth_or_designated_servers()
+        servers = self._filter_servers(servers)
+
+        if name_obj.name != dns.name.root:
+            # make DS queries
+            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
+            query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+            query.execute()
+            name_obj.add_query(query)
+
+        # make NS queries, after all others
+        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
+        query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+        query.execute()
+        name_obj.add_query(query)
+
+        return name_obj
+
+class PrivateRecursiveAnalyst(RecursiveAnalyst):
     allow_loopback_query = True
     allow_private_query = True

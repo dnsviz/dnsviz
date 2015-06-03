@@ -39,7 +39,8 @@ from dnsviz.response import DNSKEYMeta
 from dnsviz.util import tuple_to_dict
 
 import errors as Errors
-from online import OnlineDomainNameAnalysis
+from online import OnlineDomainNameAnalysis, \
+        ANALYSIS_TYPE_AUTHORITATIVE, ANALYSIS_TYPE_RECURSIVE, ANALYSIS_TYPE_CACHE
 import status as Status
 
 _logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
 
     def __init__(self, *args, **kwargs):
-        super(OfflineDomainNameAnalysis, self).__init__(name, *args, **kwargs)
+        super(OfflineDomainNameAnalysis, self).__init__(*args, **kwargs)
 
         # Shortcuts to the values in the SOA record.
         self.serial = None
@@ -541,9 +542,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 Errors.DomainNameAnalysisError.insert_into_list(err, group, server, client, response)
 
-        if not response.is_authoritative() and \
-                not response.recursion_desired_and_available():
-            Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
+        if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
+            if not response.is_authoritative() and \
+                    not response.recursion_desired_and_available():
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
 
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
@@ -810,6 +812,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return
 
         if self.parent is None:
+            return
+
+        if self.analysis_type != ANALYSIS_TYPE_AUTHORITATIVE:
             return
 
         all_names = self.get_ns_names()
@@ -1180,11 +1185,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err.add_server_client(server, client, None)
             self.delegation_errors[dns.rdatatype.DS].append(err)
 
-        if not_authoritative:
-            err = Errors.ServerNotAuthoritative()
-            for server, client in not_authoritative:
-                err.add_server_client(server, client, None)
-            self.delegation_errors[dns.rdatatype.DS].append(err)
+        if self.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
+            if not_authoritative:
+                err = Errors.ServerNotAuthoritative()
+                for server, client in not_authoritative:
+                    err.add_server_client(server, client, None)
+                self.delegation_errors[dns.rdatatype.DS].append(err)
 
     def _populate_negative_response_status(self, query, neg_response_info, \
             bad_soa_error_cls, missing_soa_error_cls, upward_referral_error_cls, missing_nsec_error_cls, \
