@@ -1121,8 +1121,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             else:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
 
-        #XXX the remaining checks need consideration for recursive
-
         # if no servers (designated or stealth authoritative) respond or none
         # respond authoritatively, then make the delegation as lame
         if not self.get_auth_or_designated_servers():
@@ -1134,7 +1132,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif not self.get_valid_auth_or_designated_servers():
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
-        elif not self._auth_servers_clients:
+        elif self.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE and not self._auth_servers_clients:
             if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_LAME
 
