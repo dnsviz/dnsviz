@@ -1987,6 +1987,10 @@ class RecursiveAnalyst(Analyst):
         query.execute()
         name_obj.add_query(query)
 
+        # if there was an NXDOMAIN for the first query, then don't ask the others
+        if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
+            return name_obj
+
         # now query most other queries
         self._analyze_queries(name_obj)
 
