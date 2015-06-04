@@ -283,36 +283,55 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: %s [ options ] ( -f <filename> | <domain name> [... ] )
+    sys.stderr.write('''%sUsage: %s [ options ] ( -f filename | domain_name [domain_name ...] )
 Options:
-    -f <filename>  - read names from a file (one name per line), instead of
+    -f filename    - read names from a file (one name per line), instead of
                      from command line.
-    -d <level>     - set debug level to a value from 0 to 3, with increasing
+    -d level       - set debug level to a value from 0 to 3, with increasing
                      verbosity (default: 2 or INFO).
-    -l <dlv>       - use dlv as a domain for DNSSEC look-aside validation.
-    -r <filename>  - read analysis from a file, instead of querying servers
-                     (use "-" for stdin).
-    -t <threads>   - use multiple threads for analysis.
-    -4 <addr>      - specify <addr> as the source IPv4 address for queries.
-    -6 <addr>      - specify <addr> as the source IPv6 address for queries.
-    -a <ancestor>  - analyze ancestry of name through specified ancestor,
-                     instead of just name itself (use "-a ." or full ancestral
-                     analysis) (default: analyze only the name itself).
-    -x <domain>:<name>[=<addr>][,<name>[=<addr>] ...]
-                   - set explicit delegation for <domain>, using servers with
-                     specified names (<name>) and (optionally) addresses
-                     (<addr>).  If an address is not supplied, then it will be
-                     looked up using the standard resolution process.  This
-                     option may be used multiple times for different domains or
-                     servers.  Note that the names are simply for
-                     identification, and it is not necessary for the names to
-                     resolve to the corresponding address (or resolve at all
-                     for that matter).
+    -l dlv         - use the specified domain for DNSSEC look-aside validation.
+    -r filename    - read analysis from the specified file, instead of querying
+                     servers (use "-" for stdin).
+    -t threads     - specify the number of threads to use for parallel
+                     analysis (default: perform analyses serially).
+    -4 addr        - specify a source IPv4 address for queries, rather than
+                     detecting it.
+    -6 addr        - specify a source IPv6 address for queries, rather than
+                     detecting it.
+    -a ancestor    - analyze the ancestry of each domain name through the
+                     specified ancestor, instead of just the domain name
+                     itself.  Use "-a ." for full ancestral analysis.
+    -x domain:server[,server ...]
+                   - set explicit delegation for the specified domain to one or
+                     more servers.  Each server specified may either be an
+                     address (IPv4 or IPv6), a domain name (which will be
+                     resolved to an address using the standard resolution
+                     process), or both (name=addr).  Note that when an address
+                     is specified, the corresponding name is only used for
+                     identification purposes, and it doesn't matter whether the
+                     name resolves to the corresponding address (or at all, for
+                     that matter).  This option cannot be used in conjunction
+                     with -R.
+    -R             - Perform analysis against recursive servers, rather than
+                     (the default) authoritative servers.  If the -s option is
+                     used, then the servers passed to it will be used.
+                     Otherwise, /etc/resolv.conf will be used to determine the
+                     servers.
+    -s server[,server ...]
+                   - designate servers for recursive analysis.  Each server
+                     specified may either be an address (IPv4 or IPv6), a
+                     domain name (which will be resolved to an address using
+                     the standard resolution process), or both (name=addr).
+                     Note that when an address is specified, the corresponding
+                     name is only used for identification purposes, and it
+                     doesn't matter whether the name resolves to the
+                     corresponding address (or at all, for that matter).  This
+                     option can only be used in conjunction with -R.
     -m             - just output meta information, not full query/response
-                     information (Note that this meta output cannot be used
-                     for input to dnsget, dnsgrok, or dnsviz).
+                     information (Note that this meta output cannot be used for
+                     input to dnsget, dnsgrok, or dnsviz).
     -p             - make json output pretty instead of minimal.
-    -o <filename>  - write the analysis to file <filename> instead of to
+    -o filename    - write the analysis to the specified file instead of to
                      stdout, which is the default.
     -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
