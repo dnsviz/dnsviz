@@ -1995,7 +1995,8 @@ class RecursiveAnalyst(Analyst):
         self._analyze_queries(name_obj)
 
         if name_obj.name != dns.name.root:
-            # make DS queries
+            # make DS queries (these won't be included in the above mix
+            # because there is no parent on the name_obj)
             self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
             query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
             query.execute()
