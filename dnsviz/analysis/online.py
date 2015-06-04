@@ -1951,10 +1951,10 @@ class RecursiveAnalyst(Analyst):
 
         if parent_obj is not None:
             nxdomain_ancestor = parent_obj.nxdomain_ancestor
-            if nxdomain_ancestor is None and \
-                    not parent_obj.stub and \
-                    parent_obj.queries[(parent_obj.name, dns.rdatatype.NS)].is_nxdomain_all():
-                nxdomain_ancestor = parent_obj
+            if nxdomain_ancestor is None and not parent_obj.stub:
+                rdtype = parent_obj.queries.keys()[0][1]
+                if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
+                    nxdomain_ancestor = parent_obj
 
             # for zones other than the root assign parent_obj to the zone apex,
             # rather than the simply the domain formed by dropping its lower
