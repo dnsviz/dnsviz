@@ -1877,7 +1877,12 @@ class RecursiveAnalyst(Analyst):
 
             name_obj.remove_query_negative_response(name, rdtype)
 
-        # also, unset negative response references
+        # unset negative response references
+        name_obj.nxdomain_name = None
+        name_obj.nxdomain_rdtype = None
+        name_obj.nxrrset_name = None
+        name_obj.nxrrset_rdtype = None
+        # clear auth NS IP mapping
         name_obj._auth_ns_ip_mapping = {}
 
     def _analyze_stub(self, name):
