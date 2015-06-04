@@ -197,6 +197,60 @@ class ParallelAnalyst(BulkAnalyst):
         pool.join()
         return name_objs
 
+def name_addr_mappings_from_string(mappings):
+    mappings_set = set()
+    mappings = mappings.split(',')
+    for mapping in mappings:
+        try:
+            name, addr = mapping.rsplit('=', 1)
+        except ValueError:
+            name = mapping
+            addr = None
+        name = name.strip()
+        addr = addr.strip()
+        try:
+            name = dns.name.from_text(name)
+        except dns.exception.DNSException:
+            usage('The domain name was invalid: "%s"' % name)
+            sys.exit(1)
+
+        # no address is provided, so query A/AAAA records for the name
+        if addr is None:
+            query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
+            answer_map = resolver.query_multiple_for_answer(*query_tuples)
+            found_answer = False
+            for a in answer_map.values():
+                if isinstance(a, DNSAnswer):
+                    found_answer = True
+                    for a_rr in a.rrset:
+                        mappings_set.add((name, IPAddr(a_rr.to_text())))
+                # negative responses
+                elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
+                    pass
+                # error responses
+                elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
+                    usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+                    sys.exit(1)
+
+            if not found_answer:
+                usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+                sys.exit(1)
+
+        # otherwise, add the address
+        elif not addr:
+            usage('No IP address was supplied.')
+            sys.exit(1)
+        else:
+            if addr and addr[0] == '[' and addr[-1] == ']':
+                addr = addr[1:-1]
+            try:
+                addr = IPAddr(addr)
+            except ValueError:
+                usage('The IP address was invalid: "%s"' % addr)
+                sys.exit(1)
+            mappings_set.add((name, addr))
+    return mappings_set
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -263,58 +317,9 @@ def main():
                 if not mappings:
                     usage('Incorrect usage of -x option: "%s"' % arg)
                     sys.exit(1)
-                mappings = mappings.split(',')
                 if domain not in explicit_delegations:
                     explicit_delegations[domain] = set()
-                for mapping in mappings:
-                    try:
-                        name, addr = mapping.rsplit('=', 1)
-                    except ValueError:
-                        name = mapping
-                        addr = None
-                    name = name.strip()
-                    addr = addr.strip()
-                    try:
-                        name = dns.name.from_text(name)
-                    except dns.exception.DNSException:
-                        usage('The domain name was invalid: "%s"' % name)
-                        sys.exit(1)
-
-                    # no address is provided, so query A/AAAA records for the name
-                    if addr is None:
-                        query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
-                        answer_map = resolver.query_multiple_for_answer(*query_tuples)
-                        found_answer = False
-                        for a in answer_map.values():
-                            if isinstance(a, DNSAnswer):
-                                found_answer = True
-                                for a_rr in a.rrset:
-                                    explicit_delegations[domain].add((name, IPAddr(a_rr.to_text())))
-                            # negative responses
-                            elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
-                                pass
-                            # error responses
-                            elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
-                                usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
-                                sys.exit(1)
-
-                        if not found_answer:
-                            usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
-                            sys.exit(1)
-
-                    # otherwise, add the address
-                    elif not addr:
-                        usage('No IP address was supplied.')
-                        sys.exit(1)
-                    else:
-                        if addr and addr[0] == '[' and addr[-1] == ']':
-                            addr = addr[1:-1]
-                        try:
-                            addr = IPAddr(addr)
-                        except ValueError:
-                            usage('The IP address was invalid: "%s"' % addr)
-                            sys.exit(1)
-                        explicit_delegations[domain].add((name, addr))
+                explicit_delegations[domain].update(name_addr_mappings_from_string(mappings))
 
         opts = dict(opts)
         if '-h' in opts:
