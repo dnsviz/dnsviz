@@ -420,7 +420,7 @@ def main():
         else:
             dlv_domain = None
 
-        # the following option is not documented in usage, as they don't
+        # the following option is not documented in usage, as it doesn't
         # apply to most users
         try:
             cache_level = int(opts['-c'])
