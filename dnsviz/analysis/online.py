@@ -1972,12 +1972,12 @@ class RecursiveAnalyst(Analyst):
         try:
             rdtype = self._rdtypes_to_query(self.name)[0]
         except IndexError:
-            rdtype = dns.rdatatype.A
-
-        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-        query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-        query.execute()
-        name_obj.add_query(query)
+            pass
+        else:
+            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+            query.execute()
+            name_obj.add_query(query)
 
         # now query most other queries
         self._analyze_queries(name_obj)
