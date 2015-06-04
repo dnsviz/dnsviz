@@ -200,14 +200,26 @@ class ParallelAnalyst(BulkAnalyst):
 def name_addr_mappings_from_string(mappings):
     mappings_set = set()
     mappings = mappings.split(',')
+    i = 1
     for mapping in mappings:
         try:
             name, addr = mapping.rsplit('=', 1)
         except ValueError:
-            name = mapping
-            addr = None
+            # first see if it's a plain IP address
+            try:
+                addr = IPAddr(mapping.strip())
+            except ValueError:
+                # if not, then assign name to mapping
+                name = mapping
+                addr = None
+            else:
+                # if it's an IP with no name specified, then create
+                # a name
+                name = 'ns%d' % i
+                i += 1
+        else:
+            addr = addr.strip()
         name = name.strip()
-        addr = addr.strip()
         try:
             name = dns.name.from_text(name)
         except dns.exception.DNSException:
