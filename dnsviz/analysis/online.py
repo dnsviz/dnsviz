@@ -150,7 +150,7 @@ _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.Simpl
 class OnlineDomainNameAnalysis(object):
     QUERY_CLASS = Q.MultiQuery
 
-    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE):
+    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE, query_cls=None):
 
         ##################################################
         # General attributes
@@ -160,6 +160,12 @@ class OnlineDomainNameAnalysis(object):
         self.name = name
         self.analysis_type = analysis_type
         self.stub = stub
+
+        # a class for constructing the queries
+        if query_cls is None:
+            self._query_cls = self.QUERY_CLASS
+        else:
+            self._query_cls = query_cls
 
         # A unique identifier for the analysis
         self.uuid = uuid.uuid4()
@@ -489,7 +495,7 @@ class OnlineDomainNameAnalysis(object):
 
         key = (query.qname, query.rdtype)
         if key not in self.queries:
-            self.queries[key] = self.QUERY_CLASS(query.qname, query.rdtype, query.rdclass)
+            self.queries[key] = self._query_cls(query.qname, query.rdtype, query.rdclass)
         self.queries[key].add_query(query, bailiwick_map, default_bailiwick)
 
         for server in query.responses:

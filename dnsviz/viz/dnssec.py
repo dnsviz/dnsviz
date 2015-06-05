@@ -780,7 +780,7 @@ class DNSAuthGraph:
             line_style = 'solid'
 
         if dname_status.included_cname is None:
-            cname_node = self.add_rrset_non_existent(name_obj, Response.NegativeResponseInfo(dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME), False, False)
+            cname_node = self.add_rrset_non_existent(name_obj, Response.NegativeResponseInfo(dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, False), False, False)
         else:
             cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, id)
 

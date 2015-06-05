@@ -685,9 +685,10 @@ class DNSKEYMeta(DNSResponseComponent):
         return d
 
 class RRsetInfo(DNSResponseComponent):
-    def __init__(self, rrset, dname_info=None):
+    def __init__(self, rrset, ttl_cmp, dname_info=None):
         super(RRsetInfo, self).__init__()
         self.rrset = rrset
+        self.ttl_cmp = ttl_cmp
         self.rrsig_info = {}
         self.wildcard_info = {}
 
@@ -707,7 +708,11 @@ class RRsetInfo(DNSResponseComponent):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
     def __eq__(self, other):
-        return self.rrset == other.rrset and self.rrset.ttl == other.rrset.ttl and self.dname_info == other.dname_info
+        if not (self.rrset == other.rrset and self.dname_info == other.dname_info):
+            return False
+        if self.ttl_cmp and self.rrset.ttl != other.rrset.ttl:
+            return False
+        return True
 
     @classmethod
     def rdata_cmp(cls, a, b):
@@ -847,10 +852,11 @@ def cname_from_dname(name, dname_rrset):
     return rrset
 
 class NegativeResponseInfo(DNSResponseComponent):
-    def __init__(self, qname, rdtype):
+    def __init__(self, qname, rdtype, ttl_cmp):
         super(NegativeResponseInfo, self).__init__()
         self.qname = qname
         self.rdtype = rdtype
+        self.ttl_cmp = ttl_cmp
         self.soa_rrset_info = []
         self.nsec_set_info = []
 
@@ -873,7 +879,7 @@ class NegativeResponseInfo(DNSResponseComponent):
         if soa_rrset is None:
             return None
 
-        soa_rrset_info = RRsetInfo(soa_rrset)
+        soa_rrset_info = RRsetInfo(soa_rrset, self.ttl_cmp)
         soa_rrset_info = self.insert_into_list(soa_rrset_info, self.soa_rrset_info, server, client, response)
         soa_rrset_info.update_rrsig_info(server, client, response, response.message.authority, is_referral)
 
@@ -885,17 +891,18 @@ class NegativeResponseInfo(DNSResponseComponent):
             if not nsec_rrsets:
                 continue
 
-            nsec_set_info = NSECSet(nsec_rrsets, is_referral)
+            nsec_set_info = NSECSet(nsec_rrsets, is_referral, self.ttl_cmp)
             nsec_set_info = self.insert_into_list(nsec_set_info, self.nsec_set_info, server, client, response)
 
             for name in nsec_set_info.rrsets:
                 nsec_set_info.rrsets[name].update_rrsig_info(server, client, response, response.message.authority, is_referral)
 
 class NSECSet(DNSResponseComponent):
-    def __init__(self, rrsets, referral):
+    def __init__(self, rrsets, referral, ttl_cmp):
         super(NSECSet, self).__init__()
         self.rrsets = {}
         self.referral = referral
+        self.ttl_cmp = ttl_cmp
         self.nsec3_params = {}
         self.use_nsec3 = False
         for rrset in rrsets:
@@ -903,7 +910,7 @@ class NSECSet(DNSResponseComponent):
             # name in the same response, but check for it and address it (if
             # necessary)
             assert rrset.name not in self.rrsets
-            self.rrsets[rrset.name] = RRsetInfo(rrset)
+            self.rrsets[rrset.name] = RRsetInfo(rrset, self.ttl_cmp)
 
             if rrset.rdtype == dns.rdatatype.NSEC3:
                 self.use_nsec3 = True
@@ -923,7 +930,7 @@ class NSECSet(DNSResponseComponent):
         if set(names).difference(self.rrsets):
             raise ValueError('NSEC name(s) don\'t exist in NSECSet')
 
-        obj = self.__class__((), self.referral)
+        obj = self.__class__((), self.referral, self.ttl_cmp)
         for name in names:
             obj.rrsets[name] = self.rrsets[name]
             rrset = obj.rrsets[name].rrset

@@ -673,6 +673,8 @@ class DNSQueryHandler:
             return response
 
 class AggregateDNSResponse(object):
+    ttl_cmp = False
+
     def __init__(self):
         self.answer_info = []
         self.nodata_info = []
@@ -703,7 +705,7 @@ class AggregateDNSResponse(object):
                 synthesized_cname_info = None
                 for dname_rrset in dname_rrsets:
                     if qname_sought.parent().is_subdomain(dname_rrset.name):
-                        synthesized_cname_info = RRsetInfo(cname_from_dname(qname_sought, dname_rrset), RRsetInfo(dname_rrset))
+                        synthesized_cname_info = RRsetInfo(cname_from_dname(qname_sought, dname_rrset), self.ttl_cmp, RRsetInfo(dname_rrset, self.ttl_cmp))
                         break
 
                 try:
@@ -740,7 +742,7 @@ class AggregateDNSResponse(object):
             else:
                 neg_response_info_list = self.nodata_info
 
-            neg_response_info = NegativeResponseInfo(qname_sought, rdtype)
+            neg_response_info = NegativeResponseInfo(qname_sought, rdtype, self.ttl_cmp)
             neg_response_info = DNSResponseComponent.insert_into_list(neg_response_info, neg_response_info_list, server, client, response)
             neg_response_info.create_or_update_nsec_info(server, client, response, referral)
             neg_response_info.create_or_update_soa_info(server, client, response, referral)
@@ -753,7 +755,7 @@ class AggregateDNSResponse(object):
         except KeyError:
             rrset = msg.find_rrset(msg.answer, qname, dns.rdataclass.IN, dns.rdatatype.CNAME)
 
-        rrset_info = RRsetInfo(rrset)
+        rrset_info = RRsetInfo(rrset, self.ttl_cmp)
         rrset_info = DNSResponseComponent.insert_into_list(rrset_info, self.answer_info, server, client, response)
 
         rrset_info.update_rrsig_info(server, client, response, msg.answer, referral)
@@ -1080,6 +1082,9 @@ class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in query.responses[server].items():
                 self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
+
+class TTLDistinguishingAggregateDNSResponse(object):
+    ttl_cmp = True
 
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
