@@ -700,7 +700,7 @@ class RRsetInfo(DNSResponseComponent):
 
     def __unicode__(self):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
-            return 'RRset for %s/%s' % (fmt.format_nsec3_name(self.rrset.name), dns.rdatatype.to_text(self.rrset.rdtype))
+            return 'RRset for %s/%s' % (fmt.format_nsec3_name(self.rrset.name).rstrip('.'), dns.rdatatype.to_text(self.rrset.rdtype))
         else:
             return 'RRset for %s/%s' % (fmt.humanize_name(self.rrset.name), dns.rdatatype.to_text(self.rrset.rdtype))
 
