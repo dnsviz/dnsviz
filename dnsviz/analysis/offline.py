@@ -55,10 +55,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     RDTYPES_SECURE_DELEGATION = 3
     RDTYPES_DELEGATION = 4
 
-    QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
+    QUERY_CLASS = Q.TTLDistinguishingMultQueryAggregateDNSResponse
 
     def __init__(self, *args, **kwargs):
         super(OfflineDomainNameAnalysis, self).__init__(*args, **kwargs)
+
+        if self.analysis_type != ANALYSIS_TYPE_AUTHORITATIVE:
+            self._query_cls = Q.MultiQueryAggregateDNSResponse
 
         # Shortcuts to the values in the SOA record.
         self.serial = None

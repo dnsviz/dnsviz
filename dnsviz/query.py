@@ -1083,7 +1083,7 @@ class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
             for client, response in query.responses[server].items():
                 self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
 
-class TTLDistinguishingAggregateDNSResponse(object):
+class TTLDistinguishingMultQueryAggregateDNSResponse(MultiQueryAggregateDNSResponse):
     ttl_cmp = True
 
 class ExecutableDNSQuery(DNSQuery):
