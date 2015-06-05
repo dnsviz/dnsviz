@@ -75,12 +75,13 @@ class DomainNameAnalysisError(object):
         description_template_escaped = cgi.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
-            if isinstance(v, (str, unicode)):
-                template_kwargs_escaped[n] = '<b>%s</b>' % cgi.escape(v)
-            elif isinstance(v, (int, long)):
+            if isinstance(v, (int, long)):
                 template_kwargs_escaped[n] = v
             else:
-                template_kwargs_escaped[n] = '<b>%s</b>' % cgi.escape(str(v))
+                if isinstance(v, (str, unicode)):
+                    template_kwargs_escaped[n] = cgi.escape(v)
+                else:
+                    template_kwargs_escaped[n] = cgi.escape(str(v))
         return description_template_escaped % template_kwargs_escaped
 
     def add_server_client(self, server, client, response):
