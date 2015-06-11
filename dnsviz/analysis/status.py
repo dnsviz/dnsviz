@@ -66,15 +66,17 @@ RRSIG_STATUS_VALID = STATUS_VALID
 RRSIG_STATUS_INDETERMINATE_NO_DNSKEY = 1
 RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE = 2
 RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM = 3
-RRSIG_STATUS_EXPIRED = 4
-RRSIG_STATUS_PREMATURE = 5
-RRSIG_STATUS_INVALID_SIG = 6
-RRSIG_STATUS_INVALID = 7
+RRSIG_STATUS_ALGORITHM_IGNORED = 4
+RRSIG_STATUS_EXPIRED = 5
+RRSIG_STATUS_PREMATURE = 6
+RRSIG_STATUS_INVALID_SIG = 7
+RRSIG_STATUS_INVALID = 8
 rrsig_status_mapping = {
         RRSIG_STATUS_VALID: 'VALID',
         RRSIG_STATUS_INDETERMINATE_NO_DNSKEY: 'INDETERMINATE_NO_DNSKEY',
         RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE: 'INDETERMINATE_MATCH_PRE_REVOKE',
         RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM: 'INDETERMINATE_UNKNOWN_ALGORITHM',
+        RRSIG_STATUS_ALGORITHM_IGNORED: 'ALGORITHM_IGNORED',
         RRSIG_STATUS_EXPIRED: 'EXPIRED',
         RRSIG_STATUS_PREMATURE: 'PREMATURE',
         RRSIG_STATUS_INVALID_SIG: 'INVALID_SIG',
@@ -85,13 +87,15 @@ DS_STATUS_VALID = STATUS_VALID
 DS_STATUS_INDETERMINATE_NO_DNSKEY = 1
 DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE = 2
 DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM = 3
-DS_STATUS_INVALID_DIGEST = 4
-DS_STATUS_INVALID = 7
+DS_STATUS_ALGORITHM_IGNORED = 4
+DS_STATUS_INVALID_DIGEST = 5
+DS_STATUS_INVALID = 6
 ds_status_mapping = {
         DS_STATUS_VALID: 'VALID',
         DS_STATUS_INDETERMINATE_NO_DNSKEY: 'INDETERMINATE_NO_DNSKEY',
         DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE: 'INDETERMINATE_MATCH_PRE_REVOKE',
         DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM: 'INDETERMINATE_UNKNOWN_ALGORITHM',
+        DS_STATUS_ALGORITHM_IGNORED: 'ALGORITHM_IGNORED',
         DS_STATUS_INVALID_DIGEST: 'INVALID_DIGEST',
         DS_STATUS_INVALID: 'INVALID',
 }
@@ -318,9 +322,9 @@ class DSStatus(object):
                 if (ds_rdata.algorithm, ds_rdata.key_tag) == (self.ds.algorithm, self.ds.key_tag):
                     my_digest_algs.add(ds_rdata.digest_type)
             if 2 in supported_digest_algs and 2 in digest_algs and 2 not in my_digest_algs:
-                self.errors.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2))
+                self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2))
                 if self.validation_status == DS_STATUS_VALID:
-                    self.validation_status = DS_STATUS_INVALID
+                    self.validation_status = DS_STATUS_ALGORITHM_IGNORED
 
     def __unicode__(self):
         return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)

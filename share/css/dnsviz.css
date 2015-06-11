@@ -20,6 +20,7 @@
 .dnsviz-indeterminate { background-color: #b7b7b7; }
 .dnsviz-indeterminate-no-dnskey { background-color: #b7b7b7; }
 .dnsviz-indeterminate-unknown-algorithm { background-color: #b7b7b7; }
+.dnsviz-algorithm-ignored { background-color: #b7b7b7; }
 .dnsviz-expired { background-color: #ad7fed; }
 .dnsviz-premature { background-color: #ad7fed; }
 .dnsviz-invalid-sig { background-color: #f17b7b; }

@@ -475,7 +475,7 @@ class DNSAuthGraph:
         if ds_status.validation_status == Status.DS_STATUS_VALID:
             line_color = COLORS['secure']
             line_style = 'solid'
-        elif ds_status.validation_status in (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
+        elif ds_status.validation_status in (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE, Status.DS_STATUS_ALGORITHM_IGNORED):
             line_color = COLORS['insecure_non_existent']
             line_style = 'dashed'
         elif ds_status.validation_status == Status.DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
@@ -557,7 +557,7 @@ class DNSAuthGraph:
         if rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
             line_color = COLORS['secure']
             line_style = 'solid'
-        elif rrsig_status.validation_status in (Status.RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, Status.RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
+        elif rrsig_status.validation_status in (Status.RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, Status.RRSIG_STATUS_INDETERMINATE_MATCH_PRE_REVOKE, Status.RRSIG_STATUS_ALGORITHM_IGNORED):
             line_color = COLORS['insecure_non_existent']
             line_style = 'dashed'
         elif rrsig_status.validation_status == Status.RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM:
