@@ -1863,36 +1863,54 @@ class RecursiveAnalyst(Analyst):
         return ceiling, False
 
     def _finalize_analysis_proper(self, name_obj):
-        # if there aren't NS records, then it's not really a zone, so delete
-        # unnecessary queries/responses
-        if name_obj.has_ns:
-            return
+        '''Since we initially queried the full set of queries before we knew
+        which were appropriate for the name in question, we now identify all queries
+        that were pertinent and remove all other.'''
 
         # if it's a stub, then no need to do anything
         if name_obj.stub:
             return
 
-        rdtypes_to_query = self._rdtypes_to_query(name_obj.name)
+        # if there are not NS records, then it's not a zone, so clear auth NS
+        # IP mapping
+        if not name_obj.has_ns:
+            name_obj._auth_ns_ip_mapping = {}
 
-        for name, rdtype in ((name_obj.nxdomain_name, name_obj.nxdomain_rdtype), (name_obj.nxrrset_name, name_obj.nxrrset_rdtype),
-                (name_obj.name, dns.rdatatype.MX), (name_obj.name, dns.rdatatype.TXT), (name_obj.name, dns.rdatatype.SOA),
-                (name_obj.name, dns.rdatatype.DNSKEY), (name_obj.name, dns.rdatatype.DS), (name_obj.name, dns.rdatatype.NS)):
+        queries = set()
+        if name_obj.is_zone():
+            queries.add((name_obj.name, dns.rdatatype.NS))
+            if self._ask_non_delegation_queries(name_obj.name):
+                queries.add((name_obj.nxdomain_name, name_obj.nxdomain_rdtype))
+                queries.add((name_obj.nxrrset_name, name_obj.nxrrset_rdtype))
+                if self._is_sld_or_lower(name_obj.name):
+                    queries.add((name_obj.name, dns.rdatatype.MX))
+                    queries.add((name_obj.name, dns.rdatatype.TXT))
+        if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
+            if self._ask_non_delegation_queries(name_obj.name):
+                queries.add((name_obj.name, dns.rdatatype.SOA))
+            queries.add((name_obj.name, dns.rdatatype.DNSKEY))
 
-            if name == name_obj.name and rdtype in rdtypes_to_query:
-                continue
+            if name_obj.parent is not None:
+                queries.add((name_obj.name, dns.rdatatype.DS))
+                if name_obj.dlv_parent is not None:
+                    queries.add((name_obj.dlv_name, dns.rdatatype.DLV))
 
-            if (name, rdtype) not in name_obj.queries:
-                continue
+        if self._ask_non_delegation_queries(name_obj.name):
+            for rdtype in self._rdtypes_to_query(name_obj.name):
+                queries.add((name_obj.name, rdtype))
 
-            name_obj.remove_query_negative_response(name, rdtype)
+        if not queries:
+            queries.add((name_obj.name, dns.rdatatype.A))
 
-        # unset negative response references
-        name_obj.nxdomain_name = None
-        name_obj.nxdomain_rdtype = None
-        name_obj.nxrrset_name = None
-        name_obj.nxrrset_rdtype = None
-        # clear auth NS IP mapping
-        name_obj._auth_ns_ip_mapping = {}
+        for name, rdtype in set(name_obj.queries).difference(queries):
+            del name_obj.queries[(name, rdtype)]
+
+        if (name_obj.nxdomain_name, name_obj.nxdomain_rdtype) not in queries:
+            name_obj.nxdomain_name = None
+            name_obj.nxdomain_rdtype = None
+        if (name_obj.nxrrset_name, name_obj.nxrrset_rdtype) not in queries:
+            name_obj.nxrrset_name = None
+            name_obj.nxrrset_rdtype = None
 
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
