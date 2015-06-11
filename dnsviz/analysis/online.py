@@ -2020,7 +2020,7 @@ class RecursiveAnalyst(Analyst):
 
         # make common query first to prime the cache
         try:
-            rdtype = self._rdtypes_to_query(self.name)[0]
+            rdtype = self._rdtypes_to_query(name_obj.name)[0]
         except IndexError:
             rdtype = dns.rdatatype.A
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
