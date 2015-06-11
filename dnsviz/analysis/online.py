@@ -1914,6 +1914,33 @@ class RecursiveAnalyst(Analyst):
 
         return name_obj
 
+    def _analyze_ancestry(self, name, is_zone):
+        # only analyze the parent if the name is not root and if there is no
+        # ceiling or the name is a subdomain of the ceiling
+        if name == dns.name.root:
+            parent_obj = None
+        elif self.ceiling is not None and self.ceiling.is_subdomain(name) and is_zone:
+            parent_obj = self._analyze_stub(name.parent())
+        else:
+            parent_obj = self._analyze(name.parent())
+
+        if parent_obj is not None:
+            nxdomain_ancestor = parent_obj.nxdomain_ancestor
+            if nxdomain_ancestor is None and not parent_obj.stub:
+                rdtype = parent_obj.queries.keys()[0][1]
+                if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
+                    nxdomain_ancestor = parent_obj
+
+            # for zones other than the root assign parent_obj to the zone apex,
+            # rather than the simply the domain formed by dropping its lower
+            # leftmost label
+            parent_obj = parent_obj.zone
+
+        else:
+            nxdomain_ancestor = None
+
+        return parent_obj, None, nxdomain_ancestor
+
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
         queries.'''
@@ -1949,31 +1976,12 @@ class RecursiveAnalyst(Analyst):
         finally:
             self._cleanup_analysis_all(name_obj)
 
-        # only analyze the parent if the name is not root and if there is no
-        # ceiling or the name is a subdomain of the ceiling
-        if name == dns.name.root:
-            parent_obj = None
-        elif self.ceiling is not None and self.ceiling.is_subdomain(name) and name_obj.has_ns:
-            parent_obj = self._analyze_stub(name.parent())
-        else:
-            parent_obj = self._analyze(name.parent())
-
-        if parent_obj is not None:
-            nxdomain_ancestor = parent_obj.nxdomain_ancestor
-            if nxdomain_ancestor is None and not parent_obj.stub:
-                rdtype = parent_obj.queries.keys()[0][1]
-                if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
-                    nxdomain_ancestor = parent_obj
-
-            # for zones other than the root assign parent_obj to the zone apex,
-            # rather than the simply the domain formed by dropping its lower
-            # leftmost label
-            parent_obj = parent_obj.zone
-
-        else:
-            nxdomain_ancestor = None
+        # analyze ancestry
+        parent_obj, dlv_parent_obj, nxdomain_ancestor = \
+                self._analyze_ancestry(name, name_obj.has_ns)
 
         name_obj.parent = parent_obj
+        name_obj.dlv_parent = dlv_parent_obj
         name_obj.nxdomain_ancestor = nxdomain_ancestor
 
         return name_obj
