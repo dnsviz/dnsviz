@@ -997,11 +997,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # algorithms per algorithm/key tag combination
             ds_algs = set()
             supported_ds_algs = set()
-            digest_algs = {}
             for ds_rdata in ds_rrset_info.rrset:
-                if (ds_rdata.algorithm, ds_rdata.key_tag) not in digest_algs:
-                    digest_algs[(ds_rdata.algorithm, ds_rdata.key_tag)] = set()
-                digest_algs[(ds_rdata.algorithm, ds_rdata.key_tag)].add(ds_rdata.digest_type)
                 if ds_rdata.algorithm in supported_algs and ds_rdata.digest_type in supported_digest_algs:
                     supported_ds_algs.add(ds_rdata.algorithm)
                 ds_algs.add(ds_rdata.algorithm)
@@ -1039,9 +1035,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
 
-                        # ignore DS algorithm 1 if algorithm 2 exists
-                        ignore_ds_alg = (ds_rdata.digest_type == 1) and (2 in digest_algs[(ds_rdata.algorithm, ds_rdata.key_tag)]) and (2 in supported_digest_algs)
-
                         for rrsig in dnskey_info.rrsig_info:
                             # move along if DNSKEY is not self-signing
                             if dnskey not in self.rrsig_status[dnskey_info][rrsig]:
@@ -1066,8 +1059,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         # if the DS digest and the RRSIG are both valid, and the digest algorithm
                                         # is not deprecated then mark it as a SEP
                                         if ds_status.validation_status == Status.DS_STATUS_VALID and \
-                                                rrsig_status.validation_status == Status.RRSIG_STATUS_VALID and \
-                                                not ignore_ds_alg:
+                                                rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
                                             # note that this algorithm is part of a successful self-signing DNSKEY
                                             algs_validating_sep[(server,client,response)].add(rrsig.algorithm)
                                             if not ds_algs.difference(algs_validating_sep[(server,client,response)]):

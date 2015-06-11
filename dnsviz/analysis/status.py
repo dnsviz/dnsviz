@@ -309,6 +309,19 @@ class DSStatus(object):
                     self.validation_status = DS_STATUS_INVALID_DIGEST
                 self.errors.append(Errors.DigestInvalid())
 
+        # RFC 4509
+        if self.ds.digest_type == 1:
+            digest_algs = set()
+            my_digest_algs = set()
+            for ds_rdata in self.ds_meta.rrset:
+                digest_algs.add(ds_rdata.digest_type)
+                if (ds_rdata.algorithm, ds_rdata.key_tag) == (self.ds.algorithm, self.ds.key_tag):
+                    my_digest_algs.add(ds_rdata.digest_type)
+            if 2 in supported_digest_algs and 2 in digest_algs and 2 not in my_digest_algs:
+                self.errors.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2))
+                if self.validation_status == DS_STATUS_VALID:
+                    self.validation_status = DS_STATUS_INVALID
+
     def __unicode__(self):
         return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
