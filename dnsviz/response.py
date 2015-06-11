@@ -787,7 +787,7 @@ class RRsetInfo(DNSResponseComponent):
         if self.is_wildcard(rrsig):
             wildcard_name = self.reduce_wildcard(rrsig)
             if wildcard_name not in self.wildcard_info:
-                self.wildcard_info[wildcard_name] = NegativeResponseInfo(self.rrset.name, self.rrset.rdtype)
+                self.wildcard_info[wildcard_name] = NegativeResponseInfo(self.rrset.name, self.rrset.rdtype, self.ttl_cmp)
             self.wildcard_info[wildcard_name].add_server_client(server, client, response)
             self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, is_referral)
 
