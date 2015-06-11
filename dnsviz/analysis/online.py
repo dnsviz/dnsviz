@@ -1939,7 +1939,13 @@ class RecursiveAnalyst(Analyst):
         else:
             nxdomain_ancestor = None
 
-        return parent_obj, None, nxdomain_ancestor
+        # retrieve the dlv
+        if self.dlv_domain is not None and self.name != self.dlv_domain:
+            dlv_parent_obj = self.analysis_cache[self.dlv_domain]
+        else:
+            dlv_parent_obj = None
+
+        return parent_obj, dlv_parent_obj, nxdomain_ancestor
 
     def _analyze(self, name):
         '''Analyze a DNS name to learn about its health using introspective
