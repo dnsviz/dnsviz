@@ -2018,19 +2018,20 @@ class RecursiveAnalyst(Analyst):
         servers = name_obj.zone.get_auth_or_designated_servers()
         servers = self._filter_servers(servers)
 
-        # make common query first to prime the cache
-        try:
-            rdtype = self._rdtypes_to_query(name_obj.name)[0]
-        except IndexError:
-            rdtype = dns.rdatatype.A
-        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-        query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-        query.execute()
-        name_obj.add_query(query)
+        # for SLDs and below, make common query first to prime the cache
+        if len(name_obj.name) > 2:
+            try:
+                rdtype = self._rdtypes_to_query(name_obj.name)[0]
+            except IndexError:
+                rdtype = dns.rdatatype.A
+            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+            query.execute()
+            name_obj.add_query(query)
 
-        # if there was an NXDOMAIN for the first query, then don't ask the others
-        if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
-            return name_obj
+            # if there was an NXDOMAIN for the first query, then don't ask the others
+            if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
+                return name_obj
 
         # now query most other queries
         self._analyze_queries(name_obj)
