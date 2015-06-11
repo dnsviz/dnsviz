@@ -1,2 +1,2 @@
-from online import WILDCARD_EXPLICIT_DELEGATION, Analyst, OnlineDomainNameAnalysis, PrivateAnalyst, PrivateRecursiveAnalyst, get_client_addresses, NetworkConnectivityException, resolver
+from online import WILDCARD_EXPLICIT_DELEGATION, Analyst, OnlineDomainNameAnalysis, PrivateAnalyst, RecursiveAnalyst, PrivateRecursiveAnalyst, get_client_addresses, NetworkConnectivityException, resolver
 from offline import OfflineDomainNameAnalysis
