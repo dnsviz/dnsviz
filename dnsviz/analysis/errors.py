@@ -302,6 +302,23 @@ class DigestAlgorithmNotSupported(DSError):
         super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
 
+class DSDigestAlgorithmIgnored(DSError):
+    '''
+    >>> e = DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2)
+    >>> e.description
+    'DS records with digest type 1 (SHA-1) are ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.'
+    '''
+    _abstract = False
+    code = 'DS_DIGEST_ALGORITHM_IGNORED'
+    description_template = "DS records with digest type %(algorithm)d (%(algorithm_text)s) are ignored when DS records with digest type %(new_algorithm)d (%(new_algorithm_text)s) exist in the same RRset."
+    references = ['RFC 4509, Sec. 3']
+    required_params = ['algorithm', 'new_algorithm']
+
+    def __init__(self, **kwargs):
+        super(DSDigestAlgorithmIgnored, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], str(self.template_kwargs['algorithm']))
+        self.template_kwargs['new_algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['new_algorithm'], str(self.template_kwargs['algorithm']))
+
 class DNSKEYRevokedDS(DSError):
     '''
     >>> e = DNSKEYRevokedDS()
