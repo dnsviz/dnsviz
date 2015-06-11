@@ -1965,6 +1965,14 @@ class RecursiveAnalyst(Analyst):
                 # set analysis_end
                 name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
+                # analyze ancestry
+                parent_obj, dlv_parent_obj, nxdomain_ancestor = \
+                        self._analyze_ancestry(name, name_obj.has_ns)
+
+                name_obj.parent = parent_obj
+                name_obj.dlv_parent = dlv_parent_obj
+                name_obj.nxdomain_ancestor = nxdomain_ancestor
+
                 self._finalize_analysis_proper(name_obj)
             finally:
                 self._cleanup_analysis_proper(name_obj)
@@ -1975,14 +1983,6 @@ class RecursiveAnalyst(Analyst):
             self._finalize_analysis_all(name_obj)
         finally:
             self._cleanup_analysis_all(name_obj)
-
-        # analyze ancestry
-        parent_obj, dlv_parent_obj, nxdomain_ancestor = \
-                self._analyze_ancestry(name, name_obj.has_ns)
-
-        name_obj.parent = parent_obj
-        name_obj.dlv_parent = dlv_parent_obj
-        name_obj.nxdomain_ancestor = nxdomain_ancestor
 
         return name_obj
 
