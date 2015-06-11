@@ -1385,15 +1385,7 @@ class Analyst(object):
 
         return name_obj
 
-    def _analyze(self, name):
-        '''Analyze a DNS name to learn about its health using introspective
-        queries.'''
-
-        # determine immediately if we need to do anything
-        name_obj = self._get_name_for_analysis(name, lock=False)
-        if name_obj is not None and name_obj.analysis_end is not None:
-            return name_obj
-
+    def _analyze_ancestry(self, name):
         # only analyze the parent if the name is not root and if there is no
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
@@ -1425,6 +1417,20 @@ class Analyst(object):
             dlv_parent_obj = self.analysis_cache[self.dlv_domain]
         else:
             dlv_parent_obj = None
+
+        return parent_obj, dlv_parent_obj, nxdomain_ancestor
+
+    def _analyze(self, name):
+        '''Analyze a DNS name to learn about its health using introspective
+        queries.'''
+
+        # determine immediately if we need to do anything
+        name_obj = self._get_name_for_analysis(name, lock=False)
+        if name_obj is not None and name_obj.analysis_end is not None:
+            return name_obj
+
+        parent_obj, dlv_parent_obj, nxdomain_ancestor = \
+                self._analyze_ancestry(name)
 
         # get or create the name
         name_obj = self._get_name_for_analysis(name)
