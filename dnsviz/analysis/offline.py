@@ -692,7 +692,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
                                 rrsig.algorithm == dnskey.rdata.algorithm):
                             continue
-                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, zone_name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
                         validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
 
                     # if we got results for multiple keys, then just select the one that validates
@@ -714,7 +714,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # no corresponding DNSKEY
             if not self.rrsig_status[rrset_info][rrsig]:
-                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), algorithm_unknown=rrsig.algorithm not in supported_algs)
+                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
                 self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
 
         # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
@@ -1036,7 +1036,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             continue
 
                         # check if the digest is a match
-                        ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, digest_algorithm_unknown=ds_rdata.digest_type not in supported_digest_algs)
+                        ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
 
                         # ignore DS algorithm 1 if algorithm 2 exists
@@ -1083,7 +1083,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # no corresponding DNSKEY
                 if not self.ds_status_by_ds[rdtype][ds_rdata]:
-                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None)
+                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None, supported_ds_algs)
                     self.ds_status_by_ds[rdtype][ds_rdata][None] = ds_status
                     if None not in self.ds_status_by_dnskey[rdtype]:
                         self.ds_status_by_dnskey[rdtype][None] = {}

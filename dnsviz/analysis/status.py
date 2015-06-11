@@ -141,13 +141,12 @@ dname_status_mapping = {
 }
 
 class RRSIGStatus(object):
-    def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, algorithm_unknown=False):
+    def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
         self.rrsig = rrsig
         self.dnskey = dnskey
         self.zone_name = zone_name
         self.reference_ts = reference_ts
-        self.algorithm_unknown = algorithm_unknown
         self.warnings = []
         self.errors = []
 
@@ -157,7 +156,7 @@ class RRSIGStatus(object):
             self.signature_valid = crypto.validate_rrsig(dnskey.rdata.algorithm, rrsig.signature, rrset.message_for_rrsig(rrsig), dnskey.rdata.key)
 
         self.validation_status = RRSIG_STATUS_VALID
-        if self.signature_valid is None or self.algorithm_unknown:
+        if self.signature_valid is None or self.dnskey.rdata.algorithm not in supported_algs:
             if self.dnskey is None:
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_NO_DNSKEY
@@ -204,7 +203,7 @@ class RRSIGStatus(object):
         elif self.reference_ts + min_ttl >= self.rrsig.expiration:
             self.errors.append(Errors.TTLBeyondExpiration(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), rrsig_ttl=min_ttl, reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
 
-        if not self.algorithm_unknown and self.signature_valid == False:
+        if self.dnskey.rdata.algorithm in supported_algs and self.signature_valid == False:
             # only report this if we're not referring to a key revoked post-sign
             if self.dnskey.key_tag == self.rrsig.key_tag:
                 if self.validation_status == RRSIG_STATUS_VALID:
@@ -271,11 +270,10 @@ class RRSIGStatus(object):
         return d
 
 class DSStatus(object):
-    def __init__(self, ds, ds_meta, dnskey, digest_algorithm_unknown=False):
+    def __init__(self, ds, ds_meta, dnskey, supported_digest_algs):
         self.ds = ds
         self.ds_meta = ds_meta
         self.dnskey = dnskey
-        self.digest_algorithm_unknown = digest_algorithm_unknown
         self.warnings = []
         self.errors = []
 
@@ -285,7 +283,7 @@ class DSStatus(object):
             self.digest_valid = crypto.validate_ds_digest(ds.digest_type, ds.digest, dnskey.message_for_ds())
 
         self.validation_status = DS_STATUS_VALID
-        if self.digest_valid is None or self.digest_algorithm_unknown:
+        if self.digest_valid is None or self.ds.digest_type not in supported_digest_algs:
             if self.dnskey is None:
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INDETERMINATE_NO_DNSKEY
@@ -304,7 +302,7 @@ class DSStatus(object):
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INVALID
 
-        if not self.digest_algorithm_unknown and self.digest_valid == False:
+        if self.ds.digest_type in supported_digest_algs and self.digest_valid == False:
             # only report this if we're not referring to a key revoked post-DS
             if self.dnskey.key_tag == self.ds.key_tag:
                 if self.validation_status == DS_STATUS_VALID:
