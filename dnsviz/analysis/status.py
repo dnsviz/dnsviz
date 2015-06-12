@@ -207,7 +207,7 @@ class RRSIGStatus(object):
         elif self.reference_ts + min_ttl >= self.rrsig.expiration:
             self.errors.append(Errors.TTLBeyondExpiration(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), rrsig_ttl=min_ttl, reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
 
-        if self.dnskey.rdata.algorithm in supported_algs and self.signature_valid == False:
+        if self.signature_valid == False and self.dnskey.rdata.algorithm in supported_algs:
             # only report this if we're not referring to a key revoked post-sign
             if self.dnskey.key_tag == self.rrsig.key_tag:
                 if self.validation_status == RRSIG_STATUS_VALID:
@@ -306,7 +306,7 @@ class DSStatus(object):
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INVALID
 
-        if self.ds.digest_type in supported_digest_algs and self.digest_valid == False:
+        if self.digest_valid == False and self.ds.digest_type in supported_digest_algs:
             # only report this if we're not referring to a key revoked post-DS
             if self.dnskey.key_tag == self.ds.key_tag:
                 if self.validation_status == DS_STATUS_VALID:
