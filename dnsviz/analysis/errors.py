@@ -285,23 +285,6 @@ class SignatureInvalid(RRSIGError):
 class DSError(DomainNameAnalysisError):
     pass
 
-class DigestAlgorithmNotSupported(DSError):
-    '''
-    >>> e = DigestAlgorithmNotSupported(algorithm=5)
-    >>> e.description
-    'Generating cryptographic hashes using algorithm 5 (5) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
-    '''
-
-    _abstract = False
-    code = 'DIGEST_ALGORITHM_NOT_SUPPORTED'
-    description_template = "Generating cryptographic hashes using algorithm %(algorithm)d (%(algorithm_text)s) is not supported by this code, so the cryptographic status of the DS RR is unknown."
-    references = ['RFC 4035, Sec. 5.2']
-    required_params = ['algorithm']
-
-    def __init__(self, **kwargs):
-        super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
-
 class DSDigestAlgorithmIgnored(DSError):
     '''
     >>> e = DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2)
@@ -319,7 +302,27 @@ class DSDigestAlgorithmIgnored(DSError):
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], str(self.template_kwargs['algorithm']))
         self.template_kwargs['new_algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['new_algorithm'], str(self.template_kwargs['algorithm']))
 
-class DNSKEYRevokedDS(DSError):
+class DSDigestError(DomainNameAnalysisError):
+    pass
+
+class DigestAlgorithmNotSupported(DSDigestError):
+    '''
+    >>> e = DigestAlgorithmNotSupported(algorithm=5)
+    >>> e.description
+    'Generating cryptographic hashes using algorithm 5 (5) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
+    '''
+
+    _abstract = False
+    code = 'DIGEST_ALGORITHM_NOT_SUPPORTED'
+    description_template = "Generating cryptographic hashes using algorithm %(algorithm)d (%(algorithm_text)s) is not supported by this code, so the cryptographic status of the DS RR is unknown."
+    references = ['RFC 4035, Sec. 5.2']
+    required_params = ['algorithm']
+
+    def __init__(self, **kwargs):
+        super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
+
+class DNSKEYRevokedDS(DSDigestError):
     '''
     >>> e = DNSKEYRevokedDS()
     >>> e.description
@@ -332,7 +335,7 @@ class DNSKEYRevokedDS(DSError):
     references = ['RFC 5011, Sec. 2.1']
     required_params = []
 
-class DigestInvalid(DSError):
+class DigestInvalid(DSDigestError):
     '''
     >>> e = DigestInvalid()
     >>> e.description
