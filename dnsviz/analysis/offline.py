@@ -1075,7 +1075,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # no corresponding DNSKEY
                 if not self.ds_status_by_ds[rdtype][ds_rdata]:
-                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None, supported_ds_algs)
+                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None, supported_digest_algs)
                     self.ds_status_by_ds[rdtype][ds_rdata][None] = ds_status
                     if None not in self.ds_status_by_dnskey[rdtype]:
                         self.ds_status_by_dnskey[rdtype][None] = {}
