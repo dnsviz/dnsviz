@@ -317,11 +317,24 @@ class DSStatus(object):
         if self.ds.digest_type == 1:
             digest_algs = set()
             my_digest_algs = set()
+            my_digest_algs = {}
             for ds_rdata in self.ds_meta.rrset:
                 digest_algs.add(ds_rdata.digest_type)
                 if (ds_rdata.algorithm, ds_rdata.key_tag) == (self.ds.algorithm, self.ds.key_tag):
-                    my_digest_algs.add(ds_rdata.digest_type)
-            if 2 in supported_digest_algs and 2 in digest_algs and 2 not in my_digest_algs:
+                    # Here we produce a status of the DS with algorithm 2 with
+                    # respect to the DNSKEY for comparison with the current DS
+                    # with algorithm 1.  It is possible that the DS with the
+                    # different digest type matches a different DNSKEY than the
+                    # present DNSKEY.  If it does, there will be a warning, but
+                    # it should be both rare and innocuous.
+                    if ds_rdata.digest_type == self.ds.digest_type:
+                        continue
+                    elif ds_rdata.digest_type not in my_digest_algs or \
+                            my_digest_algs[ds_rdata.digest_type].validation_status != DS_STATUS_VALID:
+                        my_digest_algs[ds_rdata.digest_type] = \
+                                DSStatus(ds_rdata, self.ds_meta, self.dnskey, supported_digest_algs)
+            if 2 in supported_digest_algs and 2 in digest_algs and \
+                    (2 not in my_digest_algs or my_digest_algs[2].validation_status != DS_STATUS_VALID):
                 self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2))
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_ALGORITHM_IGNORED
