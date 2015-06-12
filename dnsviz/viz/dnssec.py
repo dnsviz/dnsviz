@@ -417,9 +417,9 @@ class DNSAuthGraph:
                 plural = ''
 
             img_str = ''
-            if filter(lambda x: x.errors, ds_statuses) or zone_obj.rrset_errors[ds_info]:
+            if filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.errors), ds_statuses) or zone_obj.rrset_errors[ds_info]:
                 img_str = '<IMG SRC="%s"/>' % ERROR_ICON
-            elif filter(lambda x: x.warnings, ds_statuses) or zone_obj.rrset_warnings[ds_info]:
+            elif filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.warnings), ds_statuses) or zone_obj.rrset_warnings[ds_info]:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
