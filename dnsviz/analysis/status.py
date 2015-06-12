@@ -334,7 +334,8 @@ class DSStatus(object):
                         my_digest_algs[ds_rdata.digest_type] = \
                                 DSStatus(ds_rdata, self.ds_meta, self.dnskey, supported_digest_algs)
             if 2 in supported_digest_algs and 2 in digest_algs and \
-                    (2 not in my_digest_algs or my_digest_algs[2].validation_status != DS_STATUS_VALID):
+                    (2 not in my_digest_algs or my_digest_algs[2].validation_status not in \
+                    (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM, DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE)):
                 self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2))
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_ALGORITHM_IGNORED
