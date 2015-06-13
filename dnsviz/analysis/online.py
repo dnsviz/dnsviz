@@ -1945,7 +1945,7 @@ class RecursiveAnalyst(Analyst):
         if parent_obj is not None:
             nxdomain_ancestor = parent_obj.nxdomain_ancestor
             if nxdomain_ancestor is None and not parent_obj.stub:
-                rdtype = parent_obj.queries.keys()[0][1]
+                rdtype = filter(lambda x: x[0] == parent_obj.name, parent_obj.queries.keys())[0][1]
                 if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
                     nxdomain_ancestor = parent_obj
 
