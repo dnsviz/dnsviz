@@ -470,19 +470,20 @@ class NSECStatusNXDOMAIN(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
-            d['id'] = 'NSEC'
-
-        d['nsec'] = []
+        nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
                 nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
-                    d['nsec'].append(nsec_serialized)
+                    nsec_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
-        if not d['nsec']:
-            del d['nsec']
+                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+
+        if loglevel <= logging.INFO or show_basic or nsec_list:
+            d['id'] = 'NSEC'
+
+        if nsec_list:
+            d['nsec'] = nsec_list
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
@@ -713,19 +714,20 @@ class NSECStatusNoAnswer(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
-            d['id'] = 'NSEC'
-
-        d['nsec'] = []
+        nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
                 nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
-                    d['nsec'].append(nsec_serialized)
+                    nsec_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
-        if not d['nsec']:
-            del d['nsec']
+                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+
+        if loglevel <= logging.INFO or show_basic or nsec_list:
+            d['id'] = 'NSEC'
+
+        if nsec_list:
+            d['nsec'] = nsec_list
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
@@ -907,19 +909,20 @@ class NSEC3StatusNXDOMAIN(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
-            d['id'] = 'NSEC3'
-
-        d['nsec3'] = []
+        nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
                 nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
-                    d['nsec3'].append(nsec_serialized)
+                    nsec3_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
-        if not d['nsec3']:
-            del d['nsec3']
+                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+
+        if loglevel <= logging.INFO or show_basic or nsec3_list:
+            d['id'] = 'NSEC3'
+
+        if nsec3_list:
+            d['nsec3'] = nsec3_list
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
@@ -1241,19 +1244,20 @@ class NSEC3StatusNoAnswer(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
-            d['id'] = 'NSEC3'
-
-        d['nsec3'] = []
+        nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
                 nsec_serialized = rrset_info_serializer(nsec_rrset, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
                 if nsec_serialized:
-                    d['nsec3'].append(nsec_serialized)
+                    nsec3_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                d['nsec3'].append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
-        if not d['nsec3']:
-            del d['nsec3']
+                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+
+        if loglevel <= logging.INFO or show_basic or nsec3_list:
+            d['id'] = 'NSEC3'
+
+        if nsec3_list:
+            d['nsec3'] = nsec3_list
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
@@ -1372,18 +1376,22 @@ class CNAMEFromDNAMEStatus(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
-            d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
-
+        dname_serialized = None
         if rrset_info_serializer is not None:
             dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
-            if dname_serialized:
-                d['dname'] = dname_serialized
         elif loglevel <= logging.DEBUG:
-            d['dname'] = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
+            dname_serialized = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
+
+        if loglevel <= logging.INFO or show_basic or dname_serialized:
+            d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
+
+        if dname_serialized:
+            d['dname'] = dname_serialized
+
+        if loglevel <= logging.DEBUG:
             if self.included_cname is not None:
                 d['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
                 d['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())

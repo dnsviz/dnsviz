@@ -1415,18 +1415,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        if loglevel <= logging.INFO or (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR):
-            if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
-                d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
-            else:
-                d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
-
-        if loglevel <= logging.DEBUG:
-            d['description'] = unicode(rrset_info)
-            d.update(rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, show_servers=show_servers, html_format=html_format))
-
+        rrsig_list = []
         if self.rrsig_status[rrset_info]:
-            d['rrsig'] = []
             rrsigs = self.rrsig_status[rrset_info].keys()
             rrsigs.sort()
             for rrsig in rrsigs:
@@ -1436,34 +1426,50 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
                     rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                     if rrsig_serialized:
-                        d['rrsig'].append(rrsig_serialized)
-            if not d['rrsig']:
-                del d['rrsig']
+                        rrsig_list.append(rrsig_serialized)
 
+        dname_list = []
         if rrset_info in self.dname_status:
-            d['dname'] = []
             for dname_status in self.dname_status[rrset_info]:
                 dname_serialized = dname_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if dname_serialized:
-                    d['dname'].append(dname_serialized)
-            if not d['dname']:
-                del d['dname']
+                    dname_list.append(dname_serialized)
 
+        wildcard_proof_list = collections.OrderedDict()
         if rrset_info.wildcard_info:
-            d['wildcard_proof'] = collections.OrderedDict()
             wildcard_names = rrset_info.wildcard_info.keys()
             wildcard_names.sort()
             for wildcard_name in wildcard_names:
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
-                d['wildcard_proof'][wildcard_name_str] = []
+                wildcard_proof_list[wildcard_name_str] = []
                 for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                     nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                     if nsec_serialized:
-                        d['wildcard_proof'][wildcard_name_str].append(nsec_serialized)
-                if not d['wildcard_proof'][wildcard_name_str]:
-                    del d['wildcard_proof'][wildcard_name_str]
-            if not d['wildcard_proof']:
-                del d['wildcard_proof']
+                        wildcard_proof_list[wildcard_name_str].append(nsec_serialized)
+                if not wildcard_proof_list[wildcard_name_str]:
+                    del wildcard_proof_list[wildcard_name_str]
+
+        if loglevel <= logging.INFO or \
+                (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or \
+                (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR) or \
+                (rrsig_list or dname_list or wildcard_proof_list):
+            if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
+                d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
+            else:
+                d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
+
+        if loglevel <= logging.DEBUG:
+            d['description'] = unicode(rrset_info)
+            d.update(rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, show_servers=show_servers, html_format=html_format))
+
+        if rrsig_list:
+            d['rrsig'] = rrsig_list
+
+        if dname_list:
+            d['dname'] = dname_list
+
+        if wildcard_proof_list:
+            d['wildcard_proof'] = wildcard_proof_list
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
