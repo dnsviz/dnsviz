@@ -545,7 +545,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 Errors.DomainNameAnalysisError.insert_into_list(err, group, server, client, response)
 
-        if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
+        if qname_obj is not None and qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
             if not response.is_authoritative() and \
                     not response.recursion_desired_and_available():
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
