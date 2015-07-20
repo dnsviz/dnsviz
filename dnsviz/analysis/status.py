@@ -398,25 +398,21 @@ class NSECStatusNXDOMAIN(object):
         self.warnings = []
         self.errors = []
 
-        self.wildcard_name = dns.name.from_text('*', self.origin)
+        self.wildcard_name = None
 
         self.nsec_names_covering_qname = {}
         covering_names = nsec_set_info.nsec_covering_name(self.qname)
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
+            covering_name = list(covering_names)[0]
+            self.wildcard_name = self._get_wildcard(qname, nsec_set_info.rrsets[covering_name].rrset)
+
         self.nsec_names_covering_wildcard = {}
-        wildcard_cover = qname
-        # check that at least one wildcard is covered between qname and origin,
-        # any one of which could be expanded into wildcard
-        while wildcard_cover != self.origin:
-            wildcard_name = dns.name.from_text('*', wildcard_cover.parent())
-            covering_names = nsec_set_info.nsec_covering_name(wildcard_name)
+        if self.wildcard_name is not None:
+            covering_names = nsec_set_info.nsec_covering_name(self.wildcard_name)
             if covering_names:
-                self.wildcard_name = wildcard_name
                 self.nsec_names_covering_wildcard[self.wildcard_name] = covering_names
-                break
-            wildcard_cover = wildcard_cover.parent()
 
         # check for covering of the origin
         self.nsec_names_covering_origin = {}
@@ -438,7 +434,7 @@ class NSECStatusNXDOMAIN(object):
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.SnameNotCoveredNameError(sname=self.qname))
-        if not self.nsec_names_covering_wildcard:
+        if not self.nsec_names_covering_wildcard and self.wildcard_name is not None:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.WildcardNotCoveredNSEC(wildcard=self.wildcard_name))
         if self.nsec_names_covering_origin:
@@ -459,6 +455,19 @@ class NSECStatusNXDOMAIN(object):
 
     def __unicode__(self):
         return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
+
+    def _get_wildcard(self, qname, nsec_rrset):
+        covering_name = nsec_rrset.name
+        next_name = nsec_rrset[0].next
+        for i in range(len(qname)):
+            j = -(i + 1)
+            if i < len(covering_name) and covering_name[j].lower() == qname[j].lower():
+                continue
+            elif i < len(next_name) and next_name[j].lower() == qname[j].lower():
+                continue
+            else:
+                break
+        return dns.name.Name(('*',) + qname[-i:])
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -497,16 +506,17 @@ class NSECStatusNXDOMAIN(object):
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
-            d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
-            if self.nsec_names_covering_wildcard:
-                wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
-                nsec_name = list(nsec_names)[0]
-                nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
-                    ('wildcard', formatter(wildcard.canonicalize().to_text())),
-                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
-                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
-                ))
+            if self.wildcard_name is not None:
+                d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
+                if self.nsec_names_covering_wildcard:
+                    wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
+                    nsec_name = list(nsec_names)[0]
+                    nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
+                    d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
+                        ('wildcard', formatter(wildcard.canonicalize().to_text())),
+                        ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                        ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
+                    ))
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -591,7 +601,8 @@ class NSECStatusNoAnswer(object):
         self.referral = nsec_set_info.referral
         self.warnings = []
         self.errors = []
-        self.wildcard_name = dns.name.from_text('*', origin)
+
+        self.wildcard_name = None
 
         try:
             self.nsec_for_qname = nsec_set_info.rrsets[self.qname]
@@ -619,20 +630,17 @@ class NSECStatusNoAnswer(object):
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
+            covering_name = list(covering_names)[0]
+            self.wildcard_name = self._get_wildcard(qname, nsec_set_info.rrsets[covering_name].rrset)
+
         self.nsec_for_wildcard_name = None
         self.wildcard_has_rdtype = None
-        wildcard_cover = qname
-        # check that at least one wildcard is covered between qname and origin,
-        # any one of which could be expanded into wildcard
-        while wildcard_cover != self.origin:
-            wildcard_name = dns.name.from_text('*', wildcard_cover.parent())
+        if self.wildcard_name is not None:
             try:
-                self.nsec_for_wildcard_name = nsec_set_info.rrsets[wildcard_name]
-                self.wildcard_has_rdtype = nsec_set_info.rdtype_exists_in_bitmap(wildcard_name, self.rdtype)
-                self.wildcard_name = wildcard_name
+                self.nsec_for_wildcard_name = nsec_set_info.rrsets[self.wildcard_name]
+                self.wildcard_has_rdtype = nsec_set_info.rdtype_exists_in_bitmap(self.wildcard_name, self.rdtype)
             except KeyError:
                 pass
-            wildcard_cover = wildcard_cover.parent()
 
         # check for covering of the origin
         self.nsec_names_covering_origin = {}
@@ -651,6 +659,19 @@ class NSECStatusNoAnswer(object):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
+
+    def _get_wildcard(self, qname, nsec_rrset):
+        covering_name = nsec_rrset.name
+        next_name = nsec_rrset[0].next
+        for i in range(len(qname)):
+            j = -(i + 1)
+            if i < len(covering_name) and covering_name[j].lower() == qname[j].lower():
+                continue
+            elif i < len(next_name) and next_name[j].lower() == qname[j].lower():
+                continue
+            else:
+                break
+        return dns.name.Name(('*',) + qname[-i:])
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
@@ -673,10 +694,7 @@ class NSECStatusNoAnswer(object):
             if self.nsec_names_covering_qname:
                 self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=fmt.humanize_name(self.qname)))
                 self.validation_status = NSEC_STATUS_INVALID
-        elif self.nsec_for_wildcard_name:
-            if not self.nsec_names_covering_qname:
-                self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.SnameNotCoveredWildcardNoData(sname=fmt.humanize_name(self.qname)))
+        elif self.nsec_for_wildcard_name: # implies wildcard_name, which implies nsec_names_covering_qname
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
                 self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
@@ -748,12 +766,13 @@ class NSECStatusNoAnswer(object):
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
-            d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
-            if self.nsec_for_wildcard_name is not None:
-                d['nsec_matching_wildcard'] = collections.OrderedDict((
-                    ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
-                    #TODO - add rdtypes bitmap
-                ))
+            if self.wildcard_name is not None:
+                d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
+                if self.nsec_for_wildcard_name is not None:
+                    d['nsec_matching_wildcard'] = collections.OrderedDict((
+                        ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
+                        #TODO - add rdtypes bitmap
+                    ))
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]

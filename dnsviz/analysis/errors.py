@@ -375,10 +375,6 @@ class SnameNotCoveredWildcardAnswer(SnameNotCovered):
     _abstract = False
     references = ['RFC 4035, Sec. 3.1.3.3']
 
-class SnameNotCoveredWildcardNoData(SnameNotCovered):
-    _abstract = False
-    references = ['RFC 4035, Sec. 3.1.3.4']
-
 class NextClosestEncloserNotCovered(NSECError):
     code = 'NEXT_CLOSEST_ENCLOSER_NOT_COVERED'
     description_template = "No %(nsec_type)s RR covers the next closest encloser (%(next_closest_encloser)s)."
