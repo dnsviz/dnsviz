@@ -121,6 +121,7 @@ class DNSAuthGraph:
         self.node_info = {}
         self.node_mapping = {}
         self.node_reverse_mapping = {}
+        self.secure_dnskey_rrsets = set()
         self.node_subgraph_name = {}
         self.processed_rrsets = {}
 
@@ -1342,6 +1343,11 @@ class DNSAuthGraph:
                     if (n,n) == e1 and \
                             e1.attr['color'] == COLORS['secure']:
                         valid_self_loop = True
+
+                        # mark all the DNSKEY RRsets as valid
+                        for rrsig in self.node_mapping[e1.attr['id']]:
+                            self.secure_dnskey_rrsets.add(rrsig.rrset)
+
                         break
 
             #XXX revisit if we want to do this here
@@ -1416,6 +1422,11 @@ class DNSAuthGraph:
                         if (p,p) == e1 and \
                                 e1.attr['color'] == COLORS['secure']:
                             valid_self_loop = True
+
+                            # mark all the DNSKEY RRsets as valid
+                            for rrsig in self.node_mapping[e1.attr['id']]:
+                                self.secure_dnskey_rrsets.add(rrsig.rrset)
+
                             break
 
                 prev_node_trusted = prev_node_trusted and valid_self_loop
