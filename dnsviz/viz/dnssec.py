@@ -370,8 +370,11 @@ class DNSAuthGraph:
                 dnskey_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
             self.node_info[node_str] = [dnskey_serialized]
-            self.node_mapping[node_str] = set([dnskey])
-            self.node_reverse_mapping[dnskey] = node_str
+
+        if node_str not in self.node_mapping:
+            self.node_mapping[node_str] = set()
+        self.node_mapping[node_str].add(dnskey)
+        self.node_reverse_mapping[dnskey] = node_str
 
         return self.G.get_node(node_str)
 
@@ -465,15 +468,17 @@ class DNSAuthGraph:
                 consolidated_ds_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in zone_obj.rrset_errors[ds_info]]
 
             self.node_info[node_str] = [consolidated_ds_serialized]
-            self.node_mapping[node_str] = set(ds)
-            for d in ds:
-                self.node_reverse_mapping[d] = node_str
 
             self.G.add_edge(parent_bottom_name, node_str, style='invis', minlen='0')
 
             T, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
 
             self.add_ds_map(name, node_str, ds_statuses, zone_obj, parent_obj)
+
+        if node_str not in self.node_mapping:
+            self.node_mapping[node_str] = set()
+        self.node_mapping[node_str].add(ds_info)
+        self.node_reverse_mapping[ds_info] = node_str
 
         return self.G.get_node(node_str)
 
@@ -507,6 +512,7 @@ class DNSAuthGraph:
 
         self.node_info[edge_id] = [self.node_info[ds_node][0].copy()]
         self.node_info[edge_id][0]['description'] = 'Digest for %s' % (self.node_info[edge_id][0]['description'])
+
         self.node_mapping[edge_id] = set(ds_statuses)
         for d in ds_statuses:
             self.node_reverse_mapping[d] = edge_id
@@ -613,11 +619,10 @@ class DNSAuthGraph:
         rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
 
         if edge_id not in self.node_info:
-            self.node_info[edge_id] = [rrsig_serialized]
-            self.node_mapping[edge_id] = set([rrsig_status])
-        else:
-            self.node_info[edge_id].append(rrsig_serialized)
-            self.node_mapping[edge_id].add(rrsig_status)
+            self.node_info[edge_id] = []
+            self.node_mapping[edge_id] = set()
+        self.node_info[edge_id].append(rrsig_serialized)
+        self.node_mapping[edge_id].add(rrsig_status)
         self.node_reverse_mapping[rrsig_status] = edge_id
 
     def rrset_node_str(self, name, rdtype, id):
@@ -672,9 +677,12 @@ class DNSAuthGraph:
                 rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.rrset_errors[rrset_info]]
 
             self.node_info[node_id] = [rrset_serialized]
-            self.node_mapping[node_id] = set([rrset_info])
-            self.node_reverse_mapping[rrset_info] = node_id
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+
+        if node_id not in self.node_mapping:
+            self.node_mapping[node_id] = set()
+        self.node_mapping[node_id].add(rrset_info)
+        self.node_reverse_mapping[rrset_info] = node_id
 
         return self.G.get_node(node_str)
 
@@ -742,7 +750,13 @@ class DNSAuthGraph:
                 rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in errors_list]
 
             self.node_info[node_id] = [rrset_serialized]
+
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+
+        if node_id not in self.node_mapping:
+            self.node_mapping[node_id] = set()
+        self.node_mapping[node_id].add(neg_response_info)
+        self.node_reverse_mapping[neg_response_info] = node_id
 
         return self.G.get_node(node_str)
 
@@ -777,8 +791,10 @@ class DNSAuthGraph:
         errors_serialized['status'] = 'INVALID'
 
         self.node_info[node_id] = [errors_serialized]
-        self.node_mapping[node_id] = set()
         self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+
+        # no need to map errors
+        self.node_mapping[node_id] = set()
 
         return self.G.get_node(node_str)
 
@@ -815,8 +831,11 @@ class DNSAuthGraph:
 
             self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
             self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
-            self.node_mapping[edge_id] = set([dname_status])
-            self.node_reverse_mapping[dname_status] = edge_id
+
+        if edge_id not in self.node_mapping:
+            self.node_mapping[edge_id] = set()
+        self.node_mapping[edge_id].add(dname_status)
+        self.node_reverse_mapping[dname_status] = edge_id
 
         self.add_rrsigs(name_obj, zone_obj, dname_rrset_info, dname_node)
 
@@ -898,8 +917,6 @@ class DNSAuthGraph:
                 nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
             self.node_info[node_str] = [nsec_serialized]
-            self.node_mapping[node_str] = set([nsec_status.nsec_set_info])
-            self.node_reverse_mapping[nsec_status.nsec_set_info] = node_str
 
             nsec_node = self.G.get_node(node_str)
 
@@ -918,11 +935,19 @@ class DNSAuthGraph:
             self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
 
             self.node_info[edge_id] = [nsec_serialized_edge]
-            self.node_mapping[edge_id] = set([nsec_status])
-            self.node_reverse_mapping[nsec_status] = edge_id
 
         else:
             nsec_node = self.G.get_node(node_str)
+
+        if node_str not in self.node_mapping:
+            self.node_mapping[node_str] = set()
+        self.node_mapping[node_str].add(nsec_status.nsec_set_info)
+        self.node_reverse_mapping[nsec_status.nsec_set_info] = node_str
+
+        if edge_id not in self.node_mapping:
+            self.node_mapping[edge_id] = set()
+        self.node_mapping[edge_id].add(nsec_status)
+        self.node_reverse_mapping[nsec_status] = edge_id
 
         return nsec_node
 
