@@ -633,6 +633,7 @@ class DNSAuthGraph:
         zone_obj = name_obj.zone
         name = wildcard_name or rrset_info.rrset.name
         node_str = self.rrset_node_str(name, rrset_info.rrset.rdtype, id)
+        node_id = node_str.replace('*', '_')
 
         if not self.G.has_node(node_str):
             img_str = ''
@@ -653,7 +654,6 @@ class DNSAuthGraph:
             attr['style'] = 'rounded,filled'
             attr['fillcolor'] = '#ffffff'
 
-            node_id = node_str.replace('*', '_')
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
             S.add_node(node_str, id=node_id, label=node_label, fontsize='10', **attr)
             self.node_subgraph_name[node_str] = zone_top_name
@@ -684,6 +684,7 @@ class DNSAuthGraph:
             node_str = self.rrset_node_str(neg_response_info.qname, neg_response_info.rdtype, 0)
         else:
             node_str = self.rrset_node_str(neg_response_info.qname, neg_response_info.rdtype, 1)
+        node_id = node_str.replace('*', '_')
 
         if not self.G.has_node(node_str):
             if wildcard:
@@ -721,7 +722,6 @@ class DNSAuthGraph:
                 attr['style'] += ',diagonals'
             attr['fillcolor'] = '#ffffff'
 
-            node_id = node_str.replace('*', '_')
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
             S.add_node(node_str, id=node_id, label=node_label, fontsize='10', **attr)
             self.node_subgraph_name[node_str] = zone_top_name
