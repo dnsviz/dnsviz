@@ -1224,7 +1224,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             if response.recursion_desired_and_available():
                                 err.add_server_client(server, client, response)
 
-            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
+            # Evaluating the RRSIGs covering SOA records only makes sense if
+            # the query type is not DNSKEY
+            if neg_response_info.rdtype != dns.rdatatype.DNSKEY:
+                self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
+            else:
+                self._initialize_rrset_status(soa_rrset_info)
 
         for server,client,response in servers_without_soa:
             if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
