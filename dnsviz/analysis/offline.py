@@ -35,7 +35,7 @@ import dns.flags, dns.rdataclass, dns.rdatatype
 from dnsviz import crypto
 import dnsviz.format as fmt
 import dnsviz.query as Q
-from dnsviz.response import DNSKEYMeta
+from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
 
 import errors as Errors
@@ -154,7 +154,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             dnskey_set = set()
             for dnskey_rdata in dnskey_info.rrset:
                 if dnskey_rdata not in self._dnskeys:
-                    self._dnskeys[dnskey_rdata] = DNSKEYMeta(dnskey_info.rrset.name, dnskey_rdata, dnskey_info.rrset.ttl)
+                    self._dnskeys[dnskey_rdata] = Response.DNSKEYMeta(dnskey_info.rrset.name, dnskey_rdata, dnskey_info.rrset.ttl)
                 self._dnskeys[dnskey_rdata].rrset_info.append(dnskey_info)
                 self._dnskeys[dnskey_rdata].servers_clients.update(dnskey_info.servers_clients)
                 dnskey_set.add(self._dnskeys[dnskey_rdata])
