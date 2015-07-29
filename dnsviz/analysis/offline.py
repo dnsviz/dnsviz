@@ -1569,6 +1569,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if wildcard_proof_list:
             d['wildcard_proof'] = wildcard_proof_list
 
+        if show_info and self.response_component_status is not None:
+            d['status'] = Status.rrset_status_mapping[self.response_component_status[rrset_info]]
+
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
 
@@ -1595,6 +1598,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 d['soa'].append(rrset_serialized)
         if not d['soa']:
             del d['soa']
+
+        show_info = loglevel <= logging.INFO or \
+                (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
+                (errors[neg_response_info] and loglevel <= logging.ERROR)
+
+        if show_info and self.response_component_status is not None:
+            d['status'] = Status.rrset_status_mapping[self.response_component_status[neg_response_info]]
 
         if loglevel <= logging.DEBUG or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
@@ -1663,6 +1673,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for dnskey in self.get_dnskeys():
             dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if dnskey_serialized:
+                if self.response_component_status is not None:
+                    dnskey_serialized['status'] = Status.rrset_status_mapping[self.response_component_status[dnskey]]
                 d.append(dnskey_serialized)
 
         return d
