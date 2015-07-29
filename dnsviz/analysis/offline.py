@@ -1545,10 +1545,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not wildcard_proof_list[wildcard_name_str]:
                     del wildcard_proof_list[wildcard_name_str]
 
-        if loglevel <= logging.INFO or \
+        show_info = loglevel <= logging.INFO or \
                 (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or \
                 (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR) or \
-                (rrsig_list or dname_list or wildcard_proof_list):
+                (rrsig_list or dname_list or wildcard_proof_list)
+
+        if show_info:
             if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
             else:
