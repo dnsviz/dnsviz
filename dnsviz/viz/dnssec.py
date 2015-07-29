@@ -634,8 +634,9 @@ class DNSAuthGraph:
     def get_rrset(self, name, rdtype, id):
         return self.G.get_node(self.rrset_node_str(name, rdtype, id))
 
-    def add_rrset(self, rrset_info, wildcard_name, name_obj, id):
-        zone_obj = name_obj.zone
+    def add_rrset(self, rrset_info, wildcard_name, name_obj, id, zone_obj=None):
+        if zone_obj is None:
+            zone_obj = name_obj.zone
         name = wildcard_name or rrset_info.rrset.name
         node_str = self.rrset_node_str(name, rrset_info.rrset.rdtype, id)
         node_id = node_str.replace('*', '_')
