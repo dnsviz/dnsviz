@@ -1178,14 +1178,17 @@ class DNSAuthGraph:
             edge_id = 0
 
             nsec_statuses = []
+            soa_rrsets = []
             try:
                 ds_nodata_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nodata_status)[0]
                 nsec_statuses.extend(name_obj.nodata_status[ds_nodata_info])
+                soa_rrsets.extend(ds_nodata_info.soa_rrset_info)
             except IndexError:
                 ds_nodata_info = None
             try:
                 ds_nxdomain_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nxdomain_status)[0]
                 nsec_statuses.extend(name_obj.nxdomain_status[ds_nxdomain_info])
+                soa_rrsets.extend(ds_nxdomain_info.soa_rrset_info)
             except IndexError:
                 ds_nxdomain_info = None
 
@@ -1201,6 +1204,11 @@ class DNSAuthGraph:
                     self.add_rrsigs(name_obj, parent_obj, rrset_info, nsec_node, combine_edge_id=edge_id)
 
                 edge_id += 1
+
+            # add SOA
+            for soa_rrset_info in soa_rrsets:
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, 0, zone_obj=parent_obj)
+                self.add_rrsigs(name_obj, parent_obj, soa_rrset_info, soa_rrset_node)
 
             has_warnings = name_obj.delegation_warnings[rdtype] or (ds_nxdomain_info is not None and name_obj.nxdomain_warnings[ds_nxdomain_info]) or (ds_nodata_info is not None and name_obj.nodata_warnings[ds_nodata_info])
             has_errors = name_obj.delegation_errors[rdtype] or (ds_nxdomain_info is not None and name_obj.nxdomain_errors[ds_nxdomain_info]) or (ds_nodata_info is not None and name_obj.nodata_errors[ds_nodata_info])
