@@ -1337,36 +1337,43 @@ class DNSAuthGraph:
             if n.attr['shape'] not in ('ellipse', 'diamond', 'rectangle'):
                 continue
 
-            style = n.attr['style'].split(',')
-
-            if n.attr['color'] == COLORS['secure']:
-                status = Status.RRSET_STATUS_SECURE
-                if 'dashed' in style:
-                    n.attr['color'] = COLORS['secure_non_existent']
-
-                    # if this is an authenticated negative response, and the NSEC3
-                    # RR used opt out, then the node is actually insecure, rather
-                    # than secure.
-                    for n1 in self.G.out_neighbors(n):
-                        if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
-                            n.attr['color'] = COLORS['insecure_non_existent']
-                            status = Status.RRSET_STATUS_INSECURE
-
-            elif n.attr['color'] == COLORS['bogus']:
-                status = Status.RRSET_STATUS_BOGUS
-                if 'dashed' in style:
-                    n.attr['color'] = COLORS['bogus_non_existent']
-            elif 'dashed' in style:
-                #TODO (this should be done even when add_trust hasn't been
-                # called)
-                n.attr['color'] = COLORS['insecure_non_existent']
-                status = Status.RRSET_STATUS_NON_EXISTENT
-            else:
-                status = Status.RRSET_STATUS_INSECURE
+            status = self.status_for_node(n)
 
             node_id = n.replace('*', '_')
             for serialized in self.node_info[node_id]:
                 serialized['status'] = Status.rrset_status_mapping[status]
+
+    def status_for_node(self, n):
+        n = self.G.get_node(n)
+
+        style = n.attr['style'].split(',')
+
+        if n.attr['color'] == COLORS['secure']:
+            status = Status.RRSET_STATUS_SECURE
+            if 'dashed' in style:
+                n.attr['color'] = COLORS['secure_non_existent']
+
+                # if this is an authenticated negative response, and the NSEC3
+                # RR used opt out, then the node is actually insecure, rather
+                # than secure.
+                for n1 in self.G.out_neighbors(n):
+                    if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
+                        n.attr['color'] = COLORS['insecure_non_existent']
+                        status = Status.RRSET_STATUS_INSECURE
+
+        elif n.attr['color'] == COLORS['bogus']:
+            status = Status.RRSET_STATUS_BOGUS
+            if 'dashed' in style:
+                n.attr['color'] = COLORS['bogus_non_existent']
+        elif 'dashed' in style:
+            #TODO (this should be done even when add_trust hasn't been
+            # called)
+            n.attr['color'] = COLORS['insecure_non_existent']
+            status = Status.RRSET_STATUS_NON_EXISTENT
+        else:
+            status = Status.RRSET_STATUS_INSECURE
+
+        return status
 
     def _add_trust_to_nodes_in_chain(self, n, trusted_zones, dlv_nodes, force, trace):
         if n in trace:
