@@ -413,7 +413,7 @@ class OnlineDomainNameAnalysis(object):
         if rrset.rdtype == dns.rdatatype.CNAME:
             self._handle_cname_response(rrset)
 
-    def _process_response(self, response, server, client, query, bailiwick):
+    def _process_response(self, response, server, client, query, bailiwick, detect_ns):
         '''Process a DNS response from a query, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
 
@@ -453,7 +453,7 @@ class OnlineDomainNameAnalysis(object):
         except IndexError:
             pass
 
-        if query.qname == self.name:
+        if query.qname == self.name and detect_ns:
             # if this is a referral, also grab the referral information, if it
             # pertains to this name (could alternatively be a parent)
             if response.is_referral(query.qname, query.rdtype, bailiwick):
@@ -484,9 +484,10 @@ class OnlineDomainNameAnalysis(object):
             if ip is not None:
                 self._auth_ns_ip_mapping[name].add(ip)
 
-    def add_query(self, query):
+    def add_query(self, query, detect_ns=False):
         '''Process a DNS query and its responses, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
+
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
 
@@ -520,7 +521,7 @@ class OnlineDomainNameAnalysis(object):
                 if response.tcp_responsive:
                     self._responsive_servers_clients_tcp.add((server, client))
 
-                self._process_response(query.responses[server][client], server, client, query, bailiwick)
+                self._process_response(query.responses[server][client], server, client, query, bailiwick, detect_ns)
 
     def remove_query_negative_response(self, qname, rdtype):
         '''Remove the query with the given qname and rdtype if there is not
@@ -947,7 +948,7 @@ class OnlineDomainNameAnalysis(object):
             if key in query_map:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
                 for query in query_map[key]:
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), True)
         # set the NS dependencies for the name
         if self.is_zone():
             self.set_ns_dependencies()
@@ -1705,14 +1706,14 @@ class Analyst(object):
 
             # add remaining queries
             for query in referral_queries.values():
-                name_obj.add_query(query)
+                name_obj.add_query(query, True)
 
             # return a positive response only if not nxdomain
             return not is_nxdomain
 
         # add any queries made
         for query in referral_queries.values():
-            name_obj.add_query(query)
+            name_obj.add_query(query, True)
 
         # now identify the authoritative NS RRset from all servers, resolve all
         # names referred to in the NS RRset(s), and query each corresponding
@@ -1762,7 +1763,7 @@ class Analyst(object):
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries)
             for query in queries:
-                name_obj.add_query(query)
+                name_obj.add_query(query, True)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
 
@@ -2027,7 +2028,7 @@ class RecursiveAnalyst(Analyst):
             self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
             query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
             query.execute()
-            name_obj.add_query(query)
+            name_obj.add_query(query, True)
 
             # if there was an NXDOMAIN for the first query, then don't ask the others
             if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
@@ -2048,7 +2049,7 @@ class RecursiveAnalyst(Analyst):
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
         query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
         query.execute()
-        name_obj.add_query(query)
+        name_obj.add_query(query, True)
 
         return name_obj
 
