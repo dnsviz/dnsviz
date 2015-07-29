@@ -81,6 +81,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrset_warnings = None
         self.rrset_errors = None
         self.rrsig_status = None
+        self.response_component_status = None
         self.wildcard_status = None
         self.dname_status = None
         self.nxdomain_status = None
@@ -1422,6 +1423,90 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err = Errors.TrustAnchorNotSigning()
                 err.servers_clients = dnskey.servers_clients
                 dnskey.errors.append(err)
+
+    def populate_response_component_status(self, G):
+        response_component_status = {}
+        for obj in G.node_reverse_mapping:
+            if isinstance(obj, (Response.DNSKEYMeta, Response.RRsetInfo, Response.NSECSet, Response.NegativeResponseInfo)):
+                status = G.status_for_node(G.node_reverse_mapping[obj])
+                response_component_status[obj] = status
+
+                if isinstance(obj, Response.DNSKEYMeta):
+                    for rrset_info in obj.rrset_info:
+                        if rrset_info in G.secure_dnskey_rrsets:
+                            response_component_status[rrset_info] = Status.RRSET_STATUS_SECURE
+                        else:
+                            response_component_status[rrset_info] = status
+
+                #XXX this is a bit of a hack since (for the moment) the
+                # authentication status of individual NSEC/NSEC3 records within
+                # a set is not tracked.  However, it will work for most cases.
+                # And for those that it doesn't, it probably doesn't matter
+                # because one bogus NSEC record in a set invalidates the
+                # purposes of the whole set.
+                elif isinstance(obj, Response.NSECSet):
+                    for nsec_name in obj.rrsets:
+                        response_component_status[obj.rrsets[nsec_name]] = status
+
+                elif isinstance(obj, Response.NegativeResponseInfo):
+                    # A negative response info for a DS query points to the
+                    # "top node" of a zone in the graph.  If this "top node" is
+                    # colored "insecure", then it indicates that the negative
+                    # response has been authenticated.  To reflect this
+                    # properly, we change the status to "secure".
+                    if obj.rdtype == dns.rdatatype.DS:
+                        if status == Status.RRSET_STATUS_INSECURE:
+                            response_component_status[obj] = Status.RRSET_STATUS_SECURE
+
+                    # A negative response to a DNSKEY query is a special case.
+                    elif obj.rdtype == dns.rdatatype.DNSKEY:
+                        # If the "node" was found to be secure, then there must be
+                        # a secure entry point into the zone, indicating that there
+                        # were other, positive responses to the query (i.e., from
+                        # other servers).  That makes this negative response bogus.
+                        if status == Status.RRSET_STATUS_SECURE:
+                            response_component_status[obj] = Status.RRSET_STATUS_BOGUS
+
+                        # Since the accompanying SOA is not drawn on the graph, we
+                        # simply apply the same status to the SOA as is associated
+                        # with the negative response.
+                        for soa_rrset in obj.soa_rrset_info:
+                            response_component_status[soa_rrset] = response_component_status[obj]
+
+        self._set_response_component_status(response_component_status)
+
+    def _set_response_component_status(self, response_component_status, is_dlv=False, level=RDTYPES_ALL, trace=None, follow_mx=True):
+        if trace is None:
+            trace = []
+
+        # avoid loops
+        if self in trace:
+            return
+
+        # populate status of dependencies
+        if level <= self.RDTYPES_NS_TARGET:
+            for cname in self.cname_targets:
+                for target, cname_obj in self.cname_targets[cname].items():
+                    cname_obj._set_response_component_status(response_component_status, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
+            if follow_mx:
+                for target, mx_obj in self.mx_targets.items():
+                    if mx_obj is not None:
+                        mx_obj._set_response_component_status(response_component_status, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
+        if level <= self.RDTYPES_SECURE_DELEGATION:
+            for signer, signer_obj in self.external_signers.items():
+                if signer_obj is not None:
+                    signer_obj._set_response_component_status(response_component_status, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            for target, ns_obj in self.ns_dependencies.items():
+                if ns_obj is not None:
+                    ns_obj._set_response_component_status(response_component_status, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
+
+        # populate status of ancestry
+        if self.parent is not None:
+            self.parent._set_response_component_status(response_component_status, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+        if self.dlv_parent is not None:
+            self.dlv_parent._set_response_component_status(response_component_status, is_dlv=True, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+
+        self.response_component_status = response_component_status
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
