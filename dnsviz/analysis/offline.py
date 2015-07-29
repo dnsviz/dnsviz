@@ -599,10 +599,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # check for DO bit in request
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingNSECForWildcard(), self.rrset_errors[rrset_info], server, client, response)
 
-    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, populate_response_errors=True):
+    def _initialize_rrset_status(self, rrset_info):
         self.rrset_warnings[rrset_info] = []
         self.rrset_errors[rrset_info] = []
         self.rrsig_status[rrset_info] = {}
+
+    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, populate_response_errors=True):
+        self._initialize_rrset_status(rrset_info)
 
         if qname_obj is None:
             zone_name = None
