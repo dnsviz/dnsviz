@@ -1132,6 +1132,20 @@ class DNSAuthGraph:
                         signed_key_node = self.get_dnskey(self.id_for_dnskey(name_obj.name, signed_key.rdata), name_obj.name, signed_key.rdata.algorithm, signed_key.key_tag)
                         self.add_rrsig(rrsig_status, name_obj, signer_obj, signed_key_node)
 
+        # map negative responses for DNSKEY queries to top name of the zone
+        try:
+            dnskey_nodata_info = filter(lambda x: x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY, name_obj.nodata_status)[0]
+        except IndexError:
+            pass
+        else:
+            self.node_reverse_mapping[dnskey_nodata_info] = zone_top
+        try:
+            dnskey_nxdomain_info = filter(lambda x: x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY, name_obj.nxdomain_status)[0]
+        except IndexError:
+            pass
+        else:
+            self.node_reverse_mapping[dnskey_nxdomain_info] = zone_top
+
         if not name_obj.is_zone():
             return
 
