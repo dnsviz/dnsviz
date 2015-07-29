@@ -1255,44 +1255,47 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if not notice.servers_clients:
                             notices.remove(notice)
 
+        # Evaluating NSEC records only makes sense if the query type is not
+        # DNSKEY
         statuses = []
-        status_by_response = {}
-        for nsec_set_info in neg_response_info.nsec_set_info:
-            if nsec_set_info.use_nsec3:
-                status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
-                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
-            else:
-                status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
-                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+        if neg_response_info.rdtype != dns.rdatatype.DNSKEY:
+            status_by_response = {}
+            for nsec_set_info in neg_response_info.nsec_set_info:
+                if nsec_set_info.use_nsec3:
+                    status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
+                            soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+                else:
+                    status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
+                            soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
 
-            for nsec_rrset_info in nsec_set_info.rrsets.values():
-                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
+                for nsec_rrset_info in nsec_set_info.rrsets.values():
+                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
 
-            if status.validation_status == Status.NSEC_STATUS_VALID:
+                if status.validation_status == Status.NSEC_STATUS_VALID:
+                    if status not in statuses:
+                        statuses.append(status)
+
+                for server, client in nsec_set_info.servers_clients:
+                    for response in nsec_set_info.servers_clients[(server,client)]:
+                        if (server,client,response) in servers_missing_nsec:
+                            servers_missing_nsec.remove((server,client,response))
+                        if status.validation_status == Status.NSEC_STATUS_VALID:
+                            if (server,client,response) in status_by_response:
+                                del status_by_response[(server,client,response)]
+                        elif neg_response_info.qname == query.qname or response.recursion_desired_and_available():
+                            status_by_response[(server,client,response)] = status
+
+            for (server,client,response), status in status_by_response.items():
                 if status not in statuses:
                     statuses.append(status)
 
-            for server, client in nsec_set_info.servers_clients:
-                for response in nsec_set_info.servers_clients[(server,client)]:
-                    if (server,client,response) in servers_missing_nsec:
-                        servers_missing_nsec.remove((server,client,response))
-                    if status.validation_status == Status.NSEC_STATUS_VALID:
-                        if (server,client,response) in status_by_response:
-                            del status_by_response[(server,client,response)]
-                    elif neg_response_info.qname == query.qname or response.recursion_desired_and_available():
-                        status_by_response[(server,client,response)] = status
-
-        for (server,client,response), status in status_by_response.items():
-            if status not in statuses:
-                statuses.append(status)
-
-        for server, client, response in servers_missing_nsec:
-            # report that no NSEC(3) records were returned
-            if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
-                if response.dnssec_requested():
-                    Errors.DomainNameAnalysisError.insert_into_list(missing_nsec_error_cls(), errors, server, client, response)
-                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
+            for server, client, response in servers_missing_nsec:
+                # report that no NSEC(3) records were returned
+                if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
+                    if response.dnssec_requested():
+                        Errors.DomainNameAnalysisError.insert_into_list(missing_nsec_error_cls(), errors, server, client, response)
+                    elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client):
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
 
         return statuses
 
