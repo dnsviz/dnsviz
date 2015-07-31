@@ -1630,27 +1630,22 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d['nodata'] = []
         d['error'] = []
 
-        #TODO sort by CNAME dependencies, beginning with question
         for rrset_info in query.answer_info:
-            # only look at qname
-            #TODO fix this check for recursive
-            if rrset_info.rrset.name == query.qname:
+            if rrset_info.rrset.name == query.qname or self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 rrset_serialized = self._serialize_rrset_info(rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if rrset_serialized:
                     d['answer'].append(rrset_serialized)
 
         for neg_response_info in query.nxdomain_info:
             # only look at qname
-            #TODO fix this check for recursive
-            if neg_response_info.qname == query.qname:
+            if neg_response_info.qname == query.qname or self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if neg_response_serialized:
                     d['nxdomain'].append(neg_response_serialized)
 
         for neg_response_info in query.nodata_info:
             # only look at qname
-            #TODO fix this check for recursive
-            if neg_response_info.qname == query.qname:
+            if neg_response_info.qname == query.qname or self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nodata_status, self.nodata_warnings, self.nodata_errors, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if neg_response_serialized:
                     d['nodata'].append(neg_response_serialized)
@@ -1726,7 +1721,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
-    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, level=RDTYPES_ALL, trace=None, follow_mx=True, html_format=False):
+    def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, ancestry_only=False, level=RDTYPES_ALL, trace=None, follow_mx=True, html_format=False):
         if d is None:
             d = collections.OrderedDict()
 
@@ -1745,12 +1740,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if name_str in d:
             return d
 
+        cname_ancestry_only = self.analysis_type == ANALYSIS_TYPE_RECURSIVE
+
         # serialize status of dependencies first because their version of the
         # analysis might be the most complete (considering re-dos)
         if level <= self.RDTYPES_NS_TARGET:
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
-                    cname_obj.serialize_status(d, loglevel=loglevel, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], html_format=html_format)
+                    cname_obj.serialize_status(d, loglevel=loglevel, ancestry_only=cname_ancestry_only, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], html_format=html_format)
             if follow_mx:
                 for target, mx_obj in self.mx_targets.items():
                     if mx_obj is not None:
@@ -1768,6 +1765,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
             if self.dlv_parent is not None:
                 self.dlv_parent.serialize_status(d, is_dlv=True, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
+
+        # if we're only looking for the secure ancestry of a name, and not the
+        # name itself (i.e., because this is a subsequent name in a CNAME
+        # chain)
+        if ancestry_only:
+
+            # only proceed if the name is a zone (and thus as DNSKEY, DS, etc.)
+            if not self.is_zone():
+                return d
+
+            # explicitly set the level to self.RDTYPES_SECURE_DELEGATION, so
+            # the other query types aren't retrieved.
+            level = self.RDTYPES_SECURE_DELEGATION
 
         consolidate_clients = self.single_client()
 
