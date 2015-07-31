@@ -1375,8 +1375,7 @@ class DNSAuthGraph:
         elif n.attr['color'] in (COLORS['bogus'], COLORS['bogus_non_existent']):
             status = Status.RRSET_STATUS_BOGUS
         else:
-            style = n.attr['style'].split(',')
-            if 'dashed' in style:
+            if n.startswith('DNSKEY'):
                 status = Status.RRSET_STATUS_NON_EXISTENT
             else:
                 status = Status.RRSET_STATUS_INSECURE
