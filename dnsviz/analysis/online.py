@@ -1078,7 +1078,7 @@ class Analyst(object):
         if ceiling == dns.name.root or ceiling is None:
             return ceiling, None
 
-        # if there is a celing, but the name is not a subdomain
+        # if there is a ceiling, but the name is not a subdomain
         # of the ceiling, then use the name itself as a base
         if not self.name.is_subdomain(ceiling):
             ceiling = self.name
@@ -1861,7 +1861,12 @@ class RecursiveAnalyst(Analyst):
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
     def _detect_ceiling(self, ceiling):
-        return ceiling, False
+        # if there is a ceiling, but the name is not a subdomain
+        # of the ceiling, then use the name itself as a base
+        if ceiling is not None and not self.name.is_subdomain(ceiling):
+            ceiling = self.name
+
+        return ceiling, None
 
     def _finalize_analysis_proper(self, name_obj):
         '''Since we initially queried the full set of queries before we knew
