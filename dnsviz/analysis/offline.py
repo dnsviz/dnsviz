@@ -1583,25 +1583,35 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        d['proof'] = []
+        proof_list = []
         for nsec_status in neg_status[neg_response_info]:
             nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if nsec_serialized:
-                d['proof'].append(nsec_serialized)
-        if not d['proof']:
-            del d['proof']
+                proof_list.append(nsec_serialized)
+        if not proof_list:
+            del proof_list
 
-        d['soa'] = []
+        soa_list = []
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if rrset_serialized:
-                d['soa'].append(rrset_serialized)
-        if not d['soa']:
-            del d['soa']
+                soa_list.append(rrset_serialized)
+        if not soa_list:
+            del soa_list
 
         show_info = loglevel <= logging.INFO or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
-                (errors[neg_response_info] and loglevel <= logging.ERROR)
+                (errors[neg_response_info] and loglevel <= logging.ERROR) or \
+                (proof_list or soa_list)
+
+        if show_info:
+            d['id'] = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
+
+        if proof_list:
+            d['proof'] = proof_list
+
+        if soa_list:
+            d['soa'] = soa_list
 
         if show_info and self.response_component_status is not None:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[neg_response_info]]
