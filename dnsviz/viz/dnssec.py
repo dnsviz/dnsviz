@@ -634,9 +634,7 @@ class DNSAuthGraph:
     def get_rrset(self, name, rdtype, id):
         return self.G.get_node(self.rrset_node_str(name, rdtype, id))
 
-    def add_rrset(self, rrset_info, wildcard_name, name_obj, id, zone_obj=None):
-        if zone_obj is None:
-            zone_obj = name_obj.zone
+    def add_rrset(self, rrset_info, wildcard_name, name_obj, zone_obj, id):
         name = wildcard_name or rrset_info.rrset.name
         node_str = self.rrset_node_str(name, rrset_info.rrset.rdtype, id)
         node_id = node_str.replace('*', '_')
@@ -687,8 +685,7 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_rrset_non_existent(self, name_obj, neg_response_info, nxdomain, wildcard):
-        zone_obj = name_obj.zone
+    def add_rrset_non_existent(self, name_obj, zone_obj, neg_response_info, nxdomain, wildcard):
         if nxdomain:
             node_str = self.rrset_node_str(neg_response_info.qname, neg_response_info.rdtype, 0)
         else:
@@ -761,11 +758,9 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_errors(self, name_obj, name, rdtype, errors_list):
+    def add_errors(self, name_obj, zone_obj, name, rdtype, errors_list):
         if not errors_list:
             return None
-
-        zone_obj = name_obj.zone
 
         node_str = self.rrset_node_str(name, rdtype, 2)
 
@@ -799,10 +794,9 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_dname(self, dname_status, name_obj, id):
-        zone_obj = name_obj.zone
+    def add_dname(self, dname_status, name_obj, zone_obj, id):
         dname_rrset_info = dname_status.synthesized_cname.dname_info
-        dname_node = self.add_rrset(dname_rrset_info, None, name_obj, id)
+        dname_node = self.add_rrset(dname_rrset_info, None, name_obj, zone_obj, id)
 
         if dname_status.validation_status == Status.DNAME_STATUS_VALID:
             line_color = COLORS['secure']
@@ -815,9 +809,9 @@ class DNSAuthGraph:
             line_style = 'solid'
 
         if dname_status.included_cname is None:
-            cname_node = self.add_rrset_non_existent(name_obj, Response.NegativeResponseInfo(dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, False), False, False)
+            cname_node = self.add_rrset_non_existent(name_obj, zone_obj, Response.NegativeResponseInfo(dname_status.synthesized_cname.rrset.name, dns.rdatatype.CNAME, False), False, False)
         else:
-            cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, id)
+            cname_node = self.add_rrset(dname_status.included_cname, None, name_obj, zone_obj, id)
 
         edge_id = 'dname-%s|%s|%s|%s' % (cname_node, dname_node, line_color.lstrip('#'), line_style)
         edge_key = '%s-%s' % (line_color, line_style)
@@ -952,12 +946,10 @@ class DNSAuthGraph:
 
         return nsec_node
 
-    def add_wildcard(self, name_obj, rrset_info, nsec_status, wildcard_name, id):
-        zone_obj = name_obj.zone
-
-        wildcard_node = self.add_rrset(rrset_info, wildcard_name, name_obj, id)
+    def add_wildcard(self, name_obj, zone_obj, rrset_info, nsec_status, wildcard_name, id):
+        wildcard_node = self.add_rrset(rrset_info, wildcard_name, name_obj, zone_obj, id)
         self.add_rrsigs(name_obj, zone_obj, rrset_info, wildcard_node)
-        nxdomain_node = self.add_rrset_non_existent(name_obj, rrset_info.wildcard_info[wildcard_name], True, True)
+        nxdomain_node = self.add_rrset_non_existent(name_obj, zone_obj, rrset_info.wildcard_info[wildcard_name], True, True)
 
         if nsec_status is not None:
             nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, name_obj, zone_obj, nxdomain_node)
@@ -967,7 +959,7 @@ class DNSAuthGraph:
         return wildcard_node
 
         #XXX consider adding this node (using, e.g., clustering)
-        #rrset_node = self.add_rrset(rrset_info, None, zone_obj, id)
+        #rrset_node = self.add_rrset(rrset_info, None, zone_obj, zone_obj, id)
         #self.G.add_edge(rrset_node, nxdomain_node, color=COLORS['secure'], style='solid', dir='back')
         #self.G.add_edge(rrset_node, wildcard_node, color=COLORS['secure'], style='solid', dir='back')
         #return rrset_node
@@ -1030,19 +1022,19 @@ class DNSAuthGraph:
             #XXX can we combine wildcard components into a cluster?
             if rrset_info in name_obj.dname_status:
                 for dname_status in name_obj.dname_status[rrset_info]:
-                    my_nodes.append(self.add_dname(dname_status, name_obj, id))
+                    my_nodes.append(self.add_dname(dname_status, name_obj, zone_obj, id))
                     id += 1
             elif rrset_info.wildcard_info:
                 for wildcard_name in rrset_info.wildcard_info:
                     if name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                         for nsec_status in name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
-                            my_nodes.append(self.add_wildcard(name_obj, rrset_info, nsec_status, wildcard_name, id))
+                            my_nodes.append(self.add_wildcard(name_obj, zone_obj, rrset_info, nsec_status, wildcard_name, id))
                             id += 1
                     else:
-                        my_nodes.append(self.add_wildcard(name_obj, rrset_info, None, wildcard_name, id))
+                        my_nodes.append(self.add_wildcard(name_obj, zone_obj, rrset_info, None, wildcard_name, id))
                         id += 1
             else:
-                rrset_node = self.add_rrset(rrset_info, None, name_obj, id)
+                rrset_node = self.add_rrset(rrset_info, None, name_obj, zone_obj, id)
                 self.add_rrsigs(name_obj, zone_obj, rrset_info, rrset_node)
                 my_nodes.append(rrset_node)
                 id += 1
@@ -1061,7 +1053,7 @@ class DNSAuthGraph:
         except IndexError:
             pass
         else:
-            nxdomain_node = self.add_rrset_non_existent(name_obj, neg_response_info, True, False)
+            nxdomain_node = self.add_rrset_non_existent(name_obj, zone_obj, neg_response_info, True, False)
             my_nodes_all.append(nxdomain_node)
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nxdomain_node)
@@ -1069,7 +1061,7 @@ class DNSAuthGraph:
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, id)
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, zone_obj, id)
                 self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
@@ -1078,7 +1070,7 @@ class DNSAuthGraph:
         except IndexError:
             pass
         else:
-            nodata_node = self.add_rrset_non_existent(name_obj, neg_response_info, False, False)
+            nodata_node = self.add_rrset_non_existent(name_obj, zone_obj, neg_response_info, False, False)
             my_nodes_all.append(nodata_node)
             for nsec_status in name_obj.nodata_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nodata_node)
@@ -1086,11 +1078,11 @@ class DNSAuthGraph:
                     self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, id)
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, zone_obj, id)
                 self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
-        error_node = self.add_errors(name_obj, name, rdtype, name_obj.response_errors[query])
+        error_node = self.add_errors(name_obj, zone_obj, name, rdtype, name_obj.response_errors[query])
         if error_node is not None:
             my_nodes_all.append(error_node)
 
@@ -1221,7 +1213,7 @@ class DNSAuthGraph:
 
             # add SOA
             for soa_rrset_info in soa_rrsets:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, 0, zone_obj=parent_obj)
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, parent_obj, 0)
                 self.add_rrsigs(name_obj, parent_obj, soa_rrset_info, soa_rrset_node)
 
             # add mappings for negative responses
