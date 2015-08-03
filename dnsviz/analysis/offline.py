@@ -43,6 +43,8 @@ from online import OnlineDomainNameAnalysis, \
         ANALYSIS_TYPE_AUTHORITATIVE, ANALYSIS_TYPE_RECURSIVE, ANALYSIS_TYPE_CACHE
 import status as Status
 
+DNS_PROCESSED_VERSION = '1.0'
+
 _logger = logging.getLogger(__name__)
 
 class FoundYXDOMAIN(Exception):

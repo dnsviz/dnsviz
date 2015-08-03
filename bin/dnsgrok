@@ -31,7 +31,7 @@ import sys
 
 import dns.exception, dns.message, dns.name
 
-from dnsviz.analysis import OfflineDomainNameAnalysis
+from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION, DNS_PROCESSED_VERSION
 from dnsviz.util import get_trusted_keys
 
 # we permit dnsgrok to run without having pygraphviz installed because it is

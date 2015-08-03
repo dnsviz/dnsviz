@@ -37,14 +37,12 @@ import time
 
 import dns.exception, dns.name
 
-from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver
+from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver, DNS_RAW_VERSION
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.resolver import DNSAnswer, get_standard_resolver
 
 logger = logging.getLogger('dnsviz.analysis.online')
-
-DNS_RAW_VERSION = 1.0
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
