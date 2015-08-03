@@ -102,9 +102,6 @@ def main():
             usage()
             sys.exit(0)
 
-        if not ('-f' in opts or args) and '-r' not in opts:
-            usage('When -r is not used, either -f must be used or domain names must be supplied as command line arguments.')
-            sys.exit(1)
         if '-f' in opts and args:
             usage('If -f is used, then domain names may not supplied as command line arguments.')
             sys.exit(1)
