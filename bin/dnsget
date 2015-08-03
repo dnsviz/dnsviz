@@ -283,7 +283,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: %s [ options ] ( -f filename | domain_name [domain_name ...] )
+    sys.stderr.write('''%sUsage: %s [ options ] [ -f filename | domain_name [domain_name ...] ]
 Options:
     -f filename    - read names from a file (one name per line), instead of
                      from command line.
@@ -370,8 +370,8 @@ def main():
             usage()
             sys.exit(0)
 
-        if not ('-f' in opts or args):
-            usage('Either -f must be used or domain names must be supplied as command line arguments.')
+        if not ('-f' in opts or args) and '-r' not in opts:
+            usage('When -r is not used, either -f must be used or domain names must be supplied as command line arguments.')
             sys.exit(1)
         if '-f' in opts and args:
             usage('If -f is used, then domain names may not supplied as command line arguments.')
@@ -490,6 +490,26 @@ def main():
         logger.addHandler(handler)
         logger.setLevel(debug_level)
 
+        if '-r' in opts:
+            if opts['-r'] == '-':
+                analysis_str = sys.stdin.read()
+            else:
+                try:
+                    analysis_str = open(opts['-r']).read()
+                except IOError, e:
+                    logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                    sys.exit(2)
+            try:
+                analysis_structured = json.loads(analysis_str)
+            except ValueError:
+                logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
+                sys.exit(2)
+
+            # check version
+            if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
+                logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
+                sys.exit(2)
+
         names = []
         if '-f' in opts:
             try:
@@ -509,6 +529,12 @@ def main():
                     names.append(name)
             f.close()
         else:
+            if not args:
+                try:
+                    args = analysis_structured['_meta._dnsviz.']['names']
+                except KeyError:
+                    logger.error('No names found in json input!')
+                    sys.exit(2)
             for name in args:
                 try:
                     name = dns.name.from_text(name)
@@ -547,25 +573,6 @@ def main():
 
         name_objs = []
         if '-r' in opts:
-            if opts['-r'] == '-':
-                analysis_str = sys.stdin.read()
-            else:
-                try:
-                    analysis_str = open(opts['-r']).read()
-                except IOError, e:
-                    logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                    sys.exit(2)
-            try:
-                analysis_structured = json.loads(analysis_str)
-            except ValueError:
-                logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
-                sys.exit(2)
-
-            # check version
-            if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
-                logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
-                sys.exit(2)
-
             cache = {}
             for name in names:
                 if name.canonicalize().to_text() not in analysis_structured:
