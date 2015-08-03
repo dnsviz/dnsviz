@@ -986,6 +986,7 @@ class DNSAuthGraph:
     def graph_rrset_auth(self, name_obj, name, rdtype):
         if (name, rdtype) in self.processed_rrsets:
             return self.processed_rrsets[(name, rdtype)]
+        self.processed_rrsets[(name, rdtype)] = []
 
         assert rdtype not in (dns.rdatatype.DNSKEY, dns.rdatatype.DLV, dns.rdatatype.DS, dns.rdatatype.NSEC, dns.rdatatype.NSEC3)
 
