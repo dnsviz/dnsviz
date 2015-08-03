@@ -44,6 +44,8 @@ except ImportError:
 
 logger = logging.getLogger('dnsviz.analysis.offline')
 
+DNS_RAW_VERSION = 1.0
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -179,6 +181,11 @@ def main():
             analysis_structured = json.loads(analysis_str)
         except ValueError:
             logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
+            sys.exit(2)
+
+        # check version
+        if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
+            logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
             sys.exit(2)
 
         if '-t' in opts:
