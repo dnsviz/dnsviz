@@ -852,6 +852,7 @@ class DNSAuthGraph:
         else:
             nsec_rdtype = dns.rdatatype.NSEC
         node_str = self.nsec_node_str(nsec_rdtype, self.id_for_nsec(name, rdtype, nsec_status.__class__, nsec_status.nsec_set_info), name, rdtype)
+        edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
 
         if not self.G.has_node(node_str):
             rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], nsec_status.nsec_set_info.rrsets.values())
@@ -927,7 +928,6 @@ class DNSAuthGraph:
                 line_style = 'solid'
 
             edge_label = ''
-            edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
             self.G.add_edge(covered_node, nsec_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
 
             self.node_info[edge_id] = [nsec_serialized_edge]
