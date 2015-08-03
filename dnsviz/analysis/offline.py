@@ -1611,16 +1611,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if nsec_serialized:
                 proof_list.append(nsec_serialized)
-        if not proof_list:
-            del proof_list
 
         soa_list = []
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if rrset_serialized:
                 soa_list.append(rrset_serialized)
-        if not soa_list:
-            del soa_list
 
         show_info = loglevel <= logging.INFO or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
