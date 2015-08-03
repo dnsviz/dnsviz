@@ -543,6 +543,8 @@ def main():
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
+        dnsviz_meta = { 'version': 1.0, 'names': [n.to_text() for n in names] }
+
         flush = '-F' in opts
 
         name_objs = []
@@ -574,7 +576,7 @@ def main():
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
-                    fh.write('"_last._dnsviz":null}')
+                    fh.write('"_meta._dnsviz":%s}' % json.dumps(dnsviz_meta))
                     sys.exit(0)
 
             name_objs = a.analyze(names)
@@ -587,6 +589,7 @@ def main():
         d = collections.OrderedDict()
         for name_obj in name_objs:
             name_obj.serialize(d, meta_only)
+        d['_meta._dnsviz'] = dnsviz_meta
 
         fh.write(json.dumps(d, **kwargs))
 
