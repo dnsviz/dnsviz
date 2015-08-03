@@ -34,6 +34,14 @@ import dns.exception, dns.message, dns.name
 from dnsviz.analysis import OfflineDomainNameAnalysis
 from dnsviz.util import get_trusted_keys
 
+# we permit dnsgrok to run without having pygraphviz installed because it is
+# not used unless -t is specified.  If -t is used on the command line, then we
+# check for the existence of pygraphviz.
+try:
+    from dnsviz.viz.dnssec import DNSAuthGraph
+except ImportError:
+    pass
+
 logger = logging.getLogger('dnsviz.analysis.offline')
 
 def usage(err=None):
@@ -59,6 +67,23 @@ def test_m2crypto():
         import M2Crypto
     except ImportError:
         sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
+
+def test_pygraphviz():
+    try:
+        from pygraphviz import release
+        try:
+            major, minor = release.version.split('.')[:2]
+            major = int(major)
+            minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
+            if (major, minor) < (1,1):
+                sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+                sys.exit(3)
+        except ValueError:
+            sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+            sys.exit(3)
+    except ImportError:
+        sys.stderr.write('''pygraphviz is required, but not installed.\n''')
+        sys.exit(3)
 
 def main():
     try:
@@ -167,6 +192,8 @@ def main():
             except dns.exception.DNSException:
                 logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
                 sys.exit(2)
+            # check that pygraphviz is installed
+            test_pygraphviz()
         else:
             trusted_keys = ()
 
@@ -184,6 +211,16 @@ def main():
         d = collections.OrderedDict()
         for name_obj in name_objs:
             name_obj.populate_status(trusted_keys)
+
+            if trusted_keys:
+                G = DNSAuthGraph()
+                for qname, rdtype in name_obj.queries:
+                    if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                        continue
+                    G.graph_rrset_auth(name_obj, qname, rdtype)
+                G.add_trust(trusted_keys)
+                name_obj.populate_response_component_status(G)
+
             name_obj.serialize_status(d, loglevel=loglevel)
 
         if d:
