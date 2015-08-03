@@ -44,6 +44,8 @@ from dnsviz.resolver import DNSAnswer, get_standard_resolver
 
 logger = logging.getLogger('dnsviz.analysis.online')
 
+DNS_RAW_VERSION = 1.0
+
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
 def _setattr_dummy(self, name, value):
@@ -541,7 +543,7 @@ def main():
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
-        dnsviz_meta = { 'version': 1.0, 'names': [n.to_text() for n in names] }
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in names] }
 
         flush = '-F' in opts
 
@@ -560,6 +562,12 @@ def main():
             except ValueError:
                 logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
                 sys.exit(2)
+
+            # check version
+            if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
+                logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
+                sys.exit(2)
+
             cache = {}
             for name in names:
                 if name.canonicalize().to_text() not in analysis_structured:
@@ -574,7 +582,7 @@ def main():
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
-                    fh.write('"_meta._dnsviz":%s}' % json.dumps(dnsviz_meta, **kwargs))
+                    fh.write('"_meta._dnsviz.":%s}' % json.dumps(dnsviz_meta, **kwargs))
                     sys.exit(0)
 
             name_objs = a.analyze(names)
@@ -587,7 +595,7 @@ def main():
         d = collections.OrderedDict()
         for name_obj in name_objs:
             name_obj.serialize(d, meta_only)
-        d['_meta._dnsviz'] = dnsviz_meta
+        d['_meta._dnsviz.'] = dnsviz_meta
 
         fh.write(json.dumps(d, **kwargs))
 
