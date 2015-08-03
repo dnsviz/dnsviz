@@ -122,9 +122,9 @@ def main():
         else:
             loglevel = logging.DEBUG
         handler = logging.StreamHandler()
-        handler.setLevel(loglevel)
+        handler.setLevel(logging.WARNING)
         logger.addHandler(handler)
-        logger.setLevel(loglevel)
+        logger.setLevel(logging.WARNING)
 
         names = []
         if '-f' in opts:
