@@ -66,8 +66,8 @@ $ python setup.py --help
 ## Usage
 
 DNSViz is invoked using a series of included command-line utilities: `dnsget`,
-`dnsgrok`, and `dnsviz`.  Run any of the command-line tools without arguments
-to display all options associated with their usage.
+`dnsgrok`, and `dnsviz`.  Run any of the command-line tools with -h (help) to
+display all options associated with their usage.
 
 
 ### dnsget
@@ -78,8 +78,9 @@ queries, the results of which are serialized into JSON format.
 
 #### Examples
 
-Analyze the domain name example.com and store the queries and responses in the
-file named "example.com.json":
+Analyze the domain name example.com using your configured DNS resolvers (i.e.,
+in /etc/resolv.conf) and store the queries and responses in the file named
+"example.com.json":
 ```
 $ dnsget example.com > example.com.json
 ```
@@ -89,18 +90,32 @@ Same thing:
 $ dnsget -o example.com.json example.com
 ```
 
+Analyze the domain name example.com by querying its authoritative servers:
+```
+$ dnsget -A -o example.com.json example.com > example.com.json
+```
+
 Analyze the domain name example.com by querying explicitly-defined
 authoritative servers, rather than learning the servers through referrals from
 the root zone:
 ```
-$ dnsget -x example.com:server1=199.43.132.53,server1=2001:500:8c::53 \
-  -x example.com:server2=199.43.133.53,server2=2001:500:8d::53 \
+$ dnsget -A \
+  -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
+  -x example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=2001:500:8d::53 \
   -o example.com.json example.com
 ```
 
-Analyze the domain name example.com with its entire ancestry:
+Same, but have `dnsget` resolve the names:
 ```
-$ dnsget -a . -o example.com.json example.com
+$ dnsget -A \
+  -x example.com:a.iana-servers.org,b.iana-servers.org \
+  -o example.com.json example.com
+```
+
+Analyze the domain name example.com and its entire ancestry by querying
+authoritative servers and following delegations, starting at the root:
+```
+$ dnsget -A -a . -o example.com.json example.com
 ```
 
 
@@ -117,7 +132,7 @@ format.
 Process the query/response output produced by `dnsget`, and store the
 serialized results in a file named "example.com-chk.json":
 ```
-$ dnsgrok example.com < example.com.json > example.com-chk.json
+$ dnsgrok < example.com.json > example.com-chk.json
 ```
 
 Same thing:
@@ -127,22 +142,22 @@ $ dnsgrok -r example.com.json -o example.com-chk.json example.com
 
 Same thing, but with "pretty", formatted JSON:
 ```
-$ dnsgrok -p -r example.com.json -o example.com-chk.json example.com
+$ dnsgrok -p -r example.com.json -o example.com-chk.json
 ```
 
 Show only info-level information: descriptions, statuses, warnings, and errors:
 ```
-$ dnsgrok -p -l info -r example.com.json -o example.com-chk.json example.com
+$ dnsgrok -p -l info -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related warnings or errors:
 ```
-$ dnsgrok -p -l warning -r example.com.json -o example.com-chk.json example.com
+$ dnsgrok -p -l warning -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related errors:
 ```
-$ dnsgrok -p -l error -r example.com.json -o example.com-chk.json example.com
+$ dnsgrok -p -l error -r example.com.json -o example.com-chk.json
 ```
 
 
@@ -159,22 +174,27 @@ corresponding content in the input.  The output is an image file, a `dot`
 Process the query/response output produced by `dnsget`, and produce a graph
 visually representing the results in a png file named "example.com.png".
 ```
-$ dnsviz -Tpng example.com < example.com.json > example.com.png
+$ dnsviz -Tpng < example.com.json > example.com.png
+```
+
+Same thing:
+```
+$ dnsviz -Tpng -o example.com.png example.com < example.com.json
 ```
 
 Same thing, but produce interactive HTML format:
 interactive HTML output in a file named "example.com.html":
 ```
-$ dnsviz -Thtml example.com < example.com.json > example.com.html
+$ dnsviz -Thtml < example.com.json > example.com.html
 ```
 
 Same thing (filename is derived from domain name and output format):
 ```
-$ dnsviz -Thtml -O -r example.com.json example.com
+$ dnsviz -Thtml -O -r example.com.json
 ```
 
 Add DNSSEC trust anchors to the graph:
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
-$ dnsviz -Thtml -O -r example.com.json -t tk.txt example.com
+$ dnsviz -Thtml -O -r example.com.json -t tk.txt
 ```
