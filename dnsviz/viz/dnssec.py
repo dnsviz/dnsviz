@@ -41,6 +41,7 @@ from pygraphviz import AGraph
 
 from dnsviz.analysis import status as Status
 from dnsviz.analysis import errors as Errors
+from dnsviz.analysis.online import ANALYSIS_TYPE_RECURSIVE
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
@@ -985,16 +986,8 @@ class DNSAuthGraph:
     def graph_rrset_auth(self, name_obj, name, rdtype):
         if (name, rdtype) in self.processed_rrsets:
             return self.processed_rrsets[(name, rdtype)]
-        my_nodes_all = self.processed_rrsets[(name, rdtype)] = []
 
         assert rdtype not in (dns.rdatatype.DNSKEY, dns.rdatatype.DLV, dns.rdatatype.DS, dns.rdatatype.NSEC, dns.rdatatype.NSEC3)
-
-        zone_obj = name_obj.zone
-
-        # graph the parent
-        self.graph_zone_auth(zone_obj, False)
-
-        S, zone_graph_name, zone_bottom, zone_top = self.add_zone(zone_obj)
 
         #XXX there are reasons for this (e.g., NXDOMAIN, after which no further
         # queries are made), but it would be good to have a sanity check, so
@@ -1003,90 +996,139 @@ class DNSAuthGraph:
         if (name, rdtype) not in name_obj.queries:
             return []
 
+        zone_obj = name_obj.zone
+        self.graph_zone_auth(zone_obj, False)
+
         id = 10
         query = name_obj.queries[(name, rdtype)]
+        node_to_cname_mapping = set()
         for rrset_info in query.answer_info:
-            my_nodes = []
-            cnames = []
 
-            # only do qname
-            #XXX fix this for recursive
-            if rrset_info.rrset.name != name:
+            # only do qname, unless analysis type is recursive
+            if not (rrset_info.rrset.name == name or name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE):
                 continue
 
-            if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
-                cnames.append(rrset_info.rrset[0].target)
+            my_name = rrset_info.rrset.name
+            my_nodes = []
+            if (my_name, rdtype) not in self.processed_rrsets:
+                self.processed_rrsets[(my_name, rdtype)] = []
+
+            my_name_obj = name_obj.get_name(my_name)
+            my_zone_obj = my_name_obj.zone
+
+            # graph the parent
+            self.graph_zone_auth(my_zone_obj, False)
+
+            #XXX is this necessary?
+            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
 
             #XXX can we combine multiple DNAMEs into one?
             #XXX can we combine multiple NSEC(3) into a cluster?
             #XXX can we combine wildcard components into a cluster?
             if rrset_info in name_obj.dname_status:
                 for dname_status in name_obj.dname_status[rrset_info]:
-                    my_nodes.append(self.add_dname(dname_status, name_obj, zone_obj, id))
+                    my_nodes.append(self.add_dname(dname_status, name_obj, my_zone_obj, id))
                     id += 1
             elif rrset_info.wildcard_info:
                 for wildcard_name in rrset_info.wildcard_info:
                     if name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                         for nsec_status in name_obj.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
-                            my_nodes.append(self.add_wildcard(name_obj, zone_obj, rrset_info, nsec_status, wildcard_name, id))
+                            my_nodes.append(self.add_wildcard(name_obj, my_zone_obj, rrset_info, nsec_status, wildcard_name, id))
                             id += 1
                     else:
-                        my_nodes.append(self.add_wildcard(name_obj, zone_obj, rrset_info, None, wildcard_name, id))
+                        my_nodes.append(self.add_wildcard(name_obj, my_zone_obj, rrset_info, None, wildcard_name, id))
                         id += 1
             else:
-                rrset_node = self.add_rrset(rrset_info, None, name_obj, zone_obj, id)
-                self.add_rrsigs(name_obj, zone_obj, rrset_info, rrset_node)
+                rrset_node = self.add_rrset(rrset_info, None, name_obj, my_zone_obj, id)
+                self.add_rrsigs(name_obj, my_zone_obj, rrset_info, rrset_node)
                 my_nodes.append(rrset_node)
                 id += 1
 
-            my_nodes_all += my_nodes
-
-            for cname in cnames:
-                cname_obj = name_obj.get_name(cname)
-                cname_nodes = self.graph_rrset_auth(cname_obj, cname, rdtype)
+            # if this is a CNAME record, create a node-to-target mapping
+            if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                 for my_node in my_nodes:
-                    for cname_node in cname_nodes:
-                        self.add_alias(my_node, cname_node)
+                    node_to_cname_mapping.add((my_node, rrset_info.rrset[0].target))
 
-        try:
-            neg_response_info = filter(lambda x: x.qname == name and x.rdtype == rdtype, query.nxdomain_info)[0]
-        except IndexError:
-            pass
-        else:
-            nxdomain_node = self.add_rrset_non_existent(name_obj, zone_obj, neg_response_info, True, False)
-            my_nodes_all.append(nxdomain_node)
+            self.processed_rrsets[(my_name, rdtype)] += my_nodes
+
+        for neg_response_info in query.nxdomain_info:
+            # only do qname, unless analysis type is recursive
+            if not (neg_response_info.qname == name or name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            if (neg_response_info.qname, neg_response_info.rdtype) not in self.processed_rrsets:
+                self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)] = []
+
+            my_name_obj = name_obj.get_name(neg_response_info.qname)
+            my_zone_obj = my_name_obj.zone
+
+            # graph the parent
+            self.graph_zone_auth(my_zone_obj, False)
+
+            #XXX is this necessary?
+            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
+
+            nxdomain_node = self.add_rrset_non_existent(name_obj, my_zone_obj, neg_response_info, True, False)
+            self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nxdomain_node)
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
-                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nxdomain_node)
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nxdomain_node)
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, zone_obj, id)
-                self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, my_zone_obj, id)
+                self.add_rrsigs(name_obj, my_zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
-        try:
-            neg_response_info = filter(lambda x: x.qname == name and x.rdtype == rdtype, query.nodata_info)[0]
-        except IndexError:
-            pass
-        else:
-            nodata_node = self.add_rrset_non_existent(name_obj, zone_obj, neg_response_info, False, False)
-            my_nodes_all.append(nodata_node)
+        for neg_response_info in query.nodata_info:
+            # only do qname, unless analysis type is recursive
+            if not (neg_response_info.qname == name or name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            if (neg_response_info.qname, neg_response_info.rdtype) not in self.processed_rrsets:
+                self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)] = []
+
+            my_name_obj = name_obj.get_name(neg_response_info.qname)
+            my_zone_obj = my_name_obj.zone
+
+            # graph the parent
+            self.graph_zone_auth(my_zone_obj, False)
+
+            #XXX is this necessary?
+            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
+
+            nodata_node = self.add_rrset_non_existent(name_obj, my_zone_obj, neg_response_info, False, False)
+            self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nodata_node)
             for nsec_status in name_obj.nodata_status[neg_response_info]:
-                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, zone_obj, nodata_node)
+                nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nodata_node)
                 for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, combine_edge_id=id)
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, zone_obj, id)
-                self.add_rrsigs(name_obj, zone_obj, soa_rrset_info, soa_rrset_node)
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, my_zone_obj, id)
+                self.add_rrsigs(name_obj, my_zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
         error_node = self.add_errors(name_obj, zone_obj, name, rdtype, name_obj.response_errors[query])
         if error_node is not None:
-            my_nodes_all.append(error_node)
+            if (name, rdtype) not in self.processed_rrsets:
+                self.processed_rrsets[(name, rdtype)] = []
+            self.processed_rrsets[(name, rdtype)].append(error_node)
 
-        return my_nodes_all
+        for alias_node, target in node_to_cname_mapping:
+            # if this is a recursive analysis, then we've already graphed the
+            # node, above, so we graph its hierarchy and then retrieve it from
+            # self.processed_rrsets
+            if name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
+                cname_nodes = self.processed_rrsets[(target, rdtype)]
+            else:
+                cname_obj = name_obj.get_name(target)
+                cname_nodes = self.graph_rrset_auth(cname_obj, target, rdtype)
+
+            for cname_node in cname_nodes:
+                self.add_alias(alias_node, cname_node)
+
+        return self.processed_rrsets[(name, rdtype)]
 
     def graph_zone_auth(self, name_obj, is_dlv):
         if (name_obj.name, -1) in self.processed_rrsets:
