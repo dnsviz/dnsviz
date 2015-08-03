@@ -576,7 +576,7 @@ def main():
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
-                    fh.write('"_meta._dnsviz":%s}' % json.dumps(dnsviz_meta))
+                    fh.write('"_meta._dnsviz":%s}' % json.dumps(dnsviz_meta, **kwargs))
                     sys.exit(0)
 
             name_objs = a.analyze(names)
