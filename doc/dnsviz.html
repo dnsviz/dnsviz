@@ -215,8 +215,13 @@
 						existence</strong> or <strong>hashed authenticated denial of
 						existence</strong>, respectively.</p><p>In DNSViz the NSEC or NSEC3
 					RR(s) returned by a server to authenticate a negative response are
-					represented by a single diamond-shaped node, labeled with either NSEC
-					or NSEC3.  An edge extends from the NSEC or NSEC3 node to the
+					represented by a rectangular node with several compartments. The
+					bottom compartment is labeled with either NSEC or NSEC3, depending on
+					the type of record. Each compartment on the top row represents an
+					NSEC or NSEC3 record in the set--there will be between one and
+					three.</p>
+
+					<p>An edge extends from the NSEC or NSEC3 node to the
 					corresponding negative response, as in the figure to the left.  If the
 					edge is solid blue, then the NSEC or NSEC3 RRs returned prove the
 					validity of the negative response.</p></td></tr>
@@ -234,8 +239,7 @@
 					prove insecure delegations (i.e., lack of DS records) and nothing more.
 					Thus, a name error (NXDOMAIN) response, for example, cannot be securely
 					proven when the NSEC3 uses opt-out.</p><p>NSEC3 records with the
-					opt-out flag set are denoted by diagonals within the corners of the
-					NSEC3 node.</p></td></tr>
+					opt-out flag set are colored with a gray background.</p></td></tr>
 			<tr><td><img src="images/nsec-invalid.png"
 					alt="Invalid NSEC" /></td><td><p>A solid
 					red edge from the NSEC or NSEC3 node to the negative response indicates
@@ -348,13 +352,9 @@
 			<tr><td><img src="images/rrsig-nsec.png"
 					alt="RRSIGs covering NSEC RRsets" /></td><td><p>Because an NSEC or
 					NSEC3 node represents one or more RRsets and at least one RRSIG per
-					RRset is anticipated, the RRSIG edges from DNSKEY to NSEC or NSEC3
-					nodes are aggregated into a single edge.  The color of this edge is
-					only blue (valid) if all the RRSIGs are valid.</p><p>In the example at
-					the left, the NSEC node represents two NSEC RRs required to prove the
-					non-existence of both the name and the wildcard.  The blue edge to the
-					NSEC node therefore represents (at least) two RRSIGs, one covering each
-					NSEC RRset.</p></td></tr>
+					RRset is anticipated, multiple RRSIG edges will be drawn from DNSKEY
+					to NSEC or NSEC3 nodes, each pointing to the respective compartment
+					corresponding to the NSEC or NSEC3 record.</p></td></tr>
 		</table>
 
 		<h4><a name="wildcards">Wildcards</a></h4>
