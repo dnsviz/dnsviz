@@ -122,6 +122,7 @@ class DNSAuthGraph:
         self.node_info = {}
         self.node_mapping = {}
         self.node_reverse_mapping = {}
+        self.nsec_rr_status = {}
         self.secure_dnskey_rrsets = set()
         self.node_subgraph_name = {}
         self.processed_rrsets = {}
@@ -555,7 +556,7 @@ class DNSAuthGraph:
 
         return S, node_str, bottom_name, top_name
 
-    def add_rrsig(self, rrsig_status, name_obj, signer_obj, signed_node, combine_edge_id=None):
+    def add_rrsig(self, rrsig_status, name_obj, signer_obj, signed_node, port=None):
         if signer_obj is not None:
             zone_name = signer_obj.zone.name
         else:
@@ -599,22 +600,18 @@ class DNSAuthGraph:
         #if line_color == COLORS['secure'] and dnskey_node == signed_node and signer_obj.name == zone_obj.name:
         #    S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(signer_obj.name)
 
-        if combine_edge_id is not None:
-            edge_id = 'RRSIG-%s|%s|%d|%s' % (signed_node.replace('*', '_'), dnskey_node, combine_edge_id, line_style)
-            edge_key = '%d-%s' % (combine_edge_id, line_style)
-            try:
-                edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
-                if line_color != COLORS['secure']:
-                    edge.attr['color'] = line_color
-            except KeyError:
-                self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
-        else:
-            edge_id = 'RRSIG-%s|%s|%s|%s' % (signed_node.replace('*', '_'), dnskey_node, line_color.lstrip('#'), line_style)
-            edge_key = '%s-%s' % (line_color, line_style)
-            try:
-                edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
-            except KeyError:
-                self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
+        attrs = {}
+        edge_id = 'RRSIG-%s|%s|%s|%s' % (signed_node.replace('*', '_'), dnskey_node, line_color.lstrip('#'), line_style)
+        edge_key = '%s-%s' % (line_color, line_style)
+        if port is not None:
+            attrs['tailport'] = port
+            edge_id += '|%s' % port.replace('*', '_')
+            edge_key += '|%s' % port
+
+        try:
+            edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
+        except KeyError:
+            self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back', **attrs)
 
         consolidate_clients = name_obj.single_client()
         rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
@@ -864,24 +861,37 @@ class DNSAuthGraph:
             elif rrset_info_with_warnings:
                 img_str = '<IMG SRC="%s"/>' % WARNING_ICON
 
-            if img_str:
-                label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
-                        (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype), img_str)
-            else:
-                label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">%s</FONT>>' % \
-                        (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype))
-
-            attr = {}
-            attr['shape'] = 'diamond'
-            attr['style'] = 'filled'
-            attr['fillcolor'] = '#ffffff'
-
             # if it is NXDOMAIN, not type DS
             if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNoAnswer)) and nsec_status.opt_out:
-                attr['style'] += ',diagonals'
+                bgcolor = 'lightgray'
+            else:
+                bgcolor = '#ffffff'
+
+            #XXX it looks better when cellspacing is 0, but we can't do that
+            # when there is an icon in use because of the way the graphviz
+            # library draws it.
+            if img_str:
+                cellspacing = 0
+            else:
+                cellspacing = -2
+
+            self.nsec_rr_status[node_str] = {}
+            label_str = u'<<TABLE BORDER="0" CELLSPACING="%d" CELLPADDING="0" BGCOLOR="%s"><TR>' % (cellspacing, bgcolor)
+            for nsec_name in nsec_status.nsec_set_info.rrsets:
+                nsec_name = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
+                self.nsec_rr_status[node_str][nsec_name] = ''
+                label_str += u'<TD PORT="%s" BORDER="2"><FONT POINT-SIZE="%d"> </FONT></TD>' % (nsec_name, 6)
+            label_str += u'</TR><TR><TD COLSPAN="%d" BORDER="2" CELLPADDING="3">' % len(nsec_status.nsec_set_info.rrsets)
+            if img_str:
+                label_str += u'<TABLE BORDER="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD><TD>%s</TD></TR></TABLE>' % \
+                        (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype), img_str)
+            else:
+                label_str += u'<FONT POINT-SIZE="%d" FACE="%s">%s</FONT>' % \
+                        (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype))
+            label_str += u'</TD></TR></TABLE>>'
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
-            S.add_node(node_str, id=node_str, label=label_str, **attr)
+            S.add_node(node_str, id=node_str, label=label_str, shape='none')
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
@@ -954,8 +964,9 @@ class DNSAuthGraph:
 
         if nsec_status is not None:
             nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, name_obj, zone_obj, nxdomain_node)
-            for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+            for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
+                nsec_cell = nsec_name.canonicalize().to_text()
+                self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, port=nsec_cell)
 
         return wildcard_node
 
@@ -974,14 +985,14 @@ class DNSAuthGraph:
             else:
                 self.G.add_edge(target, alias, color='black', dir='back')
 
-    def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, combine_edge_id=None):
+    def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, port=None):
         for rrsig in name_obj.rrsig_status[rrset_info]:
             signer_obj = name_obj.get_name(rrsig.signer)
             if rrsig.signer != zone_obj.name and signer_obj is not None:
                 self.graph_zone_auth(signer_obj, False)
             for dnskey in name_obj.rrsig_status[rrset_info][rrsig]:
                 rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
-                self.add_rrsig(rrsig_status, name_obj, signer_obj, signed_node, combine_edge_id=combine_edge_id)
+                self.add_rrsig(rrsig_status, name_obj, signer_obj, signed_node, port=port)
 
     def graph_rrset_auth(self, name_obj, name, rdtype):
         if (name, rdtype) in self.processed_rrsets:
@@ -1072,8 +1083,10 @@ class DNSAuthGraph:
             self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nxdomain_node)
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nxdomain_node)
-                for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+                for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
+                    nsec_cell = nsec_name.canonicalize().to_text()
+                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, port=nsec_cell)
+
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
                 soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, my_zone_obj, id)
@@ -1101,8 +1114,10 @@ class DNSAuthGraph:
             self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nodata_node)
             for nsec_status in name_obj.nodata_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nodata_node)
-                for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, combine_edge_id=id)
+                for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
+                    nsec_cell = nsec_name.canonicalize().to_text()
+                    self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, port=nsec_cell)
+
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
                 soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, my_zone_obj, id)
@@ -1248,8 +1263,9 @@ class DNSAuthGraph:
                 # anchor NSEC node to bottom
                 self.G.add_edge(zone_bottom, nsec_node, style='invis', minlen='0')
 
-                for rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    self.add_rrsigs(name_obj, parent_obj, rrset_info, nsec_node, combine_edge_id=edge_id)
+                for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
+                    nsec_cell = nsec_name.canonicalize().to_text()
+                    self.add_rrsigs(name_obj, parent_obj, rrset_info, nsec_node, port=nsec_cell)
 
                 edge_id += 1
 
@@ -1322,7 +1338,7 @@ class DNSAuthGraph:
             # RR used opt out, then the node is actually insecure, rather
             # than secure.
             for n1 in self.G.out_neighbors(n):
-                if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
+                if n1.startswith('NSEC3') and 'BGCOLOR="lightgray"' in n1.attr['label']:
                     n.attr['color'] = COLORS['insecure_non_existent']
 
         elif n.attr['color'] == COLORS['bogus']:
@@ -1330,6 +1346,27 @@ class DNSAuthGraph:
 
         else:
             n.attr['color'] = COLORS['insecure_non_existent']
+
+    def _set_nsec_color(self, n):
+        if not n.startswith('NSEC'):
+            return
+
+        #XXX we have to assign l to n.attr['label'], perform any update
+        # operations on l, then assign n.attr['label'] to l's new value,
+        # wrapping it in "<...>".  This is because the "<" and ">" at the start
+        # and end somehow get lost when the assignment is made directly.
+        l = n.attr['label']
+        l = re.sub(r'^(<<TABLE)', r'\1 COLOR="%s"' % n.attr['color'], l, 1)
+        if n.attr['color'] == COLORS['bogus']:
+            #XXX it looks better when cellspacing is 0, but we can't do that
+            # when there are cells that are colored with different colors.  In
+            # this case, we need to change the cell spacing back to 0
+            l = re.sub(r'(<TABLE[^>]+CELLSPACING=")-\d+"', r'\g<1>0"', l, 1)
+            for nsec_name in self.nsec_rr_status[n]:
+                if not self.nsec_rr_status[n][nsec_name]:
+                    self.nsec_rr_status[n][nsec_name] = COLORS['bogus']
+                l = re.sub(r'(<TD[^>]+PORT="%s")' % nsec_name, r'\1 COLOR="%s"' % self.nsec_rr_status[n][nsec_name], l, 1)
+        n.attr['label'] = '<%s>' % l
 
     def _set_node_status(self, n):
         status = self.status_for_node(n)
@@ -1396,9 +1433,10 @@ class DNSAuthGraph:
             self._add_trust_to_orphaned_nodes(zone_node_str, [])
 
         for n in self.G.nodes():
-            if n.attr['shape'] not in ('ellipse', 'diamond', 'rectangle'):
+            if n.attr['shape'] not in ('ellipse', 'rectangle') and not n.startswith('NSEC'):
                 continue
             self._set_non_existent_color(n)
+            self._set_nsec_color(n)
             self._set_node_status(n)
 
     def status_for_node(self, n):
@@ -1534,6 +1572,18 @@ class DNSAuthGraph:
                             break
 
                 prev_node_trusted = prev_node_trusted and valid_self_loop
+
+            # if p is an NSEC (set) node, then we need to check that all the
+            # NSEC RRs have been authenticated before we mark this one as
+            # authenticated.
+            elif p.startswith('NSEC'):
+                rrsig_status = list(self.node_mapping[e.attr['id']])[0]
+                nsec_name = rrsig_status.rrset.rrset.name.canonicalize().to_text()
+                if prev_node_trusted:
+                    self.nsec_rr_status[p][nsec_name] = COLORS['secure']
+                    for nsec_name in self.nsec_rr_status[p]:
+                        if self.nsec_rr_status[p][nsec_name] != COLORS['secure']:
+                            prev_node_trusted = False
 
             if is_nsec:
                 # if this is an NSEC, then only propagate trust if the previous
