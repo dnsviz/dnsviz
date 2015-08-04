@@ -1326,7 +1326,6 @@ class DNSAuthGraph:
                     n.attr['color'] = COLORS['insecure_non_existent']
 
         elif n.attr['color'] == COLORS['bogus']:
-            status = Status.RRSET_STATUS_BOGUS
             n.attr['color'] = COLORS['bogus_non_existent']
 
         else:
