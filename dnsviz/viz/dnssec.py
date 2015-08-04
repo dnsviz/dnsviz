@@ -1312,23 +1312,24 @@ class DNSAuthGraph:
 
     def _set_non_existent_color(self, n):
         style = n.attr['style'].split(',')
-        if n.attr['color'] == COLORS['secure']:
-            if 'dashed' in style:
-                n.attr['color'] = COLORS['secure_non_existent']
+        if 'dashed' not in style:
+            return
 
-                # if this is an authenticated negative response, and the NSEC3
-                # RR used opt out, then the node is actually insecure, rather
-                # than secure.
-                for n1 in self.G.out_neighbors(n):
-                    if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
-                        n.attr['color'] = COLORS['insecure_non_existent']
+        if n.attr['color'] == COLORS['secure']:
+            n.attr['color'] = COLORS['secure_non_existent']
+
+            # if this is an authenticated negative response, and the NSEC3
+            # RR used opt out, then the node is actually insecure, rather
+            # than secure.
+            for n1 in self.G.out_neighbors(n):
+                if n1.startswith('NSEC3') and 'diagonals' in n1.attr['style'].split(','):
+                    n.attr['color'] = COLORS['insecure_non_existent']
 
         elif n.attr['color'] == COLORS['bogus']:
             status = Status.RRSET_STATUS_BOGUS
-            if 'dashed' in style:
-                n.attr['color'] = COLORS['bogus_non_existent']
+            n.attr['color'] = COLORS['bogus_non_existent']
 
-        elif 'dashed' in style:
+        else:
             n.attr['color'] = COLORS['insecure_non_existent']
 
     def _set_node_status(self, n):
