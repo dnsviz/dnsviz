@@ -299,8 +299,10 @@ Options:
     -6 addr        - specify a source IPv6 address for queries, rather than
                      detecting it.
     -a ancestor    - analyze the ancestry of each domain name through the
-                     specified ancestor, instead of just the domain name
-                     itself.  Use "-a ." for full ancestral analysis.
+                     specified ancestor.  The default for recursive analysis
+                     mode (default) is "." (i.e., full ancestral analysis to
+                     the root).   The default for authoritative analysis mode
+                     (i.e., with -A) is the domain name itself.
     -x domain:server[,server ...]
                    - set explicit delegation for the specified domain to one or
                      more servers.  Each server specified may either be an
@@ -391,8 +393,10 @@ def main():
             except dns.exception.DNSException:
                 usage('The domain name was invalid: "%s"' % opts['-a'])
                 sys.exit(1)
-        else:
+        elif '-A' in opts:
             ceiling = None
+        else:
+            ceiling = dns.name.root
 
         if '-A' not in opts:
             if '-t' in opts:
