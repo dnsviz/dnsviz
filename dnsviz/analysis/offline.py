@@ -1430,7 +1430,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         response_component_status = {}
         for obj in G.node_reverse_mapping:
             if isinstance(obj, (Response.DNSKEYMeta, Response.RRsetInfo, Response.NSECSet, Response.NegativeResponseInfo)):
-                status = G.status_for_node(G.node_reverse_mapping[obj])
+                node_str = G.node_reverse_mapping[obj]
+                status = G.status_for_node(node_str)
                 response_component_status[obj] = status
 
                 if isinstance(obj, Response.DNSKEYMeta):
@@ -1440,15 +1441,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         else:
                             response_component_status[rrset_info] = status
 
-                #XXX this is a bit of a hack since (for the moment) the
-                # authentication status of individual NSEC/NSEC3 records within
-                # a set is not tracked.  However, it will work for most cases.
-                # And for those that it doesn't, it probably doesn't matter
-                # because one bogus NSEC record in a set invalidates the
-                # purposes of the whole set.
+                # Mark each individual NSEC in the set
                 elif isinstance(obj, Response.NSECSet):
                     for nsec_name in obj.rrsets:
-                        response_component_status[obj.rrsets[nsec_name]] = status
+                        nsec_name_str = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
+                        response_component_status[obj.rrsets[nsec_name]] = G.status_for_node(node_str, nsec_name_str)
 
                 elif isinstance(obj, Response.NegativeResponseInfo):
                     # A negative response info for a DS query points to the
