@@ -390,6 +390,17 @@
 					alt="Bogus nodes" /></td><td><p>Nodes with red outline indicate that
 					they are <strong>bogus</strong>, that the chain of trust from an anchor
 					has been broken.</p></td></tr>
+			<tr><td><img src="images/nsec-partial-bogus.png"
+					alt="NSEC nodes that are partially bogus" /></td><td><p>Because the NSEC and
+					NSEC3 nodes often represent multiple NSEC or NSEC3 RRs, it is
+					possible that a proper subset of the RRs are secure, while others in
+					the set are not (e.g., missing or expired RRSIG).  In this case, the
+					outline of the compartments representing secure NSEC or NSEC3 RRs
+					will be colored blue, while the others will be red.  Because the
+					status of the collective set of NSEC and NSEC3 RRs is dependent on
+					the status of all the individual NSEC and NSEC3 RRs, the greater node
+					is only colored blue if all the compartments are colored
+					blue.</p></td></tr>
 			<tr><td><img src="images/nodes-insecure.png"
 					alt="Insecure nodes" /></td><td><p>Nodes with black outline indicate
 					that they are <strong>insecure</strong>, that no chain of trust exists;

@@ -1,0 +1,17 @@
+digraph {
+  graph [compound=true, rankdir=BT, ranksep=0.3];
+	node [label="\N",
+		penwidth=1.5
+	];
+	edge [penwidth=1.5];
+
+	"NSEC-0|foobar.example.com|A" [color="#be1515",
+					fillcolor="#ffffff",
+          label=<<TABLE COLOR="#be1515" BORDER="0" CELLSPACING="0" CELLPADDING="0" BGCOLOR="#ffffff"><TR>
+<TD PORT="nsec1" BORDER="2"><FONT POINT-SIZE="6"> </FONT></TD>
+<TD PORT="nsec2" COLOR="#0a879a" BORDER="2"><FONT POINT-SIZE="6"> </FONT></TD>
+</TR><TR><TD COLSPAN="2" BORDER="2" CELLPADDING="3"><FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT></TD></TR>
+</TABLE>>,
+					shape=none,
+					style=filled];
+}
