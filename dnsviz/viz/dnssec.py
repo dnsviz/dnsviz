@@ -1440,13 +1440,16 @@ class DNSAuthGraph:
             self._set_nsec_color(n)
             self._set_node_status(n)
 
-    def status_for_node(self, n):
+    def status_for_node(self, n, port=None):
         n = self.G.get_node(n)
 
         if n.attr['color'] in (COLORS['secure'], COLORS['secure_non_existent']):
             status = Status.RRSET_STATUS_SECURE
         elif n.attr['color'] in (COLORS['bogus'], COLORS['bogus_non_existent']):
-            status = Status.RRSET_STATUS_BOGUS
+            if port is not None and self.nsec_rr_status[n][port] == COLORS['secure']:
+                status = Status.RRSET_STATUS_SECURE
+            else:
+                status = Status.RRSET_STATUS_BOGUS
         else:
             if n.startswith('DNSKEY'):
                 status = Status.RRSET_STATUS_NON_EXISTENT
@@ -1579,7 +1582,7 @@ class DNSAuthGraph:
             # authenticated.
             elif p.startswith('NSEC'):
                 rrsig_status = list(self.node_mapping[e.attr['id']])[0]
-                nsec_name = rrsig_status.rrset.rrset.name.canonicalize().to_text()
+                nsec_name = rrsig_status.rrset.rrset.name.canonicalize().to_text().replace(r'"', r'\"')
                 if prev_node_trusted:
                     self.nsec_rr_status[p][nsec_name] = COLORS['secure']
                     for nsec_name in self.nsec_rr_status[p]:
