@@ -19,8 +19,12 @@ digraph {
 						style="rounded,filled,dashed,diagonals"];
 		"NSEC-0|foobar.example.com|A" [color="#000000",
 						fillcolor="#ffffff",
-						label=<<FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT>>,
-						shape=diamond,
+            label=<<TABLE COLOR="#000000" BORDER="0" CELLSPACING="-2" CELLPADDING="0" BGCOLOR="#ffffff"><TR>
+<TD PORT="nsec1" BORDER="2"><FONT POINT-SIZE="6"> </FONT></TD>
+<TD PORT="nsec2" BORDER="2"><FONT POINT-SIZE="6"> </FONT></TD>
+</TR><TR><TD COLSPAN="2" BORDER="2" CELLPADDING="3"><FONT POINT-SIZE="12" FACE="Helvetica">NSEC</FONT></TD></TR>
+</TABLE>>,
+						shape=none,
 						style=filled];
   }
 	"cluster_example.com_bottom" -> "RRset-0|foobar.example.com|A" [style=invis];
