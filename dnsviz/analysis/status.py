@@ -496,7 +496,6 @@ class NSECStatusNXDOMAIN(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
@@ -507,7 +506,6 @@ class NSECStatusNXDOMAIN(object):
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
             if self.wildcard_name is not None:
-                d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
@@ -749,7 +747,6 @@ class NSECStatusNoAnswer(object):
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
-            d['sname'] = formatter(self.qname.canonicalize().to_text())
             if self.nsec_for_qname is not None:
                 d['nsec_matching_sname'] = collections.OrderedDict((
                     ('sname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
@@ -767,7 +764,6 @@ class NSECStatusNoAnswer(object):
                 ))
 
             if self.wildcard_name is not None:
-                d['wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
                 if self.nsec_for_wildcard_name is not None:
                     d['nsec_matching_wildcard'] = collections.OrderedDict((
                         ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
