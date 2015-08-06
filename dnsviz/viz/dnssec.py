@@ -676,10 +676,10 @@ class DNSAuthGraph:
             self.node_info[node_id] = [rrset_serialized]
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
 
-        if node_id not in self.node_mapping:
-            self.node_mapping[node_id] = set()
-        self.node_mapping[node_id].add(rrset_info)
-        self.node_reverse_mapping[rrset_info] = node_id
+        if node_str not in self.node_mapping:
+            self.node_mapping[node_str] = set()
+        self.node_mapping[node_str].add(rrset_info)
+        self.node_reverse_mapping[rrset_info] = node_str
 
         return self.G.get_node(node_str)
 
@@ -749,10 +749,10 @@ class DNSAuthGraph:
 
             self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
 
-        if node_id not in self.node_mapping:
-            self.node_mapping[node_id] = set()
-        self.node_mapping[node_id].add(neg_response_info)
-        self.node_reverse_mapping[neg_response_info] = node_id
+        if node_str not in self.node_mapping:
+            self.node_mapping[node_str] = set()
+        self.node_mapping[node_str].add(neg_response_info)
+        self.node_reverse_mapping[neg_response_info] = node_str
 
         return self.G.get_node(node_str)
 
@@ -788,7 +788,7 @@ class DNSAuthGraph:
         self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
 
         # no need to map errors
-        self.node_mapping[node_id] = set()
+        self.node_mapping[node_str] = set()
 
         return self.G.get_node(node_str)
 
