@@ -92,14 +92,15 @@ Same thing:
 $ dnsget -o example.com.json example.com
 ```
 
-Analyze the domain name example.com by querying its authoritative servers:
+Analyze the domain name example.com by querying its authoritative servers
+directly:
 ```
 $ dnsget -A -o example.com.json example.com
 ```
 
 Analyze the domain name example.com by querying explicitly-defined
 authoritative servers, rather than learning the servers through referrals from
-the root zone:
+the IANA root servers:
 ```
 $ dnsget -A \
   -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
@@ -120,9 +121,11 @@ authoritative servers and following delegations, starting at the root:
 $ dnsget -A -a . -o example.com.json example.com
 ```
 
-Analyze multiple names in parallel using an explicit recursive resolver:
+Analyze multiple names in parallel (four threads) using explicit recursive
+resolvers (replace *192.0.1.2* and *2001:db8::1* with legitimate resolver
+addresses):
 ```
-$ dnsget -s 192.0.2.1 -t 5 -o multiple.json \
+$ dnsget -s 192.0.2.1,2001:db8::1 -t 4 -o multiple.json \
   example.com sandia.gov verisignlabs.com dnsviz.net
 ```
 
