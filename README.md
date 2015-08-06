@@ -255,6 +255,5 @@ $ dnsviz -Thtml -O -r multiple.json -t tk.txt
 Process analysis of multiple domain names, creating a single image for all
 names.
 ```
-```
 $ dnsviz -Thtml -O -r multiple.json -t tk.txt
 ```
