@@ -161,16 +161,22 @@ Show descriptions only if there are related errors:
 $ dnsgrok -p -l error -r example.com.json -o example.com-chk.json
 ```
 
+Add DNSSEC trust anchors to indicate security status of responses.
+```
+$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dnsgrok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
+```
+
 Pipeline dnsget output directly to dnsgrok:
 ```
 $ dnsget example.com | \
-      dnsgrok -p -l error -o example.com-chk.json
+      dnsgrok -p -l info -t tk.txt -o example.com-chk.json
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsget example.com | tee example.com.json | \
-      dnsgrok -p -l error -o example.com-chk.json
+      dnsgrok -p -l info -t tk.txt -o example.com-chk.json
 ```
 
 
@@ -210,4 +216,16 @@ Add DNSSEC trust anchors to the graph:
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz -Thtml -O -r example.com.json -t tk.txt
+```
+
+Pipeline dnsget output directly to dnsviz:
+```
+$ dnsget example.com | \
+      dnsviz -Thtml -O -t tk.txt
+```
+
+Same thing, but save the raw output (for re-use) along the way:
+```
+$ dnsget example.com | tee example.com.json | \
+      dnsviz -Thtml -O -t tk.txt
 ```
