@@ -189,6 +189,11 @@ $ dnsget example.com | tee example.com.json | \
       dnsgrok -p -l info -t tk.txt -o example.com-chk.json
 ```
 
+Assess multiple names at once with error level:
+```
+$ dnsgrok -p -l error -t tk.txt -r multiple.json -o example.com-chk.json
+```
+
 
 ### dnsviz
 
@@ -238,4 +243,17 @@ Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsget example.com | tee example.com.json | \
       dnsviz -Thtml -O -t tk.txt
+```
+
+Process analysis of multiple domain names, creating an image for each name
+processed:
+```
+$ dnsviz -Thtml -O -r multiple.json -t tk.txt
+```
+
+Process analysis of multiple domain names, creating a single image for all
+names.
+```
+```
+$ dnsviz -Thtml -O -r multiple.json -t tk.txt
 ```
