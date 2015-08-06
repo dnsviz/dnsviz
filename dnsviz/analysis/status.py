@@ -505,7 +505,6 @@ class NSECStatusNXDOMAIN(object):
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
-            if self.wildcard_name is not None:
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
