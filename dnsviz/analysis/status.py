@@ -433,10 +433,10 @@ class NSECStatusNXDOMAIN(object):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.SnameNotCoveredNameError(sname=self.qname))
+            self.errors.append(Errors.SnameNotCoveredNameError(sname=fmt.humanize_name(self.qname)))
         if not self.nsec_names_covering_wildcard and self.wildcard_name is not None:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.WildcardNotCoveredNSEC(wildcard=self.wildcard_name))
+            self.errors.append(Errors.WildcardNotCoveredNSEC(wildcard=fmt.humanize_name(self.wildcard_name)))
         if self.nsec_names_covering_origin:
             self.validation_status = NSEC_STATUS_INVALID
             qname, nsec_names = self.nsec_names_covering_origin.items()[0]
