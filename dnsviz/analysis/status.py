@@ -759,7 +759,6 @@ class NSECStatusNoAnswer(object):
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
-            if self.wildcard_name is not None:
                 if self.nsec_for_wildcard_name is not None:
                     d['nsec_matching_wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
 
