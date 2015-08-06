@@ -26,10 +26,11 @@ powers the Web-based analysis available at http://dnsviz.net/
 
   pygraphviz is required if visualization is desired (e.g., via the `dnsviz`
   tool) or if security status of responses is desired (e.g., using the -t
-  option with the `dnsgrok` tool).   Online analysis (using `dnsget`) and offline
-  analysis (e.g., using `dnsgrok`) can be performed without pygraphviz.  Version
-  1.1 or greater is required because of the support for unicode names and
-  HTML-like labels, both of which are utilized in the visual output.
+  option with the `dnsgrok` tool).   Online analysis (using `dnsget`) and
+  offline analysis (e.g., using `dnsgrok` without the -t) can be performed
+  without pygraphviz.  Version 1.1 or greater is required because of the support
+  for unicode names and HTML-like labels, both of which are utilized in the
+  visual output.
 
 * M2Crypto (0.21.1 or later) - https://github.com/martinpaljak/M2Crypto
 
