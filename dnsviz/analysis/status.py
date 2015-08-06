@@ -748,10 +748,7 @@ class NSECStatusNoAnswer(object):
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
             if self.nsec_for_qname is not None:
-                d['nsec_matching_sname'] = collections.OrderedDict((
-                    ('sname', formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())),
-                    #TODO - add rdtypes bitmap (when NSEC matches qname--not for empty non-terminal)
-                ))
+                d['nsec_matching_sname'] = formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())
 
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -765,10 +762,7 @@ class NSECStatusNoAnswer(object):
 
             if self.wildcard_name is not None:
                 if self.nsec_for_wildcard_name is not None:
-                    d['nsec_matching_wildcard'] = collections.OrderedDict((
-                        ('wildcard', formatter(self.wildcard_name.canonicalize().to_text())),
-                        #TODO - add rdtypes bitmap
-                    ))
+                    d['nsec_matching_wildcard'] = formatter(self.wildcard_name.canonicalize().to_text())
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1284,10 +1278,7 @@ class NSEC3StatusNoAnswer(object):
                     d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
                     d['sname_digest'] = None
-                d['nsec_matching_sname'] = collections.OrderedDict((
-                    ('sname_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))),
-                    #TODO - add rdtypes bitmap
-                ))
+                d['nsec_matching_sname'] = formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))
 
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
@@ -1321,10 +1312,7 @@ class NSEC3StatusNoAnswer(object):
                 else:
                     d['wildcard_digest'] = None
                 if self.nsec_for_wildcard_name:
-                    d['nsec_matching_wildcard'] = collections.OrderedDict((
-                        ('wildcard_digest', formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))),
-                        #TODO - add rdtypes bitmap
-                    ))
+                    d['nsec_matching_wildcard'] = formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))
 
             if not self.nsec_for_qname and not self.closest_encloser:
                 d['sname'] = formatter(self.qname.canonicalize().to_text())
