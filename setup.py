@@ -30,7 +30,7 @@ def apply_install_prefix(filename):
 apply_install_prefix(os.path.join('dnsviz','config.py.in'))
 
 setup(name='dnsviz',
-        version='0.4.0pre',
+        version='0.4.0-beta',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
