@@ -500,8 +500,8 @@ class NSECStatusNXDOMAIN(object):
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['nsec_chain_covering_sname'] = collections.OrderedDict((
-                    ('sname', formatter(qname.canonicalize().to_text())),
+                d['sname_covering'] = collections.OrderedDict((
+                    ('covered_name', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
@@ -509,8 +509,8 @@ class NSECStatusNXDOMAIN(object):
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
                     nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                    d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
-                        ('wildcard', formatter(wildcard.canonicalize().to_text())),
+                    d['wildcard_covering'] = collections.OrderedDict((
+                        ('covered_name', formatter(wildcard.canonicalize().to_text())),
                         ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                         ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                     ))
@@ -753,8 +753,8 @@ class NSECStatusNoAnswer(object):
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['nsec_chain_covering_sname'] = collections.OrderedDict((
-                    ('sname', formatter(qname.canonicalize().to_text())),
+                d['sname_covering'] = collections.OrderedDict((
+                    ('covered_name', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
@@ -957,10 +957,10 @@ class NSEC3StatusNXDOMAIN(object):
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
-                        ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
-                        ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
+                    d['next_closest_encloser_covering'] = collections.OrderedDict((
+                        ('covered_name', formatter(fmt.format_nsec3_name(qname))),
+                        ('nsec_owner', formatter(fmt.format_nsec3_name(nsec_name))),
+                        ('nsec_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
 
                 wildcard_name = self._get_wildcard(encloser_name)
@@ -974,8 +974,8 @@ class NSEC3StatusNXDOMAIN(object):
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['nsec_chain_covering_wildcard'] = collections.OrderedDict((
-                        ('wildcard_digest', formatter(fmt.format_nsec3_name(wildcard))),
+                    d['wildcard_covering'] = collections.OrderedDict((
+                        ('covered_name', formatter(fmt.format_nsec3_name(wildcard))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
@@ -1295,8 +1295,8 @@ class NSEC3StatusNoAnswer(object):
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['nsec_chain_covering_next_closest_encloser'] = collections.OrderedDict((
-                        ('next_closest_encloser_digest', formatter(fmt.format_nsec3_name(qname))),
+                    d['next_closest_encloser_covering'] = collections.OrderedDict((
+                        ('covered_name', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
                     ))
