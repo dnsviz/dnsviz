@@ -947,12 +947,10 @@ class NSEC3StatusNXDOMAIN(object):
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = collections.OrderedDict((
-                    ('name', formatter(encloser_name.canonicalize().to_text())),
-                ))
+                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
                 # could be inferred from wildcard
                 if nsec_name is not None:
-                    d['closest_encloser']['name_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
+                    d['closest_encloser_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
                 d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
@@ -1294,10 +1292,8 @@ class NSEC3StatusNoAnswer(object):
             if self.closest_encloser:
                 encloser_name, nsec_names = self.closest_encloser.items()[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = collections.OrderedDict((
-                    ('name', formatter(encloser_name.canonicalize().to_text())),
-                    ('name_digest', formatter(fmt.format_nsec3_name(nsec_name))),
-                ))
+                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
+                d['closest_encloser_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
                 d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
