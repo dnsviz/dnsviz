@@ -1064,10 +1064,8 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         except KeyError:
             pass
         if loglevel <= logging.DEBUG:
-            if None in self.closest_encloser.values()[0]:
-                d['closest_encloser']['inferred_from_wildcard'] = True
-            else:
-                d['closest_encloser']['inferred_from_wildcard'] = False
+            if filter(lambda x: x is not None, self.closest_encloser.values()[0]):
+                d['superfluous_closest_encloser'] = True
         return d
 
 class NSEC3StatusNoAnswer(object):
