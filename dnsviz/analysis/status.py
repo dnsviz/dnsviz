@@ -982,7 +982,6 @@ class NSEC3StatusNXDOMAIN(object):
                     ))
 
             else:
-                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1272,7 +1271,6 @@ class NSEC3StatusNoAnswer(object):
                 d['opt_out'] = self.opt_out
 
             if self.nsec_for_qname:
-                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1315,7 +1313,6 @@ class NSEC3StatusNoAnswer(object):
                     d['nsec_matching_wildcard'] = formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))
 
             if not self.nsec_for_qname and not self.closest_encloser:
-                d['sname'] = formatter(self.qname.canonicalize().to_text())
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
                     d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
