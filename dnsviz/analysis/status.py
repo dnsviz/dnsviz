@@ -942,15 +942,15 @@ class NSEC3StatusNXDOMAIN(object):
                 d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
                 # could be inferred from wildcard
                 if nsec_name is not None:
-                    d['closest_encloser_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
+                    d['closest_encloser_hash'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
                 d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['next_closest_encloser_digest'] = None
+                    d['next_closest_encloser_hash'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -966,9 +966,9 @@ class NSEC3StatusNXDOMAIN(object):
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
+                    d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
-                    d['wildcard_digest'] = None
+                    d['wildcard_hash'] = None
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = self.nsec_names_covering_wildcard.items()[0]
                     nsec_name = list(nsec_names)[0]
@@ -982,9 +982,9 @@ class NSEC3StatusNXDOMAIN(object):
             else:
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_hash'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['sname_digest'] = None
+                    d['sname_hash'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1271,9 +1271,9 @@ class NSEC3StatusNoAnswer(object):
             if self.nsec_for_qname:
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_hash'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['sname_digest'] = None
+                    d['sname_hash'] = None
                 d['sname_nsec_match'] = formatter(fmt.format_nsec3_name(list(self.nsec_for_qname)[0]))
 
             if self.closest_encloser:
@@ -1286,9 +1286,9 @@ class NSEC3StatusNoAnswer(object):
                 d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = self.name_digest_map[next_closest_encloser].items()[0][1]
                 if digest_name is not None:
-                    d['next_closest_encloser_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['next_closest_encloser_digest'] = None
+                    d['next_closest_encloser_hash'] = None
 
                 if self.nsec_names_covering_qname:
                     qname, nsec_names = self.nsec_names_covering_qname.items()[0]
@@ -1304,18 +1304,18 @@ class NSEC3StatusNoAnswer(object):
                 wildcard_digest = self.name_digest_map[wildcard_name].items()[0][1]
                 d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
-                    d['wildcard_digest'] = formatter(fmt.format_nsec3_name(wildcard_digest))
+                    d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
-                    d['wildcard_digest'] = None
+                    d['wildcard_hash'] = None
                 if self.nsec_for_wildcard_name:
                     d['wildcard_nsec_match'] = formatter(fmt.format_nsec3_name(list(self.nsec_for_wildcard_name)[0]))
 
             if not self.nsec_for_qname and not self.closest_encloser:
                 digest_name = self.name_digest_map[self.qname].items()[0][1]
                 if digest_name is not None:
-                    d['sname_digest'] = formatter(fmt.format_nsec3_name(digest_name))
+                    d['sname_hash'] = formatter(fmt.format_nsec3_name(digest_name))
                 else:
-                    d['sname_digest'] = None
+                    d['sname_hash'] = None
 
         if loglevel <= logging.INFO or show_basic:
             d['status'] = nsec_status_mapping[self.validation_status]
