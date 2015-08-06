@@ -73,7 +73,8 @@ display all options associated with their usage.
 ### dnsget
 
 `dnsget` takes one or more domain names as input and performs a series of
-queries, the results of which are serialized into JSON format.
+queries to either recursive (default) or authoritative DNS servers, the results
+of which are serialized into JSON format.
 
 
 #### Examples
@@ -158,6 +159,18 @@ $ dnsgrok -p -l warning -r example.com.json -o example.com-chk.json
 Show descriptions only if there are related errors:
 ```
 $ dnsgrok -p -l error -r example.com.json -o example.com-chk.json
+```
+
+Pipeline dnsget output directly to dnsgrok:
+```
+$ dnsget example.com | \
+      dnsgrok -p -l error -o example.com-chk.json
+```
+
+Same thing, but save the raw output (for re-use) along the way:
+```
+$ dnsget example.com | tee example.com.json | \
+      dnsgrok -p -l error -o example.com-chk.json
 ```
 
 
