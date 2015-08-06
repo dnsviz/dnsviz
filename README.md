@@ -94,7 +94,7 @@ $ dnsget -o example.com.json example.com
 
 Analyze the domain name example.com by querying its authoritative servers:
 ```
-$ dnsget -A -o example.com.json example.com > example.com.json
+$ dnsget -A -o example.com.json example.com
 ```
 
 Analyze the domain name example.com by querying explicitly-defined
@@ -118,6 +118,12 @@ Analyze the domain name example.com and its entire ancestry by querying
 authoritative servers and following delegations, starting at the root:
 ```
 $ dnsget -A -a . -o example.com.json example.com
+```
+
+Analyze multiple names in parallel using an explicit recursive resolver:
+```
+$ dnsget -s 192.0.2.1 -t 5 -o multiple.json \
+  example.com sandia.gov verisignlabs.com dnsviz.net
 ```
 
 
