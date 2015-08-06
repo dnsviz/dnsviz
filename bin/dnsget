@@ -303,19 +303,6 @@ Options:
                      mode (default) is "." (i.e., full ancestral analysis to
                      the root).   The default for authoritative analysis mode
                      (i.e., with -A) is the domain name itself.
-    -x domain:server[,server ...]
-                   - set explicit delegation for the specified domain to one or
-                     more servers.  Each server specified may either be an
-                     address (IPv4 or IPv6), a domain name (which will be
-                     resolved to an address using the standard resolution
-                     process), or both (name=addr).  Note that when both a name
-                     and an address are specified (name=addr), the name is only
-                     used for identification purposes, and it doesn't matter
-                     whether the name resolves to the corresponding address (or
-                     at all, for that matter).  This option can only be used in
-                     conjunction with -A.
-    -A             - Perform analysis against authoritative servers, rather than
-                     (the default) recursive servers.
     -s server[,server ...]
                    - designate servers for recursive analysis, rather than
                      using those specified in /etc/resolv.conf.  Each server
@@ -327,6 +314,19 @@ Options:
                      purposes, and it doesn't matter whether the name resolves
                      to the corresponding address (or at all, for that matter).
                      This option cannot be used in conjunction with -A.
+    -A             - Perform analysis against authoritative servers, rather than
+                     (the default) recursive servers.
+    -x domain:server[,server ...]
+                   - set explicit delegation for the specified domain to one or
+                     more servers.  Each server specified may either be an
+                     address (IPv4 or IPv6), a domain name (which will be
+                     resolved to an address using the standard resolution
+                     process), or both (name=addr).  Note that when both a name
+                     and an address are specified (name=addr), the name is only
+                     used for identification purposes, and it doesn't matter
+                     whether the name resolves to the corresponding address (or
+                     at all, for that matter).  This option can only be used in
+                     conjunction with -A.
     -m             - just output meta information, not full query/response
                      information (Note that this meta output cannot be used for
                      input to dnsget, dnsgrok, or dnsviz).
