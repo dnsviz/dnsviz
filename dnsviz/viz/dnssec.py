@@ -1009,7 +1009,14 @@ class DNSAuthGraph:
             return []
 
         zone_obj = name_obj.zone
-        self.graph_zone_auth(zone_obj, False)
+        if zone_obj is not None:
+            self.graph_zone_auth(zone_obj, False)
+        else:
+            # in recursive analysis, if we don't contact any servers that are
+            # valid and responsive, then we get a zone_obj that is None
+            # (because we couldn't detect any NS records in the ancestry)
+            zone_obj = name_obj
+            self.add_zone(zone_obj)
 
         id = 10
         query = name_obj.queries[(name, rdtype)]
@@ -1027,9 +1034,11 @@ class DNSAuthGraph:
 
             my_name_obj = name_obj.get_name(my_name)
             my_zone_obj = my_name_obj.zone
-
-            # graph the parent
-            self.graph_zone_auth(my_zone_obj, False)
+            if my_zone_obj is not None:
+                self.graph_zone_auth(my_zone_obj, False)
+            else:
+                my_zone_obj = my_name_obj
+                self.add_zone(my_zone_obj)
 
             #XXX is this necessary?
             #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
@@ -1073,9 +1082,11 @@ class DNSAuthGraph:
 
             my_name_obj = name_obj.get_name(neg_response_info.qname)
             my_zone_obj = my_name_obj.zone
-
-            # graph the parent
-            self.graph_zone_auth(my_zone_obj, False)
+            if my_zone_obj is not None:
+                self.graph_zone_auth(my_zone_obj, False)
+            else:
+                my_zone_obj = my_name_obj
+                self.add_zone(my_zone_obj)
 
             #XXX is this necessary?
             #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
@@ -1104,9 +1115,11 @@ class DNSAuthGraph:
 
             my_name_obj = name_obj.get_name(neg_response_info.qname)
             my_zone_obj = my_name_obj.zone
-
-            # graph the parent
-            self.graph_zone_auth(my_zone_obj, False)
+            if my_zone_obj is not None:
+                self.graph_zone_auth(my_zone_obj, False)
+            else:
+                my_zone_obj = my_name_obj
+                self.add_zone(my_zone_obj)
 
             #XXX is this necessary?
             #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
