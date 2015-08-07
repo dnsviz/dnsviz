@@ -391,7 +391,24 @@ class DSStatus(object):
 
         return d
 
-class NSECStatusNXDOMAIN(object):
+class NSECStatus(object):
+    def __repr__(self):
+        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
+
+    def _get_wildcard(self, qname, nsec_rrset):
+        covering_name = nsec_rrset.name
+        next_name = nsec_rrset[0].next
+        for i in range(len(qname)):
+            j = -(i + 1)
+            if i < len(covering_name) and covering_name[j].lower() == qname[j].lower():
+                continue
+            elif i < len(next_name) and next_name[j].lower() == qname[j].lower():
+                continue
+            else:
+                break
+        return dns.name.Name(('*',) + qname[-i:])
+
+class NSECStatusNXDOMAIN(NSECStatus):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
@@ -421,9 +438,6 @@ class NSECStatusNXDOMAIN(object):
             self.nsec_names_covering_origin[self.origin] = covering_names
 
         self._set_validation_status(nsec_set_info)
-
-    def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -455,19 +469,6 @@ class NSECStatusNXDOMAIN(object):
 
     def __unicode__(self):
         return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
-
-    def _get_wildcard(self, qname, nsec_rrset):
-        covering_name = nsec_rrset.name
-        next_name = nsec_rrset[0].next
-        for i in range(len(qname)):
-            j = -(i + 1)
-            if i < len(covering_name) and covering_name[j].lower() == qname[j].lower():
-                continue
-            elif i < len(next_name) and next_name[j].lower() == qname[j].lower():
-                continue
-            else:
-                break
-        return dns.name.Name(('*',) + qname[-i:])
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -541,9 +542,6 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
 
         self._set_validation_status2(nsec_set_info)
 
-    def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
@@ -590,7 +588,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             pass
         return d
 
-class NSECStatusNoAnswer(object):
+class NSECStatusNoAnswer(NSECStatus):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
@@ -650,25 +648,9 @@ class NSECStatusNoAnswer(object):
     def __unicode__(self):
         return u'NSEC record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
-    def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
-
-    def _get_wildcard(self, qname, nsec_rrset):
-        covering_name = nsec_rrset.name
-        next_name = nsec_rrset[0].next
-        for i in range(len(qname)):
-            j = -(i + 1)
-            if i < len(covering_name) and covering_name[j].lower() == qname[j].lower():
-                continue
-            elif i < len(next_name) and next_name[j].lower() == qname[j].lower():
-                continue
-            else:
-                break
-        return dns.name.Name(('*',) + qname[-i:])
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
