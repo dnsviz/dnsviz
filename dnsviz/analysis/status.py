@@ -762,7 +762,29 @@ class NSECStatusNoAnswer(NSECStatus):
 
         return d
 
-class NSEC3StatusNXDOMAIN(object):
+class NSEC3Status(object):
+    def __repr__(self):
+        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
+
+    def _get_next_closest_encloser(self, encloser):
+        return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
+
+    def get_next_closest_encloser(self):
+        if self.closest_encloser:
+            encloser_name, nsec_names = self.closest_encloser.items()[0]
+            return self._get_next_closest_encloser(encloser_name)
+        return None
+
+    def _get_wildcard(self, encloser):
+        return dns.name.from_text('*', encloser)
+
+    def get_wildcard(self):
+        if self.closest_encloser:
+            encloser_name, nsec_names = self.closest_encloser.items()[0]
+            return self._get_wildcard(encloser_name)
+        return None
+
+class NSEC3StatusNXDOMAIN(NSEC3Status):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.origin = origin
@@ -821,30 +843,9 @@ class NSEC3StatusNXDOMAIN(object):
     def __unicode__(self):
         return u'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
-    def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, self.qname)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
-
-    def _get_next_closest_encloser(self, encloser):
-        return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
-
-    def get_next_closest_encloser(self):
-        if self.closest_encloser:
-            encloser_name, nsec_names = self.closest_encloser.items()[0]
-            return self._get_next_closest_encloser(encloser_name)
-        return None
-
-    def _get_wildcard(self, encloser):
-        return dns.name.from_text('*', encloser)
-
-    def get_wildcard(self):
-        if self.closest_encloser:
-            encloser_name, nsec_names = self.closest_encloser.items()[0]
-            return self._get_wildcard(encloser_name)
-        return None
 
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
@@ -999,9 +1000,6 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
             # fill in a dummy value for wildcard_name_digest_map
             self.name_digest_map[self.wildcard_name] = { None: self.wildcard_name }
 
-    def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 super(NSEC3StatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
@@ -1050,7 +1048,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
                 d['superfluous_closest_encloser'] = True
         return d
 
-class NSEC3StatusNoAnswer(object):
+class NSEC3StatusNoAnswer(NSEC3Status):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
@@ -1127,24 +1125,9 @@ class NSEC3StatusNoAnswer(object):
     def __unicode__(self):
         return u'NSEC3 record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
-    def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, self.qname)
-
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
-
-    def _get_next_closest_encloser(self, encloser):
-        return dns.name.Name(self.qname.labels[-(len(encloser)+1):])
-
-    def get_next_closest_encloser(self):
-        if self.closest_encloser:
-            encloser_name, nsec_names = self.closest_encloser.items()[0]
-            return self._get_next_closest_encloser(encloser_name)
-        return None
-
-    def _get_wildcard(self, encloser):
-        return dns.name.from_text('*', encloser)
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
