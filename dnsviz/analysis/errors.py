@@ -811,6 +811,19 @@ class NotAuthoritative(ResponseError):
     references = ['RFC 1035, Sec. 4.1.1']
     required_params = []
 
+class RecursionNotAvailable(ResponseError):
+    '''
+    >>> e = RecursionNotAvailable()
+    >>> e.description
+    'Recursion was desired, but the Recursion Available (RA) flag was not set in the response.'
+    '''
+
+    _abstract = False
+    code = 'RECURSION_NOT_AVAILABLE'
+    description_template = "Recursion was desired, but the Recursion Available (RA) flag was not set in the response."
+    references = ['RFC 1035, Sec. 4.1.1']
+    required_params = []
+
 class ResponseErrorWithCondition(ResponseError):
     description_template = "%(response_error_description)s until %(change)s."
     required_params = ['response_error']
