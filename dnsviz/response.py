@@ -964,7 +964,7 @@ class NSECSet(DNSResponseComponent):
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if filter(lambda x: x.upper() not in base32.b32hexalphabet, nsec_name[0]):
+        if filter(lambda x: x.upper() not in base32.b32alphabet, nsec_name[0]):
             return False
         return True
 
