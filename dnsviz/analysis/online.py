@@ -1997,10 +1997,10 @@ class RecursiveAnalyst(Analyst):
                 # set analysis_end
                 name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
-                # analyze ancestry
                 # if we got any type of valid response, then continue
                 if name_obj.get_valid_servers():
 
+                    # analyze ancestry
                     parent_obj, dlv_parent_obj, nxdomain_ancestor = \
                             self._analyze_ancestry(name, name_obj.has_ns)
 
@@ -2034,20 +2034,26 @@ class RecursiveAnalyst(Analyst):
         servers = name_obj.zone.get_auth_or_designated_servers()
         servers = self._filter_servers(servers)
 
-        # for SLDs and below, make common query first to prime the cache
-        if len(name_obj.name) > 2:
+        # make common query first to prime the cache
+
+        # for root and TLD, use type NS
+        if len(name_obj.name) <= 2:
+            rdtype = dns.rdatatype.NS
+        # for SLDs and below detect an appropriate type
+        else:
             try:
                 rdtype = self._rdtypes_to_query(name_obj.name)[0]
             except IndexError:
                 rdtype = dns.rdatatype.A
-            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-            query.execute()
-            name_obj.add_query(query, True)
 
-            # if there was an NXDOMAIN for the first query, then don't ask the others
-            if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
-                return name_obj
+        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
+        query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+        query.execute()
+        name_obj.add_query(query, True)
+
+        # if there was an NXDOMAIN for the first query, then don't ask the others
+        if name_obj.queries[(name_obj.name, rdtype)].is_nxdomain_all():
+            return name_obj
 
         # now query most other queries
         self._analyze_queries(name_obj)
@@ -2060,11 +2066,12 @@ class RecursiveAnalyst(Analyst):
             query.execute()
             name_obj.add_query(query)
 
-        # finally, make NS queries, after all others
-        self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
-        query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-        query.execute()
-        name_obj.add_query(query, True)
+        # for non-TLDs make NS queries after all others
+        if len(name_obj.name) > 2:
+            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
+            query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+            query.execute()
+            name_obj.add_query(query, True)
 
         return name_obj
 
