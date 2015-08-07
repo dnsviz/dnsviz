@@ -690,6 +690,20 @@ class UnsupportedNSEC3Algorithm(NSECError):
     required_params = ['algorithm']
     nsec_type = 'NSEC3'
 
+class InvalidNSE3OwnerName(NSECError):
+    '''
+    >>> e = InvalidNSE3OwnerName(name='foo.com.')
+    >>> e.description
+    'The NSEC3 owner name (foo.com.) is invalid; it does not appear to be the Base32 Hex encoding of a hashed owner name.'
+    '''
+
+    _abstract = False
+    code = 'INVALID_NSEC3_OWNER_NAME'
+    description_template = "The %(nsec_type)s owner name (%(name)s) is invalid; it does not appear to be the Base32 Hex encoding of a hashed owner name."
+    references = ['RFC 5155, Sec. 3']
+    required_params = ['name']
+    nsec_type = 'NSEC3'
+
 class ResponseError(DomainNameAnalysisError):
     pass
 
