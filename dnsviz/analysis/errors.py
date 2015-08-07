@@ -800,7 +800,7 @@ class InvalidRcode(InvalidResponseError):
 
 class NotAuthoritative(ResponseError):
     '''
-    >>> e = NotAuthoritative(tcp=False, intermittent=False)
+    >>> e = NotAuthoritative()
     >>> e.description
     'The Authoritative Answer (AA) flag was not set in the response.'
     '''
