@@ -1008,6 +1008,12 @@ class NSECSet(DNSResponseComponent):
         prev_name = nsec_name
         if self.use_nsec3:
             next_name = self.name_for_nsec3_next(nsec_name)
+            # test that NSEC3 names have the same parent
+            try:
+                if not (name.parent() == nsec_name.parent() == next_name.parent()):
+                    return False
+            except dns.name.NoParent:
+                return False
         else:
             next_name = self.rrsets[nsec_name].rrset[0].next
 
