@@ -15,6 +15,8 @@ _b32tab = { 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '
         30: 'U', 31: 'V' }
 EMPTYSTRING = ''
 
+b32alphabet = set(_b32tab.values())
+
 def b32encode(s):
     """Encode a string using Base32.
 
