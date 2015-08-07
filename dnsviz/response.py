@@ -904,6 +904,7 @@ class NSECSet(DNSResponseComponent):
         self.referral = referral
         self.ttl_cmp = ttl_cmp
         self.nsec3_params = {}
+        self.invalid_nsec3_owner = set()
         self.use_nsec3 = False
         for rrset in rrsets:
             #XXX There shouldn't be multple NSEC(3) RRsets of the same owner
@@ -918,6 +919,9 @@ class NSECSet(DNSResponseComponent):
                 if key not in self.nsec3_params:
                     self.nsec3_params[key] = set()
                 self.nsec3_params[key].add(rrset.name)
+                if not self.is_valid_nsec3_name(rrset.name, rrset[0].algorithm):
+                    self.invalid_nsec3_owner.add(rrset.name)
+
         self.servers_clients = {}
 
     def __eq__(self, other):
@@ -940,6 +944,9 @@ class NSECSet(DNSResponseComponent):
                 if key not in obj.nsec3_params:
                     obj.nsec3_params[key] = set()
                 obj.nsec3_params[key].add(rrset.name)
+                if not obj.is_valid_nsec3_name(rrset.name, rrset[0].algorithm):
+                    obj.invalid_nsec3_owner.add(rrset.name)
+
         obj.servers_clients = self.servers_clients.copy()
         return obj
 
@@ -950,6 +957,16 @@ class NSECSet(DNSResponseComponent):
 
     def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response, is_referral):
         self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
+
+    def is_valid_nsec3_name(self, nsec_name, algorithm):
+        # check that NSEC3 name is valid
+        if algorithm == 1:
+            # base32hex encoding of SHA1 should be 32 bytes
+            if len(nsec_name[0]) != 32:
+                return False
+        if filter(lambda x: x.upper() not in base32.b32hexalphabet, nsec_name[0]):
+            return False
+        return True
 
     def get_algorithm_support(self):
         valid_algorithms = set()
@@ -1006,7 +1023,7 @@ class NSECSet(DNSResponseComponent):
         response that cover the given name.'''
 
         excluding_names = set()
-        for nsec_name in self.rrsets:
+        for nsec_name in set(self.rrsets).difference(self.invalid_nsec3_owner):
             if self._nsec_covers_name(name, nsec_name):
                 excluding_names.add(nsec_name)
         return excluding_names
