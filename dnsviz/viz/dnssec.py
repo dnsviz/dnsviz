@@ -1140,7 +1140,12 @@ class DNSAuthGraph:
             # node, above, so we graph its hierarchy and then retrieve it from
             # self.processed_rrsets
             if name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
-                cname_nodes = self.processed_rrsets[(target, rdtype)]
+                # if we didn't get the cname RRset in same response, then
+                # processed_rrsets won't be populated
+                try:
+                    cname_nodes = self.processed_rrsets[(target, rdtype)]
+                except KeyError:
+                    cname_nodes = []
             else:
                 cname_obj = name_obj.get_name(target)
                 cname_nodes = self.graph_rrset_auth(cname_obj, target, rdtype)
