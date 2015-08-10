@@ -308,7 +308,7 @@ class DNSResponse:
             if filter(lambda x: qname == x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
                 return True
         # if proper referral is NOT requested and qname is a subdomain of
-        # (including equal to) of an NS RRset in the authority, then it is a
+        # (including equal to) an NS RRset in the authority, then it is a
         # referral
         else:
             if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
@@ -317,7 +317,7 @@ class DNSResponse:
 
     def is_upward_referral(self, qname):
         '''Return True if this response yields an upward referral (i.e., a name
-        that is a supedomain of qname).'''
+        that is a superdomain of qname).'''
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
