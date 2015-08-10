@@ -548,10 +548,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 Errors.DomainNameAnalysisError.insert_into_list(err, group, server, client, response)
 
-        if qname_obj is not None and qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
-            if not response.is_authoritative() and \
-                    not response.recursion_desired_and_available():
-                Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
+        if qname_obj is not None:
+            if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
+                if not response.is_authoritative():
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
+            elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
+                if response.recursion_desired() and not response.recursion_available():
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), errors, server, client, response)
 
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
