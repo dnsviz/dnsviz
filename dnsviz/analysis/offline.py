@@ -105,6 +105,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.revoked_keys = None
         self.zsks = None
         self.ksks = None
+        self.dnskey_with_ds = None
 
     def _signed(self):
         return bool(self.dnssec_algorithms_in_dnskey or self.dnssec_algorithms_in_ds or self.dnssec_algorithms_in_dlv)
@@ -940,6 +941,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.delegation_errors = {}
         self.delegation_warnings = {}
         self.delegation_status = {}
+        self.dnskey_with_ds = set()
 
         self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
@@ -1043,6 +1045,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # check if the digest is a match
                         ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
+
+                        # if dnskey exists, then add to dnskey_with_ds
+                        if ds_status.validation_status not in \
+                                (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
+                            self.dnskey_with_ds.add(dnskey)
 
                         for rrsig in dnskey_info.rrsig_info:
                             # move along if DNSKEY is not self-signing
@@ -1419,7 +1426,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             servers_clients_without = servers_responsive.difference(servers_with_dnskey)
             if servers_clients_without:
                 err = Errors.DNSKEYMissingFromServers()
-                dnskey.errors.append(err)
+                # if the key is shown to be signing anything other than the
+                # DNSKEY RRset, then mark it as an error; otherwise, mark it as
+                # a warning
+                if dnskey in self.zsks or dnskey in self.dnskey_with_ds:
+                    dnskey.errors.append(err)
+                else:
+                    dnskey.warnings.append(err)
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
