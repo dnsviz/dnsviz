@@ -1908,7 +1908,13 @@ class RecursiveAnalyst(Analyst):
                 queries.add((name_obj.name, rdtype))
 
         if not queries:
-            queries.add((name_obj.name, dns.rdatatype.A))
+            # for TLD and higher, add NS
+            if len(name_obj.name) <= 2:
+                rdtype = dns.rdatatype.NS
+            # for SLD and lower, add A
+            else:
+                rdtype = dns.rdatatype.A
+            queries.add((name_obj.name, rdtype))
 
         for name, rdtype in set(name_obj.queries).difference(queries):
             del name_obj.queries[(name, rdtype)]
