@@ -232,6 +232,19 @@ class DNSResponse:
         self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
         self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
 
+    def recursion_desired(self):
+        '''Return True if the recursion desired (RD) bit was set in the request to the
+        server.'''
+
+        return self.is_valid_response() and self.is_complete_response() and \
+                bool(self.effective_flags & dns.flags.RD)
+
+    def recursion_available(self):
+        '''Return True if the server indicated that recursion was available.'''
+
+        return self.is_valid_response() and self.is_complete_response() and \
+                bool(self.message.flags & dns.flags.RA)
+
     def recursion_desired_and_available(self):
         '''Return True if the recursion desired (RD) bit was set in the request to the
         server AND the server indicated that recursion was available.'''
