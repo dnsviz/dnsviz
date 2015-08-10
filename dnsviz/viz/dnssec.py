@@ -1040,9 +1040,6 @@ class DNSAuthGraph:
                 my_zone_obj = my_name_obj
                 self.add_zone(my_zone_obj)
 
-            #XXX is this necessary?
-            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
-
             #XXX can we combine multiple DNAMEs into one?
             #XXX can we combine multiple NSEC(3) into a cluster?
             #XXX can we combine wildcard components into a cluster?
@@ -1088,9 +1085,6 @@ class DNSAuthGraph:
                 my_zone_obj = my_name_obj
                 self.add_zone(my_zone_obj)
 
-            #XXX is this necessary?
-            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
-
             nxdomain_node = self.add_rrset_non_existent(name_obj, my_zone_obj, neg_response_info, True, False)
             self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nxdomain_node)
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
@@ -1120,9 +1114,6 @@ class DNSAuthGraph:
             else:
                 my_zone_obj = my_name_obj
                 self.add_zone(my_zone_obj)
-
-            #XXX is this necessary?
-            #S, zone_graph_name, zone_bottom, zone_top = self.add_zone(my_zone_obj)
 
             nodata_node = self.add_rrset_non_existent(name_obj, my_zone_obj, neg_response_info, False, False)
             self.processed_rrsets[(neg_response_info.qname, neg_response_info.rdtype)].append(nodata_node)
