@@ -1427,9 +1427,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if servers_clients_without:
                 err = Errors.DNSKEYMissingFromServers()
                 # if the key is shown to be signing anything other than the
-                # DNSKEY RRset, then mark it as an error; otherwise, mark it as
-                # a warning
-                if dnskey in self.zsks or dnskey in self.dnskey_with_ds:
+                # DNSKEY RRset, or if it associated with a DS or trust anchor,
+                # then mark it as an error; otherwise, mark it as a warning.
+                if dnskey in self.zsks or dnskey in self.dnskey_with_ds or dnskey in trusted_keys_existing:
                     dnskey.errors.append(err)
                 else:
                     dnskey.warnings.append(err)
