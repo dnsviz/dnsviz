@@ -57,6 +57,8 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'expired': '#6131a3',
         'invalid': '#be1515' }
 
+INVIS_STYLE_RE = re.compile(r'(^|,)invis(,|$)')
+DASHED_STYLE_RE = re.compile(r'(^|,)dashed(,|$)')
 OPTOUT_STYLE_RE = re.compile(r'BGCOLOR="lightgray"')
 
 ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
@@ -1339,8 +1341,7 @@ class DNSAuthGraph:
             self.G.add_edge(zone_top, parent_bottom, label=edge_label, id=edge_id, color=line_color, penwidth='5.0', ltail=zone_graph_name, lhead=parent_graph_name, style=line_style, minlen='2', dir='back')
 
     def _set_non_existent_color(self, n):
-        style = n.attr['style'].split(',')
-        if 'dashed' not in style:
+        if DASHED_STYLE_RE.search(n.attr['style']) is None:
             return
 
         if n.attr['color'] == COLORS['secure']:
@@ -1539,11 +1540,9 @@ class DNSAuthGraph:
         for e in self.G.in_edges(n):
             p = e[0]
 
-            style = e.attr['style'].split(',')
-
             # if this is an edge used for formatting node (invis), then don't
             # follow it
-            if 'invis' in style:
+            if INVIS_STYLE_RE.search(e.attr['style']) is not None:
                 continue
 
             prev_top_name = self.G.get_node(self.node_subgraph_name[p])
@@ -1568,7 +1567,7 @@ class DNSAuthGraph:
                 prev_top_name.attr['color'] = ''
 
             # if this is a non-matching edge (dashed) then don't follow it
-            if 'dashed' in style:
+            if DASHED_STYLE_RE.search(e.attr['style']) is not None:
                 continue
 
             # derive trust for the previous node using the current node and the
@@ -1634,17 +1633,15 @@ class DNSAuthGraph:
         # all nodes that are not already marked as secure
         S = self.G.get_subgraph(subgraph_name)
         for n in S.nodes():
-            style = n.attr['style'].split(',')
-
             # don't mark invisible nodes (zone marking as secure/insecure is handled in the
             # traversal at the delegation point below).
-            if 'invis' in style:
+            if INVIS_STYLE_RE.search(n.attr['style']) is not None:
                 continue
 
             # if node is non-existent, then don't mark it, unless we are talking about an RRset
             # or a non-existent trust anchor; it doesn't make sense to mark other nodes
             # as bogus
-            if 'dashed' in style and not (n.attr['shape'] == 'rectangle' or \
+            if DASHED_STYLE_RE.search(n.attr['style']) is not None and not (n.attr['shape'] == 'rectangle' or \
                     n.attr['peripheries'] == 2):
                 continue
 
@@ -1750,8 +1747,7 @@ class DNSAuthGraph:
 
                 is_ksk = bool(filter(lambda x: x[0].startswith('DNSKEY-'), in_edges))
                 is_zsk = bool(filter(lambda x: not x[0].startswith('DNSKEY-'), in_edges))
-                style = n.attr['style'].split(',')
-                non_existent = 'dashed' in style
+                non_existent = DASHED_STYLE_RE.search(n.attr['style']) is not None
                 has_sep_bit = n.attr['fillcolor'] == 'lightgray'
 
                 if is_ksk:
