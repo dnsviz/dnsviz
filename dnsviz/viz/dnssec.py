@@ -57,6 +57,8 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'expired': '#6131a3',
         'invalid': '#be1515' }
 
+OPTOUT_STYLE_RE = re.compile(r'BGCOLOR="lightgray"')
+
 ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
 WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
 ERROR_ICON=os.path.join(ICON_PATH, 'error.png')
@@ -1465,6 +1467,12 @@ class DNSAuthGraph:
             else:
                 status = Status.RRSET_STATUS_INSECURE
         return status
+
+    def secure_nsec3_optout_nodes_covering_node(self, n):
+        return filter(lambda x: x.startswith('NSEC') and \
+                OPTOUT_STYLE_RE.search(x.attr['label']) is not None and \
+                x.attr['color'] == COLORS['secure'],
+                self.G.out_neighbors(n))
 
     def _add_trust_to_nodes_in_chain(self, n, trusted_zones, dlv_nodes, force, trace):
         if n in trace:
