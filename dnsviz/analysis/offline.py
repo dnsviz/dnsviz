@@ -1488,28 +1488,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         for soa_rrset in obj.soa_rrset_info:
                             response_component_status[soa_rrset] = response_component_status[obj]
 
-                    # check for secure opt out
-                    opt_out_secure = False
-                    if status == Status.RRSET_STATUS_INSECURE:
-                        if obj in self.nxdomain_status:
-                            nsec_statuses = self.nxdomain_status[obj]
-                        else:
-                            nsec_statuses = self.nodata_status[obj]
-                        for nsec_status in nsec_statuses:
-                            if G.status_for_node(G.node_reverse_mapping[nsec_status.nsec_set_info]) == Status.RRSET_STATUS_SECURE:
-                                opt_out_secure = True
-
-                    # verify that the negative response is secure by checking
-                    # that the SOA is also secure (the fact that it is marked
-                    # "secure" indicates that the NSEC proof was already
-                    # authenticated)
-                    if status == Status.RRSET_STATUS_SECURE or opt_out_secure:
-                        soa_secure = False
-                        for soa_rrset in obj.soa_rrset_info:
-                            if G.status_for_node(G.node_reverse_mapping[soa_rrset]) == Status.RRSET_STATUS_SECURE:
-                                soa_secure = True
-                        if not soa_secure:
-                            response_component_status[obj] = Status.RRSET_STATUS_BOGUS
+                    # for non-DNSKEY responses, verify that the negative
+                    # response is secure by checking that the SOA is also
+                    # secure (the fact that it is marked "secure" indicates
+                    # that the NSEC proof was already authenticated)
+                    if obj.rdtype != dns.rdatatype.DNSKEY:
+                        # check for secure opt out
+                        opt_out_secure = bool(G.secure_nsec3_optout_nodes_covering_node(node_str))
+                        if status == Status.RRSET_STATUS_SECURE or \
+                                (status == Status.RRSET_STATUS_INSECURE and opt_out_secure):
+                            soa_secure = False
+                            for soa_rrset in obj.soa_rrset_info:
+                                if G.status_for_node(G.node_reverse_mapping[soa_rrset]) == Status.RRSET_STATUS_SECURE:
+                                    soa_secure = True
+                            if not soa_secure:
+                                response_component_status[obj] = Status.RRSET_STATUS_BOGUS
 
         self._set_response_component_status(response_component_status)
 
