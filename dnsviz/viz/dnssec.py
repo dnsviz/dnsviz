@@ -1476,6 +1476,11 @@ class DNSAuthGraph:
                 x.attr['color'] == COLORS['secure'],
                 self.G.out_neighbors(n))
 
+    def secure_nsec_nodes_covering_node(self, n):
+        return filter(lambda x: x.startswith('NSEC') and \
+                x.attr['color'] == COLORS['secure'],
+                self.G.out_neighbors(n))
+
     def _add_trust_to_nodes_in_chain(self, n, trusted_zones, dlv_nodes, force, trace):
         if n in trace:
             return
