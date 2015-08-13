@@ -1471,7 +1471,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # properly, we change the status to "secure".
                     if obj.rdtype == dns.rdatatype.DS:
                         if status == Status.RRSET_STATUS_INSECURE:
-                            response_component_status[obj] = Status.RRSET_STATUS_SECURE
+                            if G.secure_nsec_nodes_covering_node(node_str):
+                                response_component_status[obj] = Status.RRSET_STATUS_SECURE
 
                     # A negative response to a DNSKEY query is a special case.
                     elif obj.rdtype == dns.rdatatype.DNSKEY:
