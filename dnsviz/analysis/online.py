@@ -149,6 +149,20 @@ resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQuer
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
+class AggregateResponseInfo(object):
+    def __init__(self, qname, rdtype, name_obj, zone_obj):
+        self.qname = qname
+        self.rdtype = rdtype
+        self.name_obj = name_obj
+        self.zone_obj = zone_obj
+        self.response_info_list = []
+
+    def __repr__(self):
+        return '<%s %s/%s (name: %s; zone: %s): %s>' % (self.__class__.__name__, self.qname, dns.rdatatype.to_text(self.rdtype), self.name_obj.name, self.zone_obj.name, ', '.join([repr(r) for r in self.response_info_list]))
+
+    def add_response_info(self, response_info, cname_info):
+        self.response_info_list.append((response_info, cname_info))
+
 class OnlineDomainNameAnalysis(object):
     QUERY_CLASS = Q.MultiQuery
 
@@ -752,6 +766,72 @@ class OnlineDomainNameAnalysis(object):
         if self.parent is None:
             return [], None
         return self.parent.get_ns_name_for_ip(ip)
+
+    def _create_response_info_recursive(self, name, rdtype, name_to_info_mapping, rrset_to_cname_mapping):
+        zone_obj = self.get_name(name).zone
+        info_obj = AggregateResponseInfo(name, rdtype, self, zone_obj)
+        for info in name_to_info_mapping[name]:
+            if info in rrset_to_cname_mapping:
+                cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping)
+            else:
+                cname_info = None
+            info_obj.add_response_info(info, cname_info)
+        return info_obj
+
+    def _get_response_info(self, name, rdtype):
+        query = self.queries[(name, rdtype)]
+        name_to_info_mapping = {}
+        rrset_to_cname_mapping = {}
+
+        for rrset_info in query.answer_info:
+
+            # only do qname, unless analysis type is recursive
+            if not (rrset_info.rrset.name == name or self.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            # if this is a CNAME record, create an info-to-target mapping
+            if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+                rrset_to_cname_mapping[rrset_info] = rrset_info.rrset[0].target
+
+            # map name to info and name_obj
+            if rrset_info.rrset.name not in name_to_info_mapping:
+                name_to_info_mapping[rrset_info.rrset.name] = []
+            name_to_info_mapping[rrset_info.rrset.name].append(rrset_info)
+
+        for neg_response_info in query.nxdomain_info + query.nodata_info:
+            # only do qname, unless analysis type is recursive
+            if not (neg_response_info.qname == name or self.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            if neg_response_info.qname not in name_to_info_mapping:
+                name_to_info_mapping[neg_response_info.qname] = []
+            name_to_info_mapping[neg_response_info.qname].append(neg_response_info)
+
+        for error in self.response_errors[query]:
+            if name not in name_to_info_mapping:
+                name_to_info_mapping[name] = []
+            name_to_info_mapping[name].append(error)
+
+        info_obj = AggregateResponseInfo(name, rdtype, self, self.zone)
+        for info in name_to_info_mapping[name]:
+            if info in rrset_to_cname_mapping:
+                if self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
+                    cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping)
+                else:
+                    cname_obj = self.get_name(rrset_to_cname_mapping[info])
+                    cname_info = cname_obj.get_response_info(rrset_to_cname_mapping[info], rdtype)
+            else:
+                cname_info = None
+            info_obj.add_response_info(info, cname_info)
+
+        return info_obj
+
+    def get_response_info(self, name, rdtype):
+        if not hasattr(self, '_response_info') or self._response_info is None:
+            self._response_info = {}
+        if (name, rdtype) not in self._response_info:
+            self._response_info[(name, rdtype)] = self._get_response_info(name, rdtype)
+        return self._response_info[(name, rdtype)]
 
     def serialize(self, d=None, meta_only=False, trace=None):
         if d is None:
