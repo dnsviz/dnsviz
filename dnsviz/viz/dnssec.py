@@ -1463,7 +1463,8 @@ class DNSAuthGraph:
             else:
                 status = Status.RRSET_STATUS_BOGUS
         else:
-            if n.startswith('DNSKEY'):
+            if n.startswith('DNSKEY') and \
+                    DASHED_STYLE_RE.search(n.attr['style']):
                 status = Status.RRSET_STATUS_NON_EXISTENT
             else:
                 status = Status.RRSET_STATUS_INSECURE
