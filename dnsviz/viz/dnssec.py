@@ -1351,7 +1351,7 @@ class DNSAuthGraph:
             # RR used opt out, then the node is actually insecure, rather
             # than secure.
             for n1 in self.G.out_neighbors(n):
-                if n1.startswith('NSEC3') and 'BGCOLOR="lightgray"' in n1.attr['label']:
+                if n1.startswith('NSEC3') and OPTOUT_STYLE_RE.search(n1.attr['label']):
                     n.attr['color'] = COLORS['insecure_non_existent']
 
         elif n.attr['color'] == COLORS['bogus']:
