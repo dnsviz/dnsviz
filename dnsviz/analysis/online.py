@@ -158,7 +158,7 @@ class AggregateResponseInfo(object):
         self.response_info_list = []
 
     def __repr__(self):
-        return '<%s %s/%s (name: %s; zone: %s): %s>' % (self.__class__.__name__, self.qname, dns.rdatatype.to_text(self.rdtype), self.name_obj.name, self.zone_obj.name, ', '.join([repr(r) for r in self.response_info_list]))
+        return '<%s %s/%s>' % (self.__class__.__name__, self.qname, dns.rdatatype.to_text(self.rdtype))
 
     def add_response_info(self, response_info, cname_info):
         self.response_info_list.append((response_info, cname_info))
