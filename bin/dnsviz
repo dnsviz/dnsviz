@@ -62,7 +62,9 @@ Options:
     -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
-def finish_graph(G, trusted_keys, fmt, filename):
+def finish_graph(G, trusted_keys, fmt, filename, fh=None):
+    assert filename is not None or fh is not None, 'Either filename or fh must be passed'
+
     G.add_trust(trusted_keys)
     G.remove_extra_edges()
 
@@ -73,7 +75,7 @@ def finish_graph(G, trusted_keys, fmt, filename):
         template_str = template_str.replace('MEDIA_URL', MEDIA_URL)
         template_str = template_str.replace('JS_CODE', js_img)
         if filename is None:
-            return template_str
+            fh.write(template_str)
         else:
             try:
                 codecs.open(filename, 'w', 'utf-8').write(template_str)
@@ -81,7 +83,7 @@ def finish_graph(G, trusted_keys, fmt, filename):
                 logger.error('%s: "%s"' % (e.strerror, filename))
     else:
         if filename is None:
-            return G.draw(fmt)
+            fh.write(G.draw(fmt))
         else:
             try:
                 G.draw(fmt, path=filename)
@@ -245,8 +247,7 @@ def main():
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                img = finish_graph(G, trusted_keys, fmt, None)
-                sys.stdout.write(img)
+                finish_graph(G, trusted_keys, fmt, None, sys.stdout)
             else:
                 finish_graph(G, trusted_keys, fmt, opts['-o'])
 
