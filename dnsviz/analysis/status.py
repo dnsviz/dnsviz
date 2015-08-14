@@ -1039,7 +1039,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSE3Owner(name=name))
+            self.errors.append(Errors.InvalidNSE3OwnerName(name=name))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
@@ -1211,7 +1211,7 @@ class NSEC3StatusNoAnswer(NSEC3Status):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSE3Owner(name=name))
+            self.errors.append(Errors.InvalidNSE3OwnerName(name=name))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
