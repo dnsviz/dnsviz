@@ -729,7 +729,7 @@ class AggregateDNSResponse(object):
                     break
                 i += 1
         except KeyError:
-            if referral:
+            if referral and rdtype != dns.rdatatype.DS:
                 return
 
             # don't store no answer or NXDOMAIN info for names other than qname
