@@ -245,8 +245,7 @@ def main():
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                filename = None
-                img = finish_graph(G, trusted_keys, fmt, filename)
+                img = finish_graph(G, trusted_keys, fmt, None)
                 sys.stdout.write(img)
             else:
                 finish_graph(G, trusted_keys, fmt, opts['-o'])
