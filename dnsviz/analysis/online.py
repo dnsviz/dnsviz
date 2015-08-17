@@ -2174,19 +2174,23 @@ class RecursiveAnalyst(Analyst):
         self._analyze_queries(name_obj)
 
         if name_obj.name != dns.name.root:
-            # make DS queries (these won't be included in the above mix
-            # because there is no parent on the name_obj)
-            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
-            query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-            query.execute()
-            name_obj.add_query(query)
+            # ensure these weren't already queried for (e.g., as part of extra_rdtypes)
+            if (name_obj.name, dns.rdatatype.DS) not in name_obj.queries:
+                # make DS queries (these won't be included in the above mix
+                # because there is no parent on the name_obj)
+                self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+                query.execute()
+                name_obj.add_query(query)
 
         # for non-TLDs make NS queries after all others
         if len(name_obj.name) > 2:
-            self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
-            query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-            query.execute()
-            name_obj.add_query(query, True)
+            # ensure these weren't already queried for (e.g., as part of extra_rdtypes)
+            if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
+                self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+                query.execute()
+                name_obj.add_query(query, True)
 
         return name_obj
 
