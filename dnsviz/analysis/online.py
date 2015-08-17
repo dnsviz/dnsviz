@@ -1619,10 +1619,8 @@ class Analyst(object):
                     # we also do a query with small UDP payload to elicit and test a truncated response
                     queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-                    # this one might have been queried in the _analyze_delegation() method
-                    if (name_obj.name, dns.rdatatype.TXT) not in name_obj.queries:
-                        self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                        queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
+                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
@@ -1671,6 +1669,10 @@ class Analyst(object):
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
                         queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
+
+        # get rid of any queries already asked
+        for name, rdtype in set(name_obj.queries).intersection(set(queries)):
+            del queries[(name, rdtype)]
 
         # finally, query any additional rdtypes
         if servers and self._ask_non_delegation_queries(name_obj.name):
