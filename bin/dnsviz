@@ -55,6 +55,10 @@ Options:
     -r <filename>  - read analysis from a file, instead of from stdin.
     -t <filename>  - use filename as a file containing trusted keys, each as
                      a DNSKEY RR, in zone file format.
+    -R type[,type...]
+                   - Output analysis of *only* the specified type(s) (e.g., A,
+                     AAAA).  The default is to output results for all types
+                     queried in the analysis.
     -O             - derive the filename(s) from the format provided to -T and
                      the domain name(s).
     -o <filename>  - save the image to filename instead of to stdout.
@@ -62,7 +66,7 @@ Options:
     -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
-def finish_graph(G, name_objs, trusted_keys, fmt, filename, fh=None):
+def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
     assert filename is not None or fh is not None, 'Either filename or fh must be passed'
 
     G.add_trust(trusted_keys)
@@ -95,7 +99,7 @@ def finish_graph(G, name_objs, trusted_keys, fmt, filename, fh=None):
         processed = set()
         for name_obj in name_objs:
             name_obj.populate_response_component_status(G)
-            tuples.extend(name_obj.serialize_status_simple(processed))
+            tuples.extend(name_obj.serialize_status_simple(rdtypes, processed))
 
         fh.write(textualize_status_output(tuples, show_colors))
     else:
@@ -220,7 +224,7 @@ def main():
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:Oo:T:h')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:r:R:t:Oo:T:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -233,6 +237,20 @@ def main():
         if '-f' in opts and args:
             usage('If -f is used, then domain names may not supplied as command line arguments.')
             sys.exit(1)
+
+        if '-R' in opts:
+            try:
+                rdtypes = opts['-R'].split(',')
+            except ValueError:
+                usage('The list of types was invalid: "%s"' % opts['-R'])
+                sys.exit(1)
+            try:
+                rdtypes = map(dns.rdatatype.from_text, rdtypes)
+            except dns.rdatatype.UnknownRdatatype:
+                usage('The list of types was invalid: "%s"' % opts['-R'])
+                sys.exit(1)
+        else:
+            rdtypes = None
 
         if '-T' in opts:
             fmt = opts['-T']
@@ -334,23 +352,35 @@ def main():
         for name_obj in name_objs:
             name_obj.populate_status(trusted_keys)
             for qname, rdtype in name_obj.queries:
-                if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
-                    continue
+                if rdtypes is None:
+                    # if rdtypes was not specified, then graph all, with some exceptions
+                    if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                        continue
+                else:
+                    # if rdtypes was specified, then only graph rdtypes that
+                    # were specified
+                    if qname != name_obj.name or rdtype not in rdtypes:
+                        continue
                 G.graph_rrset_auth(name_obj, qname, rdtype)
+
+            if rdtypes is not None:
+                for rdtype in rdtypes:
+                    if (name_obj.name, rdtype) not in name_obj.queries:
+                        logger.error('No query for "%s/%s" was included in the analysis.' % (name.to_text(), dns.rdatatype.to_text(rdtype)))
 
             if '-O' in opts:
                 if name_obj.name == dns.name.root:
                     name = 'root'
                 else:
                     name = name_obj.name.canonicalize().to_text().rstrip('.')
-                finish_graph(G, [name_obj], trusted_keys, fmt, '%s.%s' % (name, fmt))
+                finish_graph(G, [name_obj], rdtypes, trusted_keys, fmt, '%s.%s' % (name, fmt))
                 G = DNSAuthGraph()
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, trusted_keys, fmt, None, sys.stdout)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None, sys.stdout)
             else:
-                finish_graph(G, name_objs, trusted_keys, fmt, opts['-o'])
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'])
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
