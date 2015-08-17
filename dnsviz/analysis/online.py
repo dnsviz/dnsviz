@@ -1720,7 +1720,10 @@ class Analyst(object):
         except IndexError:
             secondary_rdtype = None
         else:
-            servers_queried[secondary_rdtype] = set()
+            if secondary_rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV, dns.rdatatype.NS):
+                secondary_rdtype = None
+            else:
+                servers_queried[secondary_rdtype] = set()
 
         # elicit a referral from parent servers by querying first for NS, then
         # a secondary type as a fallback
