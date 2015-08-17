@@ -2152,6 +2152,9 @@ class RecursiveAnalyst(Analyst):
                 rdtype = self._rdtypes_to_query(name_obj.name)[0]
             except IndexError:
                 rdtype = dns.rdatatype.A
+            else:
+                if rdtype in (dns.rdatatype.DS, dns.rdatatype.NS):
+                    rdtype = dns.rdatatype.A
 
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
         query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
