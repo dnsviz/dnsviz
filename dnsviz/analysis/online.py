@@ -2146,6 +2146,7 @@ class RecursiveAnalyst(Analyst):
         if len(name_obj.name) <= 2:
             rdtype = dns.rdatatype.NS
         # for SLDs and below detect an appropriate type
+        # and use A as a fallback.
         else:
             try:
                 rdtype = self._rdtypes_to_query(name_obj.name)[0]
