@@ -58,11 +58,11 @@ Options:
     -O             - derive the filename(s) from the format provided to -T and
                      the domain name(s).
     -o <filename>  - save the image to filename instead of to stdout.
-    -T <format>    - the format of the output (dot, png, jpg, svg, html).
+    -T <format>    - the format of the output (txt, dot, png, jpg, svg, html).
     -h             - display the usage and exit.
 ''' % (err, sys.argv[0]))
 
-def finish_graph(G, trusted_keys, fmt, filename, fh=None):
+def finish_graph(G, name_objs, trusted_keys, fmt, filename, fh=None):
     assert filename is not None or fh is not None, 'Either filename or fh must be passed'
 
     G.add_trust(trusted_keys)
@@ -81,6 +81,23 @@ def finish_graph(G, trusted_keys, fmt, filename, fh=None):
                 codecs.open(filename, 'w', 'utf-8').write(template_str)
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, filename))
+    elif fmt == 'txt':
+        if filename is None:
+            show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
+        else:
+            show_colors = False
+            try:
+                fh = codecs.open(filename, 'w', 'utf-8')
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, filename))
+
+        tuples = []
+        processed = set()
+        for name_obj in name_objs:
+            name_obj.populate_response_component_status(G)
+            tuples.extend(name_obj.serialize_status_simple(processed))
+
+        fh.write(textualize_status_output(tuples, show_colors))
     else:
         if filename is None:
             fh.write(G.draw(fmt))
@@ -89,6 +106,90 @@ def finish_graph(G, trusted_keys, fmt, filename, fh=None):
                 G.draw(fmt, path=filename)
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, filename))
+
+TERM_COLOR_MAP = {
+    'BOLD': '\033[1m',
+    'RESET': '\033[0m',
+    'SECURE': '\033[36m',
+    'BOGUS': '\033[31m',
+    'INSECURE': '\033[37m',
+    'NON_EXISTENT': '\033[37m',
+    'VALID': '\033[36m',
+    'INDETERMINATE_NO_DNSKEY': '\033[37m',
+    'INDETERMINATE_MATCH_PRE_REVOKE': '\033[37m',
+    'INDETERMINATE_UNKNOWN_ALGORITHM': '\033[33m',
+    'EXPIRED': '\033[35m',
+    'PREMATURE': '\033[35m',
+    'ALGORITHM_IGNORED': '\033[37m',
+    'INVALID_SIG': '\033[31m',
+    'INVALID': '\033[31m',
+    'INVALID_DIGEST': '\033[31m',
+    'ERROR': '\033[31m',
+}
+
+STATUS_MAP = {
+    'SECURE': '.',
+    'BOGUS': '!',
+    'INSECURE': '-',
+    'NON_EXISTENT': '-',
+    'VALID': '.',
+    'INDETERMINATE_NO_DNSKEY': '-',
+    'INDETERMINATE_MATCH_PRE_REVOKE': '-',
+    'INDETERMINATE_UNKNOWN_ALGORITHM': '?',
+    'EXPIRED': '!',
+    'PREMATURE': '!',
+    'ALGORITHM_IGNORED': '-',
+    'INVALID_SIG': '!',
+    'INVALID': '!',
+    'INVALID_DIGEST': '!',
+    'ERROR': '!',
+}
+
+def textualize_status_output(names, show_color):
+    s = ''
+    prefix = '  %(status_color)s[%(status)s] %(indent)s%(rdtype)s%(delimiter)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s %(status_color)s%(rdata)s%(color_reset)s '
+    params = {}
+    params['status_color'] = ''
+    params['status_color_rdata'] = ''
+
+    if show_color:
+        params['color_reset'] = TERM_COLOR_MAP['RESET']
+    else:
+        params['color_reset'] = ''
+
+    for name, responses in names:
+        params['name'] = name
+        if show_color:
+            params['status_color'] = TERM_COLOR_MAP['BOLD']
+            params['color_reset'] = TERM_COLOR_MAP['RESET']
+        s += '%(status_color)s%(name)s%(color_reset)s\n' % params
+
+        for rdtype_str, status, rdata in responses:
+            params['rdtype'] = rdtype_str
+            params['status'] = STATUS_MAP[status]
+            if rdtype_str == 'RRSIG':
+                params['indent'] = '  '
+            else:
+                params['indent'] = ''
+            if show_color:
+                params['status_color'] = TERM_COLOR_MAP[status]
+
+            params['delimiter'] = ':'
+            for i, (substatus, rdata_item) in enumerate(rdata):
+                params['rdata'] = rdata_item
+                if substatus is not None:
+                    params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
+                    params['status_rdata'] = ' [%s]' % (STATUS_MAP[substatus])
+                else:
+                    params['status_color_rdata'] = ''
+                    params['status_rdata'] = ''
+                s += prefix % params
+                s += '\n'
+
+                params['delimiter'] = ' '
+                params['rdtype'] = ' '*len(rdtype_str)
+
+    return s
 
 def test_m2crypto():
     try:
@@ -138,8 +239,8 @@ def main():
         elif '-o' in opts:
             fmt = opts['-o'].split('.')[-1]
         else:
-            fmt = 'dot'
-        if fmt not in ('dot','png','jpg','svg','html'):
+            fmt = 'txt'
+        if fmt not in ('txt', 'dot','png','jpg','svg','html'):
             usage('Image format unrecognized: "%s"' % fmt)
             sys.exit(1)
 
@@ -242,14 +343,14 @@ def main():
                     name = 'root'
                 else:
                     name = name_obj.name.canonicalize().to_text().rstrip('.')
-                finish_graph(G, trusted_keys, fmt, '%s.%s' % (name, fmt))
+                finish_graph(G, [name_obj], trusted_keys, fmt, '%s.%s' % (name, fmt))
                 G = DNSAuthGraph()
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, trusted_keys, fmt, None, sys.stdout)
+                finish_graph(G, name_objs, trusted_keys, fmt, None, sys.stdout)
             else:
-                finish_graph(G, trusted_keys, fmt, opts['-o'])
+                finish_graph(G, name_objs, trusted_keys, fmt, opts['-o'])
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
