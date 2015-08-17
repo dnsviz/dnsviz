@@ -181,6 +181,199 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
 
+    def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response=True, show_error=True):
+        tup = []
+        for info, cname_chain_info in response_info.response_info_list:
+
+            #XXX hack - fix this properly in populate_response_component_status()
+            if isinstance(info, Response.RRsetInfo) and \
+                    rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS) and \
+                    info.rrset.rdtype == dns.rdatatype.CNAME:
+                continue
+
+            rdata = []
+            if isinstance(info, Errors.DomainNameAnalysisError):
+                status = 'ERROR'
+            else:
+                if self.response_component_status is not None:
+                    status = Status.rrset_status_mapping[self.response_component_status[info]]
+                else:
+                    status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
+
+            rdata_tup = []
+            rrsig_tup = []
+            if isinstance(info, Response.RRsetInfo):
+                if info.rrset.rdtype == dns.rdatatype.CNAME:
+                    rdata_tup.append((None, 'CNAME %s' % (info.rrset[0].target.to_text())))
+                elif rdtype == dns.rdatatype.DNSKEY:
+                    rdata_tup.extend([(None, '<DNSKEY: alg=%d, id=%d, flags=%d, size=%d>' % (d.algorithm, Response.DNSKEYMeta.calc_key_tag(d), d.flags, Response.DNSKEYMeta.calc_key_len(d))) for d in info.rrset])
+                elif rdtype == dns.rdatatype.DS:
+                    dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
+                    dss.sort()
+                    for ds in dss:
+                        # only show the DS
+                        if ds not in info.rrset:
+                            continue
+                        dnskeys = response_info.name_obj.ds_status_by_ds[rdtype][ds].keys()
+                        dnskeys.sort()
+                        for dnskey in dnskeys:
+                            ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
+                            rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], '<DS: alg=%d id=%d digest alg=%d>' % (ds.algorithm, ds.key_tag, ds.digest_type)))
+
+                else:
+                    rdata_tup.extend([(None, r.to_text()) for r in info.rrset])
+
+                if response_info.name_obj.rrsig_status[info]:
+                    rrsigs = response_info.name_obj.rrsig_status[info].keys()
+                    rrsigs.sort()
+                    for rrsig in rrsigs:
+                        dnskeys = response_info.name_obj.rrsig_status[info][rrsig].keys()
+                        dnskeys.sort()
+                        for dnskey in dnskeys:
+                            rrsig_status = response_info.name_obj.rrsig_status[info][rrsig][dnskey]
+                            rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '<RRSIG: signer=%s alg=%s id=%s (%s - %s)>' % \
+                                    (rrsig.signer.to_text(), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
+
+            elif isinstance(info, Errors.DomainNameAnalysisError):
+                if not show_error:
+                    continue
+                rdata_tup.append((None, '<ERROR: %s>' % (info.code)))
+            elif info in self.nodata_status:
+                if not show_neg_response:
+                    continue
+                if self.nodata_status[info]:
+                    substatus = Status.nsec_status_mapping[self.nodata_status[info][0].validation_status]
+                else:
+                    substatus = None
+                rdata_tup.append((substatus, '<NODATA>'))
+            elif info in self.nxdomain_status:
+                if not show_neg_response:
+                    continue
+                if self.nxdomain_status[info]:
+                    substatus = Status.nsec_status_mapping[self.nxdomain_status[info][0].validation_status]
+                else:
+                    substatus = None
+                rdata_tup.append((substatus, '<NXDOMAIN>'))
+
+            tup.append((dns.rdatatype.to_text(rdtype), status, rdata_tup))
+            tup.extend(rrsig_tup)
+
+        return tup
+
+    def _serialize_status_simple(self, response_info_list, processed):
+        tup = []
+        cname_info_map = collections.OrderedDict()
+
+        # just get the first one since the names are all supposed to be the
+        # same
+        response_info = response_info_list[0]
+
+        # first build the ancestry in reverse order
+        ancestry = []
+        parent_obj = response_info.zone_obj
+        while parent_obj is not None:
+            ancestry.insert(0, parent_obj)
+            parent_obj = parent_obj.parent
+
+        name_tup = None
+
+        # now process the DS and DNSKEY for each name in the ancestry
+        parent_is_signed = None
+        for parent_obj in ancestry:
+            if (parent_obj.name, -1) in processed:
+                parent_is_signed = parent_obj.signed
+                continue
+            processed.add((parent_obj.name, -1))
+
+            dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
+            if parent_obj.parent is not None:
+                ds_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DS)
+            else:
+                ds_response_info = None
+
+            name_tup = (fmt.humanize_name(parent_obj.name), [])
+            tup.append(name_tup)
+
+            if ds_response_info is not None:
+                # if we only care about DS for the name itself, then serialize
+                # it regardless
+                if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
+                    serialize_neg_response = True
+                # otherwise, only serialize it if is a positive response or if
+                # the parent is signed
+                else:
+                    serialize_neg_response = parent_is_signed
+
+                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DS, ds_response_info, serialize_neg_response, serialize_neg_response))
+
+            # if we only care about DS for the name itself, then don't
+            # serialize the DNSKEY response
+            if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
+                pass
+            else:
+                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False, True))
+
+            parent_is_signed = parent_obj.signed
+
+        # in recursive analysis, if we don't contact any servers that are
+        # valid and responsive, then we get a zone_obj (and thus
+        # parent_obj, in this case) that is None (because we couldn't
+        # detect any NS records in the ancestry)
+        #
+        # in this case, or in the case where the name is not a zone (and
+        # thus changes), we create a new tuple.
+        if parent_obj is None or response_info.qname != parent_obj.name or name_tup is None:
+            name_tup = (fmt.humanize_name(response_info.qname), [])
+            tup.append(name_tup)
+
+        for response_info in response_info_list:
+            if (response_info.qname, response_info.rdtype) in processed:
+                continue
+            processed.add((response_info.qname, response_info.rdtype))
+
+            # if we've already done this one (above) then just move along
+            if response_info.rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
+                continue
+
+            name_tup[1].extend(response_info.name_obj._serialize_response_component_simple(response_info.rdtype, response_info))
+
+            # queue the cnames for later serialization
+            for info, cname_info in response_info.response_info_list:
+                if cname_info is None:
+                    continue
+                if cname_info.qname not in cname_info_map:
+                    cname_info_map[cname_info.qname] = []
+                cname_info_map[cname_info.qname].append(cname_info)
+
+        # now serialize the cnames
+        for qname in cname_info_map:
+            tup.extend(self._serialize_status_simple(cname_info_map[qname], processed))
+
+        return tup
+
+    def serialize_status_simple(self, processed=None):
+        if processed is None:
+            processed = set()
+
+        response_info_map = {}
+        for qname, rdtype in self.queries:
+            if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                continue
+            if qname not in response_info_map:
+                response_info_map[qname] = {}
+            response_info_map[qname][rdtype] = self.get_response_info(qname, rdtype)
+
+        tuples = []
+        qnames = response_info_map.keys()
+        qnames.sort()
+        for qname in qnames:
+            rdtypes = response_info_map[qname].keys()
+            rdtypes.sort()
+            response_info_list = [response_info_map[qname][r] for r in rdtypes]
+            tuples.extend(self._serialize_status_simple(response_info_list, processed))
+
+        return tuples
+
     def _rdtypes_for_analysis_level(self, level):
         rdtypes = set([self.referral_rdtype, dns.rdatatype.NS])
         if level == self.RDTYPES_DELEGATION:
