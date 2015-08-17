@@ -1087,10 +1087,12 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
 
     def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
+
+        assert not explicit_only or extra_rdtypes is not None, 'If explicit_only is specified, then extra_rdtypes must be specified.'
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1117,6 +1119,7 @@ class Analyst(object):
         else:
             self.explicit_delegations = explicit_delegations
         self.extra_rdtypes = extra_rdtypes
+        self.explicit_only = explicit_only
         if analysis_cache is None:
             self.analysis_cache = {}
         else:
@@ -1205,20 +1208,29 @@ class Analyst(object):
     def _rdtypes_to_query(self, name):
         orig_name = self._original_alias_of_cname()
 
-        rdtypes = self._rdtypes_to_query_for_name(name)
-        if self.name == name:
-            if orig_name != name:
-                rdtypes.extend(self._rdtypes_to_query_for_name(orig_name))
-
-            if self.extra_rdtypes is not None:
-                rdtypes.extend(self.extra_rdtypes)
-
+        rdtypes = []
+        if self.explicit_only:
+            if self.name == name:
+                if self.extra_rdtypes is not None:
+                    rdtypes.extend(self.extra_rdtypes)
+            else:
+                if name in self._cname_chain:
+                    rdtypes.extend(self._rdtypes_to_query(self.name))
         else:
-            if name in self._cname_chain:
-                rdtypes.extend(self._rdtypes_to_query(self.name))
+            rdtypes.extend(self._rdtypes_to_query_for_name(name))
+            if self.name == name:
+                if orig_name != name:
+                    rdtypes.extend(self._rdtypes_to_query_for_name(orig_name))
 
-            if self._ask_tlsa_queries(self.name) and len(name) == len(self.name) - 2:
-                rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
+                if self.extra_rdtypes is not None:
+                    rdtypes.extend(self.extra_rdtypes)
+
+            else:
+                if name in self._cname_chain:
+                    rdtypes.extend(self._rdtypes_to_query(self.name))
+
+                if self._ask_tlsa_queries(self.name) and len(name) == len(self.name) - 2:
+                    rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
 
         # remove duplicates
         rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
@@ -1588,7 +1600,7 @@ class Analyst(object):
 
             # queries specific to zones for which non-delegation-related
             # queries are being issued
-            if name_obj.is_zone() and self._ask_non_delegation_queries(name_obj.name):
+            if name_obj.is_zone() and self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
 
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
@@ -1617,7 +1629,7 @@ class Analyst(object):
 
             # if there are responsive servers to query...
             if servers:
-                if self._ask_non_delegation_queries(name_obj.name):
+                if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
                     self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
@@ -1969,14 +1981,14 @@ class RecursiveAnalyst(Analyst):
         queries = set()
         if name_obj.is_zone():
             queries.add((name_obj.name, dns.rdatatype.NS))
-            if self._ask_non_delegation_queries(name_obj.name):
+            if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
                 queries.add((name_obj.nxdomain_name, name_obj.nxdomain_rdtype))
                 queries.add((name_obj.nxrrset_name, name_obj.nxrrset_rdtype))
                 if self._is_sld_or_lower(name_obj.name):
                     queries.add((name_obj.name, dns.rdatatype.MX))
                     queries.add((name_obj.name, dns.rdatatype.TXT))
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
-            if self._ask_non_delegation_queries(name_obj.name):
+            if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
                 queries.add((name_obj.name, dns.rdatatype.SOA))
             queries.add((name_obj.name, dns.rdatatype.DNSKEY))
 
