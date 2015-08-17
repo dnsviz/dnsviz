@@ -305,7 +305,7 @@ Options:
                      mode (default) is "." (i.e., full ancestral analysis to
                      the root).   The default for authoritative analysis mode
                      (i.e., with -A) is the domain name itself.
-    -O type[,type...]
+    -R type[,type...]
                    - Perform analysis using *only* the specified type(s) (e.g.,
                      A, AAAA).  The default is to pick query types based on the
                      nature of the name (e.g., number of labels, subdomain of
@@ -347,7 +347,7 @@ Options:
 def main():
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:O:x:As:Fh')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:R:x:As:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -406,17 +406,17 @@ def main():
         else:
             ceiling = dns.name.root
 
-        if '-O' in opts:
+        if '-R' in opts:
             explicit_only = True
             try:
-                rdtypes = opts['-O'].split(',')
+                rdtypes = opts['-R'].split(',')
             except ValueError:
-                usage('The list of types was invalid: "%s"' % opts['-O'])
+                usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
             try:
                 rdtypes = map(dns.rdatatype.from_text, rdtypes)
             except dns.rdatatype.UnknownRdatatype:
-                usage('The list of types was invalid: "%s"' % opts['-O'])
+                usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
         else:
             rdtypes = None
