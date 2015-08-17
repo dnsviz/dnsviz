@@ -1717,9 +1717,10 @@ class Analyst(object):
 
         try:
             secondary_rdtype = self._rdtypes_to_query(name_obj.name)[0]
-            servers_queried[secondary_rdtype] = set()
         except IndexError:
             secondary_rdtype = None
+        else:
+            servers_queried[secondary_rdtype] = set()
 
         # elicit a referral from parent servers by querying first for NS, then
         # a secondary type as a fallback
