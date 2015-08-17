@@ -1092,8 +1092,6 @@ class Analyst(object):
     def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
 
-        assert not explicit_only or extra_rdtypes is not None, 'If explicit_only is specified, then extra_rdtypes must be specified.'
-
         self.name = name
         self.dlv_domain = dlv_domain
         self.ceiling = self._detect_ceiling(ceiling)[0]
@@ -1114,6 +1112,9 @@ class Analyst(object):
             self.trace = []
         else:
             self.trace = trace
+
+        assert not explicit_only or extra_rdtypes is not None or self._force_dnskey_query(name), 'If explicit_only is specified, then extra_rdtypes must be specified or force_dnskey must be true.'
+
         if explicit_delegations is None:
             self.explicit_delegations = {}
         else:
