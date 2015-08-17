@@ -351,14 +351,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return tup
 
-    def serialize_status_simple(self, processed=None):
+    def serialize_status_simple(self, rdtypes=None, processed=None):
         if processed is None:
             processed = set()
 
         response_info_map = {}
         for qname, rdtype in self.queries:
-            if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
-                continue
+            if rdtypes is None:
+                # if rdtypes was not specified, then serialize all, with some exceptions
+                if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                    continue
+            else:
+                # if rdtypes was specified, then only serialize rdtypes that
+                # were specified
+                if qname != self.name or rdtype not in rdtypes:
+                    continue
             if qname not in response_info_map:
                 response_info_map[qname] = {}
             response_info_map[qname][rdtype] = self.get_response_info(qname, rdtype)
