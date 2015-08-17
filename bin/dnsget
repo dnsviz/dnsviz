@@ -35,7 +35,7 @@ import multiprocessing.managers
 import threading
 import time
 
-import dns.exception, dns.name
+import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
 from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver, DNS_RAW_VERSION
 import dnsviz.format as fmt
@@ -59,13 +59,13 @@ def _raise_eof(signum, frame):
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
 
-def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, cache, cache_level, cache_lock)):
+def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
+        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -81,7 +81,7 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, dlv_domain):
+    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
         self.client_ipv4, self.client_ipv6 = get_client_addresses(warn_ipv4=client_ipv4 is None, warn_ipv6=client_ipv6 is None)
         if client_ipv4 is not None:
             self.client_ipv4 = client_ipv4
@@ -92,6 +92,8 @@ class BulkAnalyst(object):
         self.ceiling = ceiling
         self.cache_level = cache_level
         self.explicit_delegations = explicit_delegations
+        self.extra_rdtypes = extra_rdtypes
+        self.explicit_only = explicit_only
         self.dlv_domain = dlv_domain
 
         self.cache = {}
@@ -99,7 +101,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.cache, self.cache_level, self.cache_lock)
+            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -177,8 +179,8 @@ class RecursiveMultiProcessAnalyst(MultiProcessAnalystMixin, PrivateRecursiveAna
 class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, dlv_domain, processes):
-        super(ParallelAnalystMixin, self).__init__(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, dlv_domain)
+    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -303,6 +305,12 @@ Options:
                      mode (default) is "." (i.e., full ancestral analysis to
                      the root).   The default for authoritative analysis mode
                      (i.e., with -A) is the domain name itself.
+    -O type[,type...]
+                   - Perform analysis using *only* the specified type(s) (e.g.,
+                     A, AAAA).  The default is to pick query types based on the
+                     nature of the name (e.g., number of labels, subdomain of
+                     .arpa, TLSA-, SRV-, or DKIM-related labels, etc) and
+                     whether there are NS records detected.
     -s server[,server ...]
                    - designate servers for recursive analysis, rather than
                      using those specified in /etc/resolv.conf.  Each server
@@ -339,7 +347,7 @@ Options:
 def main():
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:x:As:Fh')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:O:x:As:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -397,6 +405,22 @@ def main():
             ceiling = None
         else:
             ceiling = dns.name.root
+
+        if '-O' in opts:
+            explicit_only = True
+            try:
+                rdtypes = opts['-O'].split(',')
+            except ValueError:
+                usage('The list of types was invalid: "%s"' % opts['-O'])
+                sys.exit(1)
+            try:
+                rdtypes = map(dns.rdatatype.from_text, rdtypes)
+            except dns.rdatatype.UnknownRdatatype:
+                usage('The list of types was invalid: "%s"' % opts['-O'])
+                sys.exit(1)
+        else:
+            rdtypes = None
+            explicit_only = False
 
         if '-A' not in opts:
             if '-t' in opts:
@@ -585,9 +609,9 @@ def main():
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, dlv_domain, processes)
+                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain, processes)
             else:
-                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, dlv_domain)
+                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
