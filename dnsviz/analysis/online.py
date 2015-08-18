@@ -1574,9 +1574,10 @@ class Analyst(object):
 
         self._handle_explicit_delegations(name_obj)
         if not name_obj.explicit_delegation:
-            # analyze delegation, and return if name doesn't exist
+            # analyze delegation, and return if name doesn't exist, unless
+            # explicit_only was specified
             yxdomain = self._analyze_delegation(name_obj)
-            if not yxdomain:
+            if not yxdomain and not self.explicit_only:
                 return
 
         # set the NS dependencies for the name
@@ -2166,8 +2167,9 @@ class RecursiveAnalyst(Analyst):
         if not query.is_valid_complete_response_any():
             return name_obj
 
-        # if there was an NXDOMAIN for the first query, then don't ask the others
-        if query.is_nxdomain_all():
+        # if there was an NXDOMAIN for the first query, then don't ask the
+        # others, unless explicit was called
+        if query.is_nxdomain_all() and not self.explicit_only:
             return name_obj
 
         # now query most other queries
