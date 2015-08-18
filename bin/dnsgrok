@@ -228,6 +228,14 @@ def main():
                     if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                         continue
                     G.graph_rrset_auth(name_obj, qname, rdtype)
+                for target, mx_obj in name_obj.mx_targets.items():
+                    if mx_obj is not None:
+                        G.graph_rrset_auth(mx_obj, target, dns.rdatatype.A)
+                        G.graph_rrset_auth(mx_obj, target, dns.rdatatype.AAAA)
+                for target, ns_obj in name_obj.ns_dependencies.items():
+                    if ns_obj is not None:
+                        G.graph_rrset_auth(ns_obj, target, dns.rdatatype.A)
+                        G.graph_rrset_auth(ns_obj, target, dns.rdatatype.AAAA)
                 G.add_trust(trusted_keys)
                 name_obj.populate_response_component_status(G)
 
