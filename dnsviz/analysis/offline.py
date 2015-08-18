@@ -226,7 +226,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         for dnskey in dnskeys:
                             rrsig_status = response_info.name_obj.rrsig_status[info][rrsig][dnskey]
                             rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '%s/%s/%s (%s - %s)' % \
-                                    (rrsig.signer.to_text(), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
+                                    (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
 
             elif isinstance(info, Errors.DomainNameAnalysisError):
                 if not show_error:
