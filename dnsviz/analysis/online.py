@@ -2164,7 +2164,7 @@ class RecursiveAnalyst(Analyst):
         name_obj.add_query(query, True)
 
         # if there were no valid responses, then exit out early
-        if not query.is_valid_complete_response_any():
+        if not query.is_valid_complete_response_any() and not self.explicit_only:
             return name_obj
 
         # if there was an NXDOMAIN for the first query, then don't ask the
