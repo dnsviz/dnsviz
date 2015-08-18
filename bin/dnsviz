@@ -356,7 +356,8 @@ def main():
             name_obj.populate_status(trusted_keys)
             for qname, rdtype in name_obj.queries:
                 if rdtypes is None:
-                    # if rdtypes was not specified, then graph all, with some exceptions
+                    # if rdtypes was not specified, then graph all, with some
+                    # exceptions
                     if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                         continue
                 else:
@@ -369,7 +370,7 @@ def main():
             if rdtypes is not None:
                 for rdtype in rdtypes:
                     if (name_obj.name, rdtype) not in name_obj.queries:
-                        logger.error('No query for "%s/%s" was included in the analysis.' % (name.to_text(), dns.rdatatype.to_text(rdtype)))
+                        logger.error('No query for "%s/%s" was included in the analysis.' % (name_obj.name.to_text(), dns.rdatatype.to_text(rdtype)))
 
             if '-O' in opts:
                 if name_obj.name == dns.name.root:
