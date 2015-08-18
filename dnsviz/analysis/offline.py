@@ -206,7 +206,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if info.rrset.rdtype == dns.rdatatype.CNAME:
                     rdata_tup.append((None, 'CNAME %s' % (info.rrset[0].target.to_text())))
                 elif rdtype == dns.rdatatype.DNSKEY:
-                    rdata_tup.extend([(None, '<DNSKEY: alg=%d, id=%d, flags=%d, size=%d>' % (d.algorithm, Response.DNSKEYMeta.calc_key_tag(d), d.flags, Response.DNSKEYMeta.calc_key_len(d))) for d in info.rrset])
+                    rdata_tup.extend([(None, '%d/%d/%d' % (d.algorithm, Response.DNSKEYMeta.calc_key_tag(d), d.flags)) for d in info.rrset])
                 elif rdtype == dns.rdatatype.DS:
                     dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
                     dss.sort()
@@ -218,7 +218,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         dnskeys.sort()
                         for dnskey in dnskeys:
                             ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
-                            rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], '<DS: alg=%d id=%d digest alg=%d>' % (ds.algorithm, ds.key_tag, ds.digest_type)))
+                            rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
 
                 else:
                     rdata_tup.extend([(None, r.to_text()) for r in info.rrset])
@@ -231,13 +231,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         dnskeys.sort()
                         for dnskey in dnskeys:
                             rrsig_status = response_info.name_obj.rrsig_status[info][rrsig][dnskey]
-                            rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '<RRSIG: signer=%s alg=%s id=%s (%s - %s)>' % \
+                            rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '%s/%s/%s (%s - %s)' % \
                                     (rrsig.signer.to_text(), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
 
             elif isinstance(info, Errors.DomainNameAnalysisError):
                 if not show_error:
                     continue
-                rdata_tup.append((None, '<ERROR: %s>' % (info.code)))
+                rdata_tup.append((None, 'ERROR %s' % (info.code)))
             elif info in self.nodata_status:
                 if not show_neg_response:
                     continue
@@ -245,7 +245,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     substatus = Status.nsec_status_mapping[self.nodata_status[info][0].validation_status]
                 else:
                     substatus = None
-                rdata_tup.append((substatus, '<NODATA>'))
+                rdata_tup.append((substatus, 'NODATA'))
             elif info in self.nxdomain_status:
                 if not show_neg_response:
                     continue
@@ -253,7 +253,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     substatus = Status.nsec_status_mapping[self.nxdomain_status[info][0].validation_status]
                 else:
                     substatus = None
-                rdata_tup.append((substatus, '<NXDOMAIN>'))
+                rdata_tup.append((substatus, 'NXDOMAIN'))
 
             tup.append((dns.rdatatype.to_text(rdtype), status, rdata_tup))
             tup.extend(rrsig_tup)
