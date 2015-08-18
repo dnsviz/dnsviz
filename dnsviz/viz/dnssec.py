@@ -1435,7 +1435,7 @@ class DNSAuthGraph:
 
         # now traverse clusters and mark insecure nodes in secure delegations as bad
         for zone in trusted_keys:
-            zone_top_name = self.get_zone(zone)[3]
+            S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone)
             if not self.G.has_node(zone_top_name) or zone_top_name not in self.subgraph_not_stub:
                 continue
 
