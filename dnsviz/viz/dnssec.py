@@ -128,6 +128,7 @@ class DNSAuthGraph:
         self.node_reverse_mapping = {}
         self.nsec_rr_status = {}
         self.secure_dnskey_rrsets = set()
+        self.subgraph_not_stub = set()
         self.node_subgraph_name = {}
         self.processed_rrsets = {}
 
@@ -1173,6 +1174,9 @@ class DNSAuthGraph:
         if zone_obj.stub:
             return
 
+        # indicate that this zone is not a stub
+        self.subgraph_not_stub.add(zone_top)
+
         #######################################
         # DNSKEY roles, based on what they sign
         #######################################
@@ -1402,7 +1406,7 @@ class DNSAuthGraph:
         trusted_zone_top_names = set([self.get_zone(z)[3] for z in trusted_keys])
         for zone in trusted_keys:
             zone_top_name = self.get_zone(zone)[3]
-            if not self.G.has_node(zone_top_name):
+            if not self.G.has_node(zone_top_name) or zone_top_name not in self.subgraph_not_stub:
                 continue
 
             # if at least one algorithm in trusted keys for the zone is
@@ -1432,7 +1436,7 @@ class DNSAuthGraph:
         # now traverse clusters and mark insecure nodes in secure delegations as bad
         for zone in trusted_keys:
             zone_top_name = self.get_zone(zone)[3]
-            if not self.G.has_node(zone_top_name):
+            if not self.G.has_node(zone_top_name) or zone_top_name not in self.subgraph_not_stub:
                 continue
 
             # don't yet mark subdomains of DLV zones, as we have yet
