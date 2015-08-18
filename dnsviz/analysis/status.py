@@ -169,8 +169,9 @@ class RRSIGStatus(object):
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
                 self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
 
-        if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
-            self.warnings.append(Errors.RRsetTTLMismatch(rrset_ttl=self.rrset.rrset.ttl, rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl))
+        if self.rrset.ttl_cmp:
+            if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
+                self.warnings.append(Errors.RRsetTTLMismatch(rrset_ttl=self.rrset.rrset.ttl, rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl))
         if self.rrset.rrsig_info[self.rrsig].ttl > self.rrsig.original_ttl:
             self.errors.append(Errors.OriginalTTLExceeded(rrset_ttl=self.rrset.rrset.ttl, original_ttl=self.rrsig.original_ttl))
 
