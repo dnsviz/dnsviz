@@ -1431,12 +1431,14 @@ class DNSAuthGraph:
 
         # now traverse clusters and mark insecure nodes in secure delegations as bad
         for zone in trusted_keys:
-            if self.has_zone(zone):
-                zone_node_str = self.zone_node_str(zone)
-                # don't yet mark subdomains of DLV zones, as we have yet
-                # to add trust to them
-                if '%s_top' % zone_node_str not in dlv_trusted_zone_top_names:
-                    self._add_trust_to_orphaned_nodes(zone_node_str, [])
+            zone_top_name = self.get_zone(zone)[3]
+            if not self.G.has_node(zone_top_name):
+                continue
+
+            # don't yet mark subdomains of DLV zones, as we have yet
+            # to add trust to them
+            if zone_top_name not in dlv_trusted_zone_top_names:
+                self._add_trust_to_orphaned_nodes(zone_node_str, [])
 
         # now that we can show which zones are provably insecure, we
         # can apply trust from the DLV zones
