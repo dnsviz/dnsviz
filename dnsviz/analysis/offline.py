@@ -1664,30 +1664,32 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         response_component_status[obj.rrsets[nsec_name]] = G.status_for_node(node_str, nsec_name_str)
 
                 elif isinstance(obj, Response.NegativeResponseInfo):
-                    # A negative response info for a DS query points to the
-                    # "top node" of a zone in the graph.  If this "top node" is
-                    # colored "insecure", then it indicates that the negative
-                    # response has been authenticated.  To reflect this
-                    # properly, we change the status to "secure".
-                    if obj.rdtype == dns.rdatatype.DS:
-                        if status == Status.RRSET_STATUS_INSECURE:
-                            if G.secure_nsec_nodes_covering_node(node_str):
-                                response_component_status[obj] = Status.RRSET_STATUS_SECURE
+                    # the following two cases are only for zones
+                    if G.is_invis(node_str):
+                        # A negative response info for a DS query points to the
+                        # "top node" of a zone in the graph.  If this "top node" is
+                        # colored "insecure", then it indicates that the negative
+                        # response has been authenticated.  To reflect this
+                        # properly, we change the status to "secure".
+                        if obj.rdtype == dns.rdatatype.DS:
+                            if status == Status.RRSET_STATUS_INSECURE:
+                                if G.secure_nsec_nodes_covering_node(node_str):
+                                    response_component_status[obj] = Status.RRSET_STATUS_SECURE
 
-                    # A negative response to a DNSKEY query is a special case.
-                    elif obj.rdtype == dns.rdatatype.DNSKEY:
-                        # If the "node" was found to be secure, then there must be
-                        # a secure entry point into the zone, indicating that there
-                        # were other, positive responses to the query (i.e., from
-                        # other servers).  That makes this negative response bogus.
-                        if status == Status.RRSET_STATUS_SECURE:
-                            response_component_status[obj] = Status.RRSET_STATUS_BOGUS
+                        # A negative response to a DNSKEY query is a special case.
+                        elif obj.rdtype == dns.rdatatype.DNSKEY:
+                            # If the "node" was found to be secure, then there must be
+                            # a secure entry point into the zone, indicating that there
+                            # were other, positive responses to the query (i.e., from
+                            # other servers).  That makes this negative response bogus.
+                            if status == Status.RRSET_STATUS_SECURE:
+                                response_component_status[obj] = Status.RRSET_STATUS_BOGUS
 
-                        # Since the accompanying SOA is not drawn on the graph, we
-                        # simply apply the same status to the SOA as is associated
-                        # with the negative response.
-                        for soa_rrset in obj.soa_rrset_info:
-                            response_component_status[soa_rrset] = response_component_status[obj]
+                            # Since the accompanying SOA is not drawn on the graph, we
+                            # simply apply the same status to the SOA as is associated
+                            # with the negative response.
+                            for soa_rrset in obj.soa_rrset_info:
+                                response_component_status[soa_rrset] = response_component_status[obj]
 
                     # for non-DNSKEY responses, verify that the negative
                     # response is secure by checking that the SOA is also

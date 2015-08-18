@@ -1490,6 +1490,9 @@ class DNSAuthGraph:
                 x.attr['color'] == COLORS['secure'],
                 self.G.out_neighbors(n))
 
+    def is_invis(self, n):
+        return INVIS_STYLE_RE.search(self.G.get_node(n).attr['style']) is not None
+
     def _add_trust_to_nodes_in_chain(self, n, trusted_zones, dlv_nodes, force, trace):
         if n in trace:
             return
