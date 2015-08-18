@@ -1021,9 +1021,9 @@ class DNSAuthGraph:
             zone_obj = name_obj
             self.add_zone(zone_obj)
 
-        # if this is for DNSKEY or DS, then return, as we have already take
-        # care of these types in graph_zone_auth()
-        if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
+        # if this is for DNSKEY or DS of a zone, then return, as we have
+        # already take care of these types in graph_zone_auth()
+        if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
             return []
 
         id = 10
