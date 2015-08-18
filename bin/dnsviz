@@ -151,7 +151,10 @@ STATUS_MAP = {
 
 def textualize_status_output(names, show_color):
     s = ''
-    prefix = '  %(status_color)s[%(status)s] %(indent)s%(rdtype)s%(delimiter)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s %(status_color)s%(rdata)s%(color_reset)s '
+    name_template = '%(status_color)s%(name)s%(color_reset)s\n'
+    response_prefix = '  %(status_color)s[%(status)s] %(indent)s%(rdtype)s: '
+    response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
+    join_str_template = '%(status_color)s, '
     params = {}
     params['status_color'] = ''
     params['status_color_rdata'] = ''
@@ -166,7 +169,7 @@ def textualize_status_output(names, show_color):
         if show_color:
             params['status_color'] = TERM_COLOR_MAP['BOLD']
             params['color_reset'] = TERM_COLOR_MAP['RESET']
-        s += '%(status_color)s%(name)s%(color_reset)s\n' % params
+        s += name_template % params
 
         for rdtype_str, status, rdata in responses:
             params['rdtype'] = rdtype_str
@@ -177,21 +180,21 @@ def textualize_status_output(names, show_color):
                 params['indent'] = ''
             if show_color:
                 params['status_color'] = TERM_COLOR_MAP[status]
+            s += response_prefix % params
 
-            params['delimiter'] = ':'
+            rdata_set = []
             for i, (substatus, rdata_item) in enumerate(rdata):
                 params['rdata'] = rdata_item
                 if substatus is not None:
-                    params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
+                    if show_color:
+                        params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
                     params['status_rdata'] = ' [%s]' % (STATUS_MAP[substatus])
                 else:
                     params['status_color_rdata'] = ''
                     params['status_rdata'] = ''
-                s += prefix % params
-                s += '\n'
-
-                params['delimiter'] = ' '
-                params['rdtype'] = ' '*len(rdtype_str)
+                rdata_set.append(response_rdata % params)
+            join_str = join_str_template % params
+            s += join_str.join(rdata_set) + '\n'
 
     return s
 
