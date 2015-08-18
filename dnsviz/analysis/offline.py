@@ -285,6 +285,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 continue
             processed.add((parent_obj.name, -1))
 
+            if parent_obj.stub:
+                continue
+
             dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
             if parent_obj.parent is not None:
                 ds_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DS)
