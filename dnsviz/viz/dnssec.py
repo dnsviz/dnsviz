@@ -98,7 +98,7 @@ class RRsetNonExistent(object):
             formatter = lambda x: x
 
         if self.rdtype == dns.rdatatype.NSEC3:
-            d['name'] = format.format_nsec3_name(self.name)
+            d['name'] = fmt.format_nsec3_name(self.name)
         else:
             d['name'] = formatter(self.name.canonicalize().to_text())
         d['ttl'] = None
