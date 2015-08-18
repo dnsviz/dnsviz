@@ -337,8 +337,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 continue
             processed.add((response_info.qname, response_info.rdtype))
 
-            # if we've already done this one (above) then just move along
-            if response_info.rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
+            # if we've already done this one (above) then just move along.
+            # These were only done if the name is a zone.
+            if response_info.name_obj.is_zone() and \
+                    response_info.rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
                 continue
 
             name_tup[1].extend(response_info.name_obj._serialize_response_component_simple(response_info.rdtype, response_info))
