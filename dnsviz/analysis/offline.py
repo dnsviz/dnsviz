@@ -314,7 +314,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
                 pass
             else:
-                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False, True))
+                # if we only care about DNSKEY for the name itself, then serialize
+                # it regardless
+                if response_info.rdtype == dns.rdatatype.DNSKEY and parent_obj.name == response_info.qname:
+                    serialize_neg_response = True
+                # otherwise, only serialize it if is a positive response or if
+                # there are errors
+                else:
+                    serialize_neg_response = False
+
+                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DNSKEY, dnskey_response_info, serialize_neg_response, True))
 
             parent_is_signed = parent_obj.signed
 
