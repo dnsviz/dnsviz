@@ -185,12 +185,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         tup = []
         for info, cname_chain_info in response_info.response_info_list:
 
-            #XXX hack - fix this properly in populate_response_component_status()
-            if isinstance(info, Response.RRsetInfo) and \
-                    rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS) and \
-                    info.rrset.rdtype == dns.rdatatype.CNAME:
-                continue
-
             rdata = []
             if isinstance(info, Errors.DomainNameAnalysisError):
                 status = 'ERROR'
