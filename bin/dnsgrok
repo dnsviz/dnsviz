@@ -225,7 +225,7 @@ def main():
             if trusted_keys:
                 G = DNSAuthGraph()
                 for qname, rdtype in name_obj.queries:
-                    if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                    if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                         continue
                     G.graph_rrset_auth(name_obj, qname, rdtype)
                 for target, mx_obj in name_obj.mx_targets.items():
