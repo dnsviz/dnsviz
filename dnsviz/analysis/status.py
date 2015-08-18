@@ -1146,9 +1146,9 @@ class NSEC3StatusNoAnswer(NSEC3Status):
         else:
             invalid_alg_err = None
         if self.nsec_for_qname:
-            # RFC 4034 5.2, 6840 4.4
+            # RFC 4035 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
-                if not self.has_ns:
+                if self.referral and not self.has_ns:
                     self.errors.append(Errors.ReferralWithoutNSBitNSEC3(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_ds:
