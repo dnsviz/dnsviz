@@ -1003,8 +1003,6 @@ class DNSAuthGraph:
             return self.processed_rrsets[(name, rdtype)]
         self.processed_rrsets[(name, rdtype)] = []
 
-        assert rdtype not in (dns.rdatatype.DNSKEY, dns.rdatatype.DLV, dns.rdatatype.DS, dns.rdatatype.NSEC, dns.rdatatype.NSEC3)
-
         #XXX there are reasons for this (e.g., NXDOMAIN, after which no further
         # queries are made), but it would be good to have a sanity check, so
         # we don't simply produce an incomplete graph.  (In the case above, perhaps
@@ -1021,6 +1019,11 @@ class DNSAuthGraph:
             # (because we couldn't detect any NS records in the ancestry)
             zone_obj = name_obj
             self.add_zone(zone_obj)
+
+        # if this is for DNSKEY or DS, then return, as we have already take
+        # care of these types in graph_zone_auth()
+        if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
+            return []
 
         id = 10
         query = name_obj.queries[(name, rdtype)]
