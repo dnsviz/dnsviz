@@ -82,13 +82,8 @@ class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
     def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
-        self.client_ipv4, self.client_ipv6 = get_client_addresses(warn_ipv4=client_ipv4 is None, warn_ipv6=client_ipv6 is None)
-        if client_ipv4 is not None:
-            self.client_ipv4 = client_ipv4
-        if client_ipv6 is not None:
-            self.client_ipv6 = client_ipv6
-        if self.client_ipv4 is None and self.client_ipv6 is None:
-            raise NetworkConnectivityException('No network interfaces available for analysis!')
+        self.client_ipv4 = client_ipv4
+        self.client_ipv6 = client_ipv6
         self.ceiling = ceiling
         self.cache_level = cache_level
         self.explicit_delegations = explicit_delegations
@@ -296,10 +291,11 @@ Options:
                      servers (use "-" for stdin).
     -t threads     - specify the number of threads to use for parallel
                      analysis (default: perform analyses serially).
-    -4 addr        - specify a source IPv4 address for queries, rather than
-                     detecting it.
-    -6 addr        - specify a source IPv6 address for queries, rather than
-                     detecting it.
+    -4             - use IPv4 (only).
+    -6             - use IPv6 (only).
+    -b             - specify a source IPv4 or IPv6 address for queries, rather
+                     than detecting it.  This option can be used more than once
+                     to supply both an IPv4 and an IPv6 address.
     -a ancestor    - analyze the ancestry of each domain name through the
                      specified ancestor.  The default for recursive analysis
                      mode (default) is "." (i.e., full ancestral analysis to
@@ -347,13 +343,15 @@ Options:
 def main():
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:6:4:mpo:a:R:x:As:Fh')
+            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:As:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
 
         # get all the -x options
         explicit_delegations = {}
+        client_ipv4 = None
+        client_ipv6 = None
         for opt, arg in opts:
             if opt == '-x':
                 try:
@@ -374,6 +372,28 @@ def main():
                 if domain not in explicit_delegations:
                     explicit_delegations[domain] = set()
                 explicit_delegations[domain].update(name_addr_mappings_from_string(mappings))
+
+            elif opt == '-b':
+                try:
+                    addr = IPAddr(arg)
+                except ValueError:
+                    usage('The IP address was invalid: "%s"' % arg)
+                    sys.exit(1)
+
+                if addr.version == 4:
+                    client_ipv4 = addr
+                    fam = socket.AF_INET
+                else:
+                    client_ipv6 = addr
+                    fam = socket.AF_INET6
+                try:
+                    s = socket.socket(fam)
+                    s.bind((addr, 0))
+                    del s
+                except socket.error, e:
+                    if e.errno == errno.EADDRNOTAVAIL:
+                        usage('Cannot bind to specified IP address: "%s"' % addr)
+                        sys.exit(1)
 
         opts = dict(opts)
         if '-h' in opts:
@@ -462,40 +482,27 @@ def main():
             usage('The number of threads used must be greater than 0.')
             sys.exit(1)
 
-        if '-4' in opts:
-            try:
-                client_ipv4 = IPAddr(opts['-4'])
-            except ValueError:
-                usage('The IPv4 address was invalid: "%s"' % opts['-4'])
-                sys.exit(1)
-            try:
-                s = socket.socket(socket.AF_INET)
-                s.bind((client_ipv4, 0))
-                del s
-            except socket.error, e:
-                if e.errno == errno.EADDRNOTAVAIL:
-                    usage('Cannot bind to specified IPv4 address: "%s"' % client_ipv4)
-                    sys.exit(1)
+        use_ipv4 = None
+        use_ipv6 = None
+        require_ipv4 = False
+        require_ipv6 = False
+        # if neither is specified, then they're both used
+        if '-4' not in opts and '-6' not in opts:
+            use_ipv4 = True
+            use_ipv6 = True
         else:
-            client_ipv4 = None
-
-        if '-6' in opts:
-            try:
-                client_ipv6 = IPAddr(opts['-6'])
-            except ValueError:
-                usage('The IPv6 address was invalid: "%s"' % opts['-6'])
-                sys.exit(1)
-            try:
-                s = socket.socket(socket.AF_INET6)
-                s.bind((client_ipv6, 0))
-                del s
-            except socket.error, e:
-                if e.errno == errno.EADDRNOTAVAIL:
-                    usage('Cannot bind to specified IPv6 address: "%s"' % client_ipv6)
-                    sys.exit(1)
-        else:
-            client_ipv6 = None
-
+            # use IPv4 only if specified
+            if '-4' in opts:
+                use_ipv4 = True
+                require_ipv4 = True
+            else:
+                use_ipv4 = False
+            # use IPv6 only if specified
+            if '-6' in opts:
+                use_ipv6 = True
+                require_ipv6 = True
+            else:
+                use_ipv6 = False
         try:
             val = int(opts.get('-d', 2))
         except ValueError:
@@ -517,6 +524,30 @@ def main():
         handler.setLevel(debug_level)
         logger.addHandler(handler)
         logger.setLevel(debug_level)
+
+        # get client addresses where they are needed
+        if (client_ipv4 is None and use_ipv4) or \
+                (client_ipv6 is None and use_ipv6):
+            c4, c6 = get_client_addresses(warn_ipv4=use_ipv4 and client_ipv4 is None, \
+                    warn_ipv6=use_ipv6 and client_ipv6 is None)
+            if use_ipv4 and client_ipv4 is None:
+                client_ipv4 = c4
+            if use_ipv6 and client_ipv6 is None:
+                client_ipv6 = c6
+            if require_ipv4 and client_ipv4 is None:
+                sys.exit(2)
+            if require_ipv6 and client_ipv6 is None:
+                sys.exit(2)
+        # when explicitly assigned, check that they should be used
+        else:
+            if client_ipv4 is not None and not use_ipv4:
+                client_ipv4 = None
+            if client_ipv6 is not None and not use_ipv6:
+                client_ipv6 = None
+
+        if client_ipv4 is None and client_ipv6 is None:
+            logger.error('No network interfaces available for analysis!')
+            sys.exit(2)
 
         if '-r' in opts:
             if opts['-r'] == '-':
