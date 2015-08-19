@@ -24,13 +24,10 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 * pygraphviz (1.1 or later) - http://pygraphviz.github.io/
 
-  pygraphviz is required if visualization is desired (e.g., via the `dnsviz`
-  tool) or if security status of responses is desired (e.g., using the -t
-  option with the `dnsgrok` tool).   Online analysis (using `dnsget`) and
-  offline analysis (e.g., using `dnsgrok` without the -t) can be performed
-  without pygraphviz.  Version 1.1 or greater is required because of the support
-  for unicode names and HTML-like labels, both of which are utilized in the
-  visual output.
+  pygraphviz is required for most functionality.   `dnsget` and `dnsgrok`
+  (without the -t option) can be used without pygraphviz installed.  Version 1.1
+  or greater is required because of the support for unicode names and HTML-like
+  labels, both of which are utilized in the visual output.
 
 * M2Crypto (0.21.1 or later) - https://github.com/martinpaljak/M2Crypto
 
@@ -68,7 +65,7 @@ $ python setup.py --help
 ## Usage
 
 DNSViz is invoked using a series of included command-line utilities: `dnsget`,
-`dnsgrok`, and `dnsviz`.  Run any of the command-line tools with -h (help) to
+`dnsgrok`, `dnsviz`, and `dv`.  Run any of the command-line tools with -h (help) to
 display all options associated with their usage.
 
 
@@ -234,6 +231,11 @@ $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz -Thtml -O -r example.com.json -t tk.txt
 ```
 
+Output textual analysis to the terminal:
+```
+$ dnsviz -r example.com.json -t tk.txt
+```
+
 Pipeline dnsget output directly to dnsviz:
 ```
 $ dnsget example.com | \
@@ -256,4 +258,29 @@ Process analysis of multiple domain names, creating a single image for all
 names.
 ```
 $ dnsviz -Thtml -r multiple.json -t tk.txt > multiple.html
+```
+
+### dv
+
+`dv` is a wrapper that couples the functionality of `dnsget` and `dnsviz` into
+a tool with minimal dig-like usage, used to make analysis queries and return
+the textual output to terminal or file output in one go.
+
+
+#### Examples
+
+Analyze the domain name example.com using the first of your configured DNS
+resolvers (i.e., in /etc/resolv.conf):
+```
+$ dv example.com
+```
+
+Same, but specify a trust anchor:
+```
+$ dv +trusted-key=tk.txt example.com
+```
+
+Analyze example.com through the recurisve resolver at 192.0.2.1:
+```
+$ dv @192.0.2.1 +trusted-key=tk.txt example.com
 ```
