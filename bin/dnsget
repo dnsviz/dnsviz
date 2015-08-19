@@ -442,6 +442,27 @@ def main():
             rdtypes = None
             explicit_only = False
 
+        use_ipv4 = None
+        use_ipv6 = None
+        require_ipv4 = False
+        require_ipv6 = False
+        # if neither is specified, then they're both used
+        if '-4' not in opts and '-6' not in opts:
+            use_ipv4 = True
+            use_ipv6 = True
+        else:
+            # use IPv4 only if specified
+            if '-4' in opts:
+                use_ipv4 = True
+                require_ipv4 = True
+            else:
+                use_ipv4 = False
+            # use IPv6 only if specified
+            if '-6' in opts:
+                use_ipv6 = True
+                require_ipv6 = True
+            else:
+                use_ipv6 = False
         if '-A' not in opts:
             if '-t' in opts:
                 cls = RecursiveParallelAnalyst
@@ -449,6 +470,13 @@ def main():
                 cls = RecursiveBulkAnalyst
             if '-s' in opts:
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = name_addr_mappings_from_string(opts['-s'])
+
+                ipv4_resolvers = filter(lambda x: x[1].version == 4, explicit_delegations[WILDCARD_EXPLICIT_DELEGATION])
+                ipv6_resolvers = filter(lambda x: x[1].version == 6, explicit_delegations[WILDCARD_EXPLICIT_DELEGATION])
+                if not ipv4_resolvers and not require_ipv4:
+                    use_ipv4 = False
+                if not ipv6_resolvers and not require_ipv6:
+                    use_ipv6 = False
             else:
                 servers = get_standard_resolver()._servers
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = set([(dns.name.from_text('ns%d' % i), s) for i, s in enumerate(servers)])
@@ -482,27 +510,6 @@ def main():
             usage('The number of threads used must be greater than 0.')
             sys.exit(1)
 
-        use_ipv4 = None
-        use_ipv6 = None
-        require_ipv4 = False
-        require_ipv6 = False
-        # if neither is specified, then they're both used
-        if '-4' not in opts and '-6' not in opts:
-            use_ipv4 = True
-            use_ipv6 = True
-        else:
-            # use IPv4 only if specified
-            if '-4' in opts:
-                use_ipv4 = True
-                require_ipv4 = True
-            else:
-                use_ipv4 = False
-            # use IPv6 only if specified
-            if '-6' in opts:
-                use_ipv6 = True
-                require_ipv6 = True
-            else:
-                use_ipv6 = False
         try:
             val = int(opts.get('-d', 2))
         except ValueError:
