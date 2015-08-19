@@ -102,7 +102,7 @@ class DVCommandLineQuery:
                 usage('Option "%s" not recognized.' % arg)
                 sys.exit(1)
 
-    def process_nameservers(self, nameservers, use_ipv4, use_ipv6):
+    def process_nameservers(self, nameservers):
         processed_nameservers = []
         for addr in self.nameservers:
             processed_nameservers.extend(_get_nameservers_for_name(addr))
@@ -137,7 +137,7 @@ class DVCommandLineQuery:
         if self.trace:
             dnsget_args.append('-A')
         else:
-            dnsget_args.extend(['-s', ','.join(self.nameservers)])
+            dnsget_args.extend(['-s', self.nameservers[0]])
         dnsget_args.append(self.qname)
 
         if self.trusted_keys_file is not None:
@@ -176,7 +176,7 @@ class DVCommandLine:
             self.queries.append(DVCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
         for q in self.queries:
-            q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
+            q.process_nameservers(self.nameservers)
             q.process_query_options(self.global_query_options)
 
             if not q.nameservers and not q.trace:
@@ -346,13 +346,35 @@ class DVCommandLine:
                 query = self._add_qname()
                 self.queries.append(query)
 
+    def _process_network(self):
+        if self.options['use_ipv4'] is None and self.options['use_ipv6'] is None:
+            use_ipv4 = True
+            use_ipv6 = True
+        else:
+            if self.options['use_ipv4']:
+                use_ipv4 = True
+            else:
+                use_ipv4 = False
+            if self.options['use_ipv6']:
+                use_ipv6 = True
+            else:
+                use_ipv6 = False
+        return use_ipv4, use_ipv6
+
     def _process_nameservers(self):
+        use_ipv4, use_ipv6 = self._process_network()
+
         if not self.nameservers:
             processed_nameservers = Resolver.get_standard_resolver()._servers
         else:
             processed_nameservers = []
             for addr in self.nameservers:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
+
+        if not use_ipv4:
+            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+        if not use_ipv6:
+            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
 
         self.nameservers = processed_nameservers
 
