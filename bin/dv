@@ -65,7 +65,7 @@ Where:  domain    is in the Domain Name System
                  -6                  (use IPv6 query transport only)
         d-opt    is of the form +keyword[=value], where keyword is:
                  +[no]trace          (Trace delegation down from root [+dnssec])
-                 +trusted-key=####   (Trusted Key when chasing DNSSEC sigs)
+                 +trusted-key=####   (filename containing Trusted Key when chasing DNSSEC sigs)
         global d-opts and servers (before host name) affect all queries.
         local d-opts and servers (after host name) affect only that lookup.
         -h                           (print help and exit)
