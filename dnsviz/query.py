@@ -1602,7 +1602,7 @@ def main():
         cls = RecursiveDiagnosticQuery
     else:
         cls = DiagnosticQuery
-    d = cls(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]), dns.rdataclass.IN, args[2:])
+    d = cls(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]), dns.rdataclass.IN, map(IPAddr, args[2:]))
     d.execute()
 
     if '-j' in opts:
