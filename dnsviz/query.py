@@ -319,7 +319,7 @@ class ClearEDNSFlagOnTimeoutHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
         if timeouts >= self._timeouts and (self._request.ednsflags & self._flag):
-            self._request.want_dnssec(False)
+            self._request.ednsflags &= ~(self._flag & 0xffff)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, self._flag)
 
 class ChangeEDNSVersionOnTimeoutHandler(DNSResponseHandler):
