@@ -309,18 +309,18 @@ class ReduceUDPMaxPayloadOnTimeoutHandler(DNSResponseHandler):
             self._request.payload = self._reduced_payload
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
-class ClearDOFlagOnTimeoutHandler(DNSResponseHandler):
-    '''Clear the EDNS DO flag after a given number of timeouts.  Some servers
-    don't respond to requests with the DO flag set.'''
+class ClearEDNSFlagOnTimeoutHandler(DNSResponseHandler):
+    '''Clear an EDNS flag after a given number of timeouts.'''
 
-    def __init__(self, timeouts):
+    def __init__(self, flag, timeouts):
+        self._flag = flag
         self._timeouts = timeouts
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        if timeouts >= self._timeouts and (self._request.ednsflags & dns.flags.DO):
+        if timeouts >= self._timeouts and (self._request.ednsflags & self._flag):
             self._request.want_dnssec(False)
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, dns.flags.DO)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, self._flag)
 
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
     '''Disable EDNS after a given number of timeouts.  Some servers don't
@@ -1368,7 +1368,7 @@ class DiagnosticQuery(DNSSECQuery):
     response_handlers = DNSSECQuery.response_handlers + \
             [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
-            ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
             ChangeTimeoutOnTimeoutHandler(2.0, 3),
             ChangeTimeoutOnTimeoutHandler(1.0, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 5)]
@@ -1393,7 +1393,7 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
     response_handlers = DNSSECQuery.response_handlers + \
             [DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
-            ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7),
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
             ChangeTimeoutOnTimeoutHandler(2.0, 3),
             ChangeTimeoutOnTimeoutHandler(1.0, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 5)]
@@ -1447,7 +1447,7 @@ class PMTUDiagnosticQuery(DNSSECQuery):
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7)]
 
     query_timeout = 1.0
     max_attempts = 15
@@ -1463,7 +1463,7 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
-            ClearDOFlagOnTimeoutHandler(6), DisableEDNSOnTimeoutHandler(7)]
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7)]
 
     query_timeout = 1.0
     max_attempts = 15
