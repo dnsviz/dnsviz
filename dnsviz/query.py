@@ -1603,7 +1603,7 @@ class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
 
     query_timeout = 1.0
     max_attempts = 6
-    lifetime = 18.0
+    lifetime = 15.0
 
 def main():
     import json
