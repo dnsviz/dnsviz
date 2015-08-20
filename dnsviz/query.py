@@ -335,15 +335,19 @@ class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
             self._request.use_edns(False)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_DISABLE_EDNS, None)
 
-class SetCDFlagOnServfailHandler(DNSResponseHandler):
-    '''Set the CD flag when a SERVFAIL status is returned.  This is really used
-    for analysis to determine if the cause of the SERVFAIL is related to DNSSEC
-    validation failure.'''
+class SetFlagOnRcodeHandler(DNSResponseHandler):
+    '''Set a flag when a given rcode is returned.  One example of the use of
+    this class is to determine if the cause of the SERVFAIL is related to DNSSEC
+    validation failure by retrying with the CD flag.'''
+
+    def __init__(self, flag, rcode):
+        self._flag = flag
+        self._rcode = rcode
 
     def handle(self, response_wire, response, response_time):
-        if isinstance(response, dns.message.Message) and response.rcode() == dns.rcode.SERVFAIL and not self._request.flags & dns.flags.CD:
-            self._request.flags |= dns.flags.CD
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_SET_FLAG, dns.flags.CD)
+        if isinstance(response, dns.message.Message) and response.rcode() == self._rcode and not self._request.flags & self._flag:
+            self._request.flags |= self._flag
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, self._rcode, RETRY_ACTION_SET_FLAG, self._flag)
 
 class DisableEDNSOnRcodeHandler(DNSResponseHandler):
     '''Disable EDNS if the RCODE in the response indicates that the server
@@ -1391,7 +1395,7 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
     common DNS compatibility and connectivity issues.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
-            [DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
+            [DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
             ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
             ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
             ChangeTimeoutOnTimeoutHandler(2.0, 3),
@@ -1431,7 +1435,7 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     tcp = True
 
     response_handlers = [
-            DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler()]
+            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler()]
 
     query_timeout = 4.0
     max_attempts = 2
@@ -1462,7 +1466,7 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
                 ChangeTimeoutOnTimeoutHandler(1.0, 4),
                 ChangeTimeoutOnTimeoutHandler(2.0, 5))),
             UseTCPOnTCFlagHandler(),
-            DisableEDNSOnFormerrHandler(), SetCDFlagOnServfailHandler(), DisableEDNSOnRcodeHandler(),
+            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
             ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7)]
 
     query_timeout = 1.0

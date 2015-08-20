@@ -143,7 +143,7 @@ def get_client_addresses(require_ipv4=False, require_ipv6=False, warn_ipv4=True,
 
 # create a standard recurisve DNS query with checking disabled
 class StandardRecursiveQueryCD(Q.StandardRecursiveQuery):
-    response_handlers = Q.StandardRecursiveQuery.response_handlers + [Q.SetCDFlagOnServfailHandler()]
+    response_handlers = Q.StandardRecursiveQuery.response_handlers + [Q.SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
 
 resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
