@@ -322,6 +322,19 @@ class ClearEDNSFlagOnTimeoutHandler(DNSResponseHandler):
             self._request.want_dnssec(False)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, self._flag)
 
+class ChangeEDNSVersionOnTimeoutHandler(DNSResponseHandler):
+    '''Change EDNS version after a given number of timeouts.'''
+
+    def __init__(self, edns, timeouts):
+        self._edns = edns
+        self._timeouts = timeouts
+
+    def handle(self, response_wire, response, response_time):
+        timeouts = self._get_num_timeouts(response)
+        if timeouts >= self._timeouts and self._request.edns != self._edns:
+            self._request.use_edns(self._edns, self._request.ednsflags, self._request.payload, options=self._request.options)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_EDNS_VERSION, self._edns)
+
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
     '''Disable EDNS after a given number of timeouts.  Some servers don't
     respond to EDNS queries.'''
