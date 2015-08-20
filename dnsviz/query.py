@@ -35,7 +35,7 @@ import StringIO
 import struct
 import time
 
-import dns.exception, dns.flags, dns.message, dns.rcode, \
+import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype
 
 from response import *
