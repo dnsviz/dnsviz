@@ -1580,6 +1580,31 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
     max_attempts = 6
     lifetime = 15.0
 
+class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS flag compatibility.'''
+
+    edns = 0
+    edns_max_udp_payload = 512
+    edns_flags = SimpleDNSQuery.edns_flags | 0x80
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [ClearEDNSFlagOnTimeoutHandler(0x80, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 3),
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 2 seconds
+    #  4 - clear EDNS flag; change timeout to 1 seconds
+    #  5 - change timeout to 2 seconds
+    #  6 - return
+
+    query_timeout = 1.0
+    max_attempts = 6
+    lifetime = 18.0
+
 def main():
     import json
     import sys
