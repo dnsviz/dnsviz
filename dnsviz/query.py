@@ -1555,6 +1555,31 @@ class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
     max_attempts = 6
     lifetime = 15.0
 
+class EDNSOptDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS option compatibility.'''
+
+    edns = 0
+    edns_max_udp_payload = 512
+    edns_options = [dns.edns.GenericOption(100, '')]
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [RemoveEDNSOptionOnTimeoutHandler(100, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 3),
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 2 seconds
+    #  4 - remove EDNS option; change timeout to 1 seconds
+    #  5 - change timeout to 2 seconds
+    #  6 - return
+
+    query_timeout = 1.0
+    max_attempts = 6
+    lifetime = 15.0
+
 def main():
     import json
     import sys
