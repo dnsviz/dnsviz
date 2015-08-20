@@ -1518,6 +1518,29 @@ class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
     max_attempts = 4
     lifetime = 5.0
 
+class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS version compatibility.'''
+
+    edns = 100
+    edns_max_udp_payload = 512
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [ChangeEDNSVersionOnTimeoutHandler(0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 3),
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 2 seconds
+    #  4 - change EDNS version to 0; change timeout to 1 seconds
+    #  5 - change timeout to 2 seconds
+    #  6 - return
+
+    query_timeout = 1.0
+    max_attempts = 6
+    lifetime = 15.0
+
 def main():
     import json
     import sys
