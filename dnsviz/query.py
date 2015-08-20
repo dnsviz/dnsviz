@@ -1424,25 +1424,27 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
 
     response_handlers = DNSSECQuery.response_handlers + \
             [DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
+            ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+            ChangeTimeoutOnTimeoutHandler(8.0, 4),
+            ChangeTimeoutOnTimeoutHandler(1.0, 5),
+            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
-    #  4 - reduce udp max payload to 512; change timeout to 1 second
-    #  5 - change timeout to 2 seconds
-    #  6 - clear DO flag
-    #  7 - disable EDNS
-    #  8 - return
+    #  4 - change timeout to 8 seconds
+    #  5 - reduce udp max payload to 512; change timeout to 1 second
+    #  6 - change timeout to 2 seconds
+    #  7 - clear DO flag
+    #  8 - disable EDNS
+    #  9 - return
 
     query_timeout = 1.0
-    max_attempts = 8
-    lifetime = 18.0
+    max_attempts = 9
+    lifetime = 25.0
 
 class TCPDiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
@@ -1494,15 +1496,16 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
                 LifetimeHandler(18.0),
                 ChangeTimeoutOnTimeoutHandler(2.0, 2),
                 ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                ChangeTimeoutOnTimeoutHandler(1.0, 4),
-                ChangeTimeoutOnTimeoutHandler(2.0, 5))),
+                ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                ChangeTimeoutOnTimeoutHandler(1.0, 5),
+                ChangeTimeoutOnTimeoutHandler(2.0, 6))),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7)]
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8)]
 
     query_timeout = 1.0
     max_attempts = 15
-    lifetime = 18.0
+    lifetime = 25.0
 
 class TruncationDiagnosticQuery(DNSSECQuery):
     '''A simple query to test the results of a query with capabilities of only
