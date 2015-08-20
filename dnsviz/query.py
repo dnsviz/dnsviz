@@ -335,6 +335,20 @@ class ChangeEDNSVersionOnTimeoutHandler(DNSResponseHandler):
             self._request.use_edns(self._edns, self._request.ednsflags, self._request.payload, options=self._request.options)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_EDNS_VERSION, self._edns)
 
+class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
+    '''Remove EDNS option after a given number of timeouts.'''
+
+    def __init__(self, otype, timeouts):
+        self._otype = otype
+        self._timeouts = timeouts
+
+    def handle(self, response_wire, response, response_time):
+        timeouts = self._get_num_timeouts(response)
+        filtered_options = filter(lambda x: self._otype == x.otype, self._request.options)
+        if timeouts >= self._timeouts and filtered_options:
+            self._request.options.remove(filtered_options[0])
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, self._otype)
+
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
     '''Disable EDNS after a given number of timeouts.  Some servers don't
     respond to EDNS queries.'''
