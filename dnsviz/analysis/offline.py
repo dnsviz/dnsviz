@@ -195,7 +195,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
         return rrsig_tup
 
-    def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response=True, show_error=True):
+    def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response=True):
         tup = []
         for info, cname_chain_info in response_info.response_info_list:
 
@@ -234,23 +234,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
 
             elif isinstance(info, Errors.DomainNameAnalysisError):
-                if not show_error:
-                    continue
                 rdata_tup.append((None, 'ERROR %s' % (info.code)))
             elif info in self.nodata_status:
-                if not show_neg_response:
-                    continue
                 if self.nodata_status[info]:
                     substatus = Status.nsec_status_mapping[self.nodata_status[info][0].validation_status]
                 else:
+                    if not show_neg_response:
+                        continue
                     substatus = None
                 rdata_tup.append((substatus, 'NODATA'))
             elif info in self.nxdomain_status:
-                if not show_neg_response:
-                    continue
                 if self.nxdomain_status[info]:
                     substatus = Status.nsec_status_mapping[self.nxdomain_status[info][0].validation_status]
                 else:
+                    if not show_neg_response:
+                        continue
                     substatus = None
                 rdata_tup.append((substatus, 'NXDOMAIN'))
 
@@ -277,10 +275,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         name_tup = None
 
         # now process the DS and DNSKEY for each name in the ancestry
-        parent_is_signed = None
         for parent_obj in ancestry:
             if (parent_obj.name, -1) in processed:
-                parent_is_signed = parent_obj.signed
                 continue
             processed.add((parent_obj.name, -1))
 
@@ -297,32 +293,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tup.append(name_tup)
 
             if ds_response_info is not None:
-                # if we only care about DS for the name itself, then serialize
-                # it regardless
-                if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
-                    serialize_neg_response = True
-                # otherwise, only serialize it if is a positive response or if
-                # the parent is signed
-                else:
-                    serialize_neg_response = parent_is_signed
-
-                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DS, ds_response_info, serialize_neg_response, serialize_neg_response))
+                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DS, ds_response_info, False))
 
             # if we only care about DS for the name itself, then don't
             # serialize the DNSKEY response
             if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
                 pass
             else:
-                # if we only care about DNSKEY for the name itself, then serialize
-                # it regardless
-                if response_info.rdtype == dns.rdatatype.DNSKEY and parent_obj.name == response_info.qname:
-                    serialize_neg_response = True
-                # otherwise, only serialize it if is a positive response or if
-                # there are errors
-                else:
-                    serialize_neg_response = False
-
-                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DNSKEY, dnskey_response_info, serialize_neg_response, True))
+                name_tup[1].extend(parent_obj._serialize_response_component_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False))
 
             parent_is_signed = parent_obj.signed
 
