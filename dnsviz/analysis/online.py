@@ -2037,7 +2037,19 @@ class RecursiveAnalyst(Analyst):
             self.logger.info('Analyzing %s (stub)' % fmt.humanize_name(name))
 
             name_obj.analysis_start = datetime.datetime.now(fmt.utc).replace(microsecond=0)
+
             self._handle_explicit_delegations(name_obj)
+            servers = name_obj.zone.get_auth_or_designated_servers()
+            servers = self._filter_servers(servers)
+            resolver = Resolver.Resolver(list(servers), StandardRecursiveQueryCD)
+
+            try:
+                ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
+                name_obj.parent = self._analyze_stub(name.parent()).zone
+            except dns.exception.DNSException:
+                pass
+
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
             self._finalize_analysis_proper(name_obj)
