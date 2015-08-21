@@ -181,6 +181,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
 
+    def _serialize_rrsig_simple(self, name_obj, rrset_info):
+        rrsig_tup = []
+        if name_obj.rrsig_status[rrset_info]:
+            rrsigs = name_obj.rrsig_status[rrset_info].keys()
+            rrsigs.sort()
+            for rrsig in rrsigs:
+                dnskeys = name_obj.rrsig_status[rrset_info][rrsig].keys()
+                dnskeys.sort()
+                for dnskey in dnskeys:
+                    rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
+                    rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '%s/%s/%s (%s - %s)' % \
+                            (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
+        return rrsig_tup
+
     def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response=True, show_error=True):
         tup = []
         for info, cname_chain_info in response_info.response_info_list:
@@ -217,16 +231,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 else:
                     rdata_tup.extend([(None, r.to_text()) for r in info.rrset])
 
-                if response_info.name_obj.rrsig_status[info]:
-                    rrsigs = response_info.name_obj.rrsig_status[info].keys()
-                    rrsigs.sort()
-                    for rrsig in rrsigs:
-                        dnskeys = response_info.name_obj.rrsig_status[info][rrsig].keys()
-                        dnskeys.sort()
-                        for dnskey in dnskeys:
-                            rrsig_status = response_info.name_obj.rrsig_status[info][rrsig][dnskey]
-                            rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '%s/%s/%s (%s - %s)' % \
-                                    (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
+                rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
 
             elif isinstance(info, Errors.DomainNameAnalysisError):
                 if not show_error:
