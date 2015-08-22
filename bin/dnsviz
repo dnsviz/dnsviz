@@ -171,13 +171,31 @@ def textualize_status_output(names, show_color):
             params['color_reset'] = TERM_COLOR_MAP['RESET']
         s += name_template % params
 
+        in_neg_response = False
+        soa_seen = False
         for rdtype_str, status, rdata in responses:
+
+            # consider the cases in which we might no longer be in a negative
+            # response
+            if in_neg_response:
+                # if this is SOA, then we only break out if an SOA hasn't been
+                # seen
+                if rdtype_str == 'SOA':
+                    if soa_seen:
+                        in_neg_response = False
+                # otherwise, we break out for any type that is not NSEC, NSEC3,
+                # or RRSIG (all of which accompany negative responses)
+                elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG'):
+                    in_neg_response = False
+
             params['rdtype'] = rdtype_str
             params['status'] = STATUS_MAP[status]
-            if rdtype_str == 'RRSIG':
+            if in_neg_response:
                 params['indent'] = '  '
             else:
                 params['indent'] = ''
+            if rdtype_str == 'RRSIG':
+                params['indent'] += '  '
             if show_color:
                 params['status_color'] = TERM_COLOR_MAP[status]
             s += response_prefix % params
@@ -195,6 +213,16 @@ def textualize_status_output(names, show_color):
                 rdata_set.append(response_rdata % params)
             join_str = join_str_template % params
             s += join_str.join(rdata_set) + '\n'
+
+            # if this is a negative response, and we've just seen an SOA
+            # record, then note it
+            if in_neg_response and rdtype_str == 'SOA':
+                soa_seen = True
+            # if this was a negative response, then we indicate that it is, and
+            # reset soa_seen to False
+            if rdata[0][1] in ('NXDOMAIN', 'NODATA'):
+                in_neg_response = True
+                soa_seen = False
 
     return s
 

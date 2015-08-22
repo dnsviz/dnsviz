@@ -225,7 +225,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     for dnskey in dnskeys:
                         ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
                         rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
-
+            elif rdtype == dns.rdatatype.NSEC3:
+                rdata_tup.append((None, '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
+            elif rdtype == dns.rdatatype.NSEC:
+                rdata_tup.append((None, '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
             else:
                 rdata_tup.extend([(None, r.to_text()) for r in info.rrset])
 
@@ -241,6 +244,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     return []
                 substatus = None
             rdata_tup.append((substatus, 'NODATA'))
+            for soa_rrset_info in info.soa_rrset_info:
+                rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
+            for nsec_rrset_info in self.nodata_status[info][0].nsec_set_info.rrsets.values():
+                rrsig_tup.extend(self._serialize_response_component_simple(nsec_rrset_info.rrset.rdtype, response_info, nsec_rrset_info, True))
+
         elif info in self.nxdomain_status:
             if self.nxdomain_status[info]:
                 substatus = Status.nsec_status_mapping[self.nxdomain_status[info][0].validation_status]
@@ -249,6 +257,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     return []
                 substatus = None
             rdata_tup.append((substatus, 'NXDOMAIN'))
+            for soa_rrset_info in info.soa_rrset_info:
+                rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
+            for nsec_rrset_info in self.nxdomain_status[info][0].nsec_set_info.rrsets.values():
+                rrsig_tup.extend(self._serialize_response_component_simple(nsec_rrset_info.rrset.rdtype, response_info, nsec_rrset_info, True))
 
         tup.append((dns.rdatatype.to_text(rdtype), status, rdata_tup))
         tup.extend(rrsig_tup)
