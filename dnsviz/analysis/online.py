@@ -1644,9 +1644,8 @@ class Analyst(object):
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
                 queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
-                if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
-                    # we also do a query with small UDP payload to elicit and test a truncated response
-                    queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                # we also do a query with small UDP payload to elicit and test a truncated response
+                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
 
             # query for DS/DLV
             if name_obj.parent is not None:
