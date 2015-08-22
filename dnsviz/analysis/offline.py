@@ -195,7 +195,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
         return rrsig_tup
 
-    def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response=True):
+    def _serialize_response_component_simple(self, rdtype, response_info, show_neg_response):
         tup = []
         for info, cname_chain_info in response_info.response_info_list:
 
@@ -326,7 +326,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     response_info.rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
                 continue
 
-            name_tup[1].extend(response_info.name_obj._serialize_response_component_simple(response_info.rdtype, response_info))
+            name_tup[1].extend(response_info.name_obj._serialize_response_component_simple(response_info.rdtype, response_info, True))
 
             # queue the cnames for later serialization
             for info, cname_info in response_info.response_info_list:
