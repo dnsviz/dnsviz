@@ -191,7 +191,26 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
-                    rrsig_tup.append(('RRSIG', Status.rrsig_status_mapping[rrsig_status.validation_status], [(None, '%s/%s/%s (%s - %s)' % \
+
+                    # assign the "overall" status of the RRSIG, based on both
+                    # the status of the RRSIG as well as the status of the
+                    # DNSKEY
+                    #
+                    # if the RRSIG is not valid, then use the RRSIG status as
+                    # the overall status
+                    if rrsig_status.validation_status != Status.RRSIG_STATUS_VALID:
+                        status = Status.rrsig_status_mapping[rrsig_status.validation_status]
+                    # else (the status of the RRSIG is valid)
+                    elif self.response_component_status is not None:
+                        # if there is a component status, then set the overall
+                        # status to that of the status of the DNSKEY (an RRSIG
+                        # is only as authentic as the DNSKEY that signs it)
+                        if self.response_component_status is not None:
+                            status = Status.rrset_status_mapping[self.response_component_status[dnskey]]
+                        # otherwise, set the overall status to insecure
+                        else:
+                            status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
+                    rrsig_tup.append(('RRSIG', status, [(Status.rrsig_status_mapping[rrsig_status.validation_status], '%s/%s/%s (%s - %s)' % \
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
         return rrsig_tup
 
