@@ -1527,7 +1527,9 @@ class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
     '''A simple recursive query to test the results of a query with
     capabilities of only receiving back a small (512 byte) payload.'''
 
-    response_handlers = [ChangeTimeoutOnTimeoutHandler(2.0, 2), ChangeTimeoutOnTimeoutHandler(4.0, 3)]
+    response_handlers = [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3)]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
