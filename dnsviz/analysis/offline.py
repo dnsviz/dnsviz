@@ -233,7 +233,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if rrsig_status.validation_status != Status.RRSIG_STATUS_VALID:
                         status = Status.rrsig_status_mapping[rrsig_status.validation_status]
                     # else (the status of the RRSIG is valid)
-                    elif self.response_component_status is not None:
+                    else:
                         # if there is a component status, then set the overall
                         # status to that of the status of the DNSKEY (an RRSIG
                         # is only as authentic as the DNSKEY that signs it)
