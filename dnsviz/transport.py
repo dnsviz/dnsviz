@@ -45,6 +45,11 @@ def get_default_dns_transport_handler():
         _th = DNSQueryTransport()
     return _th
 
+def close_default_dns_transport_handler():
+    global _th
+    if _th is not None:
+        _th.close()
+
 class DNSQueryTransportMeta:
     require_queryid_match = True
     require_question_case_match = True
@@ -185,9 +190,13 @@ class DNSQueryTransport:
         self._query_queue = Queue.Queue()
         self._event_map = {}
 
+        self._close = threading.Event()
         t = threading.Thread(target=self.loop)
-        t.setDaemon(True)
         t.start()
+
+    def close(self):
+        self._close.set()
+        os.write(self._notify_write_fd, struct.pack('!B', 0))
 
     def query(self, qtm):
         self._event_map[qtm] = threading.Event()
@@ -223,6 +232,10 @@ class DNSQueryTransport:
             finished_fds = []
 
             rlist_out, wlist_out, xlist_out = select.select(rlist_in, wlist_in, xlist_in, timeout)
+
+            # if we have been signalled to exit, then do that
+            if self._close.is_set():
+                break
 
             # handle the requests
             for fd in wlist_out:
