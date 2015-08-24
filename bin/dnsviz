@@ -173,6 +173,7 @@ def textualize_status_output(names, show_color):
 
         in_neg_response = False
         soa_seen = False
+        prev_rdtype_str = ''
         for rdtype_str, status, rdata in responses:
 
             # consider the cases in which we might no longer be in a negative
@@ -192,12 +193,17 @@ def textualize_status_output(names, show_color):
             params['status'] = STATUS_MAP[status]
             if in_neg_response:
                 params['indent'] = '  '
+                if rdtype_str.startswith('NSEC'):
+                    params['indent'] += '  '
+                elif rdtype_str == 'RRSIG':
+                    if prev_rdtype_str.startswith('NSEC'):
+                        params['indent'] += '    '
+                    else:
+                        params['indent'] += '  '
             else:
                 params['indent'] = ''
-            if rdtype_str.startswith('NSEC'):
-                params['indent'] += '  '
-            if rdtype_str == 'RRSIG':
-                params['indent'] += '    '
+                if rdtype_str == 'RRSIG':
+                    params['indent'] += '  '
             if show_color:
                 params['status_color'] = TERM_COLOR_MAP[status]
             s += response_prefix % params
@@ -225,6 +231,7 @@ def textualize_status_output(names, show_color):
             if rdata[0][1] in ('NXDOMAIN', 'NODATA'):
                 in_neg_response = True
                 soa_seen = False
+            prev_rdtype_str = rdtype_str
 
     return s
 
