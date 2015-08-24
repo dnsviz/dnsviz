@@ -185,7 +185,7 @@ def textualize_status_output(names, show_color):
                         in_neg_response = False
                 # otherwise, we break out for any type that is not NSEC, NSEC3,
                 # or RRSIG (all of which accompany negative responses)
-                elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG'):
+                elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG', 'PROOF'):
                     in_neg_response = False
 
             params['rdtype'] = rdtype_str
@@ -194,8 +194,10 @@ def textualize_status_output(names, show_color):
                 params['indent'] = '  '
             else:
                 params['indent'] = ''
-            if rdtype_str == 'RRSIG':
+            if rdtype_str.startswith('NSEC'):
                 params['indent'] += '  '
+            if rdtype_str == 'RRSIG':
+                params['indent'] += '    '
             if show_color:
                 params['status_color'] = TERM_COLOR_MAP[status]
             s += response_prefix % params
