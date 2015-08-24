@@ -225,8 +225,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
 
                     # assign the "overall" status of the RRSIG, based on both
-                    # the status of the RRSIG as well as the status of the
-                    # DNSKEY
+                    # the validity of the RRSIG as well as the authentication
+                    # status of the DNSKEY with which it is validated
                     #
                     # if the RRSIG is not valid, then use the RRSIG status as
                     # the overall status
