@@ -30,6 +30,8 @@ import dns.name, dns.rdataclass, dns.rdatatype
 
 from dnsviz.ipaddr import IPAddr
 from dnsviz import resolver as Resolver
+from dnsviz.transport import close_default_dns_transport_handler
+from dnsviz.util import TRUSTED_KEYS_ROOT, get_default_trusted_keys_with_sanity_check
 
 def _get_nameservers_for_name(addr):
     nameservers = []
@@ -142,6 +144,9 @@ class DVCommandLineQuery:
 
         if self.trusted_keys_file is not None:
             dnsviz_args.extend(['-t', self.trusted_keys_file])
+        else:
+            if get_default_trusted_keys_with_sanity_check():
+                dnsviz_args.extend(['-t', TRUSTED_KEYS_ROOT])
         dnsviz_args.extend(['-R', dns.rdatatype.to_text(self._get_rdtype(options))])
 
         dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
@@ -385,6 +390,8 @@ def main():
         pass
     else:
         q.query_and_display()
+    finally:
+        close_default_dns_transport_handler()
 
 if __name__ == "__main__":
     main()
