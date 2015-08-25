@@ -151,6 +151,24 @@ STATUS_MAP = {
     'WARNING': '?',
 }
 
+def _errors_warnings_str(status, warnings, errors, show_color):
+    # display status, errors, and warnings
+    if errors:
+        if show_color:
+            error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
+        else:
+            error_str = STATUS_MAP['ERROR']
+    else:
+        error_str = ''
+    if warnings:
+        if show_color:
+            warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
+        else:
+            warning_str = STATUS_MAP['WARNING']
+    else:
+        warning_str = ''
+    return '[%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
+
 def textualize_status_output(names, show_color):
     s = ''
     name_template = '%(status_color)s%(name)s%(color_reset)s\n'
@@ -198,21 +216,7 @@ def textualize_status_output(names, show_color):
                     in_neg_response = False
 
             # display status, errors, and warnings
-            if errors:
-                if show_color:
-                    error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
-                else:
-                    error_str = STATUS_MAP['ERROR']
-            else:
-                error_str = ''
-            if warnings:
-                if show_color:
-                    warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
-                else:
-                    warning_str = STATUS_MAP['WARNING']
-            else:
-                warning_str = ''
-            params['status'] = '[%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
+            params['status'] = _errors_warnings_str(status, warnings, errors, show_color)
 
             # indent based on the presence of errors and warnings
             if errors:
@@ -250,23 +254,9 @@ def textualize_status_output(names, show_color):
                 params['rdata'] = rdata_item
                 # display status, errors, and warnings
                 if substatus is not None:
-                    if suberrors:
-                        if show_color:
-                            error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[substatus])
-                        else:
-                            error_str = STATUS_MAP['ERROR']
-                    else:
-                        error_str = ''
-                    if subwarnings:
-                        if show_color:
-                            warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[substatus])
-                        else:
-                            warning_str = STATUS_MAP['WARNING']
-                    else:
-                        warning_str = ''
                     if show_color:
                         params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
-                    params['status_rdata'] = ' [%s%s%s]' % (STATUS_MAP[substatus], error_str, warning_str)
+                    params['status_rdata'] = ' ' + _errors_warnings_str(substatus, subwarnings, suberrors, show_color)
                 else:
                     params['status_color_rdata'] = ''
                     params['status_rdata'] = ''
