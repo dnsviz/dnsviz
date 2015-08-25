@@ -26,11 +26,16 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+import os
 import re
 
-import dns.message, dns.rdatatype
+import dns.exception, dns.message, dns.rdatatype
 
+from config import DNSVIZ_SHARE_PATH
 import format as fmt
+import resolver as Resolver
+
+TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 
 CR_RE = re.compile(r'\r\n', re.MULTILINE)
 ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
@@ -61,3 +66,25 @@ def get_trusted_keys(s):
             trusted_keys.append((rrset.name,dnskey))
 
     return trusted_keys
+
+def get_default_trusted_keys():
+    try:
+        tk_str = open(TRUSTED_KEYS_ROOT).read()
+    except IOError, e:
+        return []
+    return get_trusted_keys(tk_str)
+
+def get_default_trusted_keys_with_sanity_check():
+    trusted_keys = get_default_trusted_keys()
+    checked_trusted_keys = []
+    dnskey_sets = {}
+    r = Resolver.get_standard_resolver()
+    for name, dnskey in trusted_keys:
+        if name not in dnskey_sets:
+            try:
+                dnskey_sets[name] = r.query_for_answer(name, dns.rdatatype.DNSKEY)
+            except dns.exception.DNSException:
+                dnskey_sets[name] = set()
+        if dnskey in dnskey_sets[name].rrset:
+            checked_trusted_keys.append((name, dnskey))
+    return checked_trusted_keys
