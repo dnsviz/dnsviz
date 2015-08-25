@@ -1216,6 +1216,17 @@ class DNSAuthGraph:
         else:
             self.node_reverse_mapping[dnskey_nxdomain_info] = zone_top
 
+        # handle CNAME responses to DNSKEY responses
+        for rdtype in (dns.rdatatype.DS, dns.rdatatype.DNSKEY):
+            if (name_obj.name, rdtype) in name_obj.queries:
+                for rrset_info in name_obj.queries[(name_obj.name, rdtype)].answer_info:
+                    if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+                        rrset_node = self.add_rrset(rrset_info, None, name_obj, name_obj.zone, 0)
+                        if rrset_node not in self.node_mapping:
+                            self.node_mapping[rrset_node] = []
+                        self.node_mapping[rrset_node].add(rrset_info)
+                        self.node_reverse_mapping[rrset_info] = rrset_node
+
         if not name_obj.is_zone():
             return
 
