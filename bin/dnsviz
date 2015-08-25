@@ -178,6 +178,12 @@ def textualize_status_output(names, show_color):
         prev_rdtype_str = ''
         for rdtype_str, status, warnings, errors, rdata in responses:
 
+            # if this was a negative response, then we indicate that it is, and
+            # reset soa_seen to False
+            if not in_neg_response and rdtype_str == 'PROOF':
+                in_neg_response = True
+                soa_seen = False
+
             # consider the cases in which we might no longer be in a negative
             # response
             if in_neg_response:
