@@ -620,7 +620,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             qname_obj = self.get_name(qname)
             if rdtype == dns.rdatatype.DS:
                 qname_obj = qname_obj.parent
-            elif rdtype == dns.rdatatype.DLV:
+            elif rdtype == dns.rdatatype.DLV and qname == qname_obj.dlv_name:
                 qname_obj = qname_obj.dlv_parent
 
             for rrset_info in query.answer_info:
