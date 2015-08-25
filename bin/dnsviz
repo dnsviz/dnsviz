@@ -129,6 +129,7 @@ TERM_COLOR_MAP = {
     'INVALID': '\033[31m',
     'INVALID_DIGEST': '\033[31m',
     'ERROR': '\033[31m',
+    'WARNING': '\033[33m',
 }
 
 STATUS_MAP = {
@@ -147,12 +148,13 @@ STATUS_MAP = {
     'INVALID': '!',
     'INVALID_DIGEST': '!',
     'ERROR': '!',
+    'WARNING': '?',
 }
 
 def textualize_status_output(names, show_color):
     s = ''
     name_template = '%(status_color)s%(name)s%(color_reset)s\n'
-    response_prefix = '  %(status_color)s[%(status)s] %(indent)s%(rdtype)s: '
+    response_prefix = ' %(status_color)s%(status)s%(preindent)s%(indent)s%(rdtype)s: '
     response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
     join_str_template = '%(status_color)s, '
     params = {}
@@ -174,7 +176,7 @@ def textualize_status_output(names, show_color):
         in_neg_response = False
         soa_seen = False
         prev_rdtype_str = ''
-        for rdtype_str, status, rdata in responses:
+        for rdtype_str, status, warnings, errors, rdata in responses:
 
             # consider the cases in which we might no longer be in a negative
             # response
@@ -189,8 +191,33 @@ def textualize_status_output(names, show_color):
                 elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG', 'PROOF'):
                     in_neg_response = False
 
+            if errors:
+                if show_color:
+                    error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
+                else:
+                    error_str = STATUS_MAP['ERROR']
+            else:
+                error_str = ''
+            if warnings:
+                if show_color:
+                    warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
+                else:
+                    warning_str = STATUS_MAP['WARNING']
+            else:
+                warning_str = ''
+            params['status'] = ' [%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
+
+            if errors:
+                if warnings:
+                    params['preindent'] = ''
+                else:
+                    params['preindent'] = ' '
+            elif warnings:
+                params['preindent'] = ' '
+            else:
+                params['preindent'] = '  '
+
             params['rdtype'] = rdtype_str
-            params['status'] = STATUS_MAP[status]
             if in_neg_response:
                 params['indent'] = '  '
                 if rdtype_str.startswith('NSEC'):
@@ -209,12 +236,26 @@ def textualize_status_output(names, show_color):
             s += response_prefix % params
 
             rdata_set = []
-            for i, (substatus, rdata_item) in enumerate(rdata):
+            for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
                 params['rdata'] = rdata_item
                 if substatus is not None:
+                    if suberrors:
+                        if show_color:
+                            error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[substatus])
+                        else:
+                            error_str = STATUS_MAP['ERROR']
+                    else:
+                        error_str = ''
+                    if subwarnings:
+                        if show_color:
+                            warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[substatus])
+                        else:
+                            warning_str = STATUS_MAP['WARNING']
+                    else:
+                        warning_str = ''
                     if show_color:
                         params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
-                    params['status_rdata'] = ' [%s]' % (STATUS_MAP[substatus])
+                    params['status_rdata'] = ' [%s%s%s]' % (STATUS_MAP[substatus], error_str, warning_str)
                 else:
                     params['status_color_rdata'] = ''
                     params['status_rdata'] = ''
@@ -228,7 +269,7 @@ def textualize_status_output(names, show_color):
                 soa_seen = True
             # if this was a negative response, then we indicate that it is, and
             # reset soa_seen to False
-            if rdata[0][1] in ('NXDOMAIN', 'NODATA'):
+            if rdata[0][3] in ('NXDOMAIN', 'NODATA'):
                 in_neg_response = True
                 soa_seen = False
             prev_rdtype_str = rdtype_str

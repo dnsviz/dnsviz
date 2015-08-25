@@ -206,7 +206,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     else:
                         status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
 
-                nsec_tup.append(('PROOF', status, [(Status.nsec_status_mapping[nsec_status.validation_status], '')]))
+                warnings = [w.code for w in nsec_status.warnings]
+                errors = [e.code for e in nsec_status.errors]
+                nsec_tup.append(('PROOF', status, [], [], [(Status.nsec_status_mapping[nsec_status.validation_status], warnings, errors, '')]))
 
                 for nsec_rrset_info in nsec_status.nsec_set_info.rrsets.values():
                     nsec_tup.extend(self._serialize_response_component_simple(nsec_rrset_info.rrset.rdtype, response_info, nsec_rrset_info, True))
@@ -242,7 +244,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # otherwise, set the overall status to insecure
                         else:
                             status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
-                    rrsig_tup.append(('RRSIG', status, [(Status.rrsig_status_mapping[rrsig_status.validation_status], '%s/%s/%s (%s - %s)' % \
+
+                    warnings = [w.code for w in rrsig_status.warnings]
+                    errors = [e.code for e in rrsig_status.errors]
+                    rrsig_tup.append(('RRSIG', status, [], [], [(Status.rrsig_status_mapping[rrsig_status.validation_status], warnings, errors, '%s/%s/%s (%s - %s)' % \
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
         return rrsig_tup
 
@@ -261,49 +266,66 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         rrsig_tup = []
         if isinstance(info, Response.RRsetInfo):
             if info.rrset.rdtype == dns.rdatatype.CNAME:
-                rdata_tup.append((None, 'CNAME %s' % (info.rrset[0].target.to_text())))
+                rdata_tup.append((None, [], [], 'CNAME %s' % (info.rrset[0].target.to_text())))
             elif rdtype == dns.rdatatype.DNSKEY:
-                rdata_tup.extend([(None, '%d/%d/%d' % (d.algorithm, Response.DNSKEYMeta.calc_key_tag(d), d.flags)) for d in info.rrset])
+                for d in info.rrset:
+                    dnskey_meta = response_info.name_obj._dnskeys[d]
+                    warnings = [w.code for w in dnskey_meta.warnings]
+                    errors = [e.code for e in dnskey_meta.errors]
+                    rdata_tup.append((None, warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
             elif rdtype == dns.rdatatype.DS:
                 dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
                 dss.sort()
                 for ds in dss:
-                    # only show the DS
+                    # only show the DS if in the RRset in question
                     if ds not in info.rrset:
                         continue
                     dnskeys = response_info.name_obj.ds_status_by_ds[rdtype][ds].keys()
                     dnskeys.sort()
                     for dnskey in dnskeys:
                         ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
-                        rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
+                        warnings = [w.code for w in ds_status.warnings]
+                        errors = [e.code for e in ds_status.errors]
+                        rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], warnings, errors, '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
             elif rdtype == dns.rdatatype.NSEC3:
-                rdata_tup.append((None, '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
+                rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
             elif rdtype == dns.rdatatype.NSEC:
-                rdata_tup.append((None, '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
+                rdata_tup.append((None, [], [], '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
             else:
-                rdata_tup.extend([(None, r.to_text()) for r in info.rrset])
+                rdata_tup.extend([(None, [], [], r.to_text()) for r in info.rrset])
+
+            warnings = [w.code for w in response_info.name_obj.rrset_warnings[info]]
+            errors = [e.code for e in response_info.name_obj.rrset_errors[info]]
 
             rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
 
         elif isinstance(info, Errors.DomainNameAnalysisError):
-            rdata_tup.append((None, 'ERROR %s' % (info.code)))
+            warnings = []
+            errors = []
+            rdata_tup.append((None, [], [], 'ERROR %s' % (info.code)))
         elif info in self.nodata_status:
+            warnings = [w.code for w in response_info.name_obj.nodata_warnings[info]]
+            errors = [e.code for e in response_info.name_obj.nodata_errors[info]]
+
             if not self.nodata_status[info] and not show_neg_response:
                 return []
-            rdata_tup.append((None, 'NODATA'))
+            rdata_tup.append((None, [], [], 'NODATA'))
             for soa_rrset_info in info.soa_rrset_info:
                 rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
             rrsig_tup.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
 
         elif info in self.nxdomain_status:
+            warnings = [w.code for w in response_info.name_obj.nxdomain_warnings[info]]
+            errors = [e.code for e in response_info.name_obj.nxdomain_errors[info]]
+
             if not self.nxdomain_status[info] and not show_neg_response:
                 return []
-            rdata_tup.append((None, 'NXDOMAIN'))
+            rdata_tup.append((None, [], [], 'NXDOMAIN'))
             for soa_rrset_info in info.soa_rrset_info:
                 rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
             rrsig_tup.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nxdomain_status, response_info))
 
-        tup.append((dns.rdatatype.to_text(rdtype), status, rdata_tup))
+        tup.append((dns.rdatatype.to_text(rdtype), status, warnings, errors, rdata_tup))
         tup.extend(rrsig_tup)
         return tup
 
