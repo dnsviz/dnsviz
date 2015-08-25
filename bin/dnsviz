@@ -171,7 +171,7 @@ def _errors_warnings_str(status, warnings, errors, show_color):
 
 def textualize_status_output(names, show_color):
     s = ''
-    name_template = '%(status_color)s%(name)s%(color_reset)s\n'
+    name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
     response_prefix = ' %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
     response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
     join_str_template = '%(status_color)s, '
@@ -184,11 +184,16 @@ def textualize_status_output(names, show_color):
     else:
         params['color_reset'] = ''
 
-    for name, responses in names:
+    for name, status, warnings, errors, responses in names:
         params['name'] = name
+        params['status_rdata'] = ''
+        params['status_color_rdata'] = ''
         if show_color:
             params['status_color'] = TERM_COLOR_MAP['BOLD']
             params['color_reset'] = TERM_COLOR_MAP['RESET']
+        if status is not None:
+            params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
+            params['status_color_rdata'] = TERM_COLOR_MAP[status]
         s += name_template % params
 
         in_neg_response = False
