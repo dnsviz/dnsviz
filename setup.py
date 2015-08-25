@@ -49,6 +49,7 @@ setup(name='dnsviz',
                 ('share/dnsviz/css/redmond/images', glob.glob(os.path.join('share', 'css', 'redmond', 'images', '*.png')) + glob.glob(os.path.join('share', 'css', 'redmond', 'images', '*.gif'))),
                 ('share/dnsviz/js', glob.glob(os.path.join('share', 'js', '*.js'))),
                 ('share/dnsviz/html', glob.glob(os.path.join('share', 'html', '*.html'))),
+                ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt']),
         ],
         requires=[
                 'pygraphviz (>=1.1)',
