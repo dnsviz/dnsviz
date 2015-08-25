@@ -153,26 +153,23 @@ STATUS_MAP = {
 
 def _errors_warnings_str(status, warnings, errors, show_color):
     # display status, errors, and warnings
+    error_str = ''
     if errors:
         if show_color:
             error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
         else:
             error_str = STATUS_MAP['ERROR']
-    else:
-        error_str = ''
-    if warnings:
+    elif warnings:
         if show_color:
-            warning_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
+            error_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
         else:
-            warning_str = STATUS_MAP['WARNING']
-    else:
-        warning_str = ''
-    return '[%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
+            error_str = STATUS_MAP['WARNING']
+    return '[%s%s]' % (STATUS_MAP[status], error_str)
 
 def textualize_status_output(names, show_color):
     s = ''
     name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
-    response_prefix = ' %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
+    response_prefix = '  %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
     response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
     join_str_template = '%(status_color)s, '
     params = {}
@@ -224,15 +221,10 @@ def textualize_status_output(names, show_color):
             params['status'] = _errors_warnings_str(status, warnings, errors, show_color)
 
             # indent based on the presence of errors and warnings
-            if errors:
-                if warnings:
-                    params['preindent'] = ''
-                else:
-                    params['preindent'] = ' '
-            elif warnings:
-                params['preindent'] = ' '
+            if errors or warnings:
+                params['preindent'] = ''
             else:
-                params['preindent'] = '  '
+                params['preindent'] = ' '
 
             # indent based on if we're in a negative response, whether this is
             # an RRSIG, etc.
