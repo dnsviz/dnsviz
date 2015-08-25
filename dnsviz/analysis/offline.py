@@ -251,7 +251,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
         return rrsig_tup
 
-    def _serialize_response_component_simple(self, rdtype, response_info, info, show_neg_response):
+    def _serialize_response_component_simple(self, rdtype, response_info, info, show_neg_response, dname_status=None):
         tup = []
         rdata = []
         if isinstance(info, Errors.DomainNameAnalysisError):
@@ -291,6 +291,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
             elif rdtype == dns.rdatatype.NSEC:
                 rdata_tup.append((None, [], [], '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
+            elif rdtype == dns.rdatatype.DNAME:
+                warnings = [w.code for w in dname_status.warnings]
+                errors = [e.code for e in dname_status.errors]
+                print warnings, errors
+                rdata_tup.append((Status.dname_status_mapping[dname_status.validation_status], warnings, errors, info.rrset[0].to_text()))
             else:
                 rdata_tup.extend([(None, [], [], r.to_text()) for r in info.rrset])
 
@@ -300,6 +305,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
             for wildcard_name in info.wildcard_info:
                 rrsig_tup.extend(self._serialize_nsec_set_simple(info.wildcard_info[wildcard_name], response_info.name_obj.wildcard_status, response_info))
+
+            if info in response_info.name_obj.dname_status:
+                for dname_status in response_info.name_obj.dname_status[info]:
+                    rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.DNAME, response_info, dname_status.synthesized_cname.dname_info, True, dname_status))
 
         elif isinstance(info, Errors.DomainNameAnalysisError):
             warnings = []
