@@ -294,7 +294,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif rdtype == dns.rdatatype.DNAME:
                 warnings = [w.code for w in dname_status.warnings]
                 errors = [e.code for e in dname_status.errors]
-                print warnings, errors
                 rdata_tup.append((Status.dname_status_mapping[dname_status.validation_status], warnings, errors, info.rrset[0].to_text()))
             else:
                 rdata_tup.extend([(None, [], [], r.to_text()) for r in info.rrset])
