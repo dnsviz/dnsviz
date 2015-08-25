@@ -154,7 +154,7 @@ STATUS_MAP = {
 def textualize_status_output(names, show_color):
     s = ''
     name_template = '%(status_color)s%(name)s%(color_reset)s\n'
-    response_prefix = ' %(status_color)s%(status)s%(preindent)s%(indent)s%(rdtype)s: '
+    response_prefix = ' %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
     response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
     join_str_template = '%(status_color)s, '
     params = {}
@@ -211,7 +211,7 @@ def textualize_status_output(names, show_color):
                     warning_str = STATUS_MAP['WARNING']
             else:
                 warning_str = ''
-            params['status'] = ' [%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
+            params['status'] = '[%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
 
             if errors:
                 if warnings:
