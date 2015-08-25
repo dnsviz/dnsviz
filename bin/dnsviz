@@ -197,6 +197,7 @@ def textualize_status_output(names, show_color):
                 elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG', 'PROOF'):
                     in_neg_response = False
 
+            # display status, errors, and warnings
             if errors:
                 if show_color:
                     error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
@@ -213,6 +214,7 @@ def textualize_status_output(names, show_color):
                 warning_str = ''
             params['status'] = '[%s%s%s]' % (STATUS_MAP[status], error_str, warning_str)
 
+            # indent based on the presence of errors and warnings
             if errors:
                 if warnings:
                     params['preindent'] = ''
@@ -223,6 +225,8 @@ def textualize_status_output(names, show_color):
             else:
                 params['preindent'] = '  '
 
+            # indent based on if we're in a negative response, whether this is
+            # an RRSIG, etc.
             params['rdtype'] = rdtype_str
             if in_neg_response:
                 params['indent'] = '  '
@@ -244,6 +248,7 @@ def textualize_status_output(names, show_color):
             rdata_set = []
             for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
                 params['rdata'] = rdata_item
+                # display status, errors, and warnings
                 if substatus is not None:
                     if suberrors:
                         if show_color:
