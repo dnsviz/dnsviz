@@ -921,7 +921,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     for server, client in dname_info.servers_clients:
                         has_dname.update([(server,client,response) for response in dname_info.servers_clients[(server,client)]])
 
-                if rrset_info.rrset.name not in self.dname_status:
+                if rrset_info not in self.dname_status:
                     self.dname_status[rrset_info] = []
                 self.dname_status[rrset_info].append(dname_status)
 
