@@ -298,6 +298,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             errors = [e.code for e in response_info.name_obj.rrset_errors[info]]
 
             rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
+            for wildcard_name in info.wildcard_info:
+                rrsig_tup.extend(self._serialize_nsec_set_simple(info.wildcard_info[wildcard_name], response_info.name_obj.wildcard_status, response_info))
 
         elif isinstance(info, Errors.DomainNameAnalysisError):
             warnings = []
