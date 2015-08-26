@@ -59,7 +59,6 @@ Where:  domain    is in the Domain Name System
         q-opt    is one of:
                  -x dot-notation     (shortcut for reverse lookups)
                  -b address          (bind to source address)
-                 -p port             (specify port number)
                  -q name             (specify query name)
                  -t type             (specify query type)
                  -c class            (specify query class)
@@ -166,7 +165,6 @@ class DVCommandLine:
             'use_ipv6': None,
             'client_ipv4': None,
             'client_ipv6': None,
-            'port': 53,
         }
 
         self.nameservers = []
