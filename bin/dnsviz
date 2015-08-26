@@ -297,13 +297,13 @@ def test_pygraphviz():
             minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
             if (major, minor) < (1,1):
                 sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
-                sys.exit(3)
+                sys.exit(2)
         except ValueError:
             sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
-            sys.exit(3)
+            sys.exit(2)
     except ImportError:
         sys.stderr.write('''pygraphviz is required, but not installed.\n''')
-        sys.exit(3)
+        sys.exit(2)
 
 def main():
     try:
@@ -365,17 +365,17 @@ def main():
                 analysis_str = open(opts['-r']).read()
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                sys.exit(2)
+                sys.exit(3)
         try:
             analysis_structured = json.loads(analysis_str)
         except ValueError:
             logger.error('There was an error parsing the json input: "%s"' % opts.get('-r', '-'))
-            sys.exit(2)
+            sys.exit(3)
 
         # check version
         if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
             logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
-            sys.exit(2)
+            sys.exit(3)
 
         names = []
         if '-f' in opts:
@@ -383,7 +383,7 @@ def main():
                 f = codecs.open(opts['-f'], 'r', 'utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
-                sys.exit(2)
+                sys.exit(3)
             for line in f:
                 name = line.strip()
                 try:
@@ -401,7 +401,7 @@ def main():
                     args = analysis_structured['_meta._dnsviz.']['names']
                 except KeyError:
                     logger.error('No names found in json input!')
-                    sys.exit(2)
+                    sys.exit(3)
             for name in args:
                 try:
                     name = dns.name.from_text(name)
@@ -415,12 +415,12 @@ def main():
                 tk_str = open(opts['-t']).read()
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-t']))
-                sys.exit(2)
+                sys.exit(3)
             try:
                 trusted_keys = get_trusted_keys(tk_str)
             except dns.exception.DNSException:
                 logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
-                sys.exit(2)
+                sys.exit(3)
         else:
             trusted_keys = ()
 
@@ -433,7 +433,7 @@ def main():
             name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
 
         if not name_objs:
-            sys.exit(2)
+            sys.exit(4)
 
         G = DNSAuthGraph()
         for name_obj in name_objs:
