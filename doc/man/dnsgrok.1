@@ -32,6 +32,9 @@ processes the results of diagnostic queries previously performed, e.g., using
 or more domain names specified.  The results of this processing are serialized
 into JSON format for further programmatic diagnostics or alerts.
 
+The source of the diagnostic query input is either a file specified with
+\fI-r\fP or standard input.
+
 Domain names to be processed may be passed either as command-line arguments, in
 a file (using the \fI-f\fP option), or simply implied using the diagnostic
 query input.  The latter is the preferred methodology (and the simplest) and is
