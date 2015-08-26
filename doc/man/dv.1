@@ -1,0 +1,90 @@
+.\"
+.\" This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
+.\" analysis, and visualization.
+.\" Created by Casey Deccio (casey@deccio.net)
+.\"
+.\" Copyright 2015 VeriSign, Inc.
+.\"
+.\" DNSViz is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 2 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" DNSViz is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License along
+.\" with this program; if not, write to the Free Software Foundation, Inc.,
+.\" 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+.\"
+.TH dv 1 "26 Aug 2015" "v0.4.0"
+.SH NAME
+dv \- assess a DNS query
+.SH SYNOPSIS
+\fBdig\fR [@server] [\fB\-b\ \fR\fB\fIaddress\fR\fR] [\fB\-c\ \fR\fB\fIclass\fR\fR] [\fB\-q\ \fR\fB\fIname\fR\fR] [\fB\-t\ \fR\fB\fItype\fR\fR] [\fB\-x\ \fR\fB\fIaddr\fR\fR] [\fB\-4\fR] [\fB\-6\fR] [name] [type] [class] [queryopt...]
+.HP 4
+\fBdig\fR [\fB\-h\fR]
+.HP 4
+\fBdig\fR [global\-queryopt...] [query...]
+.SH DESCRIPTION
+.B dv
+issues queries for the names and types specified on the command line to DNS
+servers, processes the output, and presents it to the user.  \fBdv\fP adopts a
+subset of the command-line options used by ISC's \fIdig(1)\fP but uses
+\fIdnsget(1)\fP and \fIdnsviz(1)\fP to issue queries and assess the results.
+It is meant to be a shortcut for quickly assessing DNS queries and diagnosing
+problems by invoking \fIInsget(1)\fP and \fIdnsviz(1)\fP with their most
+commonly used options and with a usage familiar similar to (but not equal to)
+\fIdig(1)\fP.  For a more detailed analysis, revealing the nature of errors,
+the user should use \fIdnsget(1)\fP, \fIdnsgrok(1)\fP, and \fIdnsviz(1)\fP
+directly.
+
+By default diagnostic queries are sent to recursive servers.  If no servers are
+specified with "@", then the first server in /etc/resolv.conf is selected.
+Note that unlike \fIdig(1)\fP \fBdv\fP only tries one server.
+
+If \fI+trace\fP is used, the behavior changes, and \fBdv\fP first queries root
+authoritative servers, following referrals to the name(s) in question.
+
+.SH OPTIONS
+.IP "-x <address>"
+Specify and IPv4 or IPv6 address for a reverse DNS (i.e., PTR) lookup.
+.IP "-b <address>"
+Specify a source IPv4 or IPv6 address for queries, rather than detecting it.
+This option can be used more than once to supply both an IPv4 and an IPv6
+address.
+
+The use of this option is sometimes necessary when using a dual-homed machine,
+and it is desirable to use the non-default interface for queries.
+.IP "-q <name>"
+Specify a query name.
+.IP "-t <type>"
+Specify a query type.
+.IP "-c <class>"
+Specify a query class (currently, only IN is supported; all other classes are ignored).
+.IP -4
+Use IPv4 only.  If this is specified, then queries over IPv6 are not
+attempted, unless \fI-6\fP is also specified.
+.IP -6
+Use IPv6 only.  If this is specified, then queries over IPv4 are not
+attempted, unless \fI-4\fP is also specified.
+
+.SH QUERY OPTIONS
+.IP +[no]trace
+Query authoritative servers, beginning at the DNS root, and follow referrals
+downwards.  The default is to query a recursive server instead.
+.IP +trusted-key=<filename>
+Specify a file that contains trusted keys for processing diagnostic queries.
+
+The format of this file is master zone file format and should contain DNSKEY
+records that correspond to one more trusted keys for one or more DNS zones.
+.SH EXIT CODES
+The exit codes are:
+.IP 0
+Program terminated normally.
+.IP 1
+Program execution was interrupted, or an unknown error ocurred.
+.SH SEE ALSO
+.BR dnsget (1), dnsgrok (1), dnsviz (1)
