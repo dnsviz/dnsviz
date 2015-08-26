@@ -163,7 +163,9 @@ def main():
                     names.append(name)
             f.close()
         else:
-            if not args:
+            if args:
+                args = map(lambda x: x.decode(sys.getfilesystemencoding()), args)
+            else:
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']
                 except KeyError:
