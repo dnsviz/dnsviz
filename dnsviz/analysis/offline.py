@@ -272,7 +272,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     dnskey_meta = response_info.name_obj._dnskeys[d]
                     warnings = [w.code for w in dnskey_meta.warnings]
                     errors = [e.code for e in dnskey_meta.errors]
-                    rdata_tup.append((None, warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
+                    rdata_tup.append(('VALID', warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
             elif rdtype == dns.rdatatype.DS:
                 dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
                 dss.sort()
