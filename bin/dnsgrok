@@ -172,6 +172,8 @@ def main():
             for name in args:
                 try:
                     name = dns.name.from_text(name)
+                except UnicodeDecodeError, e:
+                    logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
                 else:
