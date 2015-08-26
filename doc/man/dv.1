@@ -48,6 +48,9 @@ Note that unlike \fIdig(1)\fP \fBdv\fP only tries one server.
 If \fI+trace\fP is used, the behavior changes, and \fBdv\fP first queries root
 authoritative servers, following referrals to the name(s) in question.
 
+To simplify usage \fBdv\fP uses a default root trusted key if none is specified
+on the command line with \fI+trusted-key\fP.
+
 .SH OPTIONS
 .IP "-x <address>"
 Specify and IPv4 or IPv6 address for a reverse DNS (i.e., PTR) lookup.
