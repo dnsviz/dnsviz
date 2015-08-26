@@ -1,0 +1,111 @@
+.\"
+.TH dnsget 1 "26 Aug 2015" "v0.4.0"
+.SH NAME
+dnsget \- issue diagnostic DNS queries
+.SH SYNOPSIS
+.B dnsget [options]
+.I [domain_name...]
+.SH DESCRIPTION
+.B dnsget
+takes one or more domain names as input and performs a series of diagnostic
+queries to either recursive (default) or authoritative DNS servers, the results
+of which are serialized into JSON format.  Its output is used to assess the
+health of DNS deployments, using, e.g., \fIdnsgrok(1)\fP and \fIdnsviz(1)\fP.
+
+Domain names to be processed may be passed either as command-line arguments or
+in a file (using the \fI-f\fP option).  When the \fI-r\fP option is used, then
+the domain names can simply be implied using the diagnostic query input.  
+
+Domain names are extracted from the diagnostic query input in conjunction with
+\fI-r\fP only when \fI-f\fP is not used and no domain names are supplied on the
+command line.  If the \fI-f\fP option is used, then names may not be specified
+on the command line.
+
+The domain names passed as input are fully-qualified domain names, such as
+example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
+8.b.d.0.1.0.0.2.ip6.arpa.  Because it is implied that specified domain names
+are fully qualified, no trailing dot is necessary.
+
+.SH OPTIONS
+.IP "-f <filename>"
+Read names from a file (one name per line), instead of from command line.
+
+If this option is used, then names may not be specified on the command line.
+.IP "-d <level>"
+Set debug level to a value from 0 to 3, with increasing verbosity.  The default
+is "2" (informational-level output).
+.IP "-r <filename>"
+Read diagnostic query input from the specified file, instead of querying
+servers.  Specify "-" to read from standard input.
+.IP "-t <threads>"
+Specify the number of threads to use for issuing diagnostic queries for
+different names in parallel.  The default is to execute diagnostic queries of
+names serially.
+.IP -4
+use IPv4 only.  If this is specified, then queries over IPv6 are not
+attempted, unless \fI-6\fP is also specified.
+.IP -6
+use IPv6 only.  If this is specified, then queries over IPv4 are not
+attempted, unless \fI-4\fP is also specified.
+.IP "-b <address>"
+Specify a source IPv4 or IPv6 address for queries, rather than detecting it.
+This option can be used more than once to supply both an IPv4 and an IPv6
+address.
+
+The use of this option is sometimes necessary when using a dual-homed machine,
+and it is desirable to use the non-default interface for queries.
+.IP "-a <ancestor>"
+Issue diagnostic queries of each domain name through the specified ancestor.  The
+default for recursive mode is "." (i.e., issue queries all the way to the
+root).   The default for authoritative mode (i.e., with \fI-A\fP) is the domain
+name itself.
+.IP "-R <type>[,<type>...]"
+Issue diagnostic queries for only the specified type(s) (e.g., A, AAAA).  The
+default is to pick query types based on the nature of the name (e.g., the number of
+labels, whether it is a subdomain of .arpa, labels indicating association to
+TLSA or SRV records, etc.) and whether there are NS records detected (i.e., it
+is a zone).
+.IP "-s <server>[,<server>...]"
+Designate one or more servers for recursive queries, rather than using those
+specified in /etc/resolv.conf.
+
+Each server specified may either be an address (IPv4 or IPv6), a domain name
+(which will be resolved to an address using the standard resolution process),
+or both, using the syntax "name=address".  Note that when both a name and an
+address are specified ("name=address"), the name is only used for
+identification purposes, and it doesn't matter whether the name resolves to the
+corresponding address (or at all, for that matter).
+
+This option cannot be used in conjunction with \fI-A\fP.
+
+.IP -A
+Query authoritative servers, rather than (the default) recursive servers.
+.IP "-x <domain>:<server>[,<server>...]"
+Set explicit delegation for the specified domain to one or more servers.
+
+See \fI-s\fP for the syntax used for designating servers.
+
+This option can only be used in conjunction with \fI-A\fP.
+.IP "-o <filename>"
+Write the output to the specified file instead of to standard output, which
+is the default.
+.IP -p
+Make JSON output "pretty" instead of minimal (i.e., using indentation and
+newlines).
+.IP -h
+Display the usage and exit.
+
+.SH EXIT CODES
+The exit codes are:
+.IP 0
+Program terminated normally.
+.IP 1
+Incorrect usage.
+.IP 2
+The network was unavailable for diagnostic queries.
+.IP 3
+There was an error processing the input or saving the output.
+.IP 4
+Program execution was interrupted, or an unknown error ocurred.
+.SH SEE ALSO
+.BR dnsgrok (1), dnsviz (1), dv (1)

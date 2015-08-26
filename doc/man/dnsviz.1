@@ -1,0 +1,87 @@
+.\"
+.TH dnsviz 1 "26 Aug 2015" "v0.4.0"
+.SH NAME
+dnsviz \- process diagnostic DNS queries to visual output
+.SH SYNOPSIS
+.B dnsviz [options]
+.I [domain_name...]
+.SH DESCRIPTION
+.B dnsviz
+processes the results of diagnostic queries previously performed, e.g., using
+\fIdnsget(1)\fP, to assess the health of the associated DNS deployments for one
+or more domain names specified.  The results of this processing are presented in
+one of several graphical formats for user diagnostics.
+
+Domain names to be processed may be passed either as command-line arguments, in
+a file (using the \fI-f\fP option), or simply implied using the diagnostic
+query input.  The latter is the preferred methodology (and the simplest) and is
+useful, except in cases where the input contains diagnostic queries for
+multiple domain names, only a subset of which are to be processed.
+
+If \fI-f\fP is not used and no domain names are supplied on the command line,
+then the domain names to be processed are extracted from the diagnostic query
+input.  If the \fI-f\fP option is used, then names may not be specified on the
+command line.
+
+The domain names passed as input are fully-qualified domain names, such as
+example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
+8.b.d.0.1.0.0.2.ip6.arpa.  Because it is implied that specified domain names
+are fully qualified, no trailing dot is necessary.
+
+.SH OPTIONS
+.IP "-f <filename>"
+Read names from a file (one name per line), instead of from command line.
+
+If this option is used, then names may not be specified on the command line.
+.IP "-r <filename>"
+Read diagnostic query input from the specified file, instead of from standard
+input.
+.IP "-t <filename>"
+Specify a file that contains trusted keys for processing diagnostic queries.
+
+The format of this file is master zone file format and should contain DNSKEY
+records that correspond to one more trusted keys for one or more DNS zones.
+.IP "-R <type>[,<type>...]"
+Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
+to process all types queried as part of the diagnostic input.
+.IP -O
+Save the output to a file, whose name is derived from the format (i.e.,
+provided to \fI-T\fP) and the domain name.
+
+If this option is used when the diagnostic queries of multiple domain name are
+being processed, a file will be created for each domain name processed.
+.IP "-o <filename>"
+Write the output to the specified file instead of to standard output, which
+is the default.
+
+If this option is used when the diagnostic queries of multiple domain name are
+being processed, a single file (the one specified) will be created, which will
+contain the collective output for all domain names processed.
+.IP "-T <format>"
+Specify the format of the format from among the following: "txt", "dot", "png",
+"jpg", "svg", and "html".  The default is "txt".
+
+All output formats except "txt" are created using \fIdot(1)\fP, which outputs
+the image of a directed graph.  The "html" format makes this image interactive
+using javascript libraries that are distributed with this software.
+
+The "txt" output is appropriate for terminal text file output, using colors
+(where supported by the terminal) and symbols to designate status and errors in
+a loosely-defined textual format.
+.IP -h
+Display the usage and exit.
+
+.SH EXIT CODES
+The exit codes are:
+.IP 0
+Program terminated normally.
+.IP 1
+Incorrect usage.
+.IP 2
+Required package dependencies were not found.
+.IP 3
+There was an error processing the input or saving the output.
+.IP 4
+Program execution was interrupted, or an unknown error ocurred.
+.SH SEE ALSO
+.BR dnsget (1), dnsgrok (1), dv (1)
