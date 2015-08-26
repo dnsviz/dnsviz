@@ -184,13 +184,13 @@ def textualize_status_output(names, show_color):
     for name, status, warnings, errors, responses in names:
         params['name'] = name
         params['status_rdata'] = ''
-        params['status_color_rdata'] = ''
         if show_color:
             params['status_color'] = TERM_COLOR_MAP['BOLD']
             params['color_reset'] = TERM_COLOR_MAP['RESET']
         if status is not None:
             params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
-            params['status_color_rdata'] = TERM_COLOR_MAP[status]
+            if show_color:
+                params['status_color_rdata'] = TERM_COLOR_MAP[status]
         s += name_template % params
 
         in_neg_response = False
