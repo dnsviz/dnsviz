@@ -588,7 +588,7 @@ def main():
             for line in f:
                 name = line.strip()
                 try:
-                    name = dns.name.from_unicode(name)
+                    name = dns.name.from_text(name)
                 except UnicodeDecodeError, e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
