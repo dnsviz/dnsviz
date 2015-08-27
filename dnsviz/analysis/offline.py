@@ -532,13 +532,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 lambda x: x.is_valid_response() and \
                         x.effective_edns >= 0)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, level=RDTYPES_ALL, trace=None, follow_mx=True):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True):
         if trace is None:
             trace = []
 
         # avoid loops
         if self in trace:
-            self._populate_name_status(level)
+            self._populate_name_status()
             return
 
         # if status has already been populated, then don't reevaluate
@@ -561,44 +561,40 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             supported_digest_algs = crypto._supported_digest_algs
 
         # populate status of dependencies
-        if level <= self.RDTYPES_NS_TARGET:
-            for cname in self.cname_targets:
-                for target, cname_obj in self.cname_targets[cname].items():
-                    cname_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
-            if follow_mx:
-                for target, mx_obj in self.mx_targets.items():
-                    if mx_obj is not None:
-                        mx_obj.populate_status(trusted_keys, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
-        if level <= self.RDTYPES_SECURE_DELEGATION:
-            for signer, signer_obj in self.external_signers.items():
-                if signer_obj is not None:
-                    signer_obj.populate_status(trusted_keys, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
-            for target, ns_obj in self.ns_dependencies.items():
-                if ns_obj is not None:
-                    ns_obj.populate_status(trusted_keys, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj.populate_status(trusted_keys, trace=trace + [self])
+        if follow_mx:
+            for target, mx_obj in self.mx_targets.items():
+                if mx_obj is not None:
+                    mx_obj.populate_status(trusted_keys, trace=trace + [self], follow_mx=False)
+        for signer, signer_obj in self.external_signers.items():
+            if signer_obj is not None:
+                signer_obj.populate_status(trusted_keys, trace=trace + [self])
+        for target, ns_obj in self.ns_dependencies.items():
+            if ns_obj is not None:
+                ns_obj.populate_status(trusted_keys, trace=trace + [self])
 
         # populate status of ancestry
         if self.parent is not None:
-            self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.dlv_parent is not None:
-            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self])
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
-        self._populate_name_status(level)
-        if level <= self.RDTYPES_SECURE_DELEGATION:
-            self._index_dnskeys()
-        self._populate_rrsig_status_all(supported_algs, level)
-        self._populate_nodata_status(supported_algs, level)
-        self._populate_nxdomain_status(supported_algs, level)
+        self._populate_name_status()
+        self._index_dnskeys()
+        self._populate_rrsig_status_all(supported_algs)
+        self._populate_nodata_status(supported_algs)
+        self._populate_nxdomain_status(supported_algs)
         self._finalize_key_roles()
-        if level <= self.RDTYPES_SECURE_DELEGATION:
-            if not is_dlv:
-                self._populate_delegation_status(supported_algs, supported_digest_algs)
-            if self.dlv_parent is not None:
-                self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
-            self._populate_dnskey_status(trusted_keys)
+        if not is_dlv:
+            self._populate_delegation_status(supported_algs, supported_digest_algs)
+        if self.dlv_parent is not None:
+            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+        self._populate_dnskey_status(trusted_keys)
 
-    def _populate_name_status(self, level, trace=None):
+    def _populate_name_status(self, trace=None):
         # using trace allows _populate_name_status to be called independent of
         # populate_status
         if trace is None:
@@ -615,14 +611,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
 
-        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
-
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
 
             qname_obj = self.get_name(qname)
             if rdtype == dns.rdatatype.DS:
@@ -651,35 +640,31 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if neg_response_info.qname == qname or response.recursion_desired_and_available():
                             self.nxrrset.add((neg_response_info.qname, neg_response_info.rdtype))
 
-            if level <= self.RDTYPES_DELEGATION:
-                # now check referrals (if name hasn't already been identified as YXDOMAIN)
-                if self.name == qname and self.name not in self.yxdomain:
-                    if rdtype not in (self.referral_rdtype, dns.rdatatype.NS):
-                        continue
-                    try:
-                        for query1 in query.queries.values():
-                            for server in query1.responses:
-                                bailiwick = bailiwick_map.get(server, default_bailiwick)
-                                for client in query1.responses[server]:
-                                    if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
-                                        self.yxdomain.add(self.name)
-                                        raise FoundYXDOMAIN
-                    except FoundYXDOMAIN:
-                        pass
-
-        if level <= self.RDTYPES_NS_TARGET:
-            # now add the values of CNAMEs
-            for cname in self.cname_targets:
-                if level > self.RDTYPES_ALL and cname not in (self.name, self.dlv_name):
+            # now check referrals (if name hasn't already been identified as YXDOMAIN)
+            if self.name == qname and self.name not in self.yxdomain:
+                if rdtype not in (self.referral_rdtype, dns.rdatatype.NS):
                     continue
-                for target, cname_obj in self.cname_targets[cname].items():
-                    if cname_obj is self:
-                        continue
-                    if cname_obj.yxrrset is None:
-                        cname_obj._populate_name_status(self.RDTYPES_ALL, trace=trace + [self])
-                    for name, rdtype in cname_obj.yxrrset:
-                        if name == target:
-                            self.yxrrset.add((cname,rdtype))
+                try:
+                    for query1 in query.queries.values():
+                        for server in query1.responses:
+                            bailiwick = bailiwick_map.get(server, default_bailiwick)
+                            for client in query1.responses[server]:
+                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
+                                    self.yxdomain.add(self.name)
+                                    raise FoundYXDOMAIN
+                except FoundYXDOMAIN:
+                    pass
+
+        # now add the values of CNAMEs
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                if cname_obj is self:
+                    continue
+                if cname_obj.yxrrset is None:
+                    cname_obj._populate_name_status(trace=trace + [self])
+                for name, rdtype in cname_obj.yxrrset:
+                    if name == target:
+                        self.yxrrset.add((cname,rdtype))
 
         if self.name in self.yxdomain:
             self.status = Status.NAME_STATUS_NOERROR
@@ -1059,7 +1044,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, intermittent=False, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
 
-    def _populate_rrsig_status_all(self, supported_algs, level):
+    def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -1072,14 +1057,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             self.ksks = set()
 
         _logger.debug('Assessing RRSIG status of %s...' % (fmt.humanize_name(self.name)))
-        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
-
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
 
             items_to_validate = []
             for rrset_info in query.answer_info:
@@ -1590,19 +1568,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return statuses
 
-    def _populate_nxdomain_status(self, supported_algs, level):
+    def _populate_nxdomain_status(self, supported_algs):
         self.nxdomain_status = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
 
         _logger.debug('Assessing NXDOMAIN response status of %s...' % (fmt.humanize_name(self.name)))
-        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
 
             for neg_response_info in query.nxdomain_info:
                 self.nxdomain_warnings[neg_response_info] = []
@@ -1643,19 +1615,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         err1.add_server_client(server, client, response)
                                         err2.add_server_client(server, client, response)
 
-    def _populate_nodata_status(self, supported_algs, level):
+    def _populate_nodata_status(self, supported_algs):
         self.nodata_status = {}
         self.nodata_warnings = {}
         self.nodata_errors = {}
 
         _logger.debug('Assessing NODATA response status of %s...' % (fmt.humanize_name(self.name)))
-        required_rdtypes = self._rdtypes_for_analysis_level(level)
         for (qname, rdtype), query in self.queries.items():
-            if level > self.RDTYPES_ALL and qname not in (self.name, self.dlv_name):
-                continue
-
-            if required_rdtypes is not None and rdtype not in required_rdtypes:
-                continue
 
             for neg_response_info in query.nodata_info:
                 self.nodata_warnings[neg_response_info] = []
@@ -1787,7 +1753,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         self._set_response_component_status(response_component_status)
 
-    def _set_response_component_status(self, response_component_status, is_dlv=False, level=RDTYPES_ALL, trace=None, follow_mx=True):
+    def _set_response_component_status(self, response_component_status, is_dlv=False, trace=None, follow_mx=True):
         if trace is None:
             trace = []
 
@@ -1796,27 +1762,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return
 
         # populate status of dependencies
-        if level <= self.RDTYPES_NS_TARGET:
-            for cname in self.cname_targets:
-                for target, cname_obj in self.cname_targets[cname].items():
-                    cname_obj._set_response_component_status(response_component_status, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self])
-            if follow_mx:
-                for target, mx_obj in self.mx_targets.items():
-                    if mx_obj is not None:
-                        mx_obj._set_response_component_status(response_component_status, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], follow_mx=False)
-        if level <= self.RDTYPES_SECURE_DELEGATION:
-            for signer, signer_obj in self.external_signers.items():
-                if signer_obj is not None:
-                    signer_obj._set_response_component_status(response_component_status, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
-            for target, ns_obj in self.ns_dependencies.items():
-                if ns_obj is not None:
-                    ns_obj._set_response_component_status(response_component_status, level=self.RDTYPES_NS_TARGET, trace=trace + [self])
+        for cname in self.cname_targets:
+            for target, cname_obj in self.cname_targets[cname].items():
+                cname_obj._set_response_component_status(response_component_status, trace=trace + [self])
+        if follow_mx:
+            for target, mx_obj in self.mx_targets.items():
+                if mx_obj is not None:
+                    mx_obj._set_response_component_status(response_component_status, trace=trace + [self], follow_mx=False)
+        for signer, signer_obj in self.external_signers.items():
+            if signer_obj is not None:
+                signer_obj._set_response_component_status(response_component_status, trace=trace + [self])
+        for target, ns_obj in self.ns_dependencies.items():
+            if ns_obj is not None:
+                ns_obj._set_response_component_status(response_component_status, trace=trace + [self])
 
         # populate status of ancestry
         if self.parent is not None:
-            self.parent._set_response_component_status(response_component_status, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            self.parent._set_response_component_status(response_component_status, trace=trace + [self])
         if self.dlv_parent is not None:
-            self.dlv_parent._set_response_component_status(response_component_status, is_dlv=True, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self])
+            self.dlv_parent._set_response_component_status(response_component_status, is_dlv=True, trace=trace + [self])
 
         self.response_component_status = response_component_status
 
