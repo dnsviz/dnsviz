@@ -1592,9 +1592,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if rdtype2 in (dns.rdatatype.DS, dns.rdatatype.DLV):
                             continue
 
-                        if required_rdtypes is not None and rdtype2 not in required_rdtypes:
-                            continue
-
                         for rrset_info in filter(lambda x: x.rrset.name == neg_response_info.qname, query2.answer_info):
                             shared_servers_clients = set(rrset_info.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
