@@ -148,10 +148,16 @@ class DVCommandLineQuery:
                 dnsviz_args.extend(['-t', TRUSTED_KEYS_ROOT])
         dnsviz_args.extend(['-R', dns.rdatatype.to_text(self._get_rdtype(options))])
 
-        dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
-        dnsviz_p = subprocess.Popen(dnsviz_args, stdin=dnsget_p.stdout)
-        dnsget_p.stdout.close()
-        dnsviz_p.communicate()
+        try:
+            dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
+            dnsviz_p = subprocess.Popen(dnsviz_args, stdin=dnsget_p.stdout)
+        except OSError, e:
+            sys.stderr.write('error: %s\n' % e)
+            return False
+        else:
+            dnsget_p.stdout.close()
+            dnsviz_p.communicate()
+            return dnsget_p.returncode == 0 and dnsviz_p.returncode == 0
 
 class DVCommandLine:
     def __init__(self, args):
@@ -187,8 +193,11 @@ class DVCommandLine:
                 sys.exit(1)
 
     def query_and_display(self):
+        ret = True
         for q in self.queries:
-            q.query_and_display(self.options)
+            if not q.query_and_display(self.options):
+                ret = False
+        return ret
 
     def _get_arg(self, has_arg):
         try:
@@ -387,7 +396,10 @@ def main():
     except KeyboardInterrupt:
         pass
     else:
-        q.query_and_display()
+        if q.query_and_display():
+            sys.exit(0)
+        else:
+            sys.exit(1)
     finally:
         close_default_dns_transport_handler()
 
