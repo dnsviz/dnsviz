@@ -212,12 +212,13 @@ def main():
             trusted_keys = ()
 
         name_objs = []
+        cache = {}
         for name in names:
             name_str = name.canonicalize().to_text()
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
                 continue
-            name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured))
+            name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
 
         if not name_objs:
             sys.exit(4)
