@@ -116,7 +116,7 @@ class DNSResponse:
     def copy(self):
         clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, review_history=False)
         clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp)
-        clone.set_responsiveness(self.udp_attempted, self.udp_responsive, self.tcp_attempted, self.tcp_responsive, self.responsive_cause_index)
+        clone.set_responsiveness(self.udp_attempted, self.udp_responsive, self.tcp_attempted, self.tcp_responsive, self.responsive_cause_index, self.responsive_cause_index_tcp)
         return clone
 
     def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options, effective_tcp):
@@ -127,12 +127,13 @@ class DNSResponse:
         self.effective_edns_options = edns_options
         self.effective_tcp = effective_tcp
 
-    def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index):
+    def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index, responsive_cause_index_tcp):
         self.udp_attempted = udp_attempted
         self.udp_responsive = udp_responsive
         self.tcp_attempted = tcp_attempted
         self.tcp_responsive = tcp_responsive
         self.responsive_cause_index = responsive_cause_index
+        self.responsive_cause_index_tcp = responsive_cause_index_tcp
 
     def _review_history(self):
         import query as Q
@@ -156,6 +157,7 @@ class DNSResponse:
         # check here, rather than just a valid check
 
         responsive_cause_index = None
+        responsive_cause_index_tcp = tcp
 
         prev_index = None
         for i, retry in enumerate(self.history):
@@ -181,11 +183,13 @@ class DNSResponse:
                     if responsive_cause_index is None and \
                             not tcp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_TCP:
                         responsive_cause_index = prev_index
+                        responsive_cause_index_tcp = tcp
                     tcp_valid = True
                 else:
                     if responsive_cause_index is None and \
                             not udp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_UDP:
                         responsive_cause_index = prev_index
+                        responsive_cause_index_tcp = tcp
                     udp_valid = True
 
             if retry.action == Q.RETRY_ACTION_SET_FLAG:
@@ -224,13 +228,15 @@ class DNSResponse:
                 if responsive_cause_index is None and \
                         not tcp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_TCP:
                     responsive_cause_index = prev_index
+                    responsive_cause_index_tcp = tcp
             else:
                 if responsive_cause_index is None and \
                         not udp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_UDP:
                     responsive_cause_index = prev_index
+                    responsive_cause_index_tcp = tcp
 
         self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
-        self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index)
+        self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index, responsive_cause_index_tcp)
 
     def recursion_desired(self):
         '''Return True if the recursion desired (RD) bit was set in the request to the
