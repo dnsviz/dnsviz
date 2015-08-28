@@ -1062,7 +1062,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if error_info.code == Q.RESPONSE_ERROR_OTHER:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp, intermittent=False), self.response_errors[query], server, client, response)
                     if error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, intermittent=False, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
+                        # if we used EDNS and didn't fall back, and the RCODE
+                        # was FORMERR, SERVFAIL, or NOTIMP, then this is a
+                        # legitimate reason for the RCODE
+                        if response.effective_edns >= 0 and response.message.rcode() in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP):
+                            pass
+                        else:
+                            Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, intermittent=False, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
