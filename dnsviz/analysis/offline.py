@@ -719,18 +719,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 err = Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=True)
                             else:
                                 err = Errors.ResponseErrorWithEDNS(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=False))
-                        # any other errors
-                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
-                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                err = Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=True)
-                            else:
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=False))
                         # the RCODE was invalid with EDNS
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
                                 err = Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
                             else:
                                 err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False))
+                        # any other errors
+                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
+                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
+                                err = Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=True)
+                            else:
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=False))
 
                         #XXX is there another (future) reason why  we would
                         # have disabled EDNS?
