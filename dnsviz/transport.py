@@ -153,7 +153,8 @@ class DNSQueryTransportMeta:
         self.end_time = time.time()
         if self.start_time is None:
             self.start_time = self.end_time
-        self.sock.close()
+        if self.sock is not None:
+            self.sock.close()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
