@@ -991,7 +991,7 @@ class DNSQuery(object):
             for o in self.edns_options:
                 s = StringIO.StringIO()
                 o.to_wire(s)
-                d['options']['edns_options'].append(base64.b64encode(s.getvalue()))
+                d['options']['edns_options'].append((o.otype, base64.b64encode(s.getvalue())))
             d['options']['tcp'] = self.tcp
 
         d['responses'] = collections.OrderedDict()
@@ -1027,10 +1027,8 @@ class DNSQuery(object):
             edns_max_udp_payload = d1['edns_max_udp_payload']
             edns_flags = d1['edns_flags']
             edns_options = []
-            for o in d1['edns_options']:
-                #XXX from_wire
-                #edns_options.append(foo)
-                pass
+            for otype, data in d1['edns_options']:
+                edns_options.append(dns.edns.GenericOption(otype, base64.b64decode(data)))
         else:
             edns = None
             edns_max_udp_payload = None
@@ -1081,7 +1079,7 @@ class MultiQuery(object):
         for o in query.edns_options:
             s = StringIO.StringIO()
             o.to_wire(s)
-            edns_options_str += o.getvalue()
+            edns_options_str += s.getvalue()
         params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp)
         if params in self.queries:
             self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
