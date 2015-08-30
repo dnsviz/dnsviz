@@ -33,7 +33,6 @@ import dns.exception, dns.message, dns.rdatatype
 
 from config import DNSVIZ_SHARE_PATH
 import format as fmt
-import resolver as Resolver
 
 TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 
@@ -75,6 +74,7 @@ def get_default_trusted_keys():
     return get_trusted_keys(tk_str)
 
 def get_default_trusted_keys_with_sanity_check():
+    import resolver as Resolver
     trusted_keys = get_default_trusted_keys()
     checked_trusted_keys = []
     dnskey_sets = {}
