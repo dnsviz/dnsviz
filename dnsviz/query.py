@@ -29,6 +29,7 @@
 import base64
 import bisect
 import collections
+import errno
 import Queue
 import socket
 import StringIO
@@ -695,7 +696,11 @@ class DNSQueryHandler:
                     handler.handle(response_wire, response, response_time)
 
             if retry_action is not None:
-                self.history.append(retry_action)
+                # if this error was our fault, don't add it to the history
+                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EMFILE:
+                    pass
+                else:
+                    self.history.append(retry_action)
 
             self._set_query_time()
             self._reset_wait()
