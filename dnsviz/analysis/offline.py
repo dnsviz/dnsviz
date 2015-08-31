@@ -482,41 +482,40 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _server_responsive_with_condition(self, server, client, tcp, request_test, response_test):
         for query in self.queries.values():
             for query1 in query.queries.values():
-                if request_test(query1):
+                try:
+                    if client is None:
+                        clients = query1.responses[server].keys()
+                    else:
+                        clients = (client,)
+                except KeyError:
+                    continue
+
+                for c in clients:
                     try:
-                        if client is None:
-                            clients = query1.responses[server].keys()
-                        else:
-                            clients = (client,)
+                        response = query1.responses[server][client]
                     except KeyError:
                         continue
-
-                    for c in clients:
-                        try:
-                            response = query1.responses[server][client]
-                        except KeyError:
+                    # if tcp is specified, then only follow through if the
+                    # query was ultimately issued according to that value
+                    if tcp is not None:
+                        if tcp and not response.effective_tcp:
                             continue
-                        # if tcp is specified, then only follow through if the
-                        # query was ultimately issued according to that value
-                        if tcp is not None:
-                            if tcp and not response.effective_tcp:
-                                continue
-                            if not tcp and response.effective_tcp:
-                                continue
-                        if response_test(response):
-                            return True
+                        if not tcp and response.effective_tcp:
+                            continue
+                    if request_test(response) and response_test(response):
+                        return True
         return False
 
     def server_responsive_with_edns_flag(self, server, client, tcp, f):
         return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: x.edns >= 0 and x.edns_flags & f,
+                lambda x: x.effective_edns >= 0 and x.effective_edns_flags & f,
                 lambda x: ((x.effective_tcp and x.tcp_responsive) or \
                         (not x.effective_tcp and x.udp_responsive)) and \
                         x.effective_edns >= 0 and x.effective_edns_flags & f)
 
     def server_responsive_valid_with_edns_flag(self, server, client, tcp, f):
         return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: x.edns >= 0 and x.edns_flags & f,
+                lambda x: x.effective_edns >= 0 and x.effective_edns_flags & f,
                 lambda x: ((x.effective_tcp and x.tcp_responsive) or \
                         (not x.effective_tcp and x.udp_responsive)) and \
                         x.is_valid_response() and \
@@ -530,14 +529,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def server_responsive_with_edns(self, server, client, tcp):
         return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: x.edns >= 0,
+                lambda x: x.effective_edns >= 0,
                 lambda x: ((x.effective_tcp and x.tcp_responsive) or \
                         (not x.effective_tcp and x.udp_responsive)) and \
                         x.effective_edns >= 0)
 
     def server_responsive_valid_with_edns(self, server, client, tcp):
         return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: x.edns >= 0,
+                lambda x: x.effective_edns >= 0,
                 lambda x: ((x.effective_tcp and x.tcp_responsive) or \
                         (not x.effective_tcp and x.udp_responsive)) and \
                         x.is_valid_response() and \
