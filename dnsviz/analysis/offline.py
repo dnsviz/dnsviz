@@ -573,7 +573,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # populate status of dependencies
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.populate_status(trusted_keys, trace=trace + [self])
+                if cname_obj is not None:
+                    cname_obj.populate_status(trusted_keys, trace=trace + [self])
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
@@ -669,6 +670,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is self:
+                    continue
+                if cname_obj is None:
                     continue
                 if cname_obj.yxrrset is None:
                     cname_obj._populate_name_status(trace=trace + [self])
@@ -1786,7 +1789,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # populate status of dependencies
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj._set_response_component_status(response_component_status, trace=trace + [self])
+                if cname_obj is not None:
+                    cname_obj._set_response_component_status(response_component_status, trace=trace + [self])
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
@@ -2051,7 +2055,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if level <= self.RDTYPES_NS_TARGET:
             for cname in self.cname_targets:
                 for target, cname_obj in self.cname_targets[cname].items():
-                    cname_obj.serialize_status(d, loglevel=loglevel, ancestry_only=cname_ancestry_only, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], html_format=html_format)
+                    if cname_obj is not None:
+                        cname_obj.serialize_status(d, loglevel=loglevel, ancestry_only=cname_ancestry_only, level=max(self.RDTYPES_ALL_SAME_NAME, level), trace=trace + [self], html_format=html_format)
             if follow_mx:
                 for target, mx_obj in self.mx_targets.items():
                     if mx_obj is not None:

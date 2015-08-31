@@ -916,9 +916,11 @@ class OnlineDomainNameAnalysis(object):
 
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
-                cname_obj.serialize(d, meta_only, trace=trace + [self])
+                if cname_obj is not None:
+                    cname_obj.serialize(d, meta_only, trace=trace + [self])
         for signer, signer_obj in self.external_signers.items():
-            signer_obj.serialize(d, meta_only, trace=trace + [self])
+            if signer_obj is not None:
+                signer_obj.serialize(d, meta_only, trace=trace + [self])
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
                 ns_obj.serialize(d, meta_only, trace=trace + [self])
