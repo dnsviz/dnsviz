@@ -194,6 +194,10 @@ class DNSResponse:
 
             if retry.action == Q.RETRY_ACTION_NO_CHANGE:
                 pass
+            elif retry.action == Q.RETRY_ACTION_USE_TCP:
+                tcp = True
+            elif retry.action == Q.RETRY_ACTION_USE_UDP:
+                tcp = False
             elif retry.action == Q.RETRY_ACTION_SET_FLAG:
                 flags |= retry.action_arg
             elif retry.action == Q.RETRY_ACTION_CLEAR_FLAG:
@@ -207,10 +211,6 @@ class DNSResponse:
                 edns_flags |= retry.action_arg
             elif retry.action == Q.RETRY_ACTION_CLEAR_EDNS_FLAG:
                 edns_flags &= ~retry.action_arg
-            elif retry.action == Q.RETRY_ACTION_USE_TCP:
-                tcp = True
-            elif retry.action == Q.RETRY_ACTION_USE_UDP:
-                tcp = False
             elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
                 pass
             #TODO do the same with EDNS options
