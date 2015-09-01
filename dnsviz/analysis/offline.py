@@ -818,6 +818,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
                     pass
 
+                # or if the RCODE was SERVFAIL, and the corresponding action was
+                # to set the CD flag, then this was a reasonable response
+                # from a server that couldn't validate the query
+                elif retry.cause_arg == dns.rcode.SERVFAIL and \
+                        retry.action == Q.RETRY_ACTION_SET_FLAG and \
+                        retry.action_arg == dns.flags.CD:
+                    pass
+
                 # otherwise, set the error class and instantiation kwargs
                 # appropriately
                 else:
