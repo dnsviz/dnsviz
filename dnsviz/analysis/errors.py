@@ -866,7 +866,7 @@ class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
 
 class ResponseErrorWithEDNS(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, intermittent=False, attempts=3))
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.'
     '''
