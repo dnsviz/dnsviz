@@ -211,9 +211,17 @@ class DNSResponse:
                 edns_flags |= retry.action_arg
             elif retry.action == Q.RETRY_ACTION_CLEAR_EDNS_FLAG:
                 edns_flags &= ~retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
+                #TODO option data
+                edns_options.append(dns.edns.GenericOption(retry.action_arg, ''))
+            elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
+                filtered_options = filter(lambda x: retry.action_arg == x.otype, edns_options)
+                if filtered_options:
+                    edns_options.remove(filtered_options[0])
             elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
                 pass
-            #TODO do the same with EDNS options
+            elif retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
+                edns = retry.action_arg
 
             prev_index = i
 
