@@ -37,7 +37,7 @@ setup(name='dnsviz',
         description='DNS analysis and visualization tool suite',
         long_description=open('README.md', 'r').read(),
         license='LICENSE',
-        packages=['dnsviz','dnsviz.viz','dnsviz.analysis'],
+        packages=['dnsviz','dnsviz.viz','dnsviz.analysis','dnsviz.commands'],
         scripts=['bin/dnsviz'],
         data_files=[
                 ('share/doc/dnsviz', ['README.md', 'LICENSE']),
