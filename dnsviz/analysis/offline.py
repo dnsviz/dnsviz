@@ -1028,6 +1028,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
         for server,client,response in algs_signing_rrset:
+						# if DNSSEC was not requested (e.g., for diagnostics purposes),
+						# then don't report an issue
+            if not (response.query.edns >= 0 and response.query.edns_flags & dns.flags.DO):
+                continue
+
             errors = self.rrset_errors[rrset_info]
             # report an error if all RRSIGs are missing
             if not algs_signing_rrset[(server,client,response)]:
@@ -1598,6 +1603,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 statuses.append(status)
 
         for server, client, response in servers_missing_nsec:
+						# if DNSSEC was not requested (e.g., for diagnostics purposes),
+						# then don't report an issue
+            if not (response.query.edns >= 0 and response.query.edns_flags & dns.flags.DO):
+                continue
+
             # report that no NSEC(3) records were returned
             if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
                 if response.dnssec_requested():
