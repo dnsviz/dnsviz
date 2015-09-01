@@ -506,37 +506,112 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         return True
         return False
 
-    def server_responsive_with_edns_flag(self, server, client, tcp, f):
+    def server_responsive_for_action(self, server, client, tcp, action, action_arg, require_valid):
+        '''Return True if at least one (optionally valid) response was returned
+        by the server without the specified action.  This action is the value
+        of the responsive_cause_index in the response's history.'''
+
+        if action == Q.RETRY_ACTION_NO_CHANGE:
+            return True
+
+        elif action == Q.RETRY_ACTION_CHANGE_SPORT:
+            return True
+
+        elif action == Q.RETRY_ACTION_SET_FLAG:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: not (x.effective_flags & action_arg) and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_CLEAR_FLAG:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_flags & action_arg and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_DISABLE_EDNS:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+                            x.effective_edns_max_udp_payload > action_arg and \
+                            x.msg_size > action_arg and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_SET_EDNS_FLAG:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+                            not (x.effective_edns_flags & action_arg) and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_CLEAR_EDNS_FLAG:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+                            x.effective_edns_flags & action_arg and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+                            not filter(lambda x: action_arg == x.otype, x.effective_edns_options) and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns >= 0 and \
+                            filter(lambda x: action_arg == x.otype, x.effective_edns_options) and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        elif action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns == action_arg and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+            return self._server_responsive_with_condition(server, client, tcp,
+                    lambda x: x.effective_edns == action_arg and \
+
+                            ((x.effective_tcp and x.tcp_responsive) or \
+                            (not x.effective_tcp and x.udp_responsive)) and \
+                            (not require_valid or x.is_valid_response()))
+
+        else:
+            return False
+
+    def server_responsive_with_do(self, server, client, tcp, require_valid):
         return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
+                lambda x: x.effective_edns >= 0 and \
+                        x.effective_edns_flags & dns.flags.DO and \
+
+                        ((x.effective_tcp and x.tcp_responsive) or \
                         (not x.effective_tcp and x.udp_responsive)) and \
-                        x.effective_edns >= 0 and x.effective_edns_flags & f)
-
-    def server_responsive_valid_with_edns_flag(self, server, client, tcp, f):
-        return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
-                        (not x.effective_tcp and x.udp_responsive)) and \
-                        x.is_valid_response() and \
-                        x.effective_edns >= 0 and x.effective_edns_flags & f)
-
-    def server_responsive_with_do(self, server, client, tcp):
-        return self.server_responsive_with_edns_flag(server, client, tcp, dns.flags.DO)
-
-    def server_responsive_valid_with_do(self, server, client, tcp):
-        return self.server_responsive_valid_with_edns_flag(server, client, tcp, dns.flags.DO)
-
-    def server_responsive_with_edns(self, server, client, tcp):
-        return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
-                        (not x.effective_tcp and x.udp_responsive)) and \
-                        x.effective_edns >= 0)
-
-    def server_responsive_valid_with_edns(self, server, client, tcp):
-        return self._server_responsive_with_condition(server, client, tcp,
-                lambda x: ((x.effective_tcp and x.tcp_responsive) or \
-                        (not x.effective_tcp and x.udp_responsive)) and \
-                        x.is_valid_response() and \
-                        x.effective_edns >= 0)
+                        (not require_valid or x.is_valid_response()))
 
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True):
         if trace is None:
@@ -687,166 +762,192 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     break
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
-        # if the initial request used EDNS
-        if response.query.edns >= 0:
-            err = None
-            #TODO check for general intermittent errors (i.e., not just for EDNS/DO)
-            #TODO mark a slow response as well (over a certain threshold)
+        # if we had to make some change to elicit a response, find out why that
+        # was
+        change_err = None
+        edns_err = None
+        if response.responsive_cause_index is not None:
+            retry = response.history[response.responsive_cause_index]
 
-            # if the response didn't use EDNS
-            if response.message.edns < 0:
-                # if the effective request didn't use EDNS either
-                if response.effective_edns < 0:
-                    # find out what made us turn off EDNS to elicit a valid response
-                    if response.responsive_cause_index is not None:
-                        # there was some type of a network error with EDNS in use
-                        if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
-                            if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client,response.responsive_cause_index_tcp):
-                                query_specific = True
-                            else:
-                                query_specific = False
-                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN')), query_specific=query_specific)
-                        # there was a malformed response with EDNS in use
-                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
-                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                query_specific = True
-                            else:
-                                query_specific = False
-                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size), query_specific=query_specific)
-                        # the response timed out with EDNS in use
-                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                            if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client,response.responsive_cause_index_tcp):
-                                query_specific = True
-                            else:
-                                query_specific = False
-                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1), query_specific=query_specific)
-                        # the RCODE was something other than NOERROR or NXDOMAIN
-                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                            # if the RCODE was FORMERR, SERVFAIL, or NOTIMP,
-                            # then this is a legitimate reason for falling back
-                            if response.history[response.responsive_cause_index].cause_arg in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP):
-                                pass
-                            # the RCODE was invalid with EDNS
-                            else:
-                                if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                    query_specific = True
-                                else:
-                                    query_specific = False
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg)), query_specific=query_specific)
-                        # any other errors
-                        elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
-                            if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                query_specific = True
-                            else:
-                                query_specific = False
-                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp), query_specific=query_specific)
+            cause_err_class = None
+            action_err_class = None
 
-                        #XXX is there another (future) reason why  we would
-                        # have disabled EDNS?
-                        else:
-                            pass
+            cause_err_kwargs = { 'tcp': response.responsive_cause_index_tcp }
+            action_err_kwargs = {}
 
-                    # if EDNS was disabled in the request, but the response was
-                    # still bad (indicated by the lack of a value for
-                    # responsive_cause_index), then don't report this as an
-                    # EDNS error
-                    else:
-                        pass
+            require_valid = False
+            dnssec_downgrade = False
 
-                # if the ultimate request used EDNS, then it was simply ignored
-                # by the server
+            #TODO - look for success ratio to servers due to timeout or network
+            # error, for better determining if a problem is intermittent
+
+            ####################
+            # CAUSES
+            #
+            # Network error - kwargs: errno; don't require a valid response
+            if retry.cause == Q.RETRY_CAUSE_NETWORK_ERROR:
+                cause_err_class = Errors.NetworkError
+                cause_err_kwargs['errno'] = errno.errorcode.get(retry.cause_arg, 'UNKNOWN')
+                require_valid = False
+
+            # Malformed response - kwargs: msg_size; require a valid response
+            elif retry.cause == Q.RETRY_CAUSE_FORMERR:
+                cause_err_class = Errors.FormError
+                cause_err_kwargs['msg_size'] = response.msg_size
+                require_valid = True
+
+            # Timeout - kwargs: attempts; don't require a valid response
+            elif retry.cause == Q.RETRY_CAUSE_TIMEOUT:
+                cause_err_class = Errors.Timeout
+                cause_err_kwargs['attempts'] = response.responsive_cause_index+1
+                require_valid = False
+
+            # Invalid RCODE - kwargs: rcode; require a valid response
+            elif retry.cause == Q.RETRY_CAUSE_RCODE:
+                # if the RCODE was FORMERR, SERVFAIL, or NOTIMP, and the
+                # corresponding action was to disable EDNS, then this was a
+                # reasonable response from a server that doesn't support EDNS
+                if retry.cause_arg in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP) and \
+                        retry.action == Q.RETRY_ACTION_DISABLE_EDNS:
+                    pass
+
+                # or if the RCODE was BADVERS, and the corresponding action was
+                # to change EDNS version, then this was a reasonable response
+                # from a server that doesn't support the EDNS version
+                if retry.cause_arg == dns.rcode.BADVERS and \
+                        retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
+                    pass
+
+                # otherwise, set the error class and instantiation kwargs
+                # appropriately
                 else:
-                    err = Errors.EDNSIgnored()
+                    cause_err_class = Errors.InvalidRcode
+                    cause_err_kwargs['rcode'] = dns.rcode.to_text(retry.cause_arg)
+                    require_valid = True
 
-                ##TODO handle this better
-                #if err is None and response.responsive_cause_index is not None:
-                #    raise Exception('Unknown EDNS-related error')
+            # Other errors
+            elif retry.cause == Q.RETRY_CAUSE_OTHER:
+                require_valid = True
 
-            # the response did use EDNS
-            else:
+            # by default, use the action argument as the argument
+            action_arg = retry.action_arg
 
-                # check for EDNS version mismatch
-                if response.message.edns != response.query.edns:
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.UnsupportedEDNSVersion(version=response.query.edns), warnings, server, client, response)
+            ####################
+            # ACTIONS
+            #
+            # No change was made; a valid response was received when the query
+            # was issued again
+            if retry.action == Q.RETRY_ACTION_NO_CHANGE:
+                pass
 
-                # check for PMTU issues
+            # Only the source port was changed; a valid response was received
+            # when the query was issued again
+            elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
+                pass
+
+            # A flag was set to elicit a response; kwargs: flag
+            elif retry.action == Q.RETRY_ACTION_SET_FLAG:
+                action_err_class = Errors.ResponseErrorWithoutRequestFlag
+                action_err_kwargs['flag'] = dns.flags.to_text(retry.action_arg)
+                if not action_err_kwargs['flag']:
+                    action_err_kwargs['flag'] = retry.action_arg
+
+            # A flag was cleared to elicit a response; kwargs: flag
+            elif retry.action == Q.RETRY_ACTION_CLEAR_FLAG:
+                action_err_class = Errors.ResponseErrorWithRequestFlag
+                action_err_kwargs['flag'] = dns.flags.to_text(retry.action_arg)
+                if not action_err_kwargs['flag']:
+                    action_err_kwargs['flag'] = retry.action_arg
+
+            # EDNS was disabled to elicit a response; kwargs: None
+            elif retry.action == Q.RETRY_ACTION_DISABLE_EDNS:
+                action_err_class = Errors.ResponseErrorWithEDNS
+
+                # DNSSEC was downgraded because DO bit is no longer available
+                dnssec_downgrade = True
+
+            # The EDNS UDP max payload size was changed to elicit a response;
+            # kwargs: pmtu_lower_bound, pmtu_upper_bound
+            elif retry.action == Q.RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD:
+                action_err_class = Errors.PMTUExceeded
                 #TODO need bounding here
-                if response.effective_edns_max_udp_payload != response.query.edns_max_udp_payload:
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None), warnings, server, client, response)
+                action_err_kwargs['pmtu_lower_bound'] = None
+                action_err_kwargs['pmtu_upper_bound'] = None
 
-                if response.query.edns_flags != response.effective_edns_flags:
-                    for i in range(15, -1, -1):
-                        f = 1 << i
-                        # the response used EDNS with the given flag, but the flag
-                        # wasn't (ultimately) requested
-                        if ((response.query.edns_flags & f) != (response.effective_edns_flags & f)):
-                            # find out if this really appears to be a flag issue,
-                            # by seeing if any other queries to this server with
-                            # the specified flag were also unsuccessful
-                            if response.responsive_cause_index is not None:
-                                if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
-                                    if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        query_specific = True
-                                    else:
-                                        query_specific = False
-                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN')), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
-                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
-                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        query_specific = True
-                                    else:
-                                        query_specific = False
-                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
-                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
-                                    if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        query_specific = True
-                                    else:
-                                        query_specific = False
-                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
-                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
-                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        query_specific = True
-                                    else:
-                                        query_specific = False
-                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
-                                elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
-                                    if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        query_specific = True
-                                    else:
-                                        query_specific = False
-                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg)), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
+            # An EDNS flag was set to elicit a response; kwargs: flag
+            elif retry.action == Q.RETRY_ACTION_SET_EDNS_FLAG:
+                action_err_class = Errors.ResponseErrorWithoutEDNSFlag
+                action_err_kwargs['flag'] = dns.flags.edns_to_text(retry.action_arg)
+                if not action_err_kwargs['flag']:
+                    action_err_kwargs['flag'] = retry.action_arg
 
-                                #XXX is there another (future) reason why we would
-                                # have disabled an EDNS flag?
-                                else:
-                                    pass
+            # An EDNS flag was cleared to elicit a response; kwargs: flag
+            elif retry.action == Q.RETRY_ACTION_CLEAR_EDNS_FLAG:
+                action_err_class = Errors.ResponseErrorWithEDNSFlag
+                action_err_kwargs['flag'] = dns.flags.edns_to_text(retry.action_arg)
+                if not action_err_kwargs['flag']:
+                    action_err_kwargs['flag'] = retry.action_arg
 
-                            # if an EDNS flag was disabled in the request,
-                            # but the response was still bad (indicated by
-                            # the lack of a value for
-                            # responsive_cause_index), then don't report
-                            # this as an EDNS flag error
-                            else:
-                                pass
+                # if this was the DO flag, then DNSSEC was downgraded
+                if retry.action_arg == dns.flags.DO:
+                    dnssec_downgrade = True
 
-                        if err is not None:
-                            break
+            # An EDNS option was added to elicit a response; kwargs: option
+            elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
+                action_err_class = Errors.ResponseErrorWithoutEDNSOption
+                #TODO convert numeric option ID to text
+                action_err_kwargs['option'] = retry.action_arg
 
-                    #TODO handle this better
-                    if err is None and response.responsive_cause_index is not None:
-                        raise Exception('Unknown EDNS-flag-related error')
+            # An EDNS option was removed to elicit a response; kwargs: option
+            elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
+                action_err_class = Errors.ResponseErrorWithEDNSOption
+                #TODO convert numeric option ID to text
+                action_err_kwargs['option'] = retry.action_arg
 
-            if err is not None:
-                # warn on intermittent errors
-                if isinstance(err, Errors.InvalidResponseError):
-                    group = warnings
-                # if the error really matters (e.g., due to DNSSEC), note an error
-                elif qname_obj is not None and qname_obj.zone.signed:
-                    group = errors
-                # otherwise, warn
+            # The EDNS version was changed to elicit a response; kwargs:
+            # edns_old, edns_new
+            elif retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
+                action_err_class = Errors.ResponseErrorWithEDNSVersion
+                action_err_kwargs['edns_old'] = response.query.edns
+                action_err_kwargs['edns_new'] = retry.action_arg
+
+                # if this was about changing EDNS version, then use the
+                # original version number as the argument
+                action_arg = response.query.edns
+
+            if cause_err_class is not None and action_err_class is not None:
+                if qname_obj is not None and qname_obj.zone.server_responsive_for_action(server, client, response.responsive_cause_index_tcp, \
+                        retry.action, action_arg, require_valid):
+                    query_specific = True
                 else:
-                    group = warnings
+                    query_specific = False
+                change_err = action_err_class(response_error=cause_err_class(**cause_err_kwargs), query_specific=query_specific, **action_err_kwargs)
 
-                Errors.DomainNameAnalysisError.insert_into_list(err, group, server, client, response)
+        if change_err is not None:
+            # if the error really matters (e.g., due to DNSSEC), note an error
+            if dnssec_downgrade and qname_obj is not None and qname_obj.zone.signed:
+                group = errors
+            # otherwise, warn
+            else:
+                group = warnings
+            Errors.DomainNameAnalysisError.insert_into_list(change_err, group, server, client, response)
+
+        # if the effective request used EDNS, and we got a message response (as
+        # opposed to timeout, network error, form error, etc.)
+        if response.effective_edns >= 0 and response.message is not None:
+
+            # if the message response didn't use EDNS, then create an error
+            if response.message.edns < 0:
+                edns_err = Errors.EDNSIgnored()
+
+            # if the message response used a version of EDNS other than
+            # that requested, then create an error (should have been
+            # answered with BADVERS)
+            elif response.message.edns != response.effective_edns and response.message.rcode() != dns.rcode.BADVERS:
+                edns_err = Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns)
+
+        if edns_err is not None:
+            Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
         if qname_obj is not None:
             if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
@@ -1038,7 +1139,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if not algs_signing_rrset[(server,client,response)]:
                 if response.dnssec_requested():
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIG(), errors, server, client, response)
-                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client,response.effective_tcp):
+                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client,response.effective_tcp,True):
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
             else:
                 # report an error if RRSIGs for one or more algorithms are missing
@@ -1612,7 +1713,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if qname_obj.zone.signed and (neg_response_info.qname == query.qname or response.recursion_desired_and_available()):
                 if response.dnssec_requested():
                     Errors.DomainNameAnalysisError.insert_into_list(missing_nsec_error_cls(), errors, server, client, response)
-                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client,response.effective_tcp):
+                elif qname_obj is not None and qname_obj.zone.server_responsive_with_do(server,client,response.effective_tcp,True):
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.UnableToRetrieveDNSSECRecords(), errors, server, client, response)
 
         return statuses
