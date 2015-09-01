@@ -1073,6 +1073,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # legitimate reason for the RCODE
                         if response.effective_edns >= 0 and response.message.rcode() in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP):
                             pass
+                        # if we used a non-zero version of EDNS and didn't fall
+                        # back, and the RCODE was BADVERS, then this is a
+                        # legitimate reason for the RCODE
+                        elif response.effective_edns > 0 and response.message.rcode() == dns.rcode.BADVERS:
+                            pass
                         else:
                             Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_OTHER:
