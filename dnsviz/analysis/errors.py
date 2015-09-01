@@ -960,19 +960,6 @@ class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
         super(ResponseErrorWithoutEDNSOption, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS option was added' % (self.template_kwargs['option'])
 
-class UnsupportedEDNSVersion(ResponseError):
-    '''
-    >>> e = UnsupportedEDNSVersion(version=1)
-    >>> e.description
-    "The server responded with RCODE BADVERS, indicating that it doesn't support EDNS version 1."
-    '''
-
-    _abstract = False
-    code = 'UNSUPPORTED_EDNS_VERSION'
-    description_template = "The server responded with RCODE BADVERS, indicating that it doesn't support EDNS version %(version)d."
-    references = ['RFC 6891, Sec. 6.1.3']
-    required_params = ['version']
-
 class EDNSVersionMismatch(ResponseError):
     '''
     >>> e = EDNSVersionMismatch(request_version=1, response_version=0)
