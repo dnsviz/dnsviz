@@ -1007,9 +1007,9 @@ class UnableToRetrieveDNSSECRecords(ResponseError):
     '''
 
     _abstract = False
-    code = 'EDNS_IGNORED'
+    code = 'UNABLE_TO_RETRIEVE_DNSSEC_RECORDS'
     description_template = 'The DNSSEC records necessary to validate the response could not be retrieved from the server.'
-    references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
+    references = ['RFC 4035, Sec. 3.1.1', 'RFC 4035, Sec. 3.1.3']
     required_params = []
 
 class MissingRRSIG(ResponseError):
