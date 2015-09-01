@@ -814,7 +814,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # or if the RCODE was BADVERS, and the corresponding action was
                 # to change EDNS version, then this was a reasonable response
                 # from a server that doesn't support the EDNS version
-                if retry.cause_arg == dns.rcode.BADVERS and \
+                elif retry.cause_arg == dns.rcode.BADVERS and \
                         retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
                     pass
 
