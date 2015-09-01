@@ -702,21 +702,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # there was some type of a network error with EDNS in use
                         if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                             if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client,response.responsive_cause_index_tcp):
-                                err = Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=True)
+                                query_specific = True
                             else:
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=False))
+                                query_specific = False
+                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN')), query_specific=query_specific)
                         # there was a malformed response with EDNS in use
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                err = Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size, intermittent=True)
+                                query_specific = True
                             else:
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size, intermittent=False))
+                                query_specific = False
+                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size), query_specific=query_specific)
                         # the response timed out with EDNS in use
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
                             if qname_obj is not None and qname_obj.zone.server_responsive_with_edns(server,client,response.responsive_cause_index_tcp):
-                                err = Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=True)
+                                query_specific = True
                             else:
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=False))
+                                query_specific = False
+                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1), query_specific=query_specific)
                         # the RCODE was something other than NOERROR or NXDOMAIN
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
                             # if the RCODE was FORMERR, SERVFAIL, or NOTIMP,
@@ -726,15 +729,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             # the RCODE was invalid with EDNS
                             else:
                                 if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                    err = Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
+                                    query_specific = True
                                 else:
-                                    err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False))
+                                    query_specific = False
+                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg)), query_specific=query_specific)
                         # any other errors
                         elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
                             if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns(server,client,response.responsive_cause_index_tcp):
-                                err = Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=True)
+                                query_specific = True
                             else:
-                                err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=False))
+                                query_specific = False
+                            err = Errors.ResponseErrorWithEDNS(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp), query_specific=query_specific)
 
                         #XXX is there another (future) reason why  we would
                         # have disabled EDNS?
@@ -781,29 +786,34 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             if response.responsive_cause_index is not None:
                                 if response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_NETWORK_ERROR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        err = Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=True)
+                                        query_specific = True
                                     else:
-                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN'), intermittent=False), flag=dns.flags.edns_to_text(f))
+                                        query_specific = False
+                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.NetworkError(tcp=response.responsive_cause_index_tcp, errno=errno.errorcode.get(response.history[response.responsive_cause_index].cause_arg, 'UNKNOWN')), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_FORMERR:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        err = Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size, intermittent=True)
+                                        query_specific = True
                                     else:
-                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size, intermittent=False), flag=dns.flags.edns_to_text(f))
+                                        query_specific = False
+                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.FormError(tcp=response.responsive_cause_index_tcp, msg_size=response.msg_size), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_TIMEOUT:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        err = Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=True)
+                                        query_specific = True
                                     else:
-                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1, intermittent=False), flag=dns.flags.edns_to_text(f))
+                                        query_specific = False
+                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.Timeout(tcp=response.responsive_cause_index_tcp, attempts=response.responsive_cause_index+1), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_OTHER:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        err = Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
+                                        query_specific = True
                                     else:
-                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp, intermittent=False), flag=dns.flags.edns_to_text(f))
+                                        query_specific = False
+                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.UnknownResponseError(tcp=response.responsive_cause_index_tcp), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
                                 elif response.history[response.responsive_cause_index].cause == Q.RETRY_CAUSE_RCODE:
                                     if qname_obj is not None and qname_obj.zone.server_responsive_valid_with_edns_flag(server,client,response.responsive_cause_index_tcp,f):
-                                        err = Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=True)
+                                        query_specific = True
                                     else:
-                                        err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg), intermittent=False), flag=dns.flags.edns_to_text(f))
+                                        query_specific = False
+                                    err = Errors.ResponseErrorWithEDNSFlag(response_error=Errors.InvalidRcode(tcp=response.responsive_cause_index_tcp, rcode=dns.rcode.to_text(response.history[response.responsive_cause_index].cause_arg)), query_specific=query_specific, flag=dns.flags.edns_to_text(f))
 
                                 #XXX is there another (future) reason why we would
                                 # have disabled an EDNS flag?
@@ -1047,16 +1057,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server, client in error_info.servers_clients:
                 for response in error_info.servers_clients[(server, client)]:
                     if error_info.code == Q.RESPONSE_ERROR_NETWORK_ERROR:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NetworkError(tcp=response.effective_tcp, intermittent=False, errno=errno.errorcode.get(error_info.arg, 'UNKNOWN')), self.response_errors[query], server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NetworkError(tcp=response.effective_tcp, errno=errno.errorcode.get(error_info.arg, 'UNKNOWN')), self.response_errors[query], server, client, response)
                     if error_info.code == Q.RESPONSE_ERROR_FORMERR:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.FormError(tcp=response.effective_tcp, intermittent=False, msg_size=response.msg_size), self.response_errors[query], server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.FormError(tcp=response.effective_tcp, msg_size=response.msg_size), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_TIMEOUT:
                         attempts = 1
                         for i in range(len(response.history) - 1, -1, -1):
                             if response.history[i].action in (Q.RETRY_ACTION_USE_TCP, Q.RETRY_ACTION_USE_UDP):
                                 break
                             attempts += 1
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.Timeout(tcp=response.effective_tcp, intermittent=False, attempts=attempts), self.response_errors[query], server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.Timeout(tcp=response.effective_tcp, attempts=attempts), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_INVALID_RCODE:
                         # if we used EDNS and didn't fall back, and the RCODE
                         # was FORMERR, SERVFAIL, or NOTIMP, then this is a
@@ -1064,9 +1074,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if response.effective_edns >= 0 and response.message.rcode() in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP):
                             pass
                         else:
-                            Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, intermittent=False, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
+                            Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_OTHER:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp, intermittent=False), self.response_errors[query], server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp), self.response_errors[query], server, client, response)
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}

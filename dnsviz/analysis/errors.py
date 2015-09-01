@@ -708,7 +708,7 @@ class ResponseError(DomainNameAnalysisError):
     pass
 
 class InvalidResponseError(ResponseError):
-    required_params = ['tcp', 'intermittent']
+    required_params = ['tcp']
 
     def __init__(self, *args, **kwargs):
         super(ResponseError, self).__init__(**kwargs)
@@ -716,24 +716,20 @@ class InvalidResponseError(ResponseError):
             self.template_kwargs['proto'] = 'TCP'
         else:
             self.template_kwargs['proto'] = 'UDP'
-        if self.template_kwargs['intermittent']:
-            self.template_kwargs['intermittent_text'] = 'Intermittent: '
-        else:
-            self.template_kwargs['intermittent_text'] = ''
 
 class NetworkError(InvalidResponseError):
     '''
-    >>> e = NetworkError(tcp=False, intermittent=False, errno='EHOSTUNREACH')
+    >>> e = NetworkError(tcp=False, errno='EHOSTUNREACH')
     >>> e.description
     'The server was not reachable over UDP (EHOSTUNREACH).'
-    >>> e = NetworkError(tcp=False, intermittent=False, errno='ECONNREFUSED')
+    >>> e = NetworkError(tcp=False, errno='ECONNREFUSED')
     >>> e.description
     'The UDP connection was refused (ECONNREFUSED).'
     '''
 
     _abstract = False
     code = 'NETWORK_ERROR'
-    description_template = '%(intermittent_text)s%(description)s'
+    description_template = '%(description)s'
     required_params = InvalidResponseError.required_params + ['errno']
 
     def __init__(self, *args, **kwargs):
@@ -749,38 +745,38 @@ class NetworkError(InvalidResponseError):
 
 class FormError(InvalidResponseError):
     '''
-    >>> e = FormError(tcp=False, intermittent=False, msg_size=30)
+    >>> e = FormError(tcp=False, msg_size=30)
     >>> e.description
     'The response (30 bytes) was malformed.'
     '''
 
     _abstract = False
     code = 'FORMERR'
-    description_template = "%(intermittent_text)sThe response (%(msg_size)d bytes) was malformed."
+    description_template = "The response (%(msg_size)d bytes) was malformed."
     required_params = InvalidResponseError.required_params + ['msg_size']
 
 class Timeout(InvalidResponseError):
     '''
-    >>> e = Timeout(tcp=False, intermittent=False, attempts=3)
+    >>> e = Timeout(tcp=False, attempts=3)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times).'
     '''
 
     _abstract = False
     code = 'TIMEOUT'
-    description_template = "%(intermittent_text)sNo response was received from the server over %(proto)s (tried %(attempts)d times)."
+    description_template = "No response was received from the server over %(proto)s (tried %(attempts)d times)."
     required_params = InvalidResponseError.required_params + ['attempts']
 
 class UnknownResponseError(InvalidResponseError):
     '''
-    >>> e = UnknownResponseError(tcp=False, intermittent=False)
+    >>> e = UnknownResponseError(tcp=False)
     >>> e.description
     'An invalid response was received from the server over UDP.'
     '''
 
     _abstract = False
     code = 'RESPONSE_ERROR'
-    description_template = "%(intermittent_text)sAn invalid response was received from the server over %(proto)s."
+    description_template = "An invalid response was received from the server over %(proto)s."
 
     def __init__(self, *args, **kwargs):
         super(UnknownResponseError, self).__init__(**kwargs)
@@ -788,14 +784,14 @@ class UnknownResponseError(InvalidResponseError):
 
 class InvalidRcode(InvalidResponseError):
     '''
-    >>> e = InvalidRcode(tcp=False, intermittent=False, rcode='SERVFAIL')
+    >>> e = InvalidRcode(tcp=False, rcode='SERVFAIL')
     >>> e.description
     'The response had an invalid RCODE (SERVFAIL).'
     '''
 
     _abstract = False
     code = 'INVALID_RCODE'
-    description_template = "%(intermittent_text)sThe response had an invalid RCODE (%(rcode)s)."
+    description_template = "The response had an invalid RCODE (%(rcode)s)."
     required_params = InvalidResponseError.required_params + ['rcode']
 
 class NotAuthoritative(ResponseError):
@@ -825,16 +821,20 @@ class RecursionNotAvailable(ResponseError):
     required_params = []
 
 class ResponseErrorWithCondition(ResponseError):
-    description_template = "%(response_error_description)s until %(change)s."
-    required_params = ['response_error']
+    description_template = "%(response_error_description)s until %(change)s%(query_specific_text)s."
+    required_params = ['response_error', 'query_specific']
 
     def __init__(self, *args, **kwargs):
         super(ResponseErrorWithCondition, self).__init__(**kwargs)
         self.template_kwargs['response_error_description'] = self.template_kwargs['response_error'].description[:-1]
+        if self.template_kwargs['query_specific']:
+            self.template_kwargs['query_specific_text'] = ' (however, this server appeared to respond legitimately to other queries with %s)' % (self.precondition % self.template_kwargs)
+        else:
+            self.template_kwargs['query_specific_text'] = ''
 
 class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the RD flag was cleared.'
     '''
@@ -845,12 +845,13 @@ class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['flag']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'the %(flag)s flag set'
         super(ResponseErrorWithRequestFlag, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s flag was cleared' % (self.template_kwargs['flag'])
 
 class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='RD')
+    >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the RD flag was set.'
     '''
@@ -861,12 +862,13 @@ class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['flag']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'the %(flag)s flag cleared'
         super(ResponseErrorWithoutRequestFlag, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s flag was set' % (self.template_kwargs['flag'])
 
 class ResponseErrorWithEDNS(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, intermittent=False, attempts=3))
+    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, attempts=3))
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.'
     '''
@@ -876,12 +878,13 @@ class ResponseErrorWithEDNS(ResponseErrorWithCondition):
     references = ['RFC 6891, Sec. 6.2.6']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'EDNS enabled'
         super(ResponseErrorWithEDNS, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'EDNS was disabled'
 
 class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, intermittent=False, attempts=3), edns_old=3, edns_new=0)
+    >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, attempts=3), edns_old=3, edns_new=0)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the version of EDNS was changed from 3 to 0.'
     '''
@@ -892,13 +895,14 @@ class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['edns_old', 'edns_new']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'EDNS version %(edns_old)d'
         super(ResponseErrorWithEDNSVersion, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the version of EDNS was changed from %d to %d' % \
                 (self.template_kwargs['edns_old'], self.template_kwargs['edns_new'])
 
 class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='DO')
+    >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was cleared.'
     '''
@@ -909,12 +913,13 @@ class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['flag']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'the %(flag)s EDNS flag set'
         super(ResponseErrorWithEDNSFlag, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS flag was cleared' % (self.template_kwargs['flag'])
 
 class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='DO')
+    >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was set.'
     '''
@@ -925,12 +930,13 @@ class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['flag']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'the %(flag)s EDNS flag cleared'
         super(ResponseErrorWithoutEDNSFlag, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS flag was set' % (self.template_kwargs['flag'])
 
 class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, intermittent=False, attempts=3), option='NSID')
+    >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was removed.'
     '''
@@ -941,12 +947,13 @@ class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['option']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'the %(option)s EDNS option present'
         super(ResponseErrorWithEDNSOption, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS option was removed' % (self.template_kwargs['option'])
 
 class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, intermittent=False, attempts=3), option='NSID')
+    >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID')
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was added.'
     '''
@@ -957,6 +964,7 @@ class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
     required_params = ResponseErrorWithCondition.required_params + ['option']
 
     def __init__(self, *args, **kwargs):
+        self.precondition = 'without the %(option)s EDNS option'
         super(ResponseErrorWithoutEDNSOption, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS option was added' % (self.template_kwargs['option'])
 
