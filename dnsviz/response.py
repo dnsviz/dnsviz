@@ -192,7 +192,9 @@ class DNSResponse:
                         responsive_cause_index_tcp = tcp
                     udp_valid = True
 
-            if retry.action == Q.RETRY_ACTION_SET_FLAG:
+            if retry.action == Q.RETRY_ACTION_NO_CHANGE:
+                pass
+            elif retry.action == Q.RETRY_ACTION_SET_FLAG:
                 flags |= retry.action_arg
             elif retry.action == Q.RETRY_ACTION_CLEAR_FLAG:
                 flags &= ~retry.action_arg
@@ -209,6 +211,8 @@ class DNSResponse:
                 tcp = True
             elif retry.action == Q.RETRY_ACTION_USE_UDP:
                 tcp = False
+            elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
+                pass
             #TODO do the same with EDNS options
 
             prev_index = i
