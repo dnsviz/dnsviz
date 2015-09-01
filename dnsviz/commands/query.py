@@ -49,7 +49,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage:  %s [@global-server] [domain] [q-type] [q-class] {q-opt}
+    sys.stderr.write('''%sUsage: dnsviz query [@global-server] [domain] [q-type] [q-class] {q-opt}
            {global-d-opt} host [@local-server] {local-d-opt}
            [ host [@local-server] {local-d-opt} [...]]
 Where:  domain    is in the Domain Name System
@@ -70,7 +70,7 @@ Where:  domain    is in the Domain Name System
         global d-opts and servers (before host name) affect all queries.
         local d-opts and servers (after host name) affect only that lookup.
         -h                           (print help and exit)
-''' % (err, sys.argv[0]))
+''' % (err))
 
 class DVCommandLineQuery:
     def __init__(self, qname, rdtype, rdclass):
@@ -390,9 +390,9 @@ class DVCommandLine:
 
         self.nameservers = processed_nameservers
 
-def main():
+def main(argv):
     try:
-        q = DVCommandLine(sys.argv[1:])
+        q = DVCommandLine(argv[1:])
     except KeyboardInterrupt:
         pass
     else:
@@ -404,4 +404,4 @@ def main():
         close_default_dns_transport_handler()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

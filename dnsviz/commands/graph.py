@@ -48,7 +48,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: %s [options] [domain name...]
+    sys.stderr.write('''%sUsage: dnsviz graph [options] [domain name...]
 Options:
     -f filename    - read names from a file
     -r filename    - read diagnostic queries from a file
@@ -59,7 +59,7 @@ Options:
     -o filename    - save the output to the specified file
     -T format      - specify the format of the output
     -h             - display the usage and exit
-''' % (err, sys.argv[0]))
+''' % (err))
 
 def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
     assert filename is not None or fh is not None, 'Either filename or fh must be passed'
@@ -300,13 +300,13 @@ def test_pygraphviz():
         sys.stderr.write('''pygraphviz is required, but not installed.\n''')
         sys.exit(2)
 
-def main():
+def main(argv):
     try:
         test_m2crypto()
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:r:R:t:Oo:T:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:R:t:Oo:T:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -475,4 +475,4 @@ def main():
         sys.exit(4)
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

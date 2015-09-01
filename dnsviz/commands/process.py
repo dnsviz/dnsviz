@@ -51,7 +51,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: %s [options] [domain name...]
+    sys.stderr.write('''%sUsage: dnsviz process [options] [domain name...]
 Options:
     -f filename    - read names from a file
     -r filename    - read diagnostic queries from a file
@@ -60,7 +60,7 @@ Options:
     -p             - make json output pretty instead of minimal
     -l loglevel    - set log level to one of: error, warning, info, debug
     -h             - display the usage and exit
-''' % (err, sys.argv[0]))
+''' % (err))
 
 def test_m2crypto():
     try:
@@ -85,12 +85,12 @@ def test_pygraphviz():
         sys.stderr.write('''pygraphviz is required, but not installed.\n''')
         sys.exit(2)
 
-def main():
+def main(argv):
     try:
         test_m2crypto()
 
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:r:t:o:pl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:pl:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -252,4 +252,4 @@ def main():
         sys.exit(4)
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

@@ -281,7 +281,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: %s [options] [domain_name...]
+    sys.stderr.write('''%sUsage: dnsviz probe [options] [domain_name...]
 Options:
     -f filename    - read names from a file
     -d level       - set debug level
@@ -301,12 +301,12 @@ Options:
     -p             - make json output pretty instead of minimal
     -o filename    - write the analysis to the specified file
     -h             - display the usage and exit
-''' % (err, sys.argv[0]))
+''' % (err))
 
-def main():
+def main(argv):
     try:
         try:
-            opts, args = getopt.getopt(sys.argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:As:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:As:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -645,4 +645,4 @@ def main():
         close_default_dns_transport_handler()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
