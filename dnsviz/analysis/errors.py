@@ -879,6 +879,23 @@ class ResponseErrorWithEDNS(ResponseErrorWithCondition):
         super(ResponseErrorWithEDNS, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'EDNS was disabled'
 
+class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
+    '''
+    >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, intermittent=False, attempts=3), edns_old=3, edns_new=0)
+    >>> e.description
+    'No response was received from the server over UDP (tried 3 times) until the version of EDNS was changed from 3 to 0.'
+    '''
+
+    _abstract = False
+    code = 'ERROR_WITH_EDNS_VERSION'
+    references = ['RFC 6891, Sec. 6.1.3']
+    required_params = ResponseErrorWithCondition.required_params + ['edns_old', 'edns_new']
+
+    def __init__(self, *args, **kwargs):
+        super(ResponseErrorWithEDNSVersion, self).__init__(**kwargs)
+        self.template_kwargs['change'] = 'the version of EDNS was changed from %d to %d' % \
+                (self.template_kwargs['edns_old'], self.template_kwargs['edns_new'])
+
 class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, intermittent=False, attempts=3), flag='DO')
