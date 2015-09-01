@@ -834,7 +834,7 @@ class ResponseErrorWithCondition(ResponseError):
 
 class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD')
+    >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the RD flag was cleared.'
     '''
@@ -851,7 +851,7 @@ class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
 
 class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD')
+    >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the RD flag was set.'
     '''
@@ -868,7 +868,7 @@ class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
 
 class ResponseErrorWithEDNS(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, attempts=3))
+    >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, attempts=3), query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.'
     '''
@@ -884,7 +884,7 @@ class ResponseErrorWithEDNS(ResponseErrorWithCondition):
 
 class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, attempts=3), edns_old=3, edns_new=0)
+    >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, attempts=3), edns_old=3, edns_new=0, query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the version of EDNS was changed from 3 to 0.'
     '''
@@ -902,7 +902,7 @@ class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
 
 class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO')
+    >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was cleared.'
     '''
@@ -919,7 +919,7 @@ class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
 
 class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO')
+    >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was set.'
     '''
@@ -936,7 +936,7 @@ class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
 
 class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID')
+    >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was removed.'
     '''
@@ -953,7 +953,7 @@ class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
 
 class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
     '''
-    >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID')
+    >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID', query_specific=False)
     >>> e.description
     'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was added.'
     '''
