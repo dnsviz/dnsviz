@@ -19,18 +19,17 @@
 .\" with this program; if not, write to the Free Software Foundation, Inc.,
 .\" 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 .\"
-.TH dnsget 1 "26 Aug 2015" "v0.4.0"
+.TH dnsviz-probe 1 "26 Aug 2015" "v0.4.0"
 .SH NAME
-dnsget \- issue diagnostic DNS queries
+dnsviz-probe \- issue diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsget [options]
+.B dnsviz probe [options]
 .I [domain_name...]
 .SH DESCRIPTION
-.B dnsget
-takes one or more domain names as input and performs a series of diagnostic
-queries to either recursive (default) or authoritative DNS servers, the results
-of which are serialized into JSON format.  Its output is used to assess the
-health of DNS deployments, using, e.g., \fIdnsgrok(1)\fP and \fIdnsviz(1)\fP.
+Perform a series of diagnostic queries of specified names to either recursive
+(default) or authoritative DNS servers, the results of which are serialized
+into JSON format.  Its output is used to assess the health of DNS deployments,
+using, e.g., \fI"dnsviz process"\fP and \fI"dnsviz graph"\fP.
 
 Domain names to be processed may be passed either as command-line arguments or
 in a file (using the \fI-f\fP option).  When the \fI-r\fP option is used, then
@@ -129,4 +128,4 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsgrok (1), dnsviz (1), dv (1)
+.BR dnsviz-process (1), dnsviz-graph (1), dnsviz-query (1)

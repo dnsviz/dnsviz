@@ -19,16 +19,15 @@
 .\" with this program; if not, write to the Free Software Foundation, Inc.,
 .\" 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 .\"
-.TH dnsgrok 1 "26 Aug 2015" "v0.4.0"
+.TH dnsviz-process 1 "26 Aug 2015" "v0.4.0"
 .SH NAME
-dnsgrok \- process diagnostic DNS queries to serialized output
+dnsviz-process \- process diagnostic DNS queries to serialized output
 .SH SYNOPSIS
-.B dnsgrok [options]
+.B dnsviz process [options]
 .I [domain_name...]
 .SH DESCRIPTION
-.B dnsgrok
-processes the results of diagnostic queries previously performed, e.g., using
-\fIdnsget(1)\fP, to assess the health of the associated DNS deployments for one
+Process the results of diagnostic DNS queries previously performed, e.g., using
+\fI"dnsviz probe"\fP, to assess the health of the associated DNS deployments for one
 or more domain names specified.  The results of this processing are serialized
 into JSON format for further programmatic diagnostics or alerts.
 
@@ -90,4 +89,4 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsget (1), dnsviz (1), dv (1)
+.BR dnsviz-probe (1), dnsviz-graph (1), dnsviz-query (1)
