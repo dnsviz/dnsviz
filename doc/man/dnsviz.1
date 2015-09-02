@@ -1,0 +1,67 @@
+.\"
+.\" This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
+.\" analysis, and visualization.
+.\" Created by Casey Deccio (casey@deccio.net)
+.\"
+.\" Copyright 2015 VeriSign, Inc.
+.\"
+.\" DNSViz is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 2 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" DNSViz is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License along
+.\" with this program; if not, write to the Free Software Foundation, Inc.,
+.\" 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+.\"
+.TH dnsviz 1 "26 Aug 2015" "v0.4.0"
+.SH NAME
+dnsviz \- issue and assess diagnostic DNS queries
+.SH SYNOPSIS
+.B dnsviz command [args]
+.SH DESCRIPTION
+.B dnsviz
+is a tool for assessing the health of DNS deployments by issuing diagnostic
+queries, assessing the responses, and outputting the results in one of several
+formats.  The assessment may be directed towards recursive or authoritative DNS
+servers, and the output may be textual, graphical, or serialized for
+programmatic review.
+
+.B dnsviz
+is invoked by specifying one of its commands as the first argument on the
+command line, followed by arguments specific to that command.  If the first
+argument is "help", then the usage of the command specified by the second
+argument is displayed.
+
+.SH COMMANDS
+.IP probe
+Issue diagnostic DNS queries.  See \fIdnsviz-probe(1)\fP.
+
+.IP grok
+Assess diagnostic DNS queries See \fIdnsviz-grok(1)\fP.
+
+.IP graph
+Graph the assessment of diagnostic DNS queries See \fIdnsviz-graph(1)\fP.
+
+.IP print
+Process diagnostic DNS queries to textual output See \fIdnsviz-print(1)\fP.
+
+.IP query
+Assess a DNS query See \fIdnsviz-query(1)\fP.
+
+.IP help
+Show usage for a command
+
+.SH EXIT CODES
+The exit codes are:
+.IP 0
+Program terminated normally.
+.IP 1
+Incorrect usage.
+.SH SEE ALSO
+.BR dnsviz-grok (1), dnsviz-graph (1), dnsviz-query (1)
