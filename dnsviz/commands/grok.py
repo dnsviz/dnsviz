@@ -51,7 +51,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz process [options] [domain name...]
+    sys.stderr.write('''%sUsage: dnsviz grok [options] [domain name...]
 Options:
     -f filename    - read names from a file
     -r filename    - read diagnostic queries from a file

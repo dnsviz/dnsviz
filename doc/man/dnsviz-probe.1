@@ -29,7 +29,7 @@ dnsviz-probe \- issue diagnostic DNS queries
 Perform a series of diagnostic queries of specified names to either recursive
 (default) or authoritative DNS servers, the results of which are serialized
 into JSON format.  Its output is used to assess the health of DNS deployments,
-using, e.g., \fI"dnsviz process"\fP and \fI"dnsviz graph"\fP.
+using, e.g., \fI"dnsviz grok"\fP and \fI"dnsviz graph"\fP.
 
 Domain names to be processed may be passed either as command-line arguments or
 in a file (using the \fI-f\fP option).  When the \fI-r\fP option is used, then
@@ -128,4 +128,4 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz-process (1), dnsviz-graph (1), dnsviz-query (1)
+.BR dnsviz-grok (1), dnsviz-graph (1), dnsviz-query (1)
