@@ -32,7 +32,7 @@ def usage(err=None):
     sys.stderr.write('''%sUsage: dnsviz command [args]
 Commands:
     probe          - issue diagnostic DNS queries
-    process        - process diagnostic DNS queries to serialized output
+    grok           - process diagnostic DNS queries to serialized output
     graph          - process diagnostic DNS queries to graphical output
     print          - process diagnostic DNS queries to textual output
     query          - issue and process a DNS query to textual output
