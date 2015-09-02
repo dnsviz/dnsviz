@@ -44,14 +44,25 @@ def main():
         usage()
         sys.exit(0)
 
-    command = sys.argv[1]
+    if sys.argv[1] == 'help':
+        if len(sys.argv) < 3:
+            usage()
+            sys.exit(0)
+
+        command = sys.argv[2]
+    else:
+        command = sys.argv[1]
+
     try:
         mod = importlib.import_module('dnsviz.commands.%s' % command)
     except ImportError:
         usage('Invalid command: %s' % command)
         sys.exit(1)
 
-    mod.main(sys.argv[1:])
+    if sys.argv[1] == 'help':
+        mod.usage()
+    else:
+        mod.main(sys.argv[1:])
 
 if __name__ == "__main__":
     main()
