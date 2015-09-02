@@ -32,13 +32,13 @@ dnsviz-query \- assess a DNS query
 Issue queries for the names and types specified on the command line to DNS
 servers, process the output, and present it to the user.  \fI"dnsviz query"\fI
 adopts a subset of the command-line options used by ISC's \fIdig(1)\fP but uses
-\fI"dnsviz probe"\fP and \fI"dnsviz graph"\fP to issue queries and assess the
+\fI"dnsviz probe"\fP and \fI"dnsviz print"\fP to issue queries and assess the
 results.  It is meant to be a shortcut for quickly assessing DNS queries and
-diagnosing problems by invoking \fI"dnsviz probe"\fP and \fI"dnsviz graph"\fP
+diagnosing problems by invoking \fI"dnsviz probe"\fP and \fI"dnsviz print"\fP
 with their most commonly used options and with a usage familiar similar to (but
 not equal to) \fIdig(1)\fP.  For a more detailed analysis, revealing the nature
 of errors, the user should use \fI"dnsviz probe"\fP, \fI"dnsviz grok"\fP,
-and \fI"dnsviz graph"\fP directly.
+\fI"dnsviz print"\fP, and \fI"dnsviz graph"\fP directly.
 
 By default diagnostic queries are sent to recursive servers.  If no servers are
 specified with "@", then the first server in /etc/resolv.conf is selected.
@@ -90,4 +90,4 @@ Program terminated normally.
 .IP 1
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1)
+.BR dnsviz (1), dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-print (1)
