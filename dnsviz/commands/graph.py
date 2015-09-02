@@ -29,9 +29,9 @@ import os
 import re
 import sys
 
-import dns.exception, dns.message, dns.name
+import dns.exception, dns.name
 
-from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION, DNS_PROCESSED_VERSION
+from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.config import DNSVIZ_SHARE_PATH
 from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
@@ -40,8 +40,6 @@ MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
 logger = logging.getLogger('dnsviz.analysis.offline')
-
-DNS_RAW_VERSION = 1.0
 
 def usage(err=None):
     if err is not None:
