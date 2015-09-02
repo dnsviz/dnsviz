@@ -283,23 +283,23 @@ def usage(err=None):
         err = ''
     sys.stderr.write('''%sUsage: dnsviz probe [options] [domain_name...]
 Options:
-    -f filename    - read names from a file
-    -d level       - set debug level
-    -r filename    - read diagnostic queries from a file
-    -t threads     - specify number of threads to use for parallel queries
+    -f <filename>  - read names from a file
+    -d <level>     - set debug level
+    -r <filename>  - read diagnostic queries from a file
+    -t <threads>   - specify number of threads to use for parallel queries
     -4             - use IPv4 only
     -6             - use IPv6 only
     -b             - specify a source IPv4 or IPv6 address for queries
-    -a ancestor    - query the ancestry of each domain name through ancestor
-    -R type[,type...]
+    -a <ancestor>  - query the ancestry of each domain name through ancestor
+    -R <type>[,<type>...]
                    - perform analysis using only the specified type(s)
-    -s server[,server...]
+    -s <server>[,<server>...]
                    - designate servers for recursive analysis
     -A             - query analysis against authoritative servers
-    -x domain:server[,server...]
+    -x <domain>:<server>[,<server>...]
                    - set explicit delegation for the specified domain
     -p             - make json output pretty instead of minimal
-    -o filename    - write the analysis to the specified file
+    -o <filename>    - write the analysis to the specified file
     -h             - display the usage and exit
 ''' % (err))
 

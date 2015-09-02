@@ -53,12 +53,12 @@ def usage(err=None):
         err = ''
     sys.stderr.write('''%sUsage: dnsviz grok [options] [domain name...]
 Options:
-    -f filename    - read names from a file
-    -r filename    - read diagnostic queries from a file
-    -t filename    - specify file containing trusted keys
-    -o filename    - save the output to the specified file
+    -f <filename>  - read names from a file
+    -r <filename>  - read diagnostic queries from a file
+    -t <filename>  - specify file containing trusted keys
+    -o <filename>  - save the output to the specified file
     -p             - make json output pretty instead of minimal
-    -l loglevel    - set log level to one of: error, warning, info, debug
+    -l <loglevel>  - set log level to one of: error, warning, info, debug
     -h             - display the usage and exit
 ''' % (err))
 

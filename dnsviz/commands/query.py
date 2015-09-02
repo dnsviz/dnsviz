@@ -53,9 +53,8 @@ def usage(err=None):
            {global-d-opt} host [@local-server] {local-d-opt}
            [ host [@local-server] {local-d-opt} [...]]
 Where:  domain    is in the Domain Name System
-        q-class  is one of (in,hs,ch,...) [default: in]
-        q-type   is one of (a,any,mx,ns,soa,hinfo,axfr,txt,...) [default:a]
-                 (Use ixfr=version for type ixfr)
+        q-class  is one of (in...) [default: in]
+        q-type   is one of (a,mx,ns,soa,txt,...) [default:a]
         q-opt    is one of:
                  -x dot-notation     (shortcut for reverse lookups)
                  -b address          (bind to source address)

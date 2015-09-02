@@ -44,13 +44,13 @@ def usage(err=None):
         err = ''
     sys.stderr.write('''%sUsage: dnsviz print [options] [domain name...]
 Options:
-    -f filename    - read names from a file
-    -r filename    - read diagnostic queries from a file
-    -t filename    - specify file containing trusted keys
-    -R type[,type...]
+    -f <filename>  - read names from a file
+    -r <filename>  - read diagnostic queries from a file
+    -t <filename>  - specify file containing trusted keys
+    -R <type>[,<type>...]
                    - Process queries of only the specified type(s)
     -O             - derive the filename(s) from domain name(s)
-    -o filename    - save the output to the specified file
+    -o <filename>  - save the output to the specified file
     -h             - display the usage and exit
 ''' % (err))
 
