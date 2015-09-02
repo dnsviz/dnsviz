@@ -204,8 +204,8 @@ corresponding content in the input.  The output is an image file, a `dot`
 
 #### Examples
 
-Process the query/response output produced by `dnsviz probe`, and produce a graph
-visually representing the results in a png file named "example.com.png".
+Process the query/response output produced by `dnsviz probe`, and produce a
+graph visually representing the results in a png file named "example.com.png".
 ```
 $ dnsviz graph -Tpng < example.com.json > example.com.png
 ```
@@ -232,11 +232,6 @@ $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz graph -Thtml -O -r example.com.json -t tk.txt
 ```
 
-Output textual analysis to the terminal:
-```
-$ dnsviz graph -r example.com.json -t tk.txt
-```
-
 Pipe `dnsviz probe` output directly to `dnsviz graph`:
 ```
 $ dnsviz probe example.com | \
@@ -261,11 +256,48 @@ names.
 $ dnsviz graph -Thtml -r multiple.json -t tk.txt > multiple.html
 ```
 
+
+### dnsviz print
+
+`dnsviz print` takes serialized query results in JSON format (i.e., output from
+`dnsviz probe`) as input and assesses specified domain names based on their
+corresponding content in the input.  The output is textual output suitable for
+file or terminal display.
+
+
+#### Examples
+
+Process the query/response output produced by `dnsviz probe`, and output the
+results to the terminal:
+```
+$ dnsviz print < example.com.json
+```
+
+Add DNSSEC trust anchors to the graph:
+```
+$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dnsviz print -r example.com.json -t tk.txt
+```
+
+Pipe `dnsviz probe` output directly to `dnsviz print`:
+```
+$ dnsviz probe example.com | \
+      dnsviz print -t tk.txt
+```
+
+Same thing, but save the raw output (for re-use) along the way:
+```
+$ dnsviz probe example.com | tee example.com.json | \
+      dnsviz print -t tk.txt
+```
+
+
 ### dnsviz query
 
-`dnsviz query` is a wrapper that couples the functionality of `dnsviz probe` and `dnsviz print` into
-a tool with minimal dig-like usage, used to make analysis queries and return
-the textual output to terminal or file output in one go.
+`dnsviz query` is a wrapper that couples the functionality of `dnsviz probe`
+and `dnsviz print` into a tool with minimal dig-like usage, used to make
+analysis queries and return the textual output to terminal or file output in
+one go.
 
 
 #### Examples
