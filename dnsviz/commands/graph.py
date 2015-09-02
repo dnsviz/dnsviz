@@ -78,23 +78,6 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
                 codecs.open(filename, 'w', 'utf-8').write(template_str)
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, filename))
-    elif fmt == 'txt':
-        if filename is None:
-            show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
-        else:
-            show_colors = False
-            try:
-                fh = codecs.open(filename, 'w', 'utf-8')
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, filename))
-
-        tuples = []
-        processed = set()
-        for name_obj in name_objs:
-            name_obj.populate_response_component_status(G)
-            tuples.extend(name_obj.serialize_status_simple(rdtypes, processed))
-
-        fh.write(textualize_status_output(tuples, show_colors))
     else:
         if filename is None:
             fh.write(G.draw(fmt))
@@ -103,177 +86,6 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
                 G.draw(fmt, path=filename)
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, filename))
-
-TERM_COLOR_MAP = {
-    'BOLD': '\033[1m',
-    'RESET': '\033[0m',
-    'SECURE': '\033[36m',
-    'BOGUS': '\033[31m',
-    'INSECURE': '\033[37m',
-    'NON_EXISTENT': '\033[37m',
-    'VALID': '\033[36m',
-    'INDETERMINATE': '\033[37m',
-    'INDETERMINATE_NO_DNSKEY': '\033[37m',
-    'INDETERMINATE_MATCH_PRE_REVOKE': '\033[37m',
-    'INDETERMINATE_UNKNOWN_ALGORITHM': '\033[33m',
-    'ALGORITHM_IGNORED': '\033[37m',
-    'EXPIRED': '\033[35m',
-    'PREMATURE': '\033[35m',
-    'INVALID_SIG': '\033[31m',
-    'INVALID': '\033[31m',
-    'INVALID_DIGEST': '\033[31m',
-    'INCOMPLETE': '\033[33m',
-    'LAME': '\033[33m',
-    'INVALID_TARGET': '\033[31m',
-    'ERROR': '\033[31m',
-    'WARNING': '\033[33m',
-}
-
-STATUS_MAP = {
-    'SECURE': '.',
-    'BOGUS': '!',
-    'INSECURE': '-',
-    'NON_EXISTENT': '-',
-    'VALID': '.',
-    'INDETERMINATE': '-',
-    'INDETERMINATE_NO_DNSKEY': '-',
-    'INDETERMINATE_MATCH_PRE_REVOKE': '-',
-    'INDETERMINATE_UNKNOWN_ALGORITHM': '?',
-    'ALGORITHM_IGNORED': '-',
-    'EXPIRED': '!',
-    'PREMATURE': '!',
-    'INVALID_SIG': '!',
-    'INVALID': '!',
-    'INVALID_DIGEST': '!',
-    'INCOMPLETE': '?',
-    'LAME': '?',
-    'INVALID_TARGET': '!',
-    'ERROR': '!',
-    'WARNING': '?',
-}
-
-def _errors_warnings_str(status, warnings, errors, show_color):
-    # display status, errors, and warnings
-    error_str = ''
-    if errors:
-        if show_color:
-            error_str = '%s%s%s' % (TERM_COLOR_MAP['ERROR'], STATUS_MAP['ERROR'], TERM_COLOR_MAP[status])
-        else:
-            error_str = STATUS_MAP['ERROR']
-    elif warnings:
-        if show_color:
-            error_str = '%s%s%s' % (TERM_COLOR_MAP['WARNING'], STATUS_MAP['WARNING'], TERM_COLOR_MAP[status])
-        else:
-            error_str = STATUS_MAP['WARNING']
-    return '[%s%s]' % (STATUS_MAP[status], error_str)
-
-def textualize_status_output(names, show_color):
-    s = ''
-    name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
-    response_prefix = '  %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
-    response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
-    join_str_template = '%(status_color)s, '
-    params = {}
-    params['status_color'] = ''
-    params['status_color_rdata'] = ''
-
-    if show_color:
-        params['color_reset'] = TERM_COLOR_MAP['RESET']
-    else:
-        params['color_reset'] = ''
-
-    for name, status, warnings, errors, responses in names:
-        params['name'] = name
-        params['status_rdata'] = ''
-        if show_color:
-            params['status_color'] = TERM_COLOR_MAP['BOLD']
-            params['color_reset'] = TERM_COLOR_MAP['RESET']
-        if status is not None:
-            params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
-            if show_color:
-                params['status_color_rdata'] = TERM_COLOR_MAP[status]
-        s += name_template % params
-
-        in_neg_response = False
-        soa_seen = False
-        prev_rdtype_str = ''
-        for rdtype_str, status, warnings, errors, rdata in responses:
-
-            # if this was a negative response, then we indicate that it is, and
-            # reset soa_seen to False
-            if not in_neg_response and rdtype_str == 'PROOF':
-                in_neg_response = True
-                soa_seen = False
-
-            # consider the cases in which we might no longer be in a negative
-            # response
-            if in_neg_response:
-                # if this is SOA, then we only break out if an SOA hasn't been
-                # seen
-                if rdtype_str == 'SOA':
-                    if soa_seen:
-                        in_neg_response = False
-                # otherwise, we break out for any type that is not NSEC, NSEC3,
-                # or RRSIG (all of which accompany negative responses)
-                elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG', 'PROOF'):
-                    in_neg_response = False
-
-            # display status, errors, and warnings
-            params['status'] = _errors_warnings_str(status, warnings, errors, show_color)
-
-            # indent based on the presence of errors and warnings
-            if errors or warnings:
-                params['preindent'] = ''
-            else:
-                params['preindent'] = ' '
-
-            # indent based on if we're in a negative response, whether this is
-            # an RRSIG, etc.
-            params['rdtype'] = rdtype_str
-            if in_neg_response:
-                params['indent'] = '  '
-                if rdtype_str.startswith('NSEC'):
-                    params['indent'] += '  '
-                elif rdtype_str == 'RRSIG':
-                    if prev_rdtype_str.startswith('NSEC'):
-                        params['indent'] += '    '
-                    else:
-                        params['indent'] += '  '
-            else:
-                params['indent'] = ''
-                if rdtype_str == 'RRSIG':
-                    params['indent'] += '  '
-            if show_color:
-                params['status_color'] = TERM_COLOR_MAP[status]
-            s += response_prefix % params
-
-            rdata_set = []
-            for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
-                params['rdata'] = rdata_item
-                # display status, errors, and warnings
-                if substatus is not None:
-                    if show_color:
-                        params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
-                    params['status_rdata'] = ' ' + _errors_warnings_str(substatus, subwarnings, suberrors, show_color)
-                else:
-                    params['status_color_rdata'] = ''
-                    params['status_rdata'] = ''
-                rdata_set.append(response_rdata % params)
-            join_str = join_str_template % params
-            s += join_str.join(rdata_set) + '\n'
-
-            # if this is a negative response, and we've just seen an SOA
-            # record, then note it
-            if in_neg_response and rdtype_str == 'SOA':
-                soa_seen = True
-            # if this was a negative response, then we indicate that it is, and
-            # reset soa_seen to False
-            if rdata[0][3] in ('NXDOMAIN', 'NODATA'):
-                in_neg_response = True
-                soa_seen = False
-            prev_rdtype_str = rdtype_str
-
-    return s
 
 def test_m2crypto():
     try:
@@ -337,8 +149,8 @@ def main(argv):
         elif '-o' in opts:
             fmt = opts['-o'].split('.')[-1]
         else:
-            fmt = 'txt'
-        if fmt not in ('txt', 'dot','png','jpg','svg','html'):
+            fmt = 'dot'
+        if fmt not in ('dot','png','jpg','svg','html'):
             usage('Image format unrecognized: "%s"' % fmt)
             sys.exit(1)
 
