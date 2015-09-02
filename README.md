@@ -24,7 +24,7 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 * pygraphviz (1.1 or later) - http://pygraphviz.github.io/
 
-  pygraphviz is required for most functionality.   `dnsget` and `dnsgrok`
+  pygraphviz is required for most functionality.   `dnsviz probe` and `dnsviz grok`
   (without the -t option) can be used without pygraphviz installed.  Version 1.1
   or greater is required because of the support for unicode names and HTML-like
   labels, both of which are utilized in the visual output.
@@ -64,14 +64,15 @@ $ python setup.py --help
 
 ## Usage
 
-DNSViz is invoked using a series of included command-line utilities: `dnsget`,
-`dnsgrok`, `dnsviz`, and `dv`.  Run any of the command-line tools with -h (help) to
-display all options associated with their usage.
+DNSViz is invoked using the `dnsviz` command-line utility.  `dnsviz` itself
+uses several subcommands: `probe`, `grok`, `graph`, `print`, and `query`.  See
+the man pages associated with each subcommand, in the form of
+"dnsviz-<subcommand> (1)" (e.g., "man dnsviz-probe") for more detailed
+documentation and usage.
 
+### dnsviz probe
 
-### dnsget
-
-`dnsget` takes one or more domain names as input and performs a series of
+`dnsviz probe` takes one or more domain names as input and performs a series of
 queries to either recursive (default) or authoritative DNS servers, the results
 of which are serialized into JSON format.
 
@@ -82,33 +83,33 @@ Analyze the domain name example.com using your configured DNS resolvers (i.e.,
 in /etc/resolv.conf) and store the queries and responses in the file named
 "example.com.json":
 ```
-$ dnsget example.com > example.com.json
+$ dnsviz probe example.com > example.com.json
 ```
 
 Same thing:
 ```
-$ dnsget -o example.com.json example.com
+$ dnsviz probe -o example.com.json example.com
 ```
 
 Analyze the domain name example.com by querying its authoritative servers
 directly:
 ```
-$ dnsget -A -o example.com.json example.com
+$ dnsviz probe -A -o example.com.json example.com
 ```
 
 Analyze the domain name example.com by querying explicitly-defined
 authoritative servers, rather than learning the servers through referrals from
 the IANA root servers:
 ```
-$ dnsget -A \
+$ dnsviz probe -A \
   -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
   -x example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=2001:500:8d::53 \
   -o example.com.json example.com
 ```
 
-Same, but have `dnsget` resolve the names:
+Same, but have `dnsviz probe` resolve the names:
 ```
-$ dnsget -A \
+$ dnsviz probe -A \
   -x example.com:a.iana-servers.org,b.iana-servers.org \
   -o example.com.json example.com
 ```
@@ -116,153 +117,153 @@ $ dnsget -A \
 Analyze the domain name example.com and its entire ancestry by querying
 authoritative servers and following delegations, starting at the root:
 ```
-$ dnsget -A -a . -o example.com.json example.com
+$ dnsviz probe -A -a . -o example.com.json example.com
 ```
 
 Analyze multiple names in parallel (four threads) using explicit recursive
 resolvers (replace *192.0.1.2* and *2001:db8::1* with legitimate resolver
 addresses):
 ```
-$ dnsget -s 192.0.2.1,2001:db8::1 -t 4 -o multiple.json \
+$ dnsviz probe -s 192.0.2.1,2001:db8::1 -t 4 -o multiple.json \
   example.com sandia.gov verisignlabs.com dnsviz.net
 ```
 
 
-### dnsgrok
+### dnsviz grok
 
-`dnsgrok` takes serialized query results in JSON format (i.e., output from
-`dnsget`) as input and assesses specified domain names based on their
+`dnsviz grok` takes serialized query results in JSON format (i.e., output from
+`dnsviz probe`) as input and assesses specified domain names based on their
 corresponding content in the input.  The output is also serialized into JSON
 format.
 
 
 #### Examples
 
-Process the query/response output produced by `dnsget`, and store the
+Process the query/response output produced by `dnsviz probe`, and store the
 serialized results in a file named "example.com-chk.json":
 ```
-$ dnsgrok < example.com.json > example.com-chk.json
+$ dnsviz grok < example.com.json > example.com-chk.json
 ```
 
 Same thing:
 ```
-$ dnsgrok -r example.com.json -o example.com-chk.json example.com
+$ dnsviz grok -r example.com.json -o example.com-chk.json example.com
 ```
 
 Same thing, but with "pretty", formatted JSON:
 ```
-$ dnsgrok -p -r example.com.json -o example.com-chk.json
+$ dnsviz grok -p -r example.com.json -o example.com-chk.json
 ```
 
 Show only info-level information: descriptions, statuses, warnings, and errors:
 ```
-$ dnsgrok -p -l info -r example.com.json -o example.com-chk.json
+$ dnsviz grok -p -l info -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related warnings or errors:
 ```
-$ dnsgrok -p -l warning -r example.com.json -o example.com-chk.json
+$ dnsviz grok -p -l warning -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related errors:
 ```
-$ dnsgrok -p -l error -r example.com.json -o example.com-chk.json
+$ dnsviz grok -p -l error -r example.com.json -o example.com-chk.json
 ```
 
 Add DNSSEC trust anchors to indicate security status of responses.
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
-$ dnsgrok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
+$ dnsviz grok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
 ```
 
-Pipeline dnsget output directly to dnsgrok:
+Pipe `dnsviz probe` output directly to `dnsviz grok`:
 ```
-$ dnsget example.com | \
-      dnsgrok -p -l info -t tk.txt -o example.com-chk.json
+$ dnsviz probe example.com | \
+      dnsviz grok -p -l info -t tk.txt -o example.com-chk.json
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
-$ dnsget example.com | tee example.com.json | \
-      dnsgrok -p -l info -t tk.txt -o example.com-chk.json
+$ dnsviz probe example.com | tee example.com.json | \
+      dnsviz grok -p -l info -t tk.txt -o example.com-chk.json
 ```
 
 Assess multiple names at once with error level:
 ```
-$ dnsgrok -p -l error -t tk.txt -r multiple.json -o example.com-chk.json
+$ dnsviz grok -p -l error -t tk.txt -r multiple.json -o example.com-chk.json
 ```
 
 
-### dnsviz
+### dnsviz graph
 
-`dnsviz` takes serialized query results in JSON format (i.e., output from
-`dnsget`) as input and assesses specified domain names based on their
+`dnsviz graph` takes serialized query results in JSON format (i.e., output from
+`dnsviz probe`) as input and assesses specified domain names based on their
 corresponding content in the input.  The output is an image file, a `dot`
 (directed graph) file, or an HTML file, depending on the options passed.
 
 
 #### Examples
 
-Process the query/response output produced by `dnsget`, and produce a graph
+Process the query/response output produced by `dnsviz probe`, and produce a graph
 visually representing the results in a png file named "example.com.png".
 ```
-$ dnsviz -Tpng < example.com.json > example.com.png
+$ dnsviz graph -Tpng < example.com.json > example.com.png
 ```
 
 Same thing:
 ```
-$ dnsviz -Tpng -o example.com.png example.com < example.com.json
+$ dnsviz graph -Tpng -o example.com.png example.com < example.com.json
 ```
 
 Same thing, but produce interactive HTML format:
 interactive HTML output in a file named "example.com.html":
 ```
-$ dnsviz -Thtml < example.com.json > example.com.html
+$ dnsviz graph -Thtml < example.com.json > example.com.html
 ```
 
 Same thing (filename is derived from domain name and output format):
 ```
-$ dnsviz -Thtml -O -r example.com.json
+$ dnsviz graph -Thtml -O -r example.com.json
 ```
 
 Add DNSSEC trust anchors to the graph:
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
-$ dnsviz -Thtml -O -r example.com.json -t tk.txt
+$ dnsviz graph -Thtml -O -r example.com.json -t tk.txt
 ```
 
 Output textual analysis to the terminal:
 ```
-$ dnsviz -r example.com.json -t tk.txt
+$ dnsviz graph -r example.com.json -t tk.txt
 ```
 
-Pipeline dnsget output directly to dnsviz:
+Pipe `dnsviz probe` output directly to `dnsviz graph`:
 ```
-$ dnsget example.com | \
-      dnsviz -Thtml -O -t tk.txt
+$ dnsviz probe example.com | \
+      dnsviz graph -Thtml -O -t tk.txt
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
-$ dnsget example.com | tee example.com.json | \
-      dnsviz -Thtml -O -t tk.txt
+$ dnsviz probe example.com | tee example.com.json | \
+      dnsviz graph -Thtml -O -t tk.txt
 ```
 
 Process analysis of multiple domain names, creating an image for each name
 processed:
 ```
-$ dnsviz -Thtml -O -r multiple.json -t tk.txt
+$ dnsviz graph -Thtml -O -r multiple.json -t tk.txt
 ```
 
 Process analysis of multiple domain names, creating a single image for all
 names.
 ```
-$ dnsviz -Thtml -r multiple.json -t tk.txt > multiple.html
+$ dnsviz graph -Thtml -r multiple.json -t tk.txt > multiple.html
 ```
 
-### dv
+### dnsviz query
 
-`dv` is a wrapper that couples the functionality of `dnsget` and `dnsviz` into
+`dnsviz query` is a wrapper that couples the functionality of `dnsviz probe` and `dnsviz print` into
 a tool with minimal dig-like usage, used to make analysis queries and return
 the textual output to terminal or file output in one go.
 
@@ -272,15 +273,15 @@ the textual output to terminal or file output in one go.
 Analyze the domain name example.com using the first of your configured DNS
 resolvers (i.e., in /etc/resolv.conf):
 ```
-$ dv example.com
+$ dnsviz query example.com
 ```
 
 Same, but specify a trust anchor:
 ```
-$ dv +trusted-key=tk.txt example.com
+$ dnsviz query +trusted-key=tk.txt example.com
 ```
 
 Analyze example.com through the recurisve resolver at 192.0.2.1:
 ```
-$ dv @192.0.2.1 +trusted-key=tk.txt example.com
+$ dnsviz query @192.0.2.1 +trusted-key=tk.txt example.com
 ```
