@@ -123,8 +123,8 @@ class DVCommandLineQuery:
             return self.rdclass
 
     def query_and_display(self, options):
-        dnsget_args = ['dnsget']
-        dnsviz_args = ['dnsviz']
+        dnsget_args = ['dnsviz', 'probe']
+        dnsviz_args = ['dnsviz', 'graph']
         dnsget_args.extend(['-d', '1', '-a', '.'])
         if options['use_ipv4']:
             dnsget_args.append('-4')
