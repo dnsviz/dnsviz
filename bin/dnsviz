@@ -29,7 +29,7 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz command [args]
+    sys.stderr.write('''%sUsage: dnsviz <command> [args]
 Commands:
     probe          - issue diagnostic DNS queries
     grok           - assess diagnostic DNS queries
