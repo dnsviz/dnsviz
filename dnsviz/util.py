@@ -75,6 +75,11 @@ def get_default_trusted_keys():
 
 def get_default_trusted_keys_with_sanity_check():
     import resolver as Resolver
+
+    class Ans:
+        def __init__(self):
+            self.rrset = set()
+
     trusted_keys = get_default_trusted_keys()
     checked_trusted_keys = []
     dnskey_sets = {}
@@ -84,7 +89,7 @@ def get_default_trusted_keys_with_sanity_check():
             try:
                 dnskey_sets[name] = r.query_for_answer(name, dns.rdatatype.DNSKEY)
             except dns.exception.DNSException:
-                dnskey_sets[name] = set()
+                dnskey_sets[name] = Ans()
         if dnskey in dnskey_sets[name].rrset:
             checked_trusted_keys.append((name, dnskey))
     return checked_trusted_keys
