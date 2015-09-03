@@ -1554,18 +1554,16 @@ class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
             [ChangeEDNSVersionOnTimeoutHandler(0, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
-    #  4 - change EDNS version to 0; change timeout to 1 seconds
-    #  5 - change timeout to 2 seconds
-    #  6 - return
+    #  4 - change EDNS version to 0; change timeout to 2 seconds
+    #  5 - return
 
     query_timeout = 1.0
-    max_attempts = 6
+    max_attempts = 5
     lifetime = 15.0
 
 class EDNSOptDiagnosticQuery(SimpleDNSQuery):
@@ -1579,19 +1577,17 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
             [RemoveEDNSOptionOnTimeoutHandler(100, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
 
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
-    #  4 - remove EDNS option; change timeout to 1 seconds
-    #  5 - change timeout to 2 seconds
-    #  6 - return
+    #  4 - remove EDNS option; change timeout to 2 seconds
+    #  5 - return
 
     query_timeout = 1.0
-    max_attempts = 6
+    max_attempts = 5
     lifetime = 15.0
 
 class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
@@ -1605,19 +1601,17 @@ class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
             [ClearEDNSFlagOnTimeoutHandler(0x80, 4),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
 
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
-    #  4 - clear EDNS flag; change timeout to 1 seconds
-    #  5 - change timeout to 2 seconds
-    #  6 - return
+    #  4 - clear EDNS flag; change timeout to 2 seconds
+    #  5 - return
 
     query_timeout = 1.0
-    max_attempts = 6
+    max_attempts = 5
     lifetime = 15.0
 
 def main():
