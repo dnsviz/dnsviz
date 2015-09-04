@@ -106,6 +106,13 @@ Set explicit delegation for the specified domain to one or more servers.
 See \fI-s\fP for the syntax used for designating servers.
 
 This option can only be used in conjunction with \fI-A\fP.
+.IP -E
+Include diagnostic DNS queries that can assess EDNS compatibility of servers.
+
+If this option is used, each server probed will be queried with "future" EDNS
+settings, the respective responses can later be assessed for proper behavior.
+These settings include future EDNS versions (i.e., > 0), unknown options, and
+unknown flags.
 .IP "-o <filename>"
 Write the output to the specified file instead of to standard output, which
 is the default.

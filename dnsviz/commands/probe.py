@@ -60,13 +60,13 @@ def _raise_eof(signum, frame):
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
 
-def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
+def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
+        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -82,10 +82,11 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, explicit
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
+    def __init__(self, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
         self.ceiling = ceiling
+        self.edns_diagnostics = edns_diagnostics
         self.cache_level = cache_level
         self.explicit_delegations = explicit_delegations
         self.extra_rdtypes = extra_rdtypes
@@ -97,7 +98,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.explicit_delegations, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
+            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.edns_diagnostics, self.explicit_delegations, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -175,8 +176,8 @@ class RecursiveMultiProcessAnalyst(MultiProcessAnalystMixin, PrivateRecursiveAna
 class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain, processes):
-        super(ParallelAnalystMixin, self).__init__(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain)
+    def __init__(self, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -298,6 +299,7 @@ Options:
     -A             - query analysis against authoritative servers
     -x <domain>:<server>[,<server>...]
                    - set explicit delegation for the specified domain
+    -E             - include EDNS compatibility diagnostics
     -p             - make json output pretty instead of minimal
     -o <filename>    - write the analysis to the specified file
     -h             - display the usage and exit
@@ -306,7 +308,7 @@ Options:
 def main(argv):
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:As:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:EAs:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -448,6 +450,8 @@ def main(argv):
                 cls = ParallelAnalyst
             else:
                 cls = BulkAnalyst
+
+        edns_diagnostics = '-E' in opts
 
         if '-l' in opts:
             try:
@@ -615,9 +619,9 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain, processes)
+                a = cls(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain, processes)
             else:
-                a = cls(client_ipv4, client_ipv6, ceiling, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain)
+                a = cls(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
