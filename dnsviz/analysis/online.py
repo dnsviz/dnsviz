@@ -1084,14 +1084,18 @@ class Analyst(object):
     tcp_diagnostic_query = Q.TCPDiagnosticQuery
     pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
     truncation_diagnostic_query = Q.TruncationDiagnosticQuery
+    edns_version_diagnostic_query = Q.EDNSVersionDiagnosticQuery
+    edns_flag_diagnostic_query = Q.EDNSFlagDiagnosticQuery
+    edns_opt_diagnostic_query = Q.EDNSOptDiagnosticQuery
+
     allow_loopback_query = False
     allow_private_query = False
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
 
-    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None,
+    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
 
         self.name = name
@@ -1106,6 +1110,8 @@ class Analyst(object):
         self.client_ipv6 = client_ipv6
 
         self.logger = logger
+
+        self.edns_diagnostics = edns_diagnostics
 
         self.follow_ns = follow_ns
         self.follow_mx = follow_mx
@@ -1606,6 +1612,13 @@ class Analyst(object):
             # queries are being issued
             if name_obj.is_zone() and self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
 
+                # EDNS diagnostic queries
+                if self.edns_diagnostics:
+                    self.logger.debug('Preparing EDNS diagnostic queries %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+100))] = self.edns_version_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
@@ -1963,6 +1976,10 @@ class RecursiveAnalyst(Analyst):
     tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
     pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
     truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
+    edns_version_diagnostic_query = Q.RecursiveEDNSVersionDiagnosticQuery
+    edns_flag_diagnostic_query = Q.RecursiveEDNSFlagDiagnosticQuery
+    edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
+
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
     def _detect_ceiling(self, ceiling):
