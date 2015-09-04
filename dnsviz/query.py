@@ -1614,6 +1614,85 @@ class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
     max_attempts = 5
     lifetime = 15.0
 
+class RecursiveEDNSVersionDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS version compatibility on recursive
+    servers.'''
+
+    flags = dns.flags.RD
+    edns = 100
+    edns_max_udp_payload = 512
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+            ChangeEDNSVersionOnTimeoutHandler(0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - change timeout to 2 seconds
+    #  3 - change timeout to 4 seconds
+    #  4 - change EDNS version to 0; change timeout to 2 seconds
+    #  5 - return
+
+    query_timeout = 1.0
+    max_attempts = 5
+    lifetime = 15.0
+
+class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS option compatibility on recursive
+    servers.'''
+
+    flags = dns.flags.RD
+    edns = 0
+    edns_max_udp_payload = 512
+    edns_options = [dns.edns.GenericOption(100, '')]
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+            RemoveEDNSOptionOnTimeoutHandler(100, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+
+    # For timeouts:
+    #  1 - no change
+    #  2 - change timeout to 2 seconds
+    #  3 - change timeout to 4 seconds
+    #  4 - remove EDNS option; change timeout to 2 seconds
+    #  5 - return
+
+    query_timeout = 1.0
+    max_attempts = 5
+    lifetime = 15.0
+
+class RecursiveEDNSFlagDiagnosticQuery(SimpleDNSQuery):
+    '''A query designed to test unknown EDNS flag compatibility on recursive
+    servers.'''
+
+    flags = dns.flags.RD
+    edns = 0
+    edns_max_udp_payload = 512
+    edns_flags = SimpleDNSQuery.edns_flags | 0x80
+
+    response_handlers = SimpleDNSQuery.response_handlers + \
+            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+            ClearEDNSFlagOnTimeoutHandler(0x80, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+
+    # For timeouts:
+    #  1 - no change
+    #  2 - change timeout to 2 seconds
+    #  3 - change timeout to 4 seconds
+    #  4 - clear EDNS flag; change timeout to 2 seconds
+    #  5 - return
+
+    query_timeout = 1.0
+    max_attempts = 5
+    lifetime = 15.0
+
 def main():
     import json
     import sys
