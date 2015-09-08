@@ -934,19 +934,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 group = warnings
             Errors.DomainNameAnalysisError.insert_into_list(change_err, group, server, client, response)
 
-        # if the effective request used EDNS, and we got a message response (as
-        # opposed to timeout, network error, form error, etc.)
-        if response.effective_edns >= 0 and response.message is not None:
+        # if we actually got a message response (as opposed to timeout, network
+        # error, form error, etc.)
+        if response.message is not None:
 
-            # if the message response didn't use EDNS, then create an error
-            if response.message.edns < 0:
-                edns_errs.append(Errors.EDNSIgnored())
+            # if the effective request used EDNS
+            if response.effective_edns >= 0:
+                # if the message response didn't use EDNS, then create an error
+                if response.message.edns < 0:
+                    edns_errs.append(Errors.EDNSIgnored())
 
-            # if the message response used a version of EDNS other than
-            # that requested, then create an error (should have been
-            # answered with BADVERS)
-            elif response.message.edns != response.effective_edns and response.message.rcode() != dns.rcode.BADVERS:
-                edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
+                # if the message response used a version of EDNS other than
+                # that requested, then create an error (should have been
+                # answered with BADVERS)
+                elif response.message.edns != response.effective_edns and response.message.rcode() != dns.rcode.BADVERS:
+                    edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
 
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
