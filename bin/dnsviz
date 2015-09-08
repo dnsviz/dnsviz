@@ -36,7 +36,8 @@ Commands:
     graph          - graph the assessment of diagnostic DNS queries
     print          - process diagnostic DNS queries to textual output
     query          - assess a DNS query
-    help           - show usage for a command
+    help [<command>]
+                   - show usage for a command
 ''' % (err))
 
 def main():
