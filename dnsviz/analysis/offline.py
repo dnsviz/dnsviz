@@ -45,6 +45,10 @@ import status as Status
 
 DNS_PROCESSED_VERSION = '1.0'
 
+#XXX (this needs to be updated if new specification ever updates
+# RFC 6891)
+EDNS_DEFINED_FLAGS = dns.flags.DO
+
 _logger = logging.getLogger(__name__)
 
 class FoundYXDOMAIN(Exception):
