@@ -759,7 +759,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # if we had to make some change to elicit a response, find out why that
         # was
         change_err = None
-        edns_err = None
+        edns_errs = []
         if response.responsive_cause_index is not None:
             retry = response.history[response.responsive_cause_index]
 
@@ -940,15 +940,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # if the message response didn't use EDNS, then create an error
             if response.message.edns < 0:
-                edns_err = Errors.EDNSIgnored()
+                edns_errs.append(Errors.EDNSIgnored())
 
             # if the message response used a version of EDNS other than
             # that requested, then create an error (should have been
             # answered with BADVERS)
             elif response.message.edns != response.effective_edns and response.message.rcode() != dns.rcode.BADVERS:
-                edns_err = Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns)
+                edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
 
-        if edns_err is not None:
+        for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
         if qname_obj is not None:
