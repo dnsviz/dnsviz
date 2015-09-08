@@ -1167,6 +1167,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if error_info.code == Q.RESPONSE_ERROR_NETWORK_ERROR:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.NetworkError(tcp=response.effective_tcp, errno=errno.errorcode.get(error_info.arg, 'UNKNOWN')), self.response_errors[query], server, client, response)
                     if error_info.code == Q.RESPONSE_ERROR_FORMERR:
+                        #TODO determine if this was related to truncation;
+                        #TODO add EDNS opt missing error, as appropriate
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.FormError(tcp=response.effective_tcp, msg_size=response.msg_size), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_TIMEOUT:
                         attempts = 1
