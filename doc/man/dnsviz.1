@@ -24,6 +24,8 @@
 dnsviz \- issue and assess diagnostic DNS queries
 .SH SYNOPSIS
 .B dnsviz <command> [args]
+
+.B dnsviz help [<command>]
 .SH DESCRIPTION
 .B dnsviz
 is a tool for assessing the health of DNS deployments by issuing diagnostic
@@ -36,7 +38,8 @@ programmatic review.
 is invoked by specifying one of its commands as the first argument on the
 command line, followed by arguments specific to that command.  If the first
 argument is "help", then the usage of the command specified by the second
-argument is displayed.
+argument is displayed.  If no second argument is provided, then a general usage
+message is given.
 
 .SH COMMANDS
 .IP probe
@@ -54,8 +57,8 @@ Process diagnostic DNS queries to textual output See \fIdnsviz-print(1)\fP.
 .IP query
 Assess a DNS query See \fIdnsviz-query(1)\fP.
 
-.IP help
-Show usage for a command
+.IP "help [<command>]"
+Show usage generally, or for a specific command.
 
 .SH EXIT CODES
 The exit codes are:
