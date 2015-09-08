@@ -959,6 +959,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     elif response.message.edns != response.effective_edns:
                         edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
 
+                    # check that all EDNS flags are all zero, except for DO
+                    undefined_edns_flags_set = (response.message.ednsflags & 0xffff) & ~EDNS_DEFINED_FLAGS
+                    if undefined_edns_flags_set:
+                        edns_errs.append(Errors.EDNSUndefinedFlagsSet(flags=undefined_edns_flags_set))
+
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
