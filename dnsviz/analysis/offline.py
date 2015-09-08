@@ -594,12 +594,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             ((x.effective_tcp and x.tcp_responsive) or \
                             (not x.effective_tcp and x.udp_responsive)) and \
                             (not require_valid or x.is_valid_response()))
-            return self._server_responsive_with_condition(server, client, tcp,
-                    lambda x: x.effective_edns == action_arg and \
-
-                            ((x.effective_tcp and x.tcp_responsive) or \
-                            (not x.effective_tcp and x.udp_responsive)) and \
-                            (not require_valid or x.is_valid_response()))
 
         else:
             return False
