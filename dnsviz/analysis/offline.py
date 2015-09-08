@@ -944,11 +944,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if response.message.edns < 0:
                     edns_errs.append(Errors.EDNSIgnored())
 
-                # if the message response used a version of EDNS other than
-                # that requested, then create an error (should have been
-                # answered with BADVERS)
-                elif response.message.edns != response.effective_edns and response.message.rcode() != dns.rcode.BADVERS:
-                    edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
+                # the message response did use EDNS
+                else:
+                    if response.message.rcode() == dns.rcode.BADVERS:
+                        # if the message response code was BADVERS, then the EDNS
+                        # version in the response should have been less than
+                        # that of the request
+                        if response.message.edns >= response.effective_edns:
+                            edns_errs.append(Errors.ImplementedEDNSVersionNotProvided(request_version=response.effective_edns, response_version=response.message.edns))
+
+                    # if the message response used a version of EDNS other than
+                    # that requested, then create an error (should have been
+                    # answered with BADVERS)
+                    elif response.message.edns != response.effective_edns:
+                        edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
 
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
