@@ -997,6 +997,19 @@ class EDNSIgnored(EDNSError):
     references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
     required_params = []
 
+class ImplementedEDNSVersionNotProvided(EDNSError):
+    '''
+    >>> e = ImplementedEDNSVersionNotProvided(version=100)
+    >>> e.description
+    "The server responded with BADVERS to EDNS version 100 but didn't provide the highest EDNS version it implements in its response."
+    '''
+
+    _abstract = False
+    code = 'IMPLEMENTED_EDNS_VERSION_NOT_PROVIDED'
+    description_template = "The server responded with BADVERS to EDNS version %(version)d but didn't provide the highest EDNS version it implements in its response."
+    references = ['RFC 6891, Sec. 6.1.3']
+    required_params = ['version']
+
 class UnableToRetrieveDNSSECRecords(ResponseError):
     '''
     >>> e = UnableToRetrieveDNSSECRecords()
