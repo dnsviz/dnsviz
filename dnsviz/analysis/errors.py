@@ -1010,6 +1010,19 @@ class ImplementedEDNSVersionNotProvided(EDNSError):
     references = ['RFC 6891, Sec. 6.1.3']
     required_params = ['request_version', 'response_version']
 
+class EDNSUndefinedFlagsSet(EDNSError):
+    '''
+    >>> e = EDNSUndefinedFlagsSet(flags=0x80)
+    >>> e.description
+    'The server set EDNS flags that are undefined: 128.'
+    '''
+
+    _abstract = False
+    code = 'EDNS_UNDEFINED_FLAGS_SET'
+    description_template = 'The server set EDNS flags that are undefined: %(flags)d.'
+    references = ['RFC 6891, Sec. 6.1.4']
+    required_params = ['flags']
+
 class UnableToRetrieveDNSSECRecords(ResponseError):
     '''
     >>> e = UnableToRetrieveDNSSECRecords()
