@@ -968,7 +968,10 @@ class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
         super(ResponseErrorWithoutEDNSOption, self).__init__(**kwargs)
         self.template_kwargs['change'] = 'the %s EDNS option was added' % (self.template_kwargs['option'])
 
-class EDNSVersionMismatch(ResponseError):
+class EDNSError(ResponseError):
+    pass
+
+class EDNSVersionMismatch(EDNSError):
     '''
     >>> e = EDNSVersionMismatch(request_version=1, response_version=0)
     >>> e.description
@@ -981,7 +984,7 @@ class EDNSVersionMismatch(ResponseError):
     references = ['RFC 6891, Sec. 6.1.3']
     required_params = ['request_version', 'response_version']
 
-class EDNSIgnored(ResponseError):
+class EDNSIgnored(EDNSError):
     '''
     >>> e = EDNSIgnored()
     >>> e.description
