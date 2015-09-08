@@ -392,13 +392,12 @@ class DVCommandLine:
 def main(argv):
     try:
         q = DVCommandLine(argv[1:])
-    except KeyboardInterrupt:
-        pass
-    else:
         if q.query_and_display():
             sys.exit(0)
         else:
             sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(1)
     finally:
         close_default_dns_transport_handler()
 
