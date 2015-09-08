@@ -997,6 +997,19 @@ class EDNSIgnored(EDNSError):
     references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
     required_params = []
 
+class GratuitousOPT(EDNSError):
+    '''
+    >>> e = GratuitousOPT()
+    >>> e.description
+    'The server responded with an OPT record, even though none was sent in the request.'
+    '''
+
+    _abstract = False
+    code = 'GRATUITOUS_OPT'
+    description_template = 'The server responded with an OPT record, even though none was sent in the request.'
+    references = ['RFC 6891, Sec. 6.1.1']
+    required_params = []
+
 class ImplementedEDNSVersionNotProvided(EDNSError):
     '''
     >>> e = ImplementedEDNSVersionNotProvided(request_version=100, response_version=100)
