@@ -41,7 +41,7 @@ setup(name='dnsviz',
         scripts=['bin/dnsviz'],
         data_files=[
                 ('share/doc/dnsviz', ['README.md', 'LICENSE']),
-                ('share/doc/dnsviz', ['doc/dnsviz.html']),
+                ('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
                 ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png'))),
                 ('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1']),
                 ('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
