@@ -964,6 +964,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if undefined_edns_flags_set:
                         edns_errs.append(Errors.EDNSUndefinedFlagsSet(flags=undefined_edns_flags_set))
 
+            else:
+                # if the effective request didn't use EDNS, and we got a
+                # message response with an OPT record
+                if response.message.edns >= 0:
+                    edns_errs.append(Errors.GratuitousOPT())
+
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
