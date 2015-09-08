@@ -8,6 +8,7 @@ import sys
 from distutils.core import setup
 from distutils.dist import Distribution
 from distutils.command.install import install
+from distutils.command.build import build
 
 _install = install(Distribution())
 _install.finalize_options()
@@ -27,7 +28,19 @@ def apply_install_prefix(filename):
     in_fh.close()
     out_fh.close()
 
-apply_install_prefix(os.path.join('dnsviz','config.py.in'))
+def make_documentation():
+    os.chdir('doc')
+    try:
+        if os.system('make') != 0:
+            sys.stderr.write('Warning: Some of the included documentation failed to build.  Proceeding without it.\n')
+    finally:
+        os.chdir('..')
+
+class MyBuild(build):
+    def run(self):
+        apply_install_prefix(os.path.join('dnsviz','config.py.in'))
+        make_documentation()
+        build.run(self)
 
 setup(name='dnsviz',
         version='0.4.0',
@@ -57,4 +70,5 @@ setup(name='dnsviz',
                 'm2crypto (>=0.21.1)',
                 'dnspython (>=1.11)',
         ],
+        cmdclass={ 'build': MyBuild },
 )
