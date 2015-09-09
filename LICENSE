@@ -13,9 +13,9 @@ share/js/jquery-1.11.3.min.js
   Copyright 2005, 2015 jQuery Foundation, Inc.
   MIT license: http://jquery.org/license
 
-share/js/jquery-ui-1.10.4.custom.min.js
-share/css/redmond/jquery-ui-1.10.4.custom.min.css
-  Copyright 2014 jQuery Foundation and other contributors
+share/js/jquery-ui-1.11.4.custom.min.js
+share/css/redmond/jquery-ui-1.11.4.custom.min.css
+  Copyright 2015 jQuery Foundation and other contributors
   MIT license: https://jquery.org/license/
 
 share/js/raphael-min.js
