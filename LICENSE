@@ -9,8 +9,8 @@ dnsviz/base32.py
   2011, 2012, 2013 Python Software Foundation; All Rights Reserved.
   https://docs.python.org/2/license.html
 
-share/js/jquery-1.11.1.min.js
-  Copyright 2005, 2014 jQuery Foundation, Inc.
+share/js/jquery-1.11.3.min.js
+  Copyright 2005, 2015 jQuery Foundation, Inc.
   MIT license: http://jquery.org/license
 
 share/js/jquery-ui-1.10.4.custom.min.js
