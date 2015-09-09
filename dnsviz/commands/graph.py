@@ -32,11 +32,11 @@ import sys
 import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
-from dnsviz.config import DNSVIZ_SHARE_PATH
+from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
 from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
 
-MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
+LOCAL_MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
 logger = logging.getLogger('dnsviz.analysis.offline')
@@ -69,7 +69,11 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
         js_img = G.draw('js')
 
         template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
-        template_str = template_str.replace('MEDIA_URL', MEDIA_URL)
+        template_str = template_str.replace('LOCAL_MEDIA_URL', LOCAL_MEDIA_URL)
+        template_str = template_str.replace('JQUERY_PATH', JQUERY_PATH)
+        template_str = template_str.replace('JQUERY_UI_PATH', JQUERY_UI_PATH)
+        template_str = template_str.replace('JQUERY_UI_CSS_PATH', JQUERY_UI_CSS_PATH)
+        template_str = template_str.replace('RAPHAEL_PATH', RAPHAEL_PATH)
         template_str = template_str.replace('JS_CODE', js_img)
         if filename is None:
             fh.write(template_str)
