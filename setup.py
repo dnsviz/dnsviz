@@ -24,7 +24,7 @@ def apply_install_prefix(filename):
 
     in_fh = open(filename, 'r')
     out_fh = open(filename_out, 'w')
-    out_fh.write(in_fh.read().replace('DNSVIZ_INSTALL_PREFIX', INSTALL_DATA))
+    out_fh.write(in_fh.read().replace('__DNSVIZ_INSTALL_PREFIX__', INSTALL_DATA))
     in_fh.close()
     out_fh.close()
 
