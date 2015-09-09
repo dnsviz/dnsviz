@@ -1,4 +1,4 @@
 include dnsviz/config.py.in
-recursive-include doc *
-recursive-include contrib *
-recursive-include external *
+include doc/Makefile
+include doc/dot/*dot
+include contrib/m2crypto.patch
