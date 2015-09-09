@@ -1,4 +1,3 @@
 include dnsviz/config.py.in
 recursive-include doc *
 recursive-include contrib *
-recursive-include external *
