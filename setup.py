@@ -44,6 +44,21 @@ class MyBuild(build):
         make_documentation()
         build.run(self)
 
+DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE'])]
+DATA_FILES = [('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
+        ('share/dnsviz/css', ['share/css/dnsviz.css']),
+        ('share/dnsviz/js', glob.glob(os.path.join('share', 'js', '*.js'))),
+        ('share/dnsviz/html', glob.glob(os.path.join('share', 'html', '*.html'))),
+        ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt'])]
+MAN_FILES = [('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1'])]
+DOC_EXTRA_FILES = [('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
+        ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png')))]
+JQUERY_UI_FILES = [('share/dnsviz/js', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.js']),
+        ('share/dnsviz/css', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.css']),
+        ('share/dnsviz/css/images', glob.glob(os.path.join('external', 'jquery-ui', 'images', '*.png')))]
+JQUERY_FILES = [('share/dnsviz/js', ['external/jquery/jquery-1.11.3.min.js'])]
+RAPHAEL_FILES = [('share/dnsviz/js', ['external/raphael/raphael-min.js'])]
+
 setup(name='dnsviz',
         version='0.4.0',
         author='Casey Deccio',
@@ -54,22 +69,8 @@ setup(name='dnsviz',
         license='LICENSE',
         packages=['dnsviz','dnsviz.viz','dnsviz.analysis','dnsviz.commands'],
         scripts=['bin/dnsviz'],
-        data_files=[
-                ('share/doc/dnsviz', ['README.md', 'LICENSE']),
-                ('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
-                ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png'))),
-                ('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1']),
-                ('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
-                ('share/dnsviz/css', ['share/css/dnsviz.css']),
-                ('share/dnsviz/css', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.css']),
-                ('share/dnsviz/css/images', glob.glob(os.path.join('external', 'jquery-ui', 'images', '*.png'))),
-                ('share/dnsviz/js', ['external/jquery/jquery-1.11.3.min.js']),
-                ('share/dnsviz/js', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.js']),
-                ('share/dnsviz/js', ['external/raphael/raphael-min.js']),
-                ('share/dnsviz/js', glob.glob(os.path.join('share', 'js', '*.js'))),
-                ('share/dnsviz/html', glob.glob(os.path.join('share', 'html', '*.html'))),
-                ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt']),
-        ],
+        data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
+                DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
         requires=[
                 'pygraphviz (>=1.1)',
                 'm2crypto (>=0.21.1)',
