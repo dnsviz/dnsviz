@@ -47,8 +47,8 @@ class MyBuild(build):
 DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE'])]
 DATA_FILES = [('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
         ('share/dnsviz/css', ['share/css/dnsviz.css']),
-        ('share/dnsviz/js', glob.glob(os.path.join('share', 'js', '*.js'))),
-        ('share/dnsviz/html', glob.glob(os.path.join('share', 'html', '*.html'))),
+        ('share/dnsviz/js', ['share/js/dnsviz.js']),
+        ('share/dnsviz/html', ['share/html/dnssec-template.html']),
         ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt'])]
 MAN_FILES = [('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1'])]
 DOC_EXTRA_FILES = [('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
