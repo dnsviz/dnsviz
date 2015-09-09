@@ -13,9 +13,14 @@ from distutils.command.build import build
 # get the install prefix
 _install = install(Distribution())
 _install.finalize_options()
-install_prefix = _install.install_data
+INSTALL_PREFIX = _install.install_data
 
-def apply_install_prefix(filename):
+JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
+JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
+JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
+RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
+
+def apply_substitutions(filename):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
 
     filename_out = filename[:-3]
@@ -26,7 +31,11 @@ def apply_install_prefix(filename):
     in_fh = open(filename, 'r')
     out_fh = open(filename_out, 'w')
     s = in_fh.read()
-    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', install_prefix)
+    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', INSTALL_PREFIX)
+    s = s.replace('__JQUERY_PATH__', JQUERY_PATH)
+    s = s.replace('__JQUERY_UI_PATH__', JQUERY_UI_PATH)
+    s = s.replace('__JQUERY_UI_CSS_PATH__', JQUERY_UI_CSS_PATH)
+    s = s.replace('__RAPHAEL_PATH__', RAPHAEL_PATH)
     out_fh.write(s)
     in_fh.close()
     out_fh.close()
@@ -41,7 +50,7 @@ def make_documentation():
 
 class MyBuild(build):
     def run(self):
-        apply_install_prefix(os.path.join('dnsviz','config.py.in'))
+        apply_substitutions(os.path.join('dnsviz','config.py.in'))
         make_documentation()
         build.run(self)
 
@@ -60,14 +69,18 @@ if os.path.exists(os.path.join('external', 'jquery-ui')):
     JQUERY_UI_FILES = [('share/dnsviz/js', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.js']),
             ('share/dnsviz/css', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.css']),
             ('share/dnsviz/css/images', glob.glob(os.path.join('external', 'jquery-ui', 'images', '*.png')))]
+    JQUERY_UI_PATH = "'file://' + os.path.join(DNSVIZ_SHARE_PATH, 'js', 'jquery-ui-1.11.4.custom.min.js')"
+    JQUERY_UI_CSS_PATH = "'file://' + os.path.join(DNSVIZ_SHARE_PATH, 'css', 'jquery-ui-1.11.4.custom.min.css')"
 else:
     JQUERY_UI_FILES = []
 if os.path.exists(os.path.join('external', 'jquery')):
     JQUERY_FILES = [('share/dnsviz/js', ['external/jquery/jquery-1.11.3.min.js'])]
+    JQUERY_PATH = "'file://' + os.path.join(DNSVIZ_SHARE_PATH, 'js', 'jquery-1.11.3.min.js')"
 else:
     JQUERY_FILES = []
 if os.path.exists(os.path.join('external', 'raphael')):
     RAPHAEL_FILES = [('share/dnsviz/js', ['external/raphael/raphael-min.js'])]
+    RAPHAEL_PATH = "'file://' + os.path.join(DNSVIZ_SHARE_PATH, 'js', 'raphael-min.js')"
 else:
     RAPHAEL_FILES = []
 
