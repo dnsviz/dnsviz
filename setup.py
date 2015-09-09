@@ -53,11 +53,22 @@ DATA_FILES = [('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*
 MAN_FILES = [('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1'])]
 DOC_EXTRA_FILES = [('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
         ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png')))]
-JQUERY_UI_FILES = [('share/dnsviz/js', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.js']),
-        ('share/dnsviz/css', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.css']),
-        ('share/dnsviz/css/images', glob.glob(os.path.join('external', 'jquery-ui', 'images', '*.png')))]
-JQUERY_FILES = [('share/dnsviz/js', ['external/jquery/jquery-1.11.3.min.js'])]
-RAPHAEL_FILES = [('share/dnsviz/js', ['external/raphael/raphael-min.js'])]
+
+# third-party files are only installed if they're included in the package
+if os.path.exists(os.path.join('external', 'jquery-ui')):
+    JQUERY_UI_FILES = [('share/dnsviz/js', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.js']),
+            ('share/dnsviz/css', ['external/jquery-ui/jquery-ui-1.11.4.custom.min.css']),
+            ('share/dnsviz/css/images', glob.glob(os.path.join('external', 'jquery-ui', 'images', '*.png')))]
+else:
+    JQUERY_UI_FILES = []
+if os.path.exists(os.path.join('external', 'jquery')):
+    JQUERY_FILES = [('share/dnsviz/js', ['external/jquery/jquery-1.11.3.min.js'])]
+else:
+    JQUERY_FILES = []
+if os.path.exists(os.path.join('external', 'raphael')):
+    RAPHAEL_FILES = [('share/dnsviz/js', ['external/raphael/raphael-min.js'])]
+else:
+    RAPHAEL_FILES = []
 
 setup(name='dnsviz',
         version='0.4.0',
