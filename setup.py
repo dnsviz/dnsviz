@@ -10,9 +10,10 @@ from distutils.dist import Distribution
 from distutils.command.install import install
 from distutils.command.build import build
 
+# get the install prefix
 _install = install(Distribution())
 _install.finalize_options()
-INSTALL_DATA = _install.install_data
+install_prefix = _install.install_data
 
 def apply_install_prefix(filename):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
@@ -25,7 +26,7 @@ def apply_install_prefix(filename):
     in_fh = open(filename, 'r')
     out_fh = open(filename_out, 'w')
     s = in_fh.read()
-    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', INSTALL_DATA)
+    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', install_prefix)
     out_fh.write(s)
     in_fh.close()
     out_fh.close()
