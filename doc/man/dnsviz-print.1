@@ -1,0 +1,273 @@
+.\"
+.\" This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
+.\" analysis, and visualization.
+.\" Created by Casey Deccio (casey@deccio.net)
+.\"
+.\" Copyright 2015 VeriSign, Inc.
+.\"
+.\" DNSViz is free software; you can redistribute it and/or modify
+.\" it under the terms of the GNU General Public License as published by
+.\" the Free Software Foundation; either version 2 of the License, or
+.\" (at your option) any later version.
+.\"
+.\" DNSViz is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public License along
+.\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
+.\"
+.TH dnsviz-print 1 "26 Aug 2015" "v0.4.0"
+.SH NAME
+dnsviz-print \- print the assessment of diagnostic DNS queries
+.SH SYNOPSIS
+.B dnsviz print [options]
+.I [domain_name...]
+.SH DESCRIPTION
+Process the results of diagnostic DNS queries previously performed, e.g., using
+\fI"dnsviz probe"\fP, to assess the health of the associated DNS deployments
+for one or more domain names specified.  The results of this processing are
+presented in textual output.
+
+The source of the diagnostic query input is either a file specified with
+\fI-r\fP or standard input.
+
+Domain names to be processed may be passed either as command-line arguments, in
+a file (using the \fI-f\fP option), or simply implied using the diagnostic
+query input.  The latter is the preferred methodology (and the simplest) and is
+useful, except in cases where the input contains diagnostic queries for
+multiple domain names, only a subset of which are to be processed.
+
+If \fI-f\fP is not used and no domain names are supplied on the command line,
+then the domain names to be processed are extracted from the diagnostic query
+input.  If the \fI-f\fP option is used, then names may not be specified on the
+command line.
+
+The domain names passed as input are fully-qualified domain names, such as
+example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
+8.b.d.0.1.0.0.2.ip6.arpa.  Because it is implied that specified domain names
+are fully qualified, no trailing dot is necessary.
+
+The output is appropriate for terminal or text file output, using colors
+(where supported by the terminal) and symbols to designate status and errors in
+a loosely-defined textual format.
+
+.SH OPTIONS
+.IP "-f <filename>"
+Read names from a file (one name per line), instead of from command line.
+
+If this option is used, then names may not be specified on the command line.
+.IP "-r <filename>"
+Read diagnostic query input from the specified file, instead of from standard
+input.
+.IP "-t <filename>"
+Specify a file that contains trusted keys for processing diagnostic queries.
+
+The format of this file is master zone file format and should contain DNSKEY
+records that correspond to one more trusted keys for one or more DNS zones.
+.IP "-R <type>[,<type>...]"
+Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
+to process all types queried as part of the diagnostic input.
+.IP -O
+Save the output to a file, whose name is derived from the domain name.
+
+If this option is used when the diagnostic queries of multiple domain names are
+being processed, a file will be created for each domain name processed.
+.IP "-o <filename>"
+Write the output to the specified file instead of to standard output, which
+is the default.
+
+If this option is used when the diagnostic queries of multiple domain name are
+being processed, a single file (the one specified) will be created, which will
+contain the collective output for all domain names processed.
+
+.IP -h
+Display the usage and exit.
+
+.SH OUTPUT
+
+The following is an example of the output:
+
+.PP
+.RS 0
+\fB.\fP
+.RS 0
+[.]  DNSKEY: 8/1518/256 [.], 8/19036/257 [.]
+.RS 0
+[.]    RRSIG: ./8/19036 (2015-08-20 - 2015-09-03) [.]
+.RS 0
+\fBcom\fP [.]
+.RS 0
+[.]  DS: 8/30909/2 [.]
+.RS 0
+[.]    RRSIG: ./8/1518 (2015-08-26 - 2015-09-05) [.]
+.RS 0
+[.]  DNSKEY: 8/30909/257 [.], 8/35864/256 [.]
+.RS 0
+[.]    RRSIG: com/8/30909 (2015-08-24 - 2015-08-31) [.]
+.RS 0
+\fBexample.com\fP [.]
+.RS 0
+[.]  DS: 8/31406/1 [.], 8/31406/2 [.], 8/31589/1 [-], 8/31589/2 [-], 8/43547/1 [-], 8/43547/2 [-]
+.RS 0
+[.]    RRSIG: com/8/35864 (2015-08-24 - 2015-08-31) [.]
+.RS 0
+[.]  DNSKEY: 8/54108/256 [.], 8/31406/257 [.], 8/63870/256 [.]
+.RS 0
+[.]    RRSIG: example.com/8/31406 (2015-08-24 - 2015-09-14) [.]
+.RS 0
+\fBwww.example.com\fP
+.RS 0
+[.]  A: 192.0.2.1
+.RS 0
+[.]    RRSIG: example.com/8/31406 (2015-08-24 - 2015-09-14) [.]
+.RS 0
+\fBnon-existent.example.com\fP
+.RS 0
+[.]  A: NXDOMAIN
+.RS 0
+[.]    SOA: sns.dns.icann.org. noc.dns.icann.org. 2015082401 7200 3600 1209600 3600
+.RS 0
+[.]      RRSIG: example.com/8/54108 (2015-08-24 - 2015-09-14) [.]
+.RS 0
+[.]    PROOF:  [.]
+.RS 0
+[.]      NSEC: example.com. www.example.com. A NS SOA TXT AAAA RRSIG NSEC DNSKEY
+.RS 0
+[.]        RRSIG: example.com/8/54108 (2015-08-21 - 2015-09-11) [.]
+
+.SS Domain Names
+
+.P
+The output above is divided into several sections, each corresponding to the
+domain name that starts the section (e.g., example.com).  Following the headers
+of names that correspond to zones (root excepted) is a set of characters within
+brackets.  The first character within brackets is one of the following:
+
+.IP .
+secure delegation
+.IP -
+insecure delegation
+.IP !
+bogus delegation
+.IP ?
+lame or incomplete delegation
+
+.P
+If there is a second character within the brackets, it represents the following:
+
+.IP !
+errors are present
+.IP ?
+warnings are present
+
+.P
+For example, an insecure delegation with warnings is represented as: [-?]  And
+a secure delegation with no errors is shown as: [.]
+
+.SS Query Responses
+
+The lines in each section, below the header, represent responses to queries for
+that name from one or more servers.  The bracketed characters at the far left
+of each line represent the status of the response or response component on the
+rest of the line.  The first character in the brackets represents the
+authentication status:
+
+.IP .
+secure
+.IP -
+insecure
+.IP !
+bogus
+
+.P
+If there is a second character within the brackets, it represents the
+following:
+
+.IP !
+errors are present
+.IP ?
+warnings are present
+
+.P
+For example, an insecure status with warnings is represented as: [-?]  And a
+secure status with no errors is shown as: [.]
+
+The status of the response is followed by the type corresponding to the query
+or response.  For example, "A" means that data following is in response to a
+query of type A (IPv4 address) for the name of the corresponding section.  When
+the response is positive (i.e., there is data in the answer section), the
+corresponding data is shown on the right (with some exceptions) as a
+comma-separated set of records within the RRset.  DNSKEY, DS, and RRSIG records
+show an abbreviated format of their records, as follows:
+
+.IP DNSKEY:
+<algorithm number>/<key tag>/<flags>
+
+Example: 8/35864/256
+.IP DS:
+<algorithm number>/<key tag>/<digest type>
+
+Example: 8/30909/2
+.IP RRSIG:
+<signer>/<algorithm number>/<key tag> (<inception> - <expiration>)
+
+Example: com/8/35864 (2015-08-24 - 2015-08-31)
+
+.P
+Following each record within a DNSKEY, DS, or RRSIG response is a bracketed set
+of characters, the first of which represents validity:
+
+.IP .
+valid
+
+.IP -
+indeterminate
+
+.IP !
+invalid/expired/premature
+
+.IP ?
+indeterminate due to unknown algorithm
+
+.P
+If there is a second character within the brackets, it represents the
+following:
+
+.IP !
+errors are present
+.IP ?
+warnings are present
+
+.P
+For example, a DNSKEY with warnings is shown as: [.?]  A DS corresponding to a
+non-existent DNSKEY is represented as: [-].
+
+RRSIGs are shown below the RRset they cover, indented from the RRset.
+
+.SS Negative Responses
+If a response is negative, then the appropriate "NODATA" or "NXDOMAIN" text is
+shown adjacent the type queried, e.g., "A: NXDOMDAIN".  If there was an SOA
+record and/or NSEC(3) proof, then they are listed below, indented from the
+query type.
+
+The NSEC or NSEC3 records (and their RRSIGs) comprising a proof
+are grouped by indentation under the title "PROOF" which is itself indented
+under the negative response line.  Following "PROOF" is a bracketed set of
+characters with the same meaning as those used for DS, DNSKEY, and RRSIG.
+
+.SH EXIT CODES
+The exit codes are:
+.IP 0
+Program terminated normally.
+.IP 1
+Incorrect usage.
+.IP 2
+Required package dependencies were not found.
+.IP 3
+There was an error processing the input or saving the output.
+.IP 4
+Program execution was interrupted, or an unknown error ocurred.
+.SH SEE ALSO
+.BR dnsviz (1), dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-query (1)
