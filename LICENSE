@@ -5,7 +5,8 @@ rights in this software.
 Copyright 2014-2015 VeriSign, Inc.
 
 dnsviz/base32.py
-  Copyright (c) 2001-2015 Python Software Foundation; All Rights Reserved
+  Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation;
+  All Rights Reserved
   PSF license: https://docs.python.org/2/license.html
 
 doc/src/error.svg

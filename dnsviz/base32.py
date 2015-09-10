@@ -1,5 +1,8 @@
 #
-# Copyright (c) 2001-2015 Python Software Foundation; All Rights Reserved
+# Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation;
+# All Rights Reserved
+#
+# PSF license: https://docs.python.org/2/license.html
 #
 # The contents of this module are derived the base64 module of python 2.7, with
 # the value of _b32tab modified to use the Base 32 Encoding with Extended Hex
