@@ -55,7 +55,7 @@ class MyBuild(build):
         build.run(self)
 
 DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE'])]
-DATA_FILES = [('share/dnsviz/icons', glob.glob(os.path.join('share', 'icons', '*.png'))),
+DATA_FILES = [('share/dnsviz/icons', ['doc/images/error.png', 'doc/images/warning.png']),
         ('share/dnsviz/css', ['share/css/dnsviz.css']),
         ('share/dnsviz/js', ['share/js/dnsviz.js']),
         ('share/dnsviz/html', ['share/html/dnssec-template.html']),
