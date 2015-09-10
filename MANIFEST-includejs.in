@@ -2,4 +2,4 @@ include dnsviz/config.py.in
 include doc/Makefile
 include doc/src/*dot
 include doc/src/*svg
-include contrib/m2crypto.patch
+include contrib/m2crypto.patch contrib/digviz
