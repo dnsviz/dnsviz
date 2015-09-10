@@ -138,12 +138,13 @@ def _errors_warnings_str(status, warnings, errors, show_color):
             error_str = STATUS_MAP['WARNING']
     return '[%s%s]' % (STATUS_MAP[status], error_str)
 
-def textualize_status_output(names, show_color):
+def _textualize_status_output_response(rdtype_str, status, warnings, errors, rdata, children, depth, show_color):
     s = ''
-    name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
+
     response_prefix = '  %(status_color)s%(status)s%(preindent)s %(indent)s%(rdtype)s: '
     response_rdata = '%(rdata)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s'
     join_str_template = '%(status_color)s, '
+
     params = {}
     params['status_color'] = ''
     params['status_color_rdata'] = ''
@@ -153,96 +154,75 @@ def textualize_status_output(names, show_color):
     else:
         params['color_reset'] = ''
 
-    for name, status, warnings, errors, responses in names:
-        params['name'] = name
-        params['status_rdata'] = ''
+    # display status, errors, and warnings
+    params['status'] = _errors_warnings_str(status, warnings, errors, show_color)
+
+    # indent based on the presence of errors and warnings
+    if errors or warnings:
+        params['preindent'] = ''
+    else:
+        params['preindent'] = ' '
+
+    params['rdtype'] = rdtype_str
+    params['indent'] = '  '*depth
+    if show_color:
+        params['status_color'] = TERM_COLOR_MAP[status]
+    s += response_prefix % params
+
+    rdata_set = []
+    for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
+        params['rdata'] = rdata_item
+        # display status, errors, and warnings
+        if substatus is not None:
+            if show_color:
+                params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
+            params['status_rdata'] = ' ' + _errors_warnings_str(substatus, subwarnings, suberrors, show_color)
+        else:
+            params['status_color_rdata'] = ''
+            params['status_rdata'] = ''
+        rdata_set.append(response_rdata % params)
+    join_str = join_str_template % params
+    s += join_str.join(rdata_set) + '\n'
+
+    for rdtype_str_child, status_child, warnings_child, errors_child, rdata_child, children_child in children:
+        s += _textualize_status_output_response(rdtype_str_child, status_child, warnings_child, errors_child, rdata_child, children_child, depth + 1, show_color)
+
+    return s
+
+def _textualize_status_output_name(name, status, warnings, errors, responses, show_color):
+    s = ''
+
+    name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
+
+    params = {}
+    params['status_color'] = ''
+    params['status_color_rdata'] = ''
+
+    if show_color:
+        params['color_reset'] = TERM_COLOR_MAP['RESET']
+    else:
+        params['color_reset'] = ''
+
+    params['name'] = name
+    params['status_rdata'] = ''
+    if show_color:
+        params['status_color'] = TERM_COLOR_MAP['BOLD']
+        params['color_reset'] = TERM_COLOR_MAP['RESET']
+    if status is not None:
+        params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
         if show_color:
-            params['status_color'] = TERM_COLOR_MAP['BOLD']
-            params['color_reset'] = TERM_COLOR_MAP['RESET']
-        if status is not None:
-            params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
-            if show_color:
-                params['status_color_rdata'] = TERM_COLOR_MAP[status]
-        s += name_template % params
+            params['status_color_rdata'] = TERM_COLOR_MAP[status]
+    s += name_template % params
 
-        in_neg_response = False
-        soa_seen = False
-        prev_rdtype_str = ''
-        for rdtype_str, status, warnings, errors, rdata in responses:
+    for rdtype_str, status, warnings, errors, rdata, children in responses:
+        s += _textualize_status_output_response(rdtype_str, status, warnings, errors, rdata, children, 0, show_color)
 
-            # if this was a negative response, then we indicate that it is, and
-            # reset soa_seen to False
-            if not in_neg_response and rdtype_str == 'PROOF':
-                in_neg_response = True
-                soa_seen = False
+    return s
 
-            # consider the cases in which we might no longer be in a negative
-            # response
-            if in_neg_response:
-                # if this is SOA, then we only break out if an SOA hasn't been
-                # seen
-                if rdtype_str == 'SOA':
-                    if soa_seen:
-                        in_neg_response = False
-                # otherwise, we break out for any type that is not NSEC, NSEC3,
-                # or RRSIG (all of which accompany negative responses)
-                elif rdtype_str not in ('NSEC', 'NSEC3', 'RRSIG', 'PROOF'):
-                    in_neg_response = False
-
-            # display status, errors, and warnings
-            params['status'] = _errors_warnings_str(status, warnings, errors, show_color)
-
-            # indent based on the presence of errors and warnings
-            if errors or warnings:
-                params['preindent'] = ''
-            else:
-                params['preindent'] = ' '
-
-            # indent based on if we're in a negative response, whether this is
-            # an RRSIG, etc.
-            params['rdtype'] = rdtype_str
-            if in_neg_response:
-                params['indent'] = '  '
-                if rdtype_str.startswith('NSEC'):
-                    params['indent'] += '  '
-                elif rdtype_str == 'RRSIG':
-                    if prev_rdtype_str.startswith('NSEC'):
-                        params['indent'] += '    '
-                    else:
-                        params['indent'] += '  '
-            else:
-                params['indent'] = ''
-                if rdtype_str == 'RRSIG':
-                    params['indent'] += '  '
-            if show_color:
-                params['status_color'] = TERM_COLOR_MAP[status]
-            s += response_prefix % params
-
-            rdata_set = []
-            for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
-                params['rdata'] = rdata_item
-                # display status, errors, and warnings
-                if substatus is not None:
-                    if show_color:
-                        params['status_color_rdata'] = TERM_COLOR_MAP[substatus]
-                    params['status_rdata'] = ' ' + _errors_warnings_str(substatus, subwarnings, suberrors, show_color)
-                else:
-                    params['status_color_rdata'] = ''
-                    params['status_rdata'] = ''
-                rdata_set.append(response_rdata % params)
-            join_str = join_str_template % params
-            s += join_str.join(rdata_set) + '\n'
-
-            # if this is a negative response, and we've just seen an SOA
-            # record, then note it
-            if in_neg_response and rdtype_str == 'SOA':
-                soa_seen = True
-            # if this was a negative response, then we indicate that it is, and
-            # reset soa_seen to False
-            if rdata[0][3] in ('NXDOMAIN', 'NODATA'):
-                in_neg_response = True
-                soa_seen = False
-            prev_rdtype_str = rdtype_str
+def textualize_status_output(names, show_color):
+    s = ''
+    for name, status, warnings, errors, responses in names:
+        s += _textualize_status_output_name(name, status, warnings, errors, responses, show_color)
 
     return s
 

@@ -211,10 +211,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 warnings = [w.code for w in nsec_status.warnings]
                 errors = [e.code for e in nsec_status.errors]
-                nsec_tup.append(('PROOF', status, [], [], [(Status.nsec_status_mapping[nsec_status.validation_status], warnings, errors, '')]))
 
+                children = []
                 for nsec_rrset_info in nsec_status.nsec_set_info.rrsets.values():
-                    nsec_tup.extend(self._serialize_response_component_simple(nsec_rrset_info.rrset.rdtype, response_info, nsec_rrset_info, True))
+                    children.append(self._serialize_response_component_simple(nsec_rrset_info.rrset.rdtype, response_info, nsec_rrset_info, True))
+
+                nsec_tup.append(('PROOF', status, [], [], [(Status.nsec_status_mapping[nsec_status.validation_status], warnings, errors, '')], children))
 
         return nsec_tup
 
@@ -251,11 +253,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     warnings = [w.code for w in rrsig_status.warnings]
                     errors = [e.code for e in rrsig_status.errors]
                     rrsig_tup.append(('RRSIG', status, [], [], [(Status.rrsig_status_mapping[rrsig_status.validation_status], warnings, errors, '%s/%s/%s (%s - %s)' % \
-                            (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))]))
+                            (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))], []))
         return rrsig_tup
 
     def _serialize_response_component_simple(self, rdtype, response_info, info, show_neg_response, dname_status=None):
-        tup = []
         rdata = []
         if isinstance(info, Errors.DomainNameAnalysisError):
             status = 'ERROR'
@@ -266,7 +267,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
 
         rdata_tup = []
-        rrsig_tup = []
+        children = []
         if isinstance(info, Response.RRsetInfo):
             if info.rrset.rdtype == dns.rdatatype.CNAME:
                 rdata_tup.append((None, [], [], 'CNAME %s' % (info.rrset[0].target.to_text())))
@@ -304,13 +305,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             warnings = [w.code for w in response_info.name_obj.rrset_warnings[info]]
             errors = [e.code for e in response_info.name_obj.rrset_errors[info]]
 
-            rrsig_tup = self._serialize_rrsig_simple(response_info.name_obj, info)
+            children.extend(self._serialize_rrsig_simple(response_info.name_obj, info))
             for wildcard_name in info.wildcard_info:
-                rrsig_tup.extend(self._serialize_nsec_set_simple(info.wildcard_info[wildcard_name], response_info.name_obj.wildcard_status, response_info))
+                children.extend(self._serialize_nsec_set_simple(info.wildcard_info[wildcard_name], response_info.name_obj.wildcard_status, response_info))
 
             if info in response_info.name_obj.dname_status:
                 for dname_status in response_info.name_obj.dname_status[info]:
-                    rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.DNAME, response_info, dname_status.synthesized_cname.dname_info, True, dname_status))
+                    children.append(self._serialize_response_component_simple(dns.rdatatype.DNAME, response_info, dname_status.synthesized_cname.dname_info, True, dname_status))
 
         elif isinstance(info, Errors.DomainNameAnalysisError):
             warnings = []
@@ -321,31 +322,33 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             errors = [e.code for e in response_info.name_obj.nodata_errors[info]]
 
             if not self.nodata_status[info] and not show_neg_response:
-                return []
+                return None
             rdata_tup.append((None, [], [], 'NODATA'))
             for soa_rrset_info in info.soa_rrset_info:
-                rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
-            rrsig_tup.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
+                children.append(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
+            children.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
 
         elif info in self.nxdomain_status:
             warnings = [w.code for w in response_info.name_obj.nxdomain_warnings[info]]
             errors = [e.code for e in response_info.name_obj.nxdomain_errors[info]]
 
             if not self.nxdomain_status[info] and not show_neg_response:
-                return []
+                return None
             rdata_tup.append((None, [], [], 'NXDOMAIN'))
             for soa_rrset_info in info.soa_rrset_info:
-                rrsig_tup.extend(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
-            rrsig_tup.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nxdomain_status, response_info))
+                children.append(self._serialize_response_component_simple(dns.rdatatype.SOA, response_info, soa_rrset_info, True))
+            children.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nxdomain_status, response_info))
 
-        tup.append((dns.rdatatype.to_text(rdtype), status, warnings, errors, rdata_tup))
-        tup.extend(rrsig_tup)
-        return tup
+        return (dns.rdatatype.to_text(rdtype), status, warnings, errors, rdata_tup, children)
 
     def _serialize_response_component_list_simple(self, rdtype, response_info, show_neg_response):
         tup = []
         for info, cname_chain_info in response_info.response_info_list:
-            tup.extend(self._serialize_response_component_simple(rdtype, response_info, info, show_neg_response))
+            val = self._serialize_response_component_simple(rdtype, response_info, info, show_neg_response)
+            # this might not return a non-empty value for a negative response,
+            # so we check for a non-empty value before appending it
+            if val:
+                tup.append(val)
         return tup
 
     def _serialize_status_simple(self, response_info_list, processed):
