@@ -380,7 +380,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             status = None
             warnings = []
             errors = []
-            dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
             if parent_obj.parent is not None:
                 ds_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DS)
                 if parent_obj.is_zone():
@@ -400,7 +399,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # serialize the DNSKEY response
             if response_info.rdtype == dns.rdatatype.DS and parent_obj.name == response_info.qname:
                 pass
+            # if the servers were unresponsive, then it's possible that no
+            # DNSKEY query was issued
+            elif (parent_obj.name, dns.rdatatype.DNSKEY) not in parent_obj.queries:
+                pass
             else:
+                dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
                 name_tup[4].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False))
 
             parent_is_signed = parent_obj.signed
