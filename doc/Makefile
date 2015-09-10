@@ -1,16 +1,17 @@
 DOT=dot
-DOTDIR=dot
+SRCDIR=src
 IMGDIR=images
 
-DOTFILES = $(wildcard $(DOTDIR)/*dot)
-PNGFILES = $(DOTFILES:$(DOTDIR)/%.dot=$(IMGDIR)/%.png)
+DOTFILES = $(wildcard $(SRCDIR)/*dot)
+DOTPNGFILES = $(DOTFILES:$(SRCDIR)/%.dot=$(IMGDIR)/%.png)
 
-all: $(PNGFILES)
+all: $(DOTPNGFILES)
 
-$(PNGFILES): $(IMGDIR)/%.png: $(DOTDIR)/%.dot
+# make png files from dot files
+$(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot
 	$(DOT) -Tpng $< > $@ || ( rm $@ && false )
 
 .PHONY: clean
 
 clean:
-	rm -rf $(PNGFILES)
+	rm -rf $(DOTPNGFILES)
