@@ -8,9 +8,15 @@ dnsviz/base32.py
   Copyright (c) 2001-2015 Python Software Foundation; All Rights Reserved
   PSF license: https://docs.python.org/2/license.html
 
+doc/src/error.svg
+  Public domain: https://en.wikipedia.org/wiki/File:Ambox_warning_pn.svg
+
+doc/src/warning.svg
+  Public domain: https://en.wikipedia.org/wiki/File:Ambox_warning_yellow.svg
+
 external/jquery
   Copyright 2005, 2015 jQuery Foundation, Inc.
-  MIT license: http://jquery.org/license
+  MIT license: https://jquery.org/license/
 
 external/jquery-ui
   Copyright 2015 jQuery Foundation and other contributors
