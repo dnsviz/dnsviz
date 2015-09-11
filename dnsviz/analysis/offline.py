@@ -461,7 +461,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for qname, rdtype in self.queries:
             if rdtypes is None:
                 # if rdtypes was not specified, then serialize all, with some exceptions
-                if rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                     continue
             else:
                 # if rdtypes was specified, then only serialize rdtypes that

@@ -255,7 +255,7 @@ def main(argv):
                 if rdtypes is None:
                     # if rdtypes was not specified, then graph all, with some
                     # exceptions
-                    if name_obj.is_zone() and rdtype in (dns.rdatatype.NS, dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                    if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
                         continue
                 else:
                     # if rdtypes was specified, then only graph rdtypes that
