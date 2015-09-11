@@ -110,6 +110,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.ksks = None
         self.dnskey_with_ds = None
 
+        self._dnskey_sets = None
+        self._dnskeys = None
+
     def _signed(self):
         return bool(self.dnssec_algorithms_in_dnskey or self.dnssec_algorithms_in_ds or self.dnssec_algorithms_in_dlv)
     signed = property(_signed)
@@ -150,6 +153,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self._handle_ds_response(rrset)
 
     def _index_dnskeys(self):
+        if self._dnskey_sets is not None:
+            return
+
         self._dnskey_sets = []
         self._dnskeys = {}
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
