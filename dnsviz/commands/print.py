@@ -31,8 +31,19 @@ import sys
 import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
-from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
+
+# If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
+# will be reported later
+try:
+    from dnsviz.viz.dnssec import DNSAuthGraph
+except ImportError:
+    try:
+        import pygraphviz
+    except ImportError:
+        pass
+    else:
+        raise
 
 logger = logging.getLogger('dnsviz.analysis.offline')
 

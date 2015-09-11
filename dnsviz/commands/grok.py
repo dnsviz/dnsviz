@@ -33,13 +33,17 @@ import dns.exception, dns.message, dns.name
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION, DNS_PROCESSED_VERSION
 from dnsviz.util import get_trusted_keys
 
-# we permit dnsgrok to run without having pygraphviz installed because it is
-# not used unless -t is specified.  If -t is used on the command line, then we
-# check for the existence of pygraphviz.
+# If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
+# will be reported later
 try:
     from dnsviz.viz.dnssec import DNSAuthGraph
 except ImportError:
-    pass
+    try:
+        import pygraphviz
+    except ImportError:
+        pass
+    else:
+        raise
 
 logger = logging.getLogger('dnsviz.analysis.offline')
 

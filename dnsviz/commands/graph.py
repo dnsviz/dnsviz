@@ -32,8 +32,19 @@ import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
-from dnsviz.viz.dnssec import DNSAuthGraph
 from dnsviz.util import get_trusted_keys
+
+# If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
+# will be reported later
+try:
+    from dnsviz.viz.dnssec import DNSAuthGraph
+except ImportError:
+    try:
+        import pygraphviz
+    except ImportError:
+        pass
+    else:
+        raise
 
 LOCAL_MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
