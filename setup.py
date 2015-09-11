@@ -10,17 +10,12 @@ from distutils.dist import Distribution
 from distutils.command.install import install
 from distutils.command.build import build
 
-# get the install prefix
-_install = install(Distribution())
-_install.finalize_options()
-INSTALL_PREFIX = _install.install_data
-
 JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
 JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
 RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
 
-def apply_substitutions(filename):
+def apply_substitutions(filename, install_prefix):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
 
     filename_out = filename[:-3]
@@ -31,7 +26,7 @@ def apply_substitutions(filename):
     in_fh = open(filename, 'r')
     out_fh = open(filename_out, 'w')
     s = in_fh.read()
-    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', INSTALL_PREFIX)
+    s = s.replace('__DNSVIZ_INSTALL_PREFIX__', install_prefix)
     s = s.replace('__JQUERY_PATH__', JQUERY_PATH)
     s = s.replace('__JQUERY_UI_PATH__', JQUERY_UI_PATH)
     s = s.replace('__JQUERY_UI_CSS_PATH__', JQUERY_UI_CSS_PATH)
@@ -50,9 +45,13 @@ def make_documentation():
 
 class MyBuild(build):
     def run(self):
-        apply_substitutions(os.path.join('dnsviz','config.py.in'))
         make_documentation()
         build.run(self)
+
+class MyInstall(install):
+    def run(self):
+        apply_substitutions(os.path.join('dnsviz','config.py.in'), self.install_data)
+        install.run(self)
 
 DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE'])]
 DATA_FILES = [('share/dnsviz/icons', ['doc/images/error.png', 'doc/images/warning.png']),
@@ -101,5 +100,5 @@ setup(name='dnsviz',
                 'm2crypto (>=0.21.1)',
                 'dnspython (>=1.11)',
         ],
-        cmdclass={ 'build': MyBuild },
+        cmdclass={ 'build': MyBuild, 'install': MyInstall },
 )
