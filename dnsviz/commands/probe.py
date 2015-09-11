@@ -639,7 +639,11 @@ def main(argv):
             name_obj.serialize(d, meta_only)
         d['_meta._dnsviz.'] = dnsviz_meta
 
-        fh.write(json.dumps(d, **kwargs))
+        try:
+            fh.write(json.dumps(d, **kwargs))
+        except IOError, e:
+            logger.error('Error writing analysis: %s' % e)
+            sys.exit(3)
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
