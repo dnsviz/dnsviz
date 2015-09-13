@@ -17,15 +17,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along
 with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 
-dnsviz/base32.py
-  Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation;
-  All Rights Reserved
-  PSF license: https://docs.python.org/2/license.html
-
-  The contents of dnsviz/base32.py are derived the base64 module of python 2.7,
-  with the value of _b32tab modified to use the Base 32 Encoding with Extended
-  Hex Alphabet, as specified in RFC 4648.
-
 doc/src/error.svg
   Public domain: https://en.wikipedia.org/wiki/File:Ambox_warning_pn.svg
 
