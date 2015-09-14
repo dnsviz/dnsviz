@@ -935,6 +935,7 @@ class NSECSet(DNSResponseComponent):
         self.ttl_cmp = ttl_cmp
         self.nsec3_params = {}
         self.invalid_nsec3_owner = set()
+        self.invalid_nsec3_hash = set()
         self.use_nsec3 = False
         for rrset in rrsets:
             #XXX There shouldn't be multple NSEC(3) RRsets of the same owner
@@ -951,6 +952,8 @@ class NSECSet(DNSResponseComponent):
                 self.nsec3_params[key].add(rrset.name)
                 if not self.is_valid_nsec3_name(rrset.name, rrset[0].algorithm):
                     self.invalid_nsec3_owner.add(rrset.name)
+                if not self.is_valid_nsec3_hash(rrset[0].next, rrset[0].algorithm):
+                    self.invalid_nsec3_hash.add(rrset.name)
 
         self.servers_clients = {}
 
@@ -976,6 +979,8 @@ class NSECSet(DNSResponseComponent):
                 obj.nsec3_params[key].add(rrset.name)
                 if not obj.is_valid_nsec3_name(rrset.name, rrset[0].algorithm):
                     obj.invalid_nsec3_owner.add(rrset.name)
+                if not obj.is_valid_nsec3_hash(rrset[0].next, rrset[0].algorithm):
+                    obj.invalid_nsec3_hash.add(rrset.name)
 
         obj.servers_clients = self.servers_clients.copy()
         return obj
@@ -996,6 +1001,14 @@ class NSECSet(DNSResponseComponent):
                 return False
         if filter(lambda x: x.upper() not in base32.b32alphabet, nsec_name[0]):
             return False
+        return True
+
+    def is_valid_nsec3_hash(self, nsec3_hash, algorithm):
+        # check that NSEC3 hash is valid
+        if algorithm == 1:
+            # length of SHA1 hash should be 20 bytes
+            if len(nsec3_hash) != 20:
+                return False
         return True
 
     def get_algorithm_support(self):
