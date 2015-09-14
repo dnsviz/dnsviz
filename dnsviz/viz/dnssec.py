@@ -329,9 +329,9 @@ class DNSAuthGraph:
 
             img_str = ''
             if dnskey.errors or rrset_info_with_errors:
-                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
             elif dnskey.warnings or rrset_info_with_warnings:
-                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
                 label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT></TD></TR></TABLE>>' % \
@@ -433,9 +433,9 @@ class DNSAuthGraph:
 
             img_str = ''
             if filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.errors), ds_statuses) or zone_obj.rrset_errors[ds_info]:
-                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
             elif filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.warnings), ds_statuses) or zone_obj.rrset_warnings[ds_info]:
-                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
             if img_str:
@@ -574,9 +574,9 @@ class DNSAuthGraph:
         #XXX consider not adding icons if errors are apparent from color of line
         edge_label = ''
         if rrsig_status.errors:
-            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
         elif rrsig_status.warnings:
-            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
         if rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
             line_color = COLORS['secure']
@@ -644,9 +644,9 @@ class DNSAuthGraph:
         if not self.G.has_node(node_str):
             img_str = ''
             if name_obj.rrset_errors[rrset_info]:
-                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
             elif name_obj.rrset_warnings[rrset_info]:
-                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
                 node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
@@ -712,9 +712,9 @@ class DNSAuthGraph:
 
             img_str = ''
             if errors_list:
-                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
             elif warnings_list:
-                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
                 node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
@@ -766,7 +766,7 @@ class DNSAuthGraph:
 
         node_str = self.rrset_node_str(name, rdtype, 2)
 
-        img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+        img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
 
         node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR><TR><TD><FONT POINT-SIZE="%d" FACE="%s" COLOR="%s"><I>%s/%s</I></FONT></TD></TR></TABLE>>' % \
                 (img_str, 10, 'Helvetica', '#b0b0b0', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), )
@@ -822,9 +822,9 @@ class DNSAuthGraph:
         except KeyError:
             edge_label = ''
             if dname_status.errors:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
             elif dname_status.warnings:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
             self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
@@ -861,9 +861,9 @@ class DNSAuthGraph:
 
             img_str = ''
             if rrset_info_with_errors:
-                img_str = '<IMG SRC="%s"/>' % ERROR_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
             elif rrset_info_with_warnings:
-                img_str = '<IMG SRC="%s"/>' % WARNING_ICON
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             # if it is NXDOMAIN, not type DS
             if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNoAnswer)) and nsec_status.opt_out:
@@ -1319,9 +1319,9 @@ class DNSAuthGraph:
 
             edge_label = ''
             if has_errors:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
             elif has_warnings:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             if name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_SECURE:
                 line_color = COLORS['secure']
