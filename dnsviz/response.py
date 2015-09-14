@@ -1093,7 +1093,7 @@ class NSECSet(DNSResponseComponent):
         response that cover the given (digest) name.'''
 
         excluding_names = set()
-        for nsec_name in self.nsec3_params[(salt, alg, iterations)]:
+        for nsec_name in set(self.nsec3_params[(salt, alg, iterations)]).difference(self.invalid_nsec3_owner):
             if self._nsec_covers_name(name, nsec_name):
                 excluding_names.add(nsec_name)
         return excluding_names
