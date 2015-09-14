@@ -66,6 +66,8 @@ Specify a file that contains trusted keys for processing diagnostic queries.
 
 The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.
+
+This option may be used multiple times on the command line.
 .IP "-R <type>[,<type>...]"
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.

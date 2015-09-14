@@ -271,6 +271,21 @@ def main(argv):
             usage(str(e))
             sys.exit(1)
 
+        # collect trusted keys
+        trusted_keys = []
+        for opt, arg in opts:
+            if opt == '-t':
+                try:
+                    tk_str = open(arg).read()
+                except IOError, e:
+                    logger.error('%s: "%s"' % (e.strerror, arg))
+                    sys.exit(3)
+                try:
+                    trusted_keys.extend(get_trusted_keys(tk_str))
+                except dns.exception.DNSException:
+                    logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
+                    sys.exit(3)
+
         opts = dict(opts)
         if '-h' in opts:
             usage()
@@ -358,20 +373,6 @@ def main(argv):
                     logger.error('The domain name was invalid: "%s"' % name)
                 else:
                     names.append(name)
-
-        if '-t' in opts:
-            try:
-                tk_str = open(opts['-t']).read()
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-t']))
-                sys.exit(3)
-            try:
-                trusted_keys = get_trusted_keys(tk_str)
-            except dns.exception.DNSException:
-                logger.error('There was an error parsing the trusted keys file: "%s"' % opts['-t'])
-                sys.exit(3)
-        else:
-            trusted_keys = ()
 
         name_objs = []
         cache = {}
