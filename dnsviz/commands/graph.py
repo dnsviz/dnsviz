@@ -78,7 +78,12 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
     if fmt == 'html':
         js_img = G.draw('js')
 
-        template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
+        try:
+            template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
+        except IOError, e:
+            logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
+            sys.exit(3)
+
         template_str = template_str.replace('LOCAL_MEDIA_URL', LOCAL_MEDIA_URL)
         template_str = template_str.replace('JQUERY_PATH', JQUERY_PATH)
         template_str = template_str.replace('JQUERY_UI_PATH', JQUERY_UI_PATH)
