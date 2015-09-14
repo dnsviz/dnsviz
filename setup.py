@@ -50,7 +50,13 @@ class MyBuild(build):
 
 class MyInstall(install):
     def run(self):
-        apply_substitutions(os.path.join('dnsviz','config.py.in'), self.install_data)
+        # if this an alternate root is specified, then embed the install_data
+        # path relative to that alternate root
+        if self.root is not None:
+            install_data = os.path.join(os.path.sep, os.path.relpath(self.install_data, self.root))
+        else:
+            install_data = self.install_data
+        apply_substitutions(os.path.join('dnsviz','config.py.in'), install_data)
         install.run(self)
 
 DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE', 'COPYRIGHT'])]
