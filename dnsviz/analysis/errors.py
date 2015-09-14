@@ -703,6 +703,20 @@ class InvalidNSE3OwnerName(NSECError):
     required_params = ['name']
     nsec_type = 'NSEC3'
 
+class InvalidNSEC3Hash(NSECError):
+    '''
+    >>> e = InvalidNSEC3Hash(name='foo', nsec3_hash='foo===')
+    >>> e.description
+    'The NSEC3 record for foo is invalid; the value of the Next Hashed Owner Name field (foo===) does not appear to be a valid hash.'
+    '''
+
+    _abstract = False
+    code = 'INVALID_NSEC3_HASH'
+    description_template = 'The NSEC3 record for %(name)s is invalid; the value of the Next Hashed Owner Name field (%(nsec3_hash)s) does not appear to be a valid hash.'
+    references = ['RFC 5155, Sec. 3.1.7']
+    required_params = ['name', 'nsec3_hash']
+    nsec_type = 'NSEC3'
+
 class ResponseError(DomainNameAnalysisError):
     pass
 
