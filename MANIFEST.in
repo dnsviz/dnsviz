@@ -1,5 +1,5 @@
-include COPYRIGHT doc/COPYRIGHT
 include dnsviz/config.py.in
+include doc/COPYRIGHT
 include doc/Makefile
 include doc/src/*dot
 include doc/src/*svg
