@@ -59,7 +59,7 @@ class MyInstall(install):
         apply_substitutions(os.path.join('dnsviz','config.py.in'), install_data)
         install.run(self)
 
-DOC_FILES = [('share/doc/dnsviz', ['README.md', 'LICENSE', 'COPYRIGHT'])]
+DOC_FILES = [('share/doc/dnsviz', ['README.md'])]
 DATA_FILES = [('share/dnsviz/icons', ['doc/images/error.png', 'doc/images/warning.png']),
         ('share/dnsviz/css', ['share/css/dnsviz.css']),
         ('share/dnsviz/js', ['share/js/dnsviz.js']),

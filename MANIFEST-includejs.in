@@ -1,3 +1,4 @@
+include COPYRIGHT LICENSE
 include dnsviz/config.py.in
 include doc/COPYRIGHT
 include doc/Makefile
