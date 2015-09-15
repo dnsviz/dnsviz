@@ -28,9 +28,9 @@ import logging
 import re
 import sys
 
-import dns.exception, dns.message, dns.name
+import dns.exception, dns.name
 
-from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION, DNS_PROCESSED_VERSION
+from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
@@ -46,8 +46,6 @@ except ImportError:
         raise
 
 logger = logging.getLogger('dnsviz.analysis.offline')
-
-DNS_RAW_VERSION = 1.0
 
 def usage(err=None):
     if err is not None:
