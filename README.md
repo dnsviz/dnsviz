@@ -25,7 +25,7 @@ powers the Web-based analysis available at http://dnsviz.net/
 * pygraphviz (1.1 or later) - http://pygraphviz.github.io/
 
   pygraphviz is required for most functionality.   `dnsviz probe` and `dnsviz grok`
-  (without the -t option) can be used without pygraphviz installed.  Version 1.1
+  (without -t or -T options) can be used without pygraphviz installed.  Version 1.1
   or greater is required because of the support for unicode names and HTML-like
   labels, both of which are utilized in the visual output.
 
@@ -170,27 +170,33 @@ Show descriptions only if there are related errors:
 $ dnsviz grok -p -l error -r example.com.json -o example.com-chk.json
 ```
 
-Add DNSSEC trust anchors to indicate security status of responses.
+Use built-in root key as DNSSEC trust anchor, to additionally indicate
+authentication status of responses:
 ```
-$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dnsviz grok -p -l info -T -r example.com.json -o example.com-chk.json
+```
+
+Use alternate DNSSEC trust anchor:
+```
+$ dig +noall +answer example.com dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz grok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
 ```
 
 Pipe `dnsviz probe` output directly to `dnsviz grok`:
 ```
 $ dnsviz probe example.com | \
-      dnsviz grok -p -l info -t tk.txt -o example.com-chk.json
+      dnsviz grok -p -l info -o example.com-chk.json
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsviz probe example.com | tee example.com.json | \
-      dnsviz grok -p -l info -t tk.txt -o example.com-chk.json
+      dnsviz grok -p -l info -o example.com-chk.json
 ```
 
 Assess multiple names at once with error level:
 ```
-$ dnsviz grok -p -l error -t tk.txt -r multiple.json -o example.com-chk.json
+$ dnsviz grok -p -l error -r multiple.json -o example.com-chk.json
 ```
 
 
@@ -226,34 +232,34 @@ Same thing (filename is derived from domain name and output format):
 $ dnsviz graph -Thtml -O -r example.com.json
 ```
 
-Add DNSSEC trust anchors to the graph:
+Use alternate DNSSEC trust anchor:
 ```
-$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dig +noall +answer example.com dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz graph -Thtml -O -r example.com.json -t tk.txt
 ```
 
 Pipe `dnsviz probe` output directly to `dnsviz graph`:
 ```
 $ dnsviz probe example.com | \
-      dnsviz graph -Thtml -O -t tk.txt
+      dnsviz graph -Thtml -O
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsviz probe example.com | tee example.com.json | \
-      dnsviz graph -Thtml -O -t tk.txt
+      dnsviz graph -Thtml -O
 ```
 
 Process analysis of multiple domain names, creating an image for each name
 processed:
 ```
-$ dnsviz graph -Thtml -O -r multiple.json -t tk.txt
+$ dnsviz graph -Thtml -O -r multiple.json
 ```
 
 Process analysis of multiple domain names, creating a single image for all
 names.
 ```
-$ dnsviz graph -Thtml -r multiple.json -t tk.txt > multiple.html
+$ dnsviz graph -Thtml -r multiple.json > multiple.html
 ```
 
 
@@ -273,22 +279,22 @@ results to the terminal:
 $ dnsviz print < example.com.json
 ```
 
-Add DNSSEC trust anchors to the graph:
+Use alternate DNSSEC trust anchor:
 ```
-$ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
+$ dig +noall +answer example.com dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz print -r example.com.json -t tk.txt
 ```
 
 Pipe `dnsviz probe` output directly to `dnsviz print`:
 ```
 $ dnsviz probe example.com | \
-      dnsviz print -t tk.txt
+      dnsviz print
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsviz probe example.com | tee example.com.json | \
-      dnsviz print -t tk.txt
+      dnsviz print
 ```
 
 
@@ -308,7 +314,7 @@ resolvers (i.e., in /etc/resolv.conf):
 $ dnsviz query example.com
 ```
 
-Same, but specify a trust anchor:
+Same, but specify an alternate trust anchor:
 ```
 $ dnsviz query +trusted-key=tk.txt example.com
 ```
