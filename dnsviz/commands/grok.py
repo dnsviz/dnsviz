@@ -31,7 +31,7 @@ import sys
 import dns.exception, dns.message, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION, DNS_PROCESSED_VERSION
-from dnsviz.util import get_trusted_keys
+from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -59,6 +59,7 @@ Options:
     -f <filename>  - read names from a file
     -r <filename>  - read diagnostic queries from a file
     -t <filename>  - specify file containing trusted keys
+    -T             - use the built-in root key as trusted key
     -o <filename>  - save the output to the specified file
     -p             - make json output pretty instead of minimal
     -l <loglevel>  - set log level to one of: error, warning, info, debug
@@ -93,7 +94,7 @@ def main(argv):
         test_m2crypto()
 
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:pl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:To:pl:h')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -211,8 +212,20 @@ def main(argv):
                 logger.error('%s: "%s"' % (e.strerror, opts['-o']))
                 sys.exit(3)
 
-        if '-t' in opts:
-            # check that pygraphviz is installed
+        if '-T' in opts:
+            try:
+                tk_str = open(TRUSTED_KEYS_ROOT).read()
+            except IOError, e:
+                logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
+                sys.exit(3)
+            try:
+                trusted_keys.extend(get_trusted_keys(tk_str))
+            except dns.exception.DNSException:
+                logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
+                sys.exit(3)
+
+        # if trusted keys were supplied, check that pygraphviz is installed
+        if trusted_keys:
             test_pygraphviz()
 
         name_objs = []
