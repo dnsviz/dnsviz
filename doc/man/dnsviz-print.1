@@ -63,6 +63,8 @@ Read diagnostic query input from the specified file, instead of from standard
 input.
 .IP "-t <filename>"
 Specify a file that contains trusted keys for processing diagnostic queries.
+This overrides the default behavior of using the built-in keys for the root
+zone.
 
 The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.

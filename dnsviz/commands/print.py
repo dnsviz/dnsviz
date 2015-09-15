@@ -31,7 +31,7 @@ import sys
 import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
-from dnsviz.util import get_trusted_keys
+from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -373,6 +373,18 @@ def main(argv):
                     logger.error('The domain name was invalid: "%s"' % name)
                 else:
                     names.append(name)
+
+        if '-t' not in opts:
+            try:
+                tk_str = open(TRUSTED_KEYS_ROOT).read()
+            except IOError, e:
+                logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
+                sys.exit(3)
+            try:
+                trusted_keys.extend(get_trusted_keys(tk_str))
+            except dns.exception.DNSException:
+                logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
+                sys.exit(3)
 
         name_objs = []
         cache = {}
