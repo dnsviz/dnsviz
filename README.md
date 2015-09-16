@@ -25,7 +25,7 @@ powers the Web-based analysis available at http://dnsviz.net/
 * pygraphviz (1.1 or later) - http://pygraphviz.github.io/
 
   pygraphviz is required for most functionality.   `dnsviz probe` and `dnsviz grok`
-  (without -t) can be used without pygraphviz installed.  Version 1.1
+  (without the -t option) can be used without pygraphviz installed.  Version 1.1
   or greater is required because of the support for unicode names and HTML-like
   labels, both of which are utilized in the visual output.
 
@@ -174,12 +174,6 @@ Use root key as DNSSEC trust anchor, to additionally indicate
 authentication status of responses:
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
-$ dnsviz grok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
-```
-
-Use alternate DNSSEC trust anchor:
-```
-$ dig +noall +answer example.com dnskey | awk '$5 % 2 { print $0 }' > tk.txt
 $ dnsviz grok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
 ```
 
