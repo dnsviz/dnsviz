@@ -514,7 +514,7 @@ class OnlineDomainNameAnalysis(object):
         for server in query.responses:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
 
-            # note the fact that servers were queried
+            # note the fact that the server was queried
             self._all_servers_queried.add(server)
 
             for client in query.responses[server]:
