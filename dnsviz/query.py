@@ -133,6 +133,10 @@ class AcceptResponse(Exception):
     acceptable response or error condition has been satisfied.'''
     pass
 
+class SourceAddressBINDError(Exception):
+    '''An error resulting from unsuccessfully trying to bind to an address.'''
+    pass
+
 class DNSQueryRetryAttempt:
     '''A failed attempt at a DNS query that invokes a subsequent retry.'''
 
@@ -695,6 +699,11 @@ class DNSQueryHandler:
                     handler.handle(response_wire, response, response_time)
 
             if retry_action is not None:
+                # If we were unable to bind to the source address, then this is
+                # our fault
+                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EADDRNOTAVAIL:
+                    raise AcceptResponse
+
                 # if this error was our fault, don't add it to the history
                 if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EMFILE:
                     pass
@@ -1273,6 +1282,14 @@ class ExecutableDNSQuery(DNSQuery):
                         src = IPAddr(qtm.src)
                     else:
                         src = qtm.src
+
+                    # If we were unable to bind to the source address, then
+                    # this is an error
+                    if err == RESPONSE_ERROR_NETWORK_ERROR and errno1 == errno.EADDRNOTAVAIL:
+                        if qh._client is not None:
+                            raise SourceAddressBINDError('Unable to bind to local address %s' % qh._client)
+                        else:
+                            raise SourceAddressBINDError('Unable to bind to local address')
 
                     query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
 
