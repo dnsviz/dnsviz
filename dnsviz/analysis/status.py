@@ -891,7 +891,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSE3OwnerName(name=name))
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
 
@@ -1041,7 +1041,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSE3OwnerName(name=name))
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
 
@@ -1215,7 +1215,7 @@ class NSEC3StatusNoAnswer(NSEC3Status):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSE3OwnerName(name=name))
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
 
