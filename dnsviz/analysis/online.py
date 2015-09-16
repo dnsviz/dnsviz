@@ -1322,16 +1322,22 @@ class Analyst(object):
     def _add_query(self, name_obj, query, detect_ns=False):
         name_obj.add_query(query, detect_ns)
 
-    def _filter_servers(self, servers):
+    def _filter_servers_network(self, servers):
         if self.client_ipv6 is None:
             servers = filter(lambda x: x.version != 6, servers)
         if self.client_ipv4 is None:
             servers = filter(lambda x: x.version != 4, servers)
+        return servers
+
+    def _filter_servers_locality(self, servers):
         if not self.allow_loopback_query:
             servers = filter(lambda x: not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6, servers)
         if not self.allow_private_query:
             servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
         return servers
+
+    def _filter_servers(self, servers):
+        return self._filter_servers_locality(self._filter_servers_network(servers))
 
     def _get_name_for_analysis(self, name, stub=False, lock=True):
         with self.analysis_cache_lock:
