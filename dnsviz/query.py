@@ -680,7 +680,7 @@ class DNSQueryHandler:
             return MIN_QUERY_TIMEOUT
         return timeout
 
-    def handle_response(self, response_wire, response, response_time, sport):
+    def handle_response(self, response_wire, response, response_time, client, sport):
         retry_action = None
         try:
             for handler in self._response_handlers:
@@ -1235,7 +1235,7 @@ class ExecutableDNSQuery(DNSQuery):
                 else:
                     msg_size = None
                 response_time = round(qtm.end_time - qtm.start_time, 3)
-                response = qh.handle_response(qtm.res, response, response_time, qtm.sport)
+                response = qh.handle_response(qtm.res, response, response_time, qtm.src, qtm.sport)
 
                 # if no response was returned, then resubmit the modified query
                 if response is None:
