@@ -379,6 +379,10 @@ def main(argv):
             usage('-x may only be used in conjunction with -A.')
             sys.exit(1)
 
+        if '-4' in opts and '-6' in opts:
+            usage('-4 and -6 may not be used together.')
+            sys.exit(1)
+
         if '-a' in opts:
             try:
                 ceiling = dns.name.from_text(opts['-a'])
@@ -408,25 +412,20 @@ def main(argv):
 
         use_ipv4 = None
         use_ipv6 = None
-        require_ipv4 = False
-        require_ipv6 = False
         # if neither is specified, then they're both used
         if '-4' not in opts and '-6' not in opts:
             use_ipv4 = True
             use_ipv6 = True
+        # if one or the other is specified, then only the one specified is
+        # tried
         else:
-            # use IPv4 only if specified
             if '-4' in opts:
                 use_ipv4 = True
-                require_ipv4 = True
-            else:
-                use_ipv4 = False
-            # use IPv6 only if specified
-            if '-6' in opts:
-                use_ipv6 = True
-                require_ipv6 = True
-            else:
                 use_ipv6 = False
+            else: # -6 in opts
+                use_ipv4 = False
+                use_ipv6 = True
+
         if '-A' not in opts:
             if '-t' in opts:
                 cls = RecursiveParallelAnalyst
@@ -434,13 +433,6 @@ def main(argv):
                 cls = RecursiveBulkAnalyst
             if '-s' in opts:
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = name_addr_mappings_from_string(opts['-s'])
-
-                ipv4_resolvers = filter(lambda x: x[1].version == 4, explicit_delegations[WILDCARD_EXPLICIT_DELEGATION])
-                ipv6_resolvers = filter(lambda x: x[1].version == 6, explicit_delegations[WILDCARD_EXPLICIT_DELEGATION])
-                if not ipv4_resolvers and not require_ipv4:
-                    use_ipv4 = False
-                if not ipv6_resolvers and not require_ipv6:
-                    use_ipv6 = False
             else:
                 servers = get_standard_resolver()._servers
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = set([(dns.name.from_text('ns%d' % i), s) for i, s in enumerate(servers)])
@@ -528,16 +520,6 @@ def main(argv):
                     client_ipv4 = c4
                 if use_ipv6 and client_ipv6 is None:
                     client_ipv6 = c6
-                if require_ipv4 and client_ipv4 is None:
-                    sys.exit(2)
-                if require_ipv6 and client_ipv6 is None:
-                    sys.exit(2)
-            # when explicitly assigned, check that they should be used
-            else:
-                if client_ipv4 is not None and not use_ipv4:
-                    client_ipv4 = None
-                if client_ipv6 is not None and not use_ipv6:
-                    client_ipv6 = None
 
             if client_ipv4 is None and client_ipv6 is None:
                 logger.error('No network interfaces available for analysis!')
