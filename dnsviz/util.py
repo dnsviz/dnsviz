@@ -28,7 +28,7 @@
 import os
 import re
 
-import dns.exception, dns.message, dns.rdatatype
+import dns.message, dns.rdatatype
 
 from config import DNSVIZ_SHARE_PATH
 import format as fmt
@@ -71,24 +71,3 @@ def get_default_trusted_keys():
     except IOError, e:
         return []
     return get_trusted_keys(tk_str)
-
-def get_default_trusted_keys_with_sanity_check():
-    import resolver as Resolver
-
-    class Ans:
-        def __init__(self):
-            self.rrset = set()
-
-    trusted_keys = get_default_trusted_keys()
-    checked_trusted_keys = []
-    dnskey_sets = {}
-    r = Resolver.get_standard_resolver()
-    for name, dnskey in trusted_keys:
-        if name not in dnskey_sets:
-            try:
-                dnskey_sets[name] = r.query_for_answer(name, dns.rdatatype.DNSKEY)
-            except dns.exception.DNSException:
-                dnskey_sets[name] = Ans()
-        if dnskey in dnskey_sets[name].rrset:
-            checked_trusted_keys.append((name, dnskey))
-    return checked_trusted_keys
