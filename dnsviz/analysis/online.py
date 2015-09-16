@@ -1596,7 +1596,12 @@ class Analyst(object):
         # otherwise, just query the ones that were responsive
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
-        servers = self._filter_servers(servers)
+
+        filtered_servers = self._filter_servers_network(servers)
+        if servers and not filtered_servers:
+            self._raise_connectivity_error_remote()
+
+        servers = self._filter_servers_locality(filtered_servers)
         exclude_no_answer = set()
         queries = {}
 
@@ -1955,6 +1960,14 @@ class Analyst(object):
             if not self._root_responsive(6):
                 raise IPv6ConnectivityException('No IPv6 connectivity available!')
 
+    def _raise_connectivity_error_remote(self):
+        if not (self.client_ipv4 is not None or self.client_ipv6 is not None):
+            raise NetworkConnectivityException('No servers to query!')
+        elif self.client_ipv4 is not None:
+            raise IPv4ConnectivityException('No IPv4 servers to query!')
+        elif self.client_ipv6 is not None:
+            raise IPv6ConnectivityException('No IPv6 servers to query!')
+
     def _root_responsive(self, proto):
         try:
             if proto == 4:
@@ -2169,7 +2182,12 @@ class RecursiveAnalyst(Analyst):
         self._handle_explicit_delegations(name_obj)
 
         servers = name_obj.zone.get_auth_or_designated_servers()
-        servers = self._filter_servers(servers)
+
+        filtered_servers = self._filter_servers_network(servers)
+        if servers and not filtered_servers:
+            self._raise_connectivity_error_remote()
+
+        servers = self._filter_servers_locality(filtered_servers)
 
         # make common query first to prime the cache
 
