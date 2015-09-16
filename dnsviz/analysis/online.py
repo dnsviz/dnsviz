@@ -499,7 +499,7 @@ class OnlineDomainNameAnalysis(object):
             if ip is not None:
                 self._auth_ns_ip_mapping[name].add(ip)
 
-    def add_query(self, query, detect_ns=False):
+    def add_query(self, query, detect_ns):
         '''Process a DNS query and its responses, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
 
@@ -1319,6 +1319,9 @@ class Analyst(object):
             return False
         return True
 
+    def _add_query(self, name_obj, query, detect_ns=False):
+        name_obj.add_query(query, detect_ns)
+
     def _filter_servers(self, servers):
         if self.client_ipv6 is None:
             servers = filter(lambda x: x.version != 6, servers)
@@ -1692,7 +1695,7 @@ class Analyst(object):
         Q.ExecutableDNSQuery.execute_queries(*queries.values())
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
-                name_obj.add_query(query)
+                self._add_query(name_obj, query)
 
     def _analyze_delegation(self, name_obj):
         if name_obj.parent is None:
@@ -1806,14 +1809,14 @@ class Analyst(object):
 
             # add remaining queries
             for query in referral_queries.values():
-                name_obj.add_query(query, True)
+                self._add_query(name_obj, query, True)
 
             # return a positive response only if not nxdomain
             return not is_nxdomain
 
         # add any queries made
         for query in referral_queries.values():
-            name_obj.add_query(query, True)
+            self._add_query(name_obj, query, True)
 
         # now identify the authoritative NS RRset from all servers, resolve all
         # names referred to in the NS RRset(s), and query each corresponding
@@ -1863,7 +1866,7 @@ class Analyst(object):
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries)
             for query in queries:
-                name_obj.add_query(query, True)
+                self._add_query(name_obj, query, True)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
 
@@ -2173,7 +2176,7 @@ class RecursiveAnalyst(Analyst):
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
         query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
         query.execute()
-        name_obj.add_query(query, True)
+        self._add_query(name_obj, query, True)
 
         # if there were no valid responses, then exit out early
         if not query.is_valid_complete_response_any() and not self.explicit_only:
@@ -2195,7 +2198,7 @@ class RecursiveAnalyst(Analyst):
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
                 query.execute()
-                name_obj.add_query(query)
+                self._add_query(name_obj, query)
 
         # for non-TLDs make NS queries after all others
         if len(name_obj.name) > 2:
@@ -2204,7 +2207,7 @@ class RecursiveAnalyst(Analyst):
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
                 query.execute()
-                name_obj.add_query(query, True)
+                self._add_query(name_obj, query, True)
 
         return name_obj
 
