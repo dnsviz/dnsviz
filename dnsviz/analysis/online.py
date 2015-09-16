@@ -1588,8 +1588,12 @@ class Analyst(object):
     def _analyze_queries(self, name_obj):
         bailiwick = name_obj.zone.name
 
-        if not name_obj.zone._all_servers_queried:
-            servers = name_obj.zone.get_auth_or_designated_servers()
+        servers = name_obj.zone.get_auth_or_designated_servers()
+        # if we haven't queried any of the designated servers, then query them
+        # all
+        if not name_obj.zone._all_servers_queried.intersection(servers):
+            pass
+        # otherwise, just query the ones that were responsive
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
         servers = self._filter_servers(servers)
@@ -1655,8 +1659,12 @@ class Analyst(object):
 
             # query for DS/DLV
             if name_obj.parent is not None:
-                if not name_obj.parent._all_servers_queried:
-                    parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
+                parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
+                # if we haven't queried any of the servers designated for the
+                # parent, then query them all
+                if not name_obj.parent._all_servers_queried.intersection(parent_servers):
+                    pass
+                # otherwise, just query the ones that were responsive
                 else:
                     parent_servers = name_obj.zone.parent.get_responsive_auth_or_designated_servers()
                     if not parent_servers:
