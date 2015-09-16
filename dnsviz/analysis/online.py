@@ -113,33 +113,6 @@ analysis_type_codes = {
         'cache': ANALYSIS_TYPE_CACHE,
 }
 
-def _get_client_address(server):
-    if server.version == 6:
-        af = socket.AF_INET6
-    else:
-        af = socket.AF_INET
-    s = socket.socket(af, socket.SOCK_DGRAM)
-    try:
-        s.connect((server, 53))
-    except socket.error:
-        return None
-    return IPAddr(s.getsockname()[0])
-
-def get_client_addresses(require_ipv4=False, require_ipv6=False, warn_ipv4=True, warn_ipv6=True, logger=_logger):
-    client_ipv4 = _get_client_address(list(ROOT_NS_IPS_4)[0])
-    if client_ipv4 is None:
-        if require_ipv4:
-            raise NetworkConnectivityException('No IPv4 interfaces available for analysis!')
-        elif warn_ipv4:
-            logger.warning('No IPv4 interfaces available for analysis!')
-    client_ipv6 = _get_client_address(list(ROOT_NS_IPS_6)[0])
-    if client_ipv6 is None:
-        if require_ipv6:
-            raise NetworkConnectivityException('No IPv6 interfaces available for analysis!')
-        elif warn_ipv6:
-            logger.warning('No IPv6 interfaces available for analysis!')
-    return client_ipv4, client_ipv6
-
 # create a standard recurisve DNS query with checking disabled
 class StandardRecursiveQueryCD(Q.StandardRecursiveQuery):
     response_handlers = Q.StandardRecursiveQuery.response_handlers + [Q.SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
@@ -1075,19 +1048,17 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
 
-    def __init__(self, name, dlv_domain=None, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
+    def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
 
         self.name = name
         self.dlv_domain = dlv_domain
         self.ceiling = self._detect_ceiling(ceiling)[0]
 
-        if client_ipv4 is None and client_ipv6 is None:
-            client_ipv4, client_ipv6 = get_client_addresses(logger=logger)
-        if client_ipv4 is None and client_ipv6 is None:
-            raise NetworkConnectivityException('No network interfaces available for analysis!')
+        self.try_ipv4 = try_ipv4
+        self.try_ipv6 = try_ipv6
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
 
@@ -1323,9 +1294,9 @@ class Analyst(object):
         name_obj.add_query(query, detect_ns)
 
     def _filter_servers_network(self, servers):
-        if self.client_ipv6 is None:
+        if not self.try_ipv6:
             servers = filter(lambda x: x.version != 6, servers)
-        if self.client_ipv4 is None:
+        if not self.try_ipv4:
             servers = filter(lambda x: x.version != 4, servers)
         return servers
 
@@ -1953,19 +1924,19 @@ class Analyst(object):
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
     def _check_connectivity(self, name_obj):
-        if name_obj.get_auth_or_designated_servers(4) and self.client_ipv4 is not None and not name_obj.get_responsive_servers_udp(4):
+        if name_obj.get_auth_or_designated_servers(4) and filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4) and not name_obj.get_responsive_servers_udp(4):
             if not self._root_responsive(4):
                 raise IPv4ConnectivityException('No IPv4 connectivity available!')
-        if name_obj.get_auth_or_designated_servers(6) and self.client_ipv6 is not None and not name_obj.get_responsive_servers_udp(6):
+        if name_obj.get_auth_or_designated_servers(6) and filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6) and not name_obj.get_responsive_servers_udp(6):
             if not self._root_responsive(6):
                 raise IPv6ConnectivityException('No IPv6 connectivity available!')
 
     def _raise_connectivity_error_remote(self):
-        if not (self.client_ipv4 is not None or self.client_ipv6 is not None):
+        if not (self.try_ipv4 or self.try_ipv6):
             raise NetworkConnectivityException('No servers to query!')
-        elif self.client_ipv4 is not None:
+        elif self.try_ipv4:
             raise IPv4ConnectivityException('No IPv4 servers to query!')
-        elif self.client_ipv6 is not None:
+        elif self.try_ipv6:
             raise IPv6ConnectivityException('No IPv6 servers to query!')
 
     def _root_responsive(self, proto):

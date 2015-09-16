@@ -36,7 +36,7 @@ import time
 
 import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
-from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, get_client_addresses, NetworkConnectivityException, resolver, DNS_RAW_VERSION
+from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, resolver, DNS_RAW_VERSION
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.resolver import DNSAnswer, get_standard_resolver
@@ -59,17 +59,20 @@ def _raise_eof(signum, frame):
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
 
-def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
+def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
         raise
+    # report exceptions related to network connectivity
+    except NetworkConnectivityException, e:
+        logger.error('Error analyzing %s: %s' % (fmt.humanize_name(name), e))
     # don't report EOFError, as that is what is raised if there is a
     # KeyboardInterrupt in ParallelAnalyst
     except EOFError:
@@ -81,7 +84,9 @@ def _analyze((cls, name, dlv_domain, client_ipv4, client_ipv6, ceiling, edns_dia
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain):
+        self.try_ipv4 = try_ipv4
+        self.try_ipv6 = try_ipv6
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
         self.ceiling = ceiling
@@ -97,7 +102,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.client_ipv4, self.client_ipv6, self.ceiling, self.edns_diagnostics, self.explicit_delegations, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
+            yield (self.analyst_cls, name, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.ceiling, self.edns_diagnostics, self.explicit_delegations, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -175,8 +180,8 @@ class RecursiveMultiProcessAnalyst(MultiProcessAnalystMixin, PrivateRecursiveAna
 class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
 
-    def __init__(self, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain, processes):
-        super(ParallelAnalystMixin, self).__init__(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain)
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -410,21 +415,21 @@ def main(argv):
             rdtypes = None
             explicit_only = False
 
-        use_ipv4 = None
-        use_ipv6 = None
-        # if neither is specified, then they're both used
+        try_ipv4 = None
+        try_ipv6 = None
+        # if neither is specified, then they're both tried
         if '-4' not in opts and '-6' not in opts:
-            use_ipv4 = True
-            use_ipv6 = True
+            try_ipv4 = True
+            try_ipv6 = True
         # if one or the other is specified, then only the one specified is
         # tried
         else:
             if '-4' in opts:
-                use_ipv4 = True
-                use_ipv6 = False
+                try_ipv4 = True
+                try_ipv6 = False
             else: # -6 in opts
-                use_ipv4 = False
-                use_ipv6 = True
+                try_ipv4 = False
+                try_ipv6 = True
 
         if '-A' not in opts:
             if '-t' in opts:
@@ -510,21 +515,6 @@ def main(argv):
                 logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
                 sys.exit(3)
 
-        else:
-            # get client addresses where they are needed
-            if (client_ipv4 is None and use_ipv4) or \
-                    (client_ipv6 is None and use_ipv6):
-                c4, c6 = get_client_addresses(warn_ipv4=use_ipv4 and client_ipv4 is None, \
-                        warn_ipv6=use_ipv6 and client_ipv6 is None)
-                if use_ipv4 and client_ipv4 is None:
-                    client_ipv4 = c4
-                if use_ipv6 and client_ipv6 is None:
-                    client_ipv6 = c6
-
-            if client_ipv4 is None and client_ipv6 is None:
-                logger.error('No network interfaces available for analysis!')
-                sys.exit(2)
-
         names = []
         if '-f' in opts:
             try:
@@ -600,9 +590,9 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain, processes)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain, processes)
             else:
-                a = cls(client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, cache_level, explicit_delegations, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
