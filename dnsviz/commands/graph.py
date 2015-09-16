@@ -147,12 +147,12 @@ def main(argv):
                 try:
                     tk_str = open(arg).read()
                 except IOError, e:
-                    logger.error('%s: "%s"' % (e.strerror, arg))
+                    sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
                 try:
                     trusted_keys.extend(get_trusted_keys(tk_str))
                 except dns.exception.DNSException:
-                    logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
+                    sys.stderr.write('There was an error parsing the trusted keys file: "%s"\n' % arg)
                     sys.exit(3)
 
         opts = dict(opts)
