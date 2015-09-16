@@ -19,7 +19,20 @@
 #
 
 import binascii
+import re
 import socket
+
+_LOOPBACK_IPV4_RE = re.compile(r'^127')
+_LOOPBACK_IPV6_RE = re.compile(r'^[0:]+1$')
+_RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
+_LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
+_UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
+
+IP_SCOPE_GLOBAL = 0
+IP_SCOPE_UNIQUE_LOCAL = 1
+IP_SCOPE_LINK_LOCAL = 2
+IP_SCOPE_RFC_1918 = 3
+IP_SCOPE_LOOPBACK = 4
 
 class IPAddr(str):
     def __new__(cls, string):
@@ -36,6 +49,18 @@ class IPAddr(str):
         obj = super(IPAddr, cls).__new__(cls, socket.inet_ntop(af, ipaddr_bytes))
         obj._ipaddr_bytes = ipaddr_bytes
         obj.version = vers
+
+        if _LOOPBACK_IPV4_RE.match(obj) or _LOOPBACK_IPV6_RE.match(obj):
+            obj.scope = IP_SCOPE_LOOPBACK
+        elif _RFC_1918_RE.match(obj):
+            obj.scope = IP_SCOPE_RFC_1918
+        elif _LINK_LOCAL_RE.match(obj):
+            obj.scope = IP_SCOPE_LINK_LOCAL
+        elif _UNIQ_LOCAL_RE.match(obj):
+            obj.scope = IP_SCOPE_UNIQUE_LOCAL
+        else:
+            obj.scope = IP_SCOPE_GLOBAL
+
         return obj
 
     def __lt__(self, other):
