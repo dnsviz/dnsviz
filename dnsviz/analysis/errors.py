@@ -832,6 +832,19 @@ class NotAuthoritative(ResponseError):
     references = ['RFC 1035, Sec. 4.1.1']
     required_params = []
 
+class AuthoritativeReferral(ResponseError):
+    '''
+    >>> e = AuthoritativeReferral()
+    >>> e.description
+    'The Authoritative Answer (AA) flag was set in the referral response.'
+    '''
+
+    _abstract = False
+    code = 'AUTHORITATIVE_REFERRAL'
+    description_template = "The Authoritative Answer (AA) flag was set in the referral response."
+    references = ['RFC 1035, Sec. 4.1.1']
+    required_params = []
+
 class RecursionNotAvailable(ResponseError):
     '''
     >>> e = RecursionNotAvailable()
