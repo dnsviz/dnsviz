@@ -704,6 +704,17 @@ class DNSQueryHandler:
                 if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EADDRNOTAVAIL:
                     raise AcceptResponse
 
+                # If there is no client-side connectivity, then simply return.
+                #
+                #XXX (Note that this only catches the case when a client IP has
+                # not been explicitly specified (i.e., self._client is None).
+                # Explicitly specifying a client IP that cannot connect to a
+                # given destination (e.g., because it is of the wrong address
+                # scope) will result in a regular network failure with
+                # EHOSTUNREACH, as there is no scope comparison in this code.)
+                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EHOSTUNREACH and client is None:
+                    raise AcceptResponse
+
                 # if this error was our fault, don't add it to the history
                 if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EMFILE:
                     pass
@@ -1198,6 +1209,7 @@ class ExecutableDNSQuery(DNSQuery):
         response_wire_map = {}
 
         queries_to_execute = set()
+        queries_aborted = {}
         query_handlers = {}
         for query in queries:
             for server in query.servers.difference(query.responses):
@@ -1206,6 +1218,7 @@ class ExecutableDNSQuery(DNSQuery):
                 bisect.insort(request_list, (qh.query_time, qtm))
                 query_handlers[qtm] = query, qh
                 queries_to_execute.add(query)
+                queries_aborted[query] = set()
 
         while queries_to_execute:
             while request_list and time.time() >= request_list[0][0]:
@@ -1291,9 +1304,14 @@ class ExecutableDNSQuery(DNSQuery):
                         else:
                             raise SourceAddressBINDError('Unable to bind to local address')
 
-                    query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
+                    # if src is None, then it is a connectivity issue on our
+                    # side, so don't record it in the responses
+                    if src is None:
+                        queries_aborted[query].add(IPAddr(qtm.dst))
+                    else:
+                        query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
 
-                    if not query.servers.difference(query.responses):
+                    if not query.servers.difference(set(query.responses).union(queries_aborted[query])):
                         queries_to_execute.remove(query)
                         query._executed = True
 
