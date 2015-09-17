@@ -1291,6 +1291,12 @@ class Analyst(object):
         return True
 
     def _add_query(self, name_obj, query, detect_ns=False):
+        # if this query is empty (i.e., nothing was actually asked, e.g., due
+        # to client-side connectivity failure), then raise a connectivity
+        # failure
+        if not query.responses:
+            self._raise_connectivity_error_local()
+
         name_obj.add_query(query, detect_ns)
 
     def _filter_servers_network(self, servers):
@@ -1937,6 +1943,16 @@ class Analyst(object):
             raise IPv4ConnectivityException('No IPv4 servers to query!')
         elif self.try_ipv6:
             raise IPv6ConnectivityException('No IPv6 servers to query!')
+
+    def _raise_connectivity_error_local(self):
+        if self.try_ipv4 and self.try_ipv6:
+            pass
+        elif self.try_ipv4:
+            raise IPv4ConnectivityException('No IPv4 network connectivity available!')
+        elif self.try_ipv6:
+            raise IPv6ConnectivityException('No IPv6 network connectivity available!')
+        else:
+            raise NetworkConnectivityException('No network connectivity available!')
 
     def _root_responsive(self, proto):
         try:
