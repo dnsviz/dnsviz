@@ -32,6 +32,7 @@ class DomainNameAnalysisError(object):
     _abstract = True
     code = None
     description_template = '%(code)s'
+    terse_description_template = '%(code)s'
     references = []
     required_params = []
 
@@ -68,6 +69,10 @@ class DomainNameAnalysisError(object):
     @property
     def description(self):
         return self.description_template % self.template_kwargs
+
+    @property
+    def terse_description(self):
+        return self.terse_description_template % self.template_kwargs
 
     @property
     def html_description(self):
@@ -722,6 +727,7 @@ class ResponseError(DomainNameAnalysisError):
 
 class InvalidResponseError(ResponseError):
     required_params = ['tcp']
+    terse_description_template = '%(code)s:%(proto)s'
 
     def __init__(self, *args, **kwargs):
         super(ResponseError, self).__init__(**kwargs)
@@ -738,11 +744,14 @@ class NetworkError(InvalidResponseError):
     >>> e = NetworkError(tcp=False, errno='ECONNREFUSED')
     >>> e.description
     'The UDP connection was refused (ECONNREFUSED).'
+    >>> e.terse_description
+    'NETWORK_ERROR:ECONNREFUSED'
     '''
 
     _abstract = False
     code = 'NETWORK_ERROR'
     description_template = '%(description)s'
+    terse_description_template = '%(code)s:%(errno)s'
     required_params = InvalidResponseError.required_params + ['errno']
 
     def __init__(self, *args, **kwargs):
@@ -800,11 +809,14 @@ class InvalidRcode(InvalidResponseError):
     >>> e = InvalidRcode(tcp=False, rcode='SERVFAIL')
     >>> e.description
     'The response had an invalid RCODE (SERVFAIL).'
+    >>> e.terse_description
+    'INVALID_RCODE:SERVFAIL'
     '''
 
     _abstract = False
     code = 'INVALID_RCODE'
     description_template = "The response had an invalid RCODE (%(rcode)s)."
+    terse_description_template = '%(code)s:%(rcode)s'
     required_params = InvalidResponseError.required_params + ['rcode']
 
 class NotAuthoritative(ResponseError):
