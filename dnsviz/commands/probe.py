@@ -41,8 +41,12 @@ import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.resolver import DNSAnswer, get_standard_resolver
 from dnsviz.transport import close_default_dns_transport_handler
+from dnsviz.util import get_client_address
 
 logger = logging.getLogger('dnsviz.analysis.online')
+
+A_ROOT_IPV4 = IPAddr('198.41.0.4')
+A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
@@ -415,8 +419,6 @@ def main(argv):
             rdtypes = None
             explicit_only = False
 
-        try_ipv4 = None
-        try_ipv6 = None
         # if neither is specified, then they're both tried
         if '-4' not in opts and '-6' not in opts:
             try_ipv4 = True
@@ -494,6 +496,12 @@ def main(argv):
         handler.setLevel(debug_level)
         logger.addHandler(handler)
         logger.setLevel(debug_level)
+
+        if '-A' in opts:
+            if try_ipv4 and get_client_address(A_ROOT_IPV4) is None:
+                logger.warning('No global IPv4 connectivity detected')
+            if try_ipv6 and get_client_address(A_ROOT_IPV6) is None:
+                logger.warning('No global IPv6 connectivity detected')
 
         if '-r' in opts:
             if opts['-r'] == '-':

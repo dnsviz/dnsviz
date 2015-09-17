@@ -27,11 +27,13 @@
 
 import os
 import re
+import socket
 
 import dns.message, dns.rdatatype
 
 from config import DNSVIZ_SHARE_PATH
 import format as fmt
+from ipaddr import IPAddr
 
 TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 
@@ -71,3 +73,15 @@ def get_default_trusted_keys():
     except IOError, e:
         return []
     return get_trusted_keys(tk_str)
+
+def get_client_address(server):
+    if server.version == 6:
+        af = socket.AF_INET6
+    else:
+        af = socket.AF_INET
+    s = socket.socket(af, socket.SOCK_DGRAM)
+    try:
+        s.connect((server, 53))
+    except socket.error:
+        return None
+    return IPAddr(s.getsockname()[0])
