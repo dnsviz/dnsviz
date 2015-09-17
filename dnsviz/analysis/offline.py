@@ -96,6 +96,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.nodata_warnings = None
         self.nodata_errors = None
         self.response_errors = None
+        self.response_warnings = None
 
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
@@ -1233,6 +1234,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     elif error_info.code == Q.RESPONSE_ERROR_OTHER:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp), self.response_errors[query], server, client, response)
 
+        self.response_warnings[query] = []
+        for auth_referral_info in query.auth_referral_info:
+            for server, client in auth_referral_info.servers_clients:
+                for response in auth_referral_info.servers_clients[(server, client)]:
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.AuthoritativeReferral(), self.response_warnings[query], server, client, response)
+
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
         self.rrset_errors = {}
@@ -1240,6 +1247,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.dname_status = {}
         self.wildcard_status = {}
         self.response_errors = {}
+        self.response_warnings = {}
 
         if self.is_zone():
             self.zsks = set()
@@ -2103,6 +2111,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d['nxdomain'] = []
         d['nodata'] = []
         d['error'] = []
+        d['warning'] = []
 
         for rrset_info in query.answer_info:
             if rrset_info.rrset.name == query.qname or self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
@@ -2124,6 +2133,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if neg_response_serialized:
                     d['nodata'].append(neg_response_serialized)
 
+        if loglevel <= logging.WARNING:
+            for warning in self.response_warnings[query]:
+                warning_serialized = warning.serialize(consolidate_clients=consolidate_clients, html_format=html_format)
+                if warning_serialized:
+                    d['warning'].append(warning_serialized)
+
         for error in self.response_errors[query]:
             error_serialized = error.serialize(consolidate_clients=consolidate_clients, html_format=html_format)
             if error_serialized:
@@ -2133,6 +2148,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not d['nxdomain']: del d['nxdomain']
         if not d['nodata']: del d['nodata']
         if not d['error']: del d['error']
+        if not d['warning']: del d['warning']
 
         return d
 
