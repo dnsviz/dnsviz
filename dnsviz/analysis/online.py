@@ -1008,7 +1008,7 @@ class OnlineDomainNameAnalysis(object):
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in query_map[key]:
-                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick))
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), False)
 
     def _deserialize_dependencies(self, d, cache):
         if self.stub:
