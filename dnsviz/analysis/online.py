@@ -738,6 +738,8 @@ class OnlineDomainNameAnalysis(object):
         name_to_info_mapping = {}
         rrset_to_cname_mapping = {}
 
+        name_to_info_mapping[name] = []
+
         for rrset_info in query.answer_info:
 
             # only do qname, unless analysis type is recursive
@@ -763,8 +765,6 @@ class OnlineDomainNameAnalysis(object):
             name_to_info_mapping[neg_response_info.qname].append(neg_response_info)
 
         for error in self.response_errors[query]:
-            if name not in name_to_info_mapping:
-                name_to_info_mapping[name] = []
             name_to_info_mapping[name].append(error)
 
         info_obj = AggregateResponseInfo(name, rdtype, self, self.zone)
