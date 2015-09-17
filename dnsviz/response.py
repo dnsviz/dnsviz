@@ -1176,3 +1176,11 @@ class DNSResponseError(DNSResponseComponent):
 
     def __eq__(self, other):
         return self.code == other.code and self.arg == other.arg
+
+class AuthoritativeReferral(DNSResponseComponent):
+    def __init__(self, name):
+        super(AuthoritativeReferral, self).__init__()
+        self.name = name
+
+    def __eq__(self, other):
+        return self.name == other.name
