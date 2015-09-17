@@ -1308,7 +1308,10 @@ class Analyst(object):
         return servers
 
     def _filter_servers(self, servers):
-        return self._filter_servers_locality(self._filter_servers_network(servers))
+        filtered_servers = self._filter_servers_network(servers)
+        if servers and not filtered_servers:
+            self._raise_connectivity_error_remote()
+        return self._filter_servers_locality(filtered_servers)
 
     def _get_name_for_analysis(self, name, stub=False, lock=True):
         with self.analysis_cache_lock:
@@ -1568,11 +1571,7 @@ class Analyst(object):
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
 
-        filtered_servers = self._filter_servers_network(servers)
-        if servers and not filtered_servers:
-            self._raise_connectivity_error_remote()
-
-        servers = self._filter_servers_locality(filtered_servers)
+        servers = self._filter_servers(servers)
         exclude_no_answer = set()
         queries = {}
 
@@ -2153,12 +2152,7 @@ class RecursiveAnalyst(Analyst):
         self._handle_explicit_delegations(name_obj)
 
         servers = name_obj.zone.get_auth_or_designated_servers()
-
-        filtered_servers = self._filter_servers_network(servers)
-        if servers and not filtered_servers:
-            self._raise_connectivity_error_remote()
-
-        servers = self._filter_servers_locality(filtered_servers)
+        servers = self._filter_servers(servers)
 
         # make common query first to prime the cache
 
