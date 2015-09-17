@@ -1931,10 +1931,10 @@ class Analyst(object):
     def _check_connectivity(self, name_obj):
         if name_obj.get_auth_or_designated_servers(4) and filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4) and not name_obj.get_responsive_servers_udp(4):
             if not self._root_responsive(4):
-                raise IPv4ConnectivityException('No IPv4 connectivity available!')
+                raise IPv4ConnectivityException('Public IPv4 network unreachable!')
         if name_obj.get_auth_or_designated_servers(6) and filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6) and not name_obj.get_responsive_servers_udp(6):
             if not self._root_responsive(6):
-                raise IPv6ConnectivityException('No IPv6 connectivity available!')
+                raise IPv6ConnectivityException('Public IPv6 network unreachable!')
 
     def _raise_connectivity_error_remote(self):
         if not (self.try_ipv4 or self.try_ipv6):
