@@ -1229,7 +1229,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 response.message.rcode() == dns.rcode.BADVERS:
                             pass
                         else:
-                            Errors.DomainNameAnalysisError.insert_into_list(Errors.InvalidRcode(tcp=response.effective_tcp, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
+                            Errors.DomainNameAnalysisError.insert_into_list(Errors.UnexpectedRcode(tcp=response.effective_tcp, rcode=dns.rcode.to_text(response.message.rcode())), self.response_errors[query], server, client, response)
                     elif error_info.code == Q.RESPONSE_ERROR_OTHER:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp), self.response_errors[query], server, client, response)
 

@@ -804,18 +804,18 @@ class UnknownResponseError(InvalidResponseError):
         super(UnknownResponseError, self).__init__(**kwargs)
         self.template_kwargs['description'] = "An invalid response was received from the server over %s" % (self.template_kwargs['proto'])
 
-class InvalidRcode(InvalidResponseError):
+class UnexpectedRcode(InvalidResponseError):
     '''
-    >>> e = InvalidRcode(tcp=False, rcode='SERVFAIL')
+    >>> e = UnexpectedRcode(tcp=False, rcode='SERVFAIL')
     >>> e.description
-    'The response had an invalid RCODE (SERVFAIL).'
+    'The response contained an unexpected RCODE (SERVFAIL).'
     >>> e.terse_description
-    'INVALID_RCODE:SERVFAIL'
+    'UNEXPECTED_RCODE:SERVFAIL'
     '''
 
     _abstract = False
-    code = 'INVALID_RCODE'
-    description_template = "The response had an invalid RCODE (%(rcode)s)."
+    code = 'UNEXPECTED_RCODE'
+    description_template = "The response contained an unexpected RCODE (%(rcode)s)."
     terse_description_template = '%(code)s:%(rcode)s'
     required_params = InvalidResponseError.required_params + ['rcode']
 
