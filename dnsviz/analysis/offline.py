@@ -215,8 +215,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     else:
                         status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
 
-                warnings = [w.code for w in nsec_status.warnings]
-                errors = [e.code for e in nsec_status.errors]
+                warnings = [w.terse_description for w in nsec_status.warnings]
+                errors = [e.terse_description for e in nsec_status.errors]
 
                 children = []
                 for nsec_rrset_info in nsec_status.nsec_set_info.rrsets.values():
@@ -256,8 +256,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         else:
                             status = Status.rrset_status_mapping[Status.RRSET_STATUS_INSECURE]
 
-                    warnings = [w.code for w in rrsig_status.warnings]
-                    errors = [e.code for e in rrsig_status.errors]
+                    warnings = [w.terse_description for w in rrsig_status.warnings]
+                    errors = [e.terse_description for e in rrsig_status.errors]
                     rrsig_tup.append(('RRSIG', status, [], [], [(Status.rrsig_status_mapping[rrsig_status.validation_status], warnings, errors, '%s/%s/%s (%s - %s)' % \
                             (fmt.humanize_name(rrsig.signer), rrsig.algorithm, rrsig.key_tag, fmt.timestamp_to_str(rrsig.inception)[:10], fmt.timestamp_to_str(rrsig.expiration)[:10]))], []))
         return rrsig_tup
@@ -280,8 +280,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif rdtype == dns.rdatatype.DNSKEY:
                 for d in info.rrset:
                     dnskey_meta = response_info.name_obj._dnskeys[d]
-                    warnings = [w.code for w in dnskey_meta.warnings]
-                    errors = [e.code for e in dnskey_meta.errors]
+                    warnings = [w.terse_description for w in dnskey_meta.warnings]
+                    errors = [e.terse_description for e in dnskey_meta.errors]
                     rdata_tup.append(('VALID', warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
             elif rdtype == dns.rdatatype.DS:
                 dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
@@ -294,22 +294,22 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     dnskeys.sort()
                     for dnskey in dnskeys:
                         ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
-                        warnings = [w.code for w in ds_status.warnings]
-                        errors = [e.code for e in ds_status.errors]
+                        warnings = [w.terse_description for w in ds_status.warnings]
+                        errors = [e.terse_description for e in ds_status.errors]
                         rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], warnings, errors, '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
             elif rdtype == dns.rdatatype.NSEC3:
                 rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
             elif rdtype == dns.rdatatype.NSEC:
                 rdata_tup.append((None, [], [], '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
             elif rdtype == dns.rdatatype.DNAME:
-                warnings = [w.code for w in dname_status.warnings]
-                errors = [e.code for e in dname_status.errors]
+                warnings = [w.terse_description for w in dname_status.warnings]
+                errors = [e.terse_description for e in dname_status.errors]
                 rdata_tup.append((Status.dname_status_mapping[dname_status.validation_status], warnings, errors, info.rrset[0].to_text()))
             else:
                 rdata_tup.extend([(None, [], [], r.to_text()) for r in info.rrset])
 
-            warnings = [w.code for w in response_info.name_obj.rrset_warnings[info]]
-            errors = [e.code for e in response_info.name_obj.rrset_errors[info]]
+            warnings = [w.terse_description for w in response_info.name_obj.rrset_warnings[info]]
+            errors = [e.terse_description for e in response_info.name_obj.rrset_errors[info]]
 
             children.extend(self._serialize_rrsig_simple(response_info.name_obj, info))
             for wildcard_name in info.wildcard_info:
@@ -322,10 +322,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif isinstance(info, Errors.DomainNameAnalysisError):
             warnings = []
             errors = []
-            rdata_tup.append((None, [], [], 'ERROR %s' % (info.code)))
+            rdata_tup.append((None, [], [], 'ERROR %s' % (info.terse_description)))
         elif info in self.nodata_status:
-            warnings = [w.code for w in response_info.name_obj.nodata_warnings[info]]
-            errors = [e.code for e in response_info.name_obj.nodata_errors[info]]
+            warnings = [w.terse_description for w in response_info.name_obj.nodata_warnings[info]]
+            errors = [e.terse_description for e in response_info.name_obj.nodata_errors[info]]
 
             if not self.nodata_status[info] and not show_neg_response:
                 return None
@@ -335,8 +335,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             children.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
 
         elif info in self.nxdomain_status:
-            warnings = [w.code for w in response_info.name_obj.nxdomain_warnings[info]]
-            errors = [e.code for e in response_info.name_obj.nxdomain_errors[info]]
+            warnings = [w.terse_description for w in response_info.name_obj.nxdomain_warnings[info]]
+            errors = [e.terse_description for e in response_info.name_obj.nxdomain_errors[info]]
 
             if not self.nxdomain_status[info] and not show_neg_response:
                 return None
@@ -390,8 +390,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ds_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DS)
                 if parent_obj.is_zone():
                     status = Status.delegation_status_mapping[parent_obj.delegation_status[dns.rdatatype.DS]]
-                    warnings = [w.code for w in parent_obj.delegation_warnings[dns.rdatatype.DS]]
-                    errors = [e.code for e in parent_obj.delegation_errors[dns.rdatatype.DS]]
+                    warnings = [w.terse_description for w in parent_obj.delegation_warnings[dns.rdatatype.DS]]
+                    errors = [e.terse_description for e in parent_obj.delegation_errors[dns.rdatatype.DS]]
             else:
                 ds_response_info = None
 
