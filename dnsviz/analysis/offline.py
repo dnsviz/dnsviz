@@ -60,7 +60,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     RDTYPES_SECURE_DELEGATION = 3
     RDTYPES_DELEGATION = 4
 
-    QUERY_CLASS = Q.TTLDistinguishingMultQueryAggregateDNSResponse
+    QUERY_CLASS = Q.TTLDistinguishingMultiQueryAggregateDNSResponse
 
     def __init__(self, *args, **kwargs):
         super(OfflineDomainNameAnalysis, self).__init__(*args, **kwargs)
