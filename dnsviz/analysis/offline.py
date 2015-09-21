@@ -327,7 +327,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif isinstance(info, Errors.DomainNameAnalysisError):
             warnings = []
             errors = []
-            rdata_tup.append((None, [], [], 'ERROR %s' % (info.terse_description)))
+            rdata_tup.append((None, [], [], '%s' % (info.terse_description)))
         elif info in self.nodata_status:
             warnings = [w.terse_description for w in response_info.name_obj.nodata_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nodata_errors[info]]
