@@ -266,7 +266,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_response_component_simple(self, rdtype, response_info, info, show_neg_response, dname_status=None):
         rdata = []
         if isinstance(info, Errors.DomainNameAnalysisError):
-            status = 'ERROR'
+            query = response_info.name_obj.queries[(response_info.qname, response_info.rdtype)]
+            if info in response_info.name_obj.response_warnings[query]:
+                status = 'WARNING'
+            else:
+                status = 'ERROR'
         else:
             if self.response_component_status is not None:
                 status = Status.rrset_status_mapping[self.response_component_status[info]]

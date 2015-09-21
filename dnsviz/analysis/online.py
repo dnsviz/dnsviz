@@ -767,6 +767,9 @@ class OnlineDomainNameAnalysis(object):
         for error in self.response_errors[query]:
             name_to_info_mapping[name].append(error)
 
+        for warning in self.response_warnings[query]:
+            name_to_info_mapping[name].append(warning)
+
         info_obj = AggregateResponseInfo(name, rdtype, self, self.zone)
         for info in name_to_info_mapping[name]:
             if info in rrset_to_cname_mapping:
