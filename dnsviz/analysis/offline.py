@@ -1242,10 +1242,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.UnknownResponseError(tcp=response.effective_tcp), self.response_errors[query], server, client, response)
 
         self.response_warnings[query] = []
-        for auth_referral_info in query.auth_referral_info:
-            for server, client in auth_referral_info.servers_clients:
-                for response in auth_referral_info.servers_clients[(server, client)]:
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.AuthoritativeReferral(), self.response_warnings[query], server, client, response)
+        for referral_info in query.referral_info:
+            for server, client in referral_info.servers_clients:
+                for response in referral_info.servers_clients[(server, client)]:
+                    if response.is_authoritative():
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.AuthoritativeReferral(), self.response_warnings[query], server, client, response)
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}

@@ -734,8 +734,8 @@ class AggregateDNSResponse(object):
         self.answer_info = []
         self.nodata_info = []
         self.nxdomain_info = []
+        self.referral_info = []
         self.error_info = []
-        self.auth_referral_info = []
 
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
         if response.is_valid_response():
@@ -786,15 +786,16 @@ class AggregateDNSResponse(object):
                 i += 1
         except KeyError:
             if referral and rdtype != dns.rdatatype.DS:
-                # if this was an authoritative referral, then note it
-                if response.is_authoritative():
-                    try:
-                        rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, msg.authority)[0]
-                    except IndexError:
-                        pass
-                    else:
-                        auth_referral_info = AuthoritativeReferral(rrset.name)
-                        DNSResponseComponent.insert_into_list(auth_referral_info, self.auth_referral_info, server, client, response)
+                # add referrals
+                try:
+                    rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, msg.authority)[0]
+                except IndexError:
+                    pass
+                else:
+                    referral_info = AuthoritativeReferral(rrset.name)
+                    DNSResponseComponent.insert_into_list(referral_info, self.referral_info, server, client, response)
+
+                # with referrals, don't do any further processing
                 return
 
             # don't store no answer or NXDOMAIN info for names other than qname
