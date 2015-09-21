@@ -1025,7 +1025,7 @@ class EDNSIgnored(EDNSError):
     '''
     >>> e = EDNSIgnored()
     >>> e.description
-    'The server responded with no OPT record, rather than with RCODE FORMERR (preferred), SERVFAIL, or NOTIMPL.'
+    'The server responded with no OPT record, rather than with RCODE FORMERR.'
     '''
 
     _abstract = False
