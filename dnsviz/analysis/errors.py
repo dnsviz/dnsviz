@@ -727,7 +727,6 @@ class ResponseError(DomainNameAnalysisError):
 
 class InvalidResponseError(ResponseError):
     required_params = ['tcp']
-    terse_description_template = '%(code)s:%(proto)s'
 
     def __init__(self, *args, **kwargs):
         super(ResponseError, self).__init__(**kwargs)
