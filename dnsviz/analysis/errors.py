@@ -1030,8 +1030,8 @@ class EDNSIgnored(EDNSError):
 
     _abstract = False
     code = 'EDNS_IGNORED'
-    description_template = 'The server responded with no OPT record, rather than with RCODE FORMERR (preferred), SERVFAIL, or NOTIMPL.'
-    references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
+    description_template = 'The server responded with no OPT record, rather than with RCODE FORMERR.'
+    references = ['RFC 6891, Sec. 7']
     required_params = []
 
 class GratuitousOPT(EDNSError):
