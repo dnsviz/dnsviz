@@ -959,7 +959,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if response.effective_edns >= 0:
                 # if the message response didn't use EDNS, then create an error
                 if response.message.edns < 0:
-                    edns_errs.append(Errors.EDNSIgnored())
+                    # if there were indicators that the server supported EDNS
+                    # (e.g., by RRSIGs in the answer), then report it as such
+                    if filter(lambda x: x.rdtype == dns.rdatatype.RRSIG, response.message.answer):
+                        edns_errs.append(Errors.EDNSSupportNoOpt())
+                    # otherwise, simply report it as a server not responding
+                    # properly to EDNS requests
+                    else:
+                        edns_errs.append(Errors.EDNSIgnored())
 
                 # the message response did use EDNS
                 else:
