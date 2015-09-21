@@ -1034,6 +1034,19 @@ class EDNSIgnored(EDNSError):
     references = ['RFC 6891, Sec. 7']
     required_params = []
 
+class EDNSSupportNoOpt(EDNSError):
+    '''
+    >>> e = EDNSSupportNoOpt()
+    >>> e.description
+    'The server appeared to understand EDNS by including RRSIG records, but its response included no OPT record.'
+    '''
+
+    _abstract = False
+    code = 'EDNS_SUPPORT_NO_OPT'
+    description_template = 'The server appeared to understand EDNS by including RRSIG records, but its response included no OPT record.'
+    references = ['RFC 6891, Sec. 7']
+    required_params = []
+
 class GratuitousOPT(EDNSError):
     '''
     >>> e = GratuitousOPT()
