@@ -30,7 +30,7 @@ import sys
 
 import dns.exception, dns.name
 
-from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
+from dnsviz.analysis import TTLAgnosticOfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
@@ -393,7 +393,7 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
                 continue
-            name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
+            name_objs.append(TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
 
         if not name_objs:
             sys.exit(4)

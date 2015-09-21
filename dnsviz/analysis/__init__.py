@@ -1,2 +1,2 @@
 from online import WILDCARD_EXPLICIT_DELEGATION, Analyst, OnlineDomainNameAnalysis, PrivateAnalyst, RecursiveAnalyst, PrivateRecursiveAnalyst, NetworkConnectivityException, resolver, DNS_RAW_VERSION
-from offline import OfflineDomainNameAnalysis, DNS_PROCESSED_VERSION
+from offline import OfflineDomainNameAnalysis, TTLAgnosticOfflineDomainNameAnalysis, DNS_PROCESSED_VERSION

@@ -2335,3 +2335,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             del d[name_str]
 
         return d
+
+class TTLAgnosticOfflineDomainNameAnalysis(OfflineDomainNameAnalysis):
+    QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
