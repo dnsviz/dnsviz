@@ -27,4 +27,6 @@
 .dnsviz-invalid-digest { background-color: #f17b7b; }
 .dnsviz-invalid-target { background-color: #f17b7b; }
 .dnsviz-invalid { background-color: #f17b7b; }
+.dnsviz-error { background-color: #f17b7b; }
+.dnsviz-warning { background-color: #fffa8f; }
 .dnsviz-match-pre-revoke { background-color: #fffa8f; }

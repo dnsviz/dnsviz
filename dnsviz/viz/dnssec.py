@@ -760,13 +760,13 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def add_errors(self, name_obj, zone_obj, name, rdtype, errors_list):
+    def _add_errors(self, name_obj, zone_obj, name, rdtype, errors_list, code, icon, status, description):
         if not errors_list:
             return None
 
-        node_str = self.rrset_node_str(name, rdtype, 2)
+        node_str = self.rrset_node_str(name, rdtype, code)
 
-        img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
+        img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % icon
 
         node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR><TR><TD><FONT POINT-SIZE="%d" FACE="%s" COLOR="%s"><I>%s/%s</I></FONT></TD></TR></TABLE>>' % \
                 (img_str, 10, 'Helvetica', '#b0b0b0', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), )
@@ -784,9 +784,9 @@ class DNSAuthGraph:
 
         errors_serialized = collections.OrderedDict()
 
-        errors_serialized['description'] = 'Response errors for %s/%s' % (fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
+        errors_serialized['description'] = '%s %s/%s' % (description, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
         errors_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in errors_list]
-        errors_serialized['status'] = 'INVALID'
+        errors_serialized['status'] = status
 
         self.node_info[node_id] = [errors_serialized]
         self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
@@ -795,6 +795,12 @@ class DNSAuthGraph:
         self.node_mapping[node_str] = set()
 
         return self.G.get_node(node_str)
+
+    def add_errors(self, name_obj, zone_obj, name, rdtype, errors_list):
+        return self._add_errors(name_obj, zone_obj, name, rdtype, errors_list, 2, ERROR_ICON, 'ERROR', 'Response errors for')
+
+    def add_warnings(self, name_obj, zone_obj, name, rdtype, warnings_list):
+        return self._add_errors(name_obj, zone_obj, name, rdtype, warnings_list, 3, WARNING_ICON, 'WARNING', 'Response warnings for')
 
     def add_dname(self, dname_status, name_obj, zone_obj, id):
         dname_rrset_info = dname_status.synthesized_cname.dname_info
@@ -1141,6 +1147,12 @@ class DNSAuthGraph:
             if (name, rdtype) not in self.processed_rrsets:
                 self.processed_rrsets[(name, rdtype)] = []
             self.processed_rrsets[(name, rdtype)].append(error_node)
+
+        warning_node = self.add_warnings(name_obj, zone_obj, name, rdtype, name_obj.response_warnings[query])
+        if warning_node is not None:
+            if (name, rdtype) not in self.processed_rrsets:
+                self.processed_rrsets[(name, rdtype)] = []
+            self.processed_rrsets[(name, rdtype)].append(warning_node)
 
         for alias_node, target in node_to_cname_mapping:
             # if this is a recursive analysis, then we've already graphed the
