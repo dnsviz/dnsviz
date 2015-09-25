@@ -542,7 +542,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
-                super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
+                super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name_from_rrsig == other.wildcard_name_from_rrsig
 
     def _next_closest_encloser(self):
         return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
