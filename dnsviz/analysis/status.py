@@ -538,7 +538,6 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
     def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
         self.wildcard_name_from_rrsig = wildcard_name
         super(NSECStatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
-        self.nsec_names_covering_wildcard = {}
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -558,6 +557,10 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         else:
             self.validation_status = NSEC_STATUS_INVALID
             self.errors.append(Errors.SnameNotCoveredWildcardAnswer(sname=self.qname))
+
+        if self.nsec_names_covering_wildcard:
+            self.validation_status = NSEC_STATUS_INVALID
+            self.errors.append(Errors.WildcardCoveredAnswerNSEC(wildcard=fmt.humanize_name(self.wildcard_name)))
 
         if self.nsec_names_covering_origin:
             self.validation_status = NSEC_STATUS_INVALID
