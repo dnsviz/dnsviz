@@ -536,11 +536,9 @@ class NSECStatusNXDOMAIN(NSECStatus):
 
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
     def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
+        self.wildcard_name_from_rrsig = wildcard_name
         super(NSECStatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
-        self.wildcard_name = wildcard_name
         self.nsec_names_covering_wildcard = {}
-
-        self._set_validation_status2(nsec_set_info)
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -550,9 +548,6 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
 
     def _set_validation_status(self, nsec_set_info):
-        pass
-
-    def _set_validation_status2(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if self.nsec_names_covering_qname:
             next_closest_encloser = self._next_closest_encloser()
