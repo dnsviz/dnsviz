@@ -112,6 +112,14 @@ class RRsetNonExistent(object):
             servers = list(servers)
             servers.sort()
         d['servers'] = servers
+
+        tags = set()
+        for server,client in self.servers_clients:
+            for response in self.servers_clients[(server,client)]:
+                tags.add(response.tag())
+        d['tags'] = list(tags)
+        d['tags'].sort()
+
         return d
 
 class DNSAuthGraph:

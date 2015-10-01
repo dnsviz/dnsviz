@@ -119,6 +119,19 @@ class DomainNameAnalysisError(object):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.servers_clients:
+                for response in self.servers_clients[(server,client)]:
+                    # some errors are not in conjunction with responses, per
+                    # se, only servers, in which case, the response value is
+                    # None.
+                    if response is not None:
+                        tags.add(response.tag())
+            if tags:
+                d['tags'] = list(tags)
+                d['tags'].sort()
+
         return d
 
     @classmethod

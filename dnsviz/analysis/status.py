@@ -265,6 +265,14 @@ class RRSIGStatus(object):
                 servers.sort()
             d['servers'] = servers
 
+            tags = set()
+            for server,client in self.rrset.rrsig_info[self.rrsig].servers_clients:
+                for response in self.rrset.rrsig_info[self.rrsig].servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
+
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
@@ -382,6 +390,14 @@ class DSStatus(object):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.ds_meta.servers_clients:
+                for response in self.ds_meta.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -525,6 +541,14 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.nsec_set_info.servers_clients:
+                for response in self.nsec_set_info.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -751,6 +775,14 @@ class NSECStatusNoAnswer(NSECStatus):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.nsec_set_info.servers_clients:
+                for response in self.nsec_set_info.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -982,6 +1014,14 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.nsec_set_info.servers_clients:
+                for response in self.nsec_set_info.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -1306,6 +1346,14 @@ class NSEC3StatusNoAnswer(NSEC3Status):
                 servers.sort()
             d['servers'] = servers
 
+            tags = set()
+            for server,client in self.nsec_set_info.servers_clients:
+                for response in self.nsec_set_info.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
+
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
 
@@ -1378,6 +1426,14 @@ class CNAMEFromDNAMEStatus(object):
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.synthesized_cname.dname_info.servers_clients:
+                for response in self.synthesized_cname.dname_info.servers_clients[(server, client)]:
+                    if response is not None:
+                        tags.add(response.tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
