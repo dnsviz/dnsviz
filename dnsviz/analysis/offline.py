@@ -2046,7 +2046,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if loglevel <= logging.DEBUG:
             d['description'] = unicode(rrset_info)
-            d.update(rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, show_servers=show_servers, html_format=html_format))
+            d.update(rrset_info.serialize(include_rrsig_info=False, consolidate_clients=consolidate_clients, html_format=html_format))
 
         if rrsig_list:
             d['rrsig'] = rrsig_list
@@ -2059,6 +2059,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if show_info and self.response_component_status is not None:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[rrset_info]]
+
+        if show_info and show_servers:
+            servers = tuple_to_dict(rrset_info.servers_clients)
+            if consolidate_clients:
+                servers = list(servers)
+                servers.sort()
+            d['servers'] = servers
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
