@@ -1244,7 +1244,10 @@ class ExecutableDNSQuery(DNSQuery):
             try:
                 # pull a response from the queue
                 qtm = response_queue.get(timeout=timeout)
+            except Queue.Empty:
+                pass
 
+            else:
                 # find its matching query meta information
                 query, qh = query_handlers.pop(qtm)
 
@@ -1325,9 +1328,6 @@ class ExecutableDNSQuery(DNSQuery):
                     if not query.servers.difference(set(query.responses).union(queries_aborted[query])):
                         queries_to_execute.remove(query)
                         query._executed = True
-
-            except Queue.Empty:
-                pass
 
     def require_executed(func):
         def _func(self, *args, **kwargs):
