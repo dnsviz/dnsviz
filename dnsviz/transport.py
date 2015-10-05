@@ -191,7 +191,7 @@ class DNSQueryTransport:
         self._event_map = {}
 
         self._close = threading.Event()
-        t = threading.Thread(target=self.loop)
+        t = threading.Thread(target=self._loop)
         t.start()
 
     def close(self):
@@ -211,7 +211,7 @@ class DNSQueryTransport:
         self._query_queue.put(qtm)
         os.write(self._notify_write_fd, struct.pack('!B', 0))
 
-    def loop(self):
+    def _loop(self):
         '''Return the data resulting from a UDP transaction.'''
 
         query_meta = {}
