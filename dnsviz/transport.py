@@ -46,8 +46,7 @@ def get_default_dns_transport_handler():
 
 def close_default_dns_transport_handler():
     global _th
-    if _th is not None:
-        _th.close()
+    del _th
 
 class DNSQueryTransportMeta:
     require_queryid_match = True
@@ -180,7 +179,7 @@ class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
     require_queryid_match = False
     require_question_case_match = False
 
-class DNSQueryTransport:
+class _DNSQueryTransport:
     '''A class that handles'''
 
     #TODO might need FD_SETSIZE to support lots of fds
@@ -354,3 +353,16 @@ class DNSQueryTransport:
 
                 # empty the pipe
                 os.read(self._notify_read_fd, 65535)
+
+class DNSQueryTransport:
+    def __init__(self):
+        self._th = _DNSQueryTransport()
+
+    def __del__(self):
+        self._th.close()
+
+    def query(self, qtm):
+        return self._th.query(qtm)
+
+    def query_nowait(self, qtm):
+        return self._th.query_nowait(qtm)
