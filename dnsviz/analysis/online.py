@@ -113,11 +113,7 @@ analysis_type_codes = {
         'cache': ANALYSIS_TYPE_CACHE,
 }
 
-# create a standard recurisve DNS query with checking disabled
-class StandardRecursiveQueryCD(Q.StandardRecursiveQuery):
-    response_handlers = Q.StandardRecursiveQuery.response_handlers + [Q.SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
-
-resolver = Resolver.Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
+resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD)
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
@@ -2060,7 +2056,7 @@ class RecursiveAnalyst(Analyst):
             self._handle_explicit_delegations(name_obj)
             servers = name_obj.zone.get_auth_or_designated_servers()
             servers = self._filter_servers(servers)
-            resolver = Resolver.Resolver(list(servers), StandardRecursiveQueryCD)
+            resolver = Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD)
 
             try:
                 ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
