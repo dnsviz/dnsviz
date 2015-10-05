@@ -1423,6 +1423,12 @@ class StandardRecursiveQuery(StandardQuery, RecursiveDNSQuery):
 
     pass
 
+class StandardRecursiveQueryCD(StandardRecursiveQuery):
+    '''A recursive DNS query that retries with checking disabled if the
+    response code is SERVFAIL.'''
+
+    response_handlers = StandardRecursiveQuery.response_handlers + [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
+
 class EDNS0Query(StandardQuery):
     '''A standard query with EDNS0.'''
 
