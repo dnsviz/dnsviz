@@ -42,6 +42,7 @@ import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 import dnsviz.query as Q
 import dnsviz.resolver as Resolver
+from dnsviz import transport
 
 _logger = logging.getLogger(__name__)
 
@@ -1047,10 +1048,15 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_handler']
 
     def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, transport_handler=None):
+
+        if transport_handler is None:
+            self.transport_handler = transport.DNSQueryTransport()
+        else:
+            self.transport_handler = transport_handler
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1090,7 +1096,6 @@ class Analyst(object):
             self.analysis_cache_lock = threading.Lock()
         else:
             self.analysis_cache_lock = analysis_cache_lock
-
         self._detect_cname_chain()
 
     def _detect_cname_chain(self):
@@ -1686,7 +1691,7 @@ class Analyst(object):
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
-        Q.ExecutableDNSQuery.execute_queries(*queries.values())
+        Q.ExecutableDNSQuery.execute_queries(*queries.values(), th=self.transport_handler)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
                 self._add_query(name_obj, query)
@@ -1858,7 +1863,7 @@ class Analyst(object):
                     queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
             # actually execute the queries, then store the results
-            Q.ExecutableDNSQuery.execute_queries(*queries)
+            Q.ExecutableDNSQuery.execute_queries(*queries, th=self.transport_handler)
             for query in queries:
                 self._add_query(name_obj, query, True)
 
