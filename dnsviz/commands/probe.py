@@ -40,7 +40,6 @@ from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, Privat
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.resolver import DNSAnswer, get_standard_resolver
-from dnsviz.transport import close_default_dns_transport_handler
 from dnsviz.util import get_client_address
 
 logger = logging.getLogger('dnsviz.analysis.online')
@@ -628,8 +627,6 @@ def main(argv):
     except KeyboardInterrupt:
         logger.error('Interrupted.')
         sys.exit(4)
-    finally:
-        close_default_dns_transport_handler()
 
 if __name__ == "__main__":
     main(sys.argv)

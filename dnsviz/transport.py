@@ -37,17 +37,6 @@ from ipaddr import IPAddr
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
 
-_th = None
-def get_default_dns_transport_handler():
-    global _th
-    if _th is None:
-        _th = DNSQueryTransport()
-    return _th
-
-def close_default_dns_transport_handler():
-    global _th
-    del _th
-
 class DNSQueryTransportMeta:
     require_queryid_match = True
     require_question_case_match = True

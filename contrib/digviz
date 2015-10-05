@@ -30,7 +30,6 @@ import dns.flags, dns.exception, dns.name, dns.opcode, dns.rdataclass, dns.rdata
 from dnsviz.ipaddr import IPAddr
 from dnsviz import query as Q
 from dnsviz import resolver as Resolver
-from dnsviz.transport import close_default_dns_transport_handler
 from dnsviz.util import get_trusted_keys
 
 class CommandLineException(Exception):
@@ -645,8 +644,6 @@ def main():
         sys.exit(1)
     except KeyboardInterrupt:
         pass
-    finally:
-        close_default_dns_transport_handler()
 
 if __name__ == "__main__":
     main()
