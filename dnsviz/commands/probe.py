@@ -41,10 +41,14 @@ import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.query import StandardRecursiveQueryCD
 from dnsviz.resolver import DNSAnswer, Resolver
+from dnsviz import transport
 from dnsviz.util import get_client_address
 
 logger = logging.getLogger('dnsviz.analysis.online')
-resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
+
+# this needs to be global because of multiprocessing
+th = transport.DNSQueryTransport()
+resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_handler=th)
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
@@ -61,8 +65,16 @@ def _raise_eof(signum, frame):
     # KeyboardInterrupt
     raise EOFError
 
+def _init_th():
+    global th
+    th = transport.DNSQueryTransport()
+
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
+
+def _init_subprocess():
+    _init_th()
+    _init_interrupt_handler()
 
 def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
     if ceiling is not None and name.is_subdomain(ceiling):
@@ -70,7 +82,7 @@ def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_handler=th)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -198,7 +210,7 @@ class ParallelAnalystMixin(object):
     def analyze(self, names, flush_func=None):
         results = []
         name_objs = []
-        pool = multiprocessing.Pool(self.processes, _init_interrupt_handler)
+        pool = multiprocessing.Pool(self.processes, _init_subprocess)
         try:
             for args in self._name_to_args_iter(names):
                 results.append(pool.apply_async(_analyze, (args,)))
@@ -287,6 +299,7 @@ def name_addr_mappings_from_string(mappings):
     return mappings_set
 
 def usage(err=None):
+    global th
     if err is not None:
         err += '\n\n'
     else:
@@ -629,6 +642,11 @@ def main(argv):
     except KeyboardInterrupt:
         logger.error('Interrupted.')
         sys.exit(4)
+
+    # th is global (because of possible multiprocessing), so we need to
+    # explicitly close it here
+    finally:
+        th.close()
 
 if __name__ == "__main__":
     main(sys.argv)
