@@ -348,10 +348,13 @@ class DNSQueryTransport:
         self._th = _DNSQueryTransport()
 
     def __del__(self):
-        self._th.close()
+        self.close()
 
     def query(self, qtm):
         return self._th.query(qtm)
 
     def query_nowait(self, qtm):
         return self._th.query_nowait(qtm)
+
+    def close(self):
+        return self._th.close()
