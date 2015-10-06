@@ -47,8 +47,8 @@ from dnsviz.util import get_client_address
 logger = logging.getLogger('dnsviz.analysis.online')
 
 # this needs to be global because of multiprocessing
-th = transport.DNSQueryTransport()
-resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_handler=th)
+th = None
+resolver = None
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
@@ -299,7 +299,6 @@ def name_addr_mappings_from_string(mappings):
     return mappings_set
 
 def usage(err=None):
-    global th
     if err is not None:
         err += '\n\n'
     else:
@@ -328,12 +327,18 @@ Options:
 ''' % (err))
 
 def main(argv):
+    global th
+    global resolver
+
     try:
         try:
             opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:mpo:a:R:x:EAs:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
+
+        th = transport.DNSQueryTransport()
+        resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_handler=th)
 
         # get all the -x options
         explicit_delegations = {}
@@ -646,7 +651,8 @@ def main(argv):
     # th is global (because of possible multiprocessing), so we need to
     # explicitly close it here
     finally:
-        th.close()
+        if th is not None:
+            th.close()
 
 if __name__ == "__main__":
     main(sys.argv)
