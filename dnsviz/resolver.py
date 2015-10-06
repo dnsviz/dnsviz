@@ -24,6 +24,7 @@ import time
 
 import query
 from ipaddr import IPAddr
+import transport
 
 import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
 
@@ -89,7 +90,7 @@ class DNSAnswerNoAnswerAllowed(DNSAnswer):
 class Resolver:
     '''A simple stub DNS resolver.'''
 
-    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False, client_ipv4=None, client_ipv6=None, port=53):
+    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False, client_ipv4=None, client_ipv6=None, port=53, transport_handler=None):
         if lifetime is None and max_attempts is None:
             raise ValueError("At least one of lifetime or max_attempts must be specified for a Resolver instance.")
 
@@ -102,9 +103,10 @@ class Resolver:
         self._client_ipv4 = client_ipv4
         self._client_ipv6 = client_ipv6
         self._port = port
+        self._transport_handler = transport_handler
 
     @classmethod
-    def from_file(cls, resolv_conf, query_cls):
+    def from_file(cls, resolv_conf, query_cls, **kwargs):
         servers = []
         try:
             with open(resolv_conf, 'r') as f:
@@ -120,7 +122,7 @@ class Resolver:
             pass
         if not servers:
             servers.append(IPAddr('127.0.0.1'))
-        return Resolver(servers, query_cls)
+        return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
         return self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values()[0]
@@ -214,7 +216,7 @@ class Resolver:
 
                     attempts[query_tuple] += 1
 
-            query.ExecutableDNSQuery.execute_queries(*queries.values())
+            query.ExecutableDNSQuery.execute_queries(*queries.values(), th=self._transport_handler)
 
             for query_tuple, q in queries.items():
                 server, client_response = q.responses.items()[0]
