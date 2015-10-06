@@ -114,7 +114,6 @@ analysis_type_codes = {
         'cache': ANALYSIS_TYPE_CACHE,
 }
 
-resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD)
 _root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 _root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
 
@@ -1057,6 +1056,7 @@ class Analyst(object):
             self.transport_handler = transport.DNSQueryTransport()
         else:
             self.transport_handler = transport_handler
+        self.resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_handler=self.transport_handler)
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1113,7 +1113,7 @@ class Analyst(object):
             rdtype = dns.rdatatype.A
 
         try:
-            ans = resolver.query_for_answer(self.name, rdtype, dns.rdataclass.IN, allow_noanswer=True)
+            ans = self.resolver.query_for_answer(self.name, rdtype, dns.rdataclass.IN, allow_noanswer=True)
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.DNSException):
             return
 
@@ -1135,7 +1135,7 @@ class Analyst(object):
             ceiling = self.name
 
         try:
-            ans = resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            ans = self.resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
             try:
                 ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 return ceiling, False
@@ -1437,13 +1437,13 @@ class Analyst(object):
             self._handle_explicit_delegations(name_obj)
             if not name_obj.explicit_delegation:
                 try:
-                    ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
+                    ans = self.resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
 
                     # resolve every name in the NS RRset
                     query_tuples = []
                     for rr in ans.rrset:
                         query_tuples.extend([(rr.target, dns.rdatatype.A, dns.rdataclass.IN), (rr.target, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-                    answer_map = resolver.query_multiple_for_answer(*query_tuples)
+                    answer_map = self.resolver.query_multiple_for_answer(*query_tuples)
                     for query_tuple in answer_map:
                         a = answer_map[query_tuple]
                         if isinstance(a, Resolver.DNSAnswer):
@@ -1734,7 +1734,7 @@ class Analyst(object):
 
             self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
             query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
-            query.execute()
+            query.execute(th=self.transport_handler)
             referral_queries[rdtype] = query
 
             # if NXDOMAIN was received, then double-check with the secondary
@@ -1827,7 +1827,7 @@ class Analyst(object):
             query_tuples = []
             for name in names_not_resolved:
                 query_tuples.extend([(name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN)])
-            answer_map = resolver.query_multiple_for_answer(*query_tuples)
+            answer_map = self.resolver.query_multiple_for_answer(*query_tuples)
             for query_tuple in answer_map:
                 name = query_tuple[0]
                 a = answer_map[query_tuple]
@@ -2061,7 +2061,7 @@ class RecursiveAnalyst(Analyst):
             self._handle_explicit_delegations(name_obj)
             servers = name_obj.zone.get_auth_or_designated_servers()
             servers = self._filter_servers(servers)
-            resolver = Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD)
+            resolver = Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD, transport_handler=self.transport_handler)
 
             try:
                 ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
@@ -2192,7 +2192,7 @@ class RecursiveAnalyst(Analyst):
 
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
         query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-        query.execute()
+        query.execute(th=self.transport_handler)
         self._add_query(name_obj, query, True)
 
         # if there were no valid responses, then exit out early
@@ -2214,7 +2214,7 @@ class RecursiveAnalyst(Analyst):
                 # because there is no parent on the name_obj)
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-                query.execute()
+                query.execute(th=self.transport_handler)
                 self._add_query(name_obj, query)
 
         # for non-TLDs make NS queries after all others
@@ -2223,7 +2223,7 @@ class RecursiveAnalyst(Analyst):
             if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-                query.execute()
+                query.execute(th=self.transport_handler)
                 self._add_query(name_obj, query, True)
 
         return name_obj

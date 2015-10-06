@@ -36,13 +36,15 @@ import time
 
 import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
-from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, resolver, DNS_RAW_VERSION
+from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
-from dnsviz.resolver import DNSAnswer, get_standard_resolver
+from dnsviz.query import StandardRecursiveQueryCD
+from dnsviz.resolver import DNSAnswer, Resolver
 from dnsviz.util import get_client_address
 
 logger = logging.getLogger('dnsviz.analysis.online')
+resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD)
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
@@ -440,7 +442,7 @@ def main(argv):
             if '-s' in opts:
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = name_addr_mappings_from_string(opts['-s'])
             else:
-                servers = get_standard_resolver()._servers
+                servers = resolver._servers
                 explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = set([(dns.name.from_text('ns%d' % i), s) for i, s in enumerate(servers)])
         else:
             if '-t' in opts:
