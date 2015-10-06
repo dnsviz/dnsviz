@@ -48,12 +48,6 @@ _logger = logging.getLogger(__name__)
 
 DNS_RAW_VERSION = 1.0
 
-class DomainNameAnalysisInterruption(Exception):
-    pass
-
-class DependencyAnalysisException(DomainNameAnalysisInterruption):
-    pass
-
 class NetworkConnectivityException(Exception):
     pass
 
