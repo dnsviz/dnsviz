@@ -120,8 +120,6 @@ class Resolver:
                             pass
         except IOError:
             pass
-        if not servers:
-            servers.append(IPAddr('127.0.0.1'))
         return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
