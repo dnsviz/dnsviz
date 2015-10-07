@@ -219,6 +219,14 @@ class Resolver:
             query.ExecutableDNSQuery.execute_queries(*queries.values(), th=self._transport_handler)
 
             for query_tuple, q in queries.items():
+                # no response means we didn't even try because we don't have
+                # proper connectivity
+                if not q.responses:
+                    server = list(q.servers)[0]
+                    valid_servers[query_tuple].remove(server)
+                    last_responses[query_tuple] = server, None
+                    continue
+
                 server, client_response = q.responses.items()[0]
                 client, response = client_response.items()[0]
                 responses[query_tuple] = (server, response)
