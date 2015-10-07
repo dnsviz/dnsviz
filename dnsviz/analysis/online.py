@@ -108,9 +108,6 @@ analysis_type_codes = {
         'cache': ANALYSIS_TYPE_CACHE,
 }
 
-_root_ipv4_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_4), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
-_root_ipv6_connectivity_checker = Resolver.Resolver(list(ROOT_NS_IPS_6), Q.SimpleDNSQuery, max_attempts=1, shuffle=True)
-
 class AggregateResponseInfo(object):
     def __init__(self, qname, rdtype, name_obj, zone_obj):
         self.qname = qname
@@ -1928,10 +1925,10 @@ class Analyst(object):
 
     def _check_connectivity(self, name_obj):
         if name_obj.get_auth_or_designated_servers(4) and filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4) and not name_obj.get_responsive_servers_udp(4):
-            if not self._root_responsive(4):
+            if self._root_responsive(4) is False:
                 raise IPv4ConnectivityException('Public IPv4 network unreachable!')
         if name_obj.get_auth_or_designated_servers(6) and filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6) and not name_obj.get_responsive_servers_udp(6):
-            if not self._root_responsive(6):
+            if self._root_responsive(6) is False:
                 raise IPv6ConnectivityException('Public IPv6 network unreachable!')
 
     def _raise_connectivity_error_remote(self):
@@ -1953,12 +1950,16 @@ class Analyst(object):
             raise NetworkConnectivityException('No network connectivity available!')
 
     def _root_responsive(self, proto):
+        if proto == 4:
+            servers = list(ROOT_NS_IPS_4)
+        elif proto == 6:
+            servers = list(ROOT_NS_IPS_6)
+        checker = Resolver.Resolver(servers, Q.SimpleDNSQuery, max_attempts=1, shuffle=True, transport_handler=self.transport_handler)
         try:
-            if proto == 4:
-                _root_ipv4_connectivity_checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
-            elif proto == 6:
-                _root_ipv6_connectivity_checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
+            checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
             return True
+        except dns.resolver.NoNameservers:
+            return None
         except dns.exception.Timeout:
             pass
         return False
