@@ -190,7 +190,7 @@ class Resolver:
                     try:
                         last_responses[query_tuple] = responses[query_tuple]
                     except KeyError:
-                        last_responses[query_tuple] = None
+                        last_responses[query_tuple] = None, None
                     continue
 
                 while query_tuple not in queries:
@@ -200,7 +200,7 @@ class Resolver:
                         try:
                             last_responses[query_tuple] = responses[query_tuple]
                         except KeyError:
-                            last_responses[query_tuple] = None
+                            last_responses[query_tuple] = None, None
                         break
 
                     server = servers[server_index]
