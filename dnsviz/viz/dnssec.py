@@ -1235,9 +1235,19 @@ class DNSAuthGraph:
         else:
             self.node_reverse_mapping[dnskey_nxdomain_info] = zone_top
 
-        # handle CNAME responses to DNSKEY responses
+        # handle other responses to DNSKEY/DS queries
         for rdtype in (dns.rdatatype.DS, dns.rdatatype.DNSKEY):
             if (name_obj.name, rdtype) in name_obj.queries:
+
+                # Handle errors and warnings for DNSKEY/DS queries
+                if rdtype == dns.rdatatype.DS and zone_obj.parent is not None:
+                    z_obj = zone_obj.parent
+                else:
+                    z_obj = zone_obj
+                self.add_errors(name_obj, z_obj, name_obj.name, rdtype, name_obj.response_errors[name_obj.queries[(name_obj.name, rdtype)]])
+                self.add_warnings(name_obj, z_obj, name_obj.name, rdtype, name_obj.response_warnings[name_obj.queries[(name_obj.name, rdtype)]])
+
+                # Map CNAME responses to DNSKEY/DS queries to appropriate node
                 for rrset_info in name_obj.queries[(name_obj.name, rdtype)].answer_info:
                     if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                         rrset_node = self.add_rrset(rrset_info, None, name_obj, name_obj.zone, 0)
