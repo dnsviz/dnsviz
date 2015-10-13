@@ -506,7 +506,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 if nsec_serialized:
                     nsec_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, html_format=html_format))
 
         erroneous_status = self.validation_status != STATUS_VALID
 
@@ -748,7 +748,7 @@ class NSECStatusNoAnswer(NSECStatus):
                 if nsec_serialized:
                     nsec_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+                nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, html_format=html_format))
 
         erroneous_status = self.validation_status != STATUS_VALID
 
@@ -955,7 +955,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 if nsec_serialized:
                     nsec3_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, html_format=html_format))
 
         erroneous_status = self.validation_status != STATUS_VALID
 
@@ -1292,7 +1292,7 @@ class NSEC3StatusNoAnswer(NSEC3Status):
                 if nsec_serialized:
                     nsec3_list.append(nsec_serialized)
             elif loglevel <= logging.DEBUG:
-                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+                nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, html_format=html_format))
 
         erroneous_status = self.validation_status != STATUS_VALID
 
@@ -1424,7 +1424,7 @@ class CNAMEFromDNAMEStatus(object):
         if rrset_info_serializer is not None:
             dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
         elif loglevel <= logging.DEBUG:
-            dname_serialized = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
+            dname_serialized = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, html_format=html_format)
 
         erroneous_status = self.validation_status != STATUS_VALID
 
