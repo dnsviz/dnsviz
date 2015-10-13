@@ -53,6 +53,11 @@ def main():
     else:
         command = sys.argv[1]
 
+    # first try importing just the commands module to make sure
+    # dnsviz is properly reachable with the current path
+    import dnsviz.commands
+
+    # now try importing the module for the actual command
     try:
         mod = importlib.import_module('dnsviz.commands.%s' % command)
     except ImportError:
