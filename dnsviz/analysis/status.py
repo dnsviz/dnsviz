@@ -220,7 +220,8 @@ class RRSIGStatus(object):
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
+        erroneous_status = self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -354,7 +355,8 @@ class DSStatus(object):
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
+        erroneous_status = self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -489,7 +491,8 @@ class NSECStatusNXDOMAIN(NSECStatus):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
+        erroneous_status = self.validation_status != STATUS_VALID
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -726,7 +729,8 @@ class NSECStatusNoAnswer(NSECStatus):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
+        erroneous_status = self.validation_status != STATUS_VALID
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -928,7 +932,8 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
+        erroneous_status = self.validation_status != STATUS_VALID
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -1260,7 +1265,8 @@ class NSEC3StatusNoAnswer(NSEC3Status):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
+        erroneous_status = self.validation_status != STATUS_VALID
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -1390,7 +1396,8 @@ class CNAMEFromDNAMEStatus(object):
         values = []
         d = collections.OrderedDict()
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or self.validation_status != STATUS_VALID
+        erroneous_status = self.validation_status != STATUS_VALID
+        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR) or erroneous_status
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
