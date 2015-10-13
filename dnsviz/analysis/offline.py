@@ -1252,6 +1252,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if response.is_authoritative():
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.AuthoritativeReferral(), self.response_warnings[query], server, client, response)
 
+        for truncated_info in query.truncated_info:
+            for server, client in truncated_info.servers_clients:
+                for response in truncated_info.servers_clients[(server, client)]:
+                    self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
+
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
         self.rrset_errors = {}
