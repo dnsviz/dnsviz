@@ -56,6 +56,13 @@ def main():
     try:
         mod = importlib.import_module('dnsviz.commands.%s' % command)
     except ImportError:
+        # if there are more than two frames in the stack trace,
+        # then the command was legit, but there was an ImportError
+        # raised while running that command.
+        exc_frame = sys.exc_info()[2]
+        if exc_frame.tb_next.tb_next is not None:
+            raise
+
         usage('Invalid command: %s' % command)
         sys.exit(1)
 
