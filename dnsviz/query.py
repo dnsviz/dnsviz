@@ -797,7 +797,7 @@ class AggregateDNSResponse(object):
                 except IndexError:
                     pass
                 else:
-                    referral_info = AuthoritativeReferral(rrset.name)
+                    referral_info = ReferralResponse(rrset.name)
                     DNSResponseComponent.insert_into_list(referral_info, self.referral_info, server, client, response)
 
                 # with referrals, don't do any further processing
