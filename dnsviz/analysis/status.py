@@ -221,7 +221,8 @@ class RRSIGStatus(object):
         d = collections.OrderedDict()
 
         erroneous_status = self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
-        show_basic = \
+
+        show_id = loglevel <= logging.INFO or \
                 (self.warnings and loglevel <= logging.WARNING) or \
                 (self.errors and loglevel <= logging.ERROR) or \
                 erroneous_status
@@ -231,7 +232,7 @@ class RRSIGStatus(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
+        if show_id:
             d['id'] = '%s/%d/%d' % (self.rrsig.signer.canonicalize().to_text(), self.rrsig.algorithm, self.rrsig.key_tag)
 
         if loglevel <= logging.DEBUG:
@@ -259,10 +260,10 @@ class RRSIGStatus(object):
                 d['expiration'] += ' (%s)' % (fmt.format_diff(fmt.timestamp_to_datetime(self.reference_ts), fmt.timestamp_to_datetime(self.rrsig.expiration)))
                 d['ttl'] = '%d (%s)' % (self.rrset.rrsig_info[self.rrsig].ttl, fmt.humanize_time(self.rrset.rrsig_info[self.rrsig].ttl))
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = rrsig_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.rrset.rrsig_info[self.rrsig].servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -359,7 +360,8 @@ class DSStatus(object):
         d = collections.OrderedDict()
 
         erroneous_status = self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
-        show_basic = \
+
+        show_id = loglevel <= logging.INFO or \
                 (self.warnings and loglevel <= logging.WARNING) or \
                 (self.errors and loglevel <= logging.ERROR) or \
                 erroneous_status
@@ -369,7 +371,7 @@ class DSStatus(object):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
+        if show_id:
             d['id'] = '%d/%d/%d' % (self.ds.algorithm, self.ds.key_tag, self.ds.digest_type)
 
         if loglevel <= logging.DEBUG:
@@ -389,10 +391,10 @@ class DSStatus(object):
             if html_format:
                 d['ttl'] = '%d (%s)' % (self.ds_meta.rrset.ttl, fmt.humanize_time(self.ds_meta.rrset.ttl))
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = ds_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.ds_meta.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -497,17 +499,6 @@ class NSECStatusNXDOMAIN(NSECStatus):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        erroneous_status = self.validation_status != STATUS_VALID
-        show_basic = \
-                (self.warnings and loglevel <= logging.WARNING) or \
-                (self.errors and loglevel <= logging.ERROR) or \
-                erroneous_status
-
-        if html_format:
-            formatter = lambda x: cgi.escape(x, True)
-        else:
-            formatter = lambda x: x
-
         nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
@@ -517,7 +508,19 @@ class NSECStatusNXDOMAIN(NSECStatus):
             elif loglevel <= logging.DEBUG:
                 nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
-        if loglevel <= logging.INFO or show_basic or nsec_list:
+        erroneous_status = self.validation_status != STATUS_VALID
+
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR) or \
+                (erroneous_status or nsec_list)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
+        if show_id:
             d['id'] = 'NSEC'
 
         if nsec_list:
@@ -544,10 +547,10 @@ class NSECStatusNXDOMAIN(NSECStatus):
                         ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                     ))
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.nsec_set_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -738,16 +741,6 @@ class NSECStatusNoAnswer(NSECStatus):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        erroneous_status = self.validation_status != STATUS_VALID
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or \
-                (self.errors and loglevel <= logging.ERROR) or \
-                erroneous_status
-
-        if html_format:
-            formatter = lambda x: cgi.escape(x, True)
-        else:
-            formatter = lambda x: x
-
         nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
@@ -757,7 +750,19 @@ class NSECStatusNoAnswer(NSECStatus):
             elif loglevel <= logging.DEBUG:
                 nsec_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
-        if loglevel <= logging.INFO or show_basic or nsec_list:
+        erroneous_status = self.validation_status != STATUS_VALID
+
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR) or \
+                (erroneous_status or nsec_list)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
+        if show_id:
             d['id'] = 'NSEC'
 
         if nsec_list:
@@ -781,10 +786,10 @@ class NSECStatusNoAnswer(NSECStatus):
                 if self.nsec_for_wildcard_name is not None:
                     d['wildcard_nsec_match'] = formatter(self.wildcard_name.canonicalize().to_text())
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.nsec_set_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -943,17 +948,6 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        erroneous_status = self.validation_status != STATUS_VALID
-        show_basic = \
-                (self.warnings and loglevel <= logging.WARNING) or \
-                (self.errors and loglevel <= logging.ERROR) or \
-                erroneous_status
-
-        if html_format:
-            formatter = lambda x: cgi.escape(x, True)
-        else:
-            formatter = lambda x: x
-
         nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
@@ -963,7 +957,19 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             elif loglevel <= logging.DEBUG:
                 nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
-        if loglevel <= logging.INFO or show_basic or nsec3_list:
+        erroneous_status = self.validation_status != STATUS_VALID
+
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR) or \
+                (erroneous_status or nsec3_list)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
+        if show_id:
             d['id'] = 'NSEC3'
 
         if nsec3_list:
@@ -1024,10 +1030,10 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 else:
                     d['sname_hash'] = None
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.nsec_set_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -1279,17 +1285,6 @@ class NSEC3StatusNoAnswer(NSEC3Status):
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        erroneous_status = self.validation_status != STATUS_VALID
-        show_basic = \
-                (self.warnings and loglevel <= logging.WARNING) or \
-                (self.errors and loglevel <= logging.ERROR) or \
-                erroneous_status
-
-        if html_format:
-            formatter = lambda x: cgi.escape(x, True)
-        else:
-            formatter = lambda x: x
-
         nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
             if rrset_info_serializer is not None:
@@ -1299,7 +1294,19 @@ class NSEC3StatusNoAnswer(NSEC3Status):
             elif loglevel <= logging.DEBUG:
                 nsec3_list.append(nsec_rrset.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
-        if loglevel <= logging.INFO or show_basic or nsec3_list:
+        erroneous_status = self.validation_status != STATUS_VALID
+
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR) or \
+                (erroneous_status or nsec3_list)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
+        if show_id:
             d['id'] = 'NSEC3'
 
         if nsec3_list:
@@ -1359,10 +1366,10 @@ class NSEC3StatusNoAnswer(NSEC3Status):
                 else:
                     d['sname_hash'] = None
 
-        if loglevel <= logging.INFO or show_basic:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.nsec_set_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -1413,24 +1420,25 @@ class CNAMEFromDNAMEStatus(object):
         values = []
         d = collections.OrderedDict()
 
-        erroneous_status = self.validation_status != STATUS_VALID
-        show_basic = \
-                (self.warnings and loglevel <= logging.WARNING) or \
-                (self.errors and loglevel <= logging.ERROR) or \
-                erroneous_status
-
-        if html_format:
-            formatter = lambda x: cgi.escape(x, True)
-        else:
-            formatter = lambda x: x
-
         dname_serialized = None
         if rrset_info_serializer is not None:
             dname_serialized = rrset_info_serializer(self.synthesized_cname.dname_info, consolidate_clients=consolidate_clients, show_servers=False, loglevel=loglevel, html_format=html_format)
         elif loglevel <= logging.DEBUG:
             dname_serialized = self.synthesized_cname.dname_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format)
 
-        if loglevel <= logging.INFO or show_basic or dname_serialized:
+        erroneous_status = self.validation_status != STATUS_VALID
+
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR) or \
+                (erroneous_status or dname_serialized)
+
+        if html_format:
+            formatter = lambda x: cgi.escape(x, True)
+        else:
+            formatter = lambda x: x
+
+        if show_id:
             d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
 
         if loglevel <= logging.DEBUG:
@@ -1444,10 +1452,10 @@ class CNAMEFromDNAMEStatus(object):
                 d['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
                 d['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
 
-        if loglevel <= logging.INFO or self.validation_status != STATUS_VALID:
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = dname_status_mapping[self.validation_status]
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.synthesized_cname.dname_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
