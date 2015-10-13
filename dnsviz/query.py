@@ -735,6 +735,7 @@ class AggregateDNSResponse(object):
         self.nodata_info = []
         self.nxdomain_info = []
         self.referral_info = []
+        self.truncated_info = []
         self.error_info = []
 
     def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
@@ -742,6 +743,10 @@ class AggregateDNSResponse(object):
             if response.is_complete_response():
                 is_referral = response.is_referral(qname, rdtype, bailiwick)
                 self._aggregate_answer(server, client, response, is_referral, qname, rdtype)
+            else:
+                truncated_info = TruncatedResponse(response.message.to_wire())
+                DNSResponseComponent.insert_into_list(truncated_info, self.truncated_info, server, client, response)
+
         else:
             self._aggregate_error(server, client, response)
 

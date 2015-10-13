@@ -1192,3 +1192,11 @@ class AuthoritativeReferral(DNSResponseComponent):
 
     def __eq__(self, other):
         return self.name == other.name
+
+class TruncatedResponse(DNSResponseComponent):
+    def __init__(self, wire):
+        super(TruncatedResponse, self).__init__()
+        self.wire = wire
+
+    def __eq__(self, other):
+        return self.wire == other.wire
