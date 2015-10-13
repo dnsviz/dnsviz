@@ -2038,12 +2038,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not wildcard_proof_list[wildcard_name_str]:
                     del wildcard_proof_list[wildcard_name_str]
 
-        show_info = loglevel <= logging.INFO or \
+        show_id = loglevel <= logging.INFO or \
                 (self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING) or \
                 (self.rrset_errors[rrset_info] and loglevel <= logging.ERROR) or \
                 (rrsig_list or dname_list or wildcard_proof_list)
 
-        if show_info:
+        if show_id:
             if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
             else:
@@ -2062,10 +2062,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if wildcard_proof_list:
             d['wildcard_proof'] = wildcard_proof_list
 
-        if show_info and self.response_component_status is not None:
+        if loglevel <= logging.INFO and self.response_component_status is not None:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[rrset_info]]
 
-        if show_info and show_servers:
+        if loglevel <= logging.INFO and show_servers:
             servers = tuple_to_dict(rrset_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -2102,12 +2102,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if rrset_serialized:
                 soa_list.append(rrset_serialized)
 
-        show_info = loglevel <= logging.INFO or \
+        show_id = loglevel <= logging.INFO or \
                 (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
                 (errors[neg_response_info] and loglevel <= logging.ERROR) or \
                 (proof_list or soa_list)
 
-        if show_info:
+        if show_id:
             d['id'] = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
 
         if proof_list:
@@ -2116,12 +2116,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if soa_list:
             d['soa'] = soa_list
 
-        if show_info and self.response_component_status is not None:
+        if loglevel <= logging.INFO and self.response_component_status is not None:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[neg_response_info]]
 
-        if loglevel <= logging.DEBUG or \
-                (warnings[neg_response_info] and loglevel <= logging.WARNING) or \
-                (errors[neg_response_info] and loglevel <= logging.ERROR):
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(neg_response_info.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
@@ -2196,7 +2194,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for dnskey in self.get_dnskeys():
             dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if dnskey_serialized:
-                if self.response_component_status is not None:
+                if loglevel <= logging.INFO and self.response_component_status is not None:
                     dnskey_serialized['status'] = Status.rrset_status_mapping[self.response_component_status[dnskey]]
                 d.append(dnskey_serialized)
 
@@ -2238,7 +2236,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if not d['insecurity_proof']:
                 del d['insecurity_proof']
 
-        if loglevel <= logging.INFO or self.delegation_status[rdtype] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE):
+        erroneous_status = self.delegation_status[rdtype] not in (Status.DELEGATION_STATUS_SECURE, Status.DELEGATION_STATUS_INSECURE)
+
+        if loglevel <= logging.INFO or erroneous_status:
             d['status'] = Status.delegation_status_mapping[self.delegation_status[rdtype]]
 
         if self.delegation_warnings[rdtype] and loglevel <= logging.WARNING:
@@ -2310,8 +2310,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         consolidate_clients = self.single_client()
 
+        erroneous_status = self.status not in (Status.NAME_STATUS_NOERROR, Status.NAME_STATUS_NXDOMAIN)
+
         d[name_str] = collections.OrderedDict()
-        if loglevel <= logging.INFO or self.status not in (Status.NAME_STATUS_NOERROR, Status.NAME_STATUS_NXDOMAIN):
+        if loglevel <= logging.INFO or erroneous_status:
             d[name_str]['status'] = Status.name_status_mapping[self.status]
 
         d[name_str]['queries'] = collections.OrderedDict()
