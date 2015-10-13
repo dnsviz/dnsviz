@@ -1484,7 +1484,7 @@ class GlueMismatchError(DelegationError):
     '''
 
     _abstract = False
-    code = 'GLUE_MISMATCH_ERROR'
+    code = 'GLUE_MISMATCH'
     description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from their respective authoritative address(es) (%(auth_addresses_text)s).'
     required_params = ['name', 'glue_addresses', 'auth_addresses']
 
