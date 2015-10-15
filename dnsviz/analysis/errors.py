@@ -129,7 +129,7 @@ class DomainNameAnalysisError(object):
                     # None.
                     if response is not None:
                         if self.use_effective_tag:
-                            tag = response.tag()
+                            tag = response.effective_tag()
                         else:
                             tag = response.initial_tag()
                         tags.add(tag)

@@ -98,7 +98,7 @@ class DNSResponse:
                 s += '_%d' % opt.otype
         return s
 
-    def tag(self):
+    def effective_tag(self):
         s = ''
         if self.effective_tcp:
             s += 'TCP_'

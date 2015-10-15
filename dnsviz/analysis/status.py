@@ -274,7 +274,7 @@ class RRSIGStatus(object):
             for server,client in self.rrset.rrsig_info[self.rrsig].servers_clients:
                 for response in self.rrset.rrsig_info[self.rrsig].servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -405,7 +405,7 @@ class DSStatus(object):
             for server,client in self.ds_meta.servers_clients:
                 for response in self.ds_meta.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -561,7 +561,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -800,7 +800,7 @@ class NSECStatusNoAnswer(NSECStatus):
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -1044,7 +1044,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -1380,7 +1380,7 @@ class NSEC3StatusNoAnswer(NSEC3Status):
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -1466,7 +1466,7 @@ class CNAMEFromDNAMEStatus(object):
             for server,client in self.synthesized_cname.dname_info.servers_clients:
                 for response in self.synthesized_cname.dname_info.servers_clients[(server, client)]:
                     if response is not None:
-                        tags.add(response.tag())
+                        tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 

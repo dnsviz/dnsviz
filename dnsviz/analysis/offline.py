@@ -2075,7 +2075,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tags = set()
             for server,client in rrset_info.servers_clients:
                 for response in rrset_info.servers_clients[(server,client)]:
-                    tags.add(response.tag())
+                    tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
@@ -2129,7 +2129,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tags = set()
             for server,client in neg_response_info.servers_clients:
                 for response in neg_response_info.servers_clients[(server,client)]:
-                    tags.add(response.tag())
+                    tags.add(response.effective_tag())
             d['tags'] = list(tags)
             d['tags'].sort()
 
