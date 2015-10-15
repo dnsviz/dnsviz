@@ -83,6 +83,21 @@ class DNSResponse:
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
+    def initial_tag(self):
+        s = ''
+        if self.query.tcp:
+            s += 'TCP_'
+        else:
+            s += 'UDP_'
+        s += '%d_' % self.query.flags
+        if self.query.edns < 0:
+            s += 'NOEDNS'
+        else:
+            s += 'EDNS%d_%d_%d' % (self.query.edns, (self.query.edns_flags & 0xffff), self.query.edns_max_udp_payload)
+            for opt in self.query.edns_options:
+                s += '_%d' % opt.otype
+        return s
+
     def tag(self):
         s = ''
         if self.effective_tcp:
