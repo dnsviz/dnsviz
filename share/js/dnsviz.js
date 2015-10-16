@@ -102,8 +102,8 @@ AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 					if (val[i]['servers'] != undefined) {
 						servers_tags = servers_tags.concat(val[i]['servers']);
 					}
-					if (val[i]['tags'] != undefined) {
-						servers_tags = servers_tags.concat(val[i]['tags']);
+					if (val[i]['query_options'] != undefined) {
+						servers_tags = servers_tags.concat(val[i]['query_options']);
 					}
 					if (servers_tags.length > 0) {
 						s += ' (' + servers_tags.join(", ") + ')';

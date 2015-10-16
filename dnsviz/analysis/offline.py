@@ -2076,8 +2076,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server,client in rrset_info.servers_clients:
                 for response in rrset_info.servers_clients[(server,client)]:
                     tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
@@ -2130,8 +2130,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server,client in neg_response_info.servers_clients:
                 for response in neg_response_info.servers_clients[(server,client)]:
                     tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if warnings[neg_response_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in warnings[neg_response_info]]

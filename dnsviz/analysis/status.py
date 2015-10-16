@@ -275,8 +275,8 @@ class RRSIGStatus(object):
                 for response in self.rrset.rrsig_info[self.rrsig].servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -406,8 +406,8 @@ class DSStatus(object):
                 for response in self.ds_meta.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -562,8 +562,8 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -801,8 +801,8 @@ class NSECStatusNoAnswer(NSECStatus):
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -1045,8 +1045,8 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -1381,8 +1381,8 @@ class NSEC3StatusNoAnswer(NSEC3Status):
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
@@ -1467,8 +1467,8 @@ class CNAMEFromDNAMEStatus(object):
                 for response in self.synthesized_cname.dname_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_tag())
-            d['tags'] = list(tags)
-            d['tags'].sort()
+            d['query_options'] = list(tags)
+            d['query_options'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]

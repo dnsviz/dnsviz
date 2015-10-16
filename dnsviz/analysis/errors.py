@@ -134,8 +134,8 @@ class DomainNameAnalysisError(object):
                             tag = response.initial_tag()
                         tags.add(tag)
             if tags:
-                d['tags'] = list(tags)
-                d['tags'].sort()
+                d['query_options'] = list(tags)
+                d['query_options'].sort()
 
         return d
 
