@@ -868,7 +868,7 @@ class RRsetInfo(DNSResponseComponent):
 
         return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
-    def serialize(self, include_rrsig_info=True, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
         if html_format:
@@ -890,10 +890,6 @@ class RRsetInfo(DNSResponseComponent):
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
                 d['rdata'].append(formatter(rdata.to_text()))
-
-        if include_rrsig_info:
-            #TODO include RRSIG info...
-            pass
 
         return d
 
