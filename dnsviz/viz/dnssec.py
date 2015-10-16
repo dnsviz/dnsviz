@@ -116,7 +116,7 @@ class RRsetNonExistent(object):
         tags = set()
         for server,client in self.servers_clients:
             for response in self.servers_clients[(server,client)]:
-                tags.add(response.effective_tag())
+                tags.add(response.effective_query_tag())
         d['query_options'] = list(tags)
         d['query_options'].sort()
 

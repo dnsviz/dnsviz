@@ -35,7 +35,7 @@ class DomainNameAnalysisError(object):
     terse_description_template = '%(code)s'
     references = []
     required_params = []
-    use_effective_tag = True
+    use_effective_query_tag = True
 
     def __init__(self, **kwargs):
         if self._abstract:
@@ -128,10 +128,10 @@ class DomainNameAnalysisError(object):
                     # se, only servers, in which case, the response value is
                     # None.
                     if response is not None:
-                        if self.use_effective_tag:
-                            tag = response.effective_tag()
+                        if self.use_effective_query_tag:
+                            tag = response.effective_query_tag()
                         else:
-                            tag = response.initial_tag()
+                            tag = response.initial_query_tag()
                         tags.add(tag)
             if tags:
                 d['query_options'] = list(tags)
@@ -878,7 +878,7 @@ class RecursionNotAvailable(ResponseError):
 class ResponseErrorWithCondition(ResponseError):
     description_template = "%(response_error_description)s until %(change)s%(query_specific_text)s."
     required_params = ['response_error', 'query_specific']
-    use_effective_tag = False
+    use_effective_query_tag = False
 
     def __init__(self, *args, **kwargs):
         super(ResponseErrorWithCondition, self).__init__(**kwargs)

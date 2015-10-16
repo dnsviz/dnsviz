@@ -83,7 +83,7 @@ class DNSResponse:
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
 
-    def initial_tag(self):
+    def initial_query_tag(self):
         s = ''
         if self.query.tcp:
             s += 'TCP_'
@@ -98,7 +98,7 @@ class DNSResponse:
                 s += '_%d' % opt.otype
         return s
 
-    def effective_tag(self):
+    def effective_query_tag(self):
         s = ''
         if self.effective_tcp:
             s += 'TCP_'
@@ -752,7 +752,7 @@ class DNSKEYMeta(DNSResponseComponent):
             tags = set()
             for server,client in self.servers_clients:
                 for response in self.servers_clients[(server,client)]:
-                    tags.add(response.effective_tag())
+                    tags.add(response.effective_query_tag())
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -921,7 +921,7 @@ class RRsetInfo(DNSResponseComponent):
             tags = set()
             for server,client in self.servers_clients:
                 for response in self.servers_clients[(server,client)]:
-                    tags.add(response.effective_tag())
+                    tags.add(response.effective_query_tag())
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
