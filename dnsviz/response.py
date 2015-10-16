@@ -690,10 +690,12 @@ class DNSKEYMeta(DNSResponseComponent):
 
         return s.getvalue()
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         from analysis import status as Status
 
-        show_basic = (self.warnings and loglevel <= logging.WARNING) or (self.errors and loglevel <= logging.ERROR)
+        show_id = loglevel <= logging.INFO or \
+                (self.warnings and loglevel <= logging.WARNING) or \
+                (self.errors and loglevel <= logging.ERROR)
 
         d = collections.OrderedDict()
 
@@ -702,7 +704,7 @@ class DNSKEYMeta(DNSResponseComponent):
         else:
             formatter = lambda x: x
 
-        if loglevel <= logging.INFO or show_basic:
+        if show_id:
             d['id'] = '%d/%d' % (self.rdata.algorithm, self.key_tag)
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(unicode(self))
@@ -729,12 +731,19 @@ class DNSKEYMeta(DNSResponseComponent):
 
         #TODO: put DNSKEY roles in meta, if it makes sense
 
-        if loglevel <= logging.DEBUG or show_basic:
+        if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.servers_clients)
             if consolidate_clients:
                 servers = list(servers)
                 servers.sort()
             d['servers'] = servers
+
+            tags = set()
+            for server,client in self.servers_clients:
+                for response in self.servers_clients[(server,client)]:
+                    tags.add(response.effective_tag())
+            d['tags'] = list(tags)
+            d['tags'].sort()
 
         if self.warnings and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.warnings]
