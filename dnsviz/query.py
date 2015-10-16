@@ -1050,11 +1050,7 @@ class DNSQuery(object):
         rdclass = dns.rdataclass.from_text(d['qclass'])
         rdtype = dns.rdatatype.from_text(d['qtype'])
 
-        if 'options' in d:
-            d1 = d['options']
-        #XXX backwards compatibility with previous version
-        else:
-            d1 = d
+        d1 = d['options']
 
         flags = d1['flags']
         if 'edns_version' in d1:
@@ -1070,11 +1066,7 @@ class DNSQuery(object):
             edns_flags = None
             edns_options = []
 
-        #XXX backwards compatibility with previous version
-        if 'tcp_first' in d1:
-            tcp = d1['tcp_first']
-        else:
-            tcp = d1['tcp']
+        tcp = d1['tcp']
 
         q = DNSQuery(qname, rdtype, rdclass,
                 flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
