@@ -548,7 +548,18 @@ class DNSResponse:
         if d['message'] is None:
             message = None
         else:
-            message = dns.message.from_wire(base64.b64decode(d['message']))
+            wire = base64.b64decode(d['message'])
+            try:
+                message = dns.message.from_wire(wire)
+            except Exception, e:
+                message = None
+                if isinstance(e, (struct.error, dns.exception.FormError)):
+                    error = Q.RESPONSE_ERROR_FORMERR
+                #XXX need to determine how to handle non-parsing
+                # validation errors with dnspython (e.g., signature with
+                # no keyring)
+                else:
+                    error = Q.RESPONSE_ERROR_OTHER
 
         response_time = d['response_time']
         history = []
