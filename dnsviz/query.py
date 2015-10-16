@@ -295,7 +295,7 @@ class DisableEDNSOnFormerrHandler(DNSResponseHandler):
     servers don't handle EDNS appropriately.'''
 
     def handle(self, response_wire, response, response_time):
-        if isinstance(response, (struct.error, dns.exception.FormError, dns.exception.SyntaxError)) and self._request.edns >= 0:
+        if isinstance(response, (struct.error, dns.exception.FormError)) and self._request.edns >= 0:
             self._request.use_edns(False)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_FORMERR, None, RETRY_ACTION_DISABLE_EDNS, None)
 
@@ -1298,7 +1298,7 @@ class ExecutableDNSQuery(DNSQuery):
                             err = RESPONSE_ERROR_TIMEOUT
                         elif isinstance(response, (socket.error, EOFError)):
                             err = RESPONSE_ERROR_NETWORK_ERROR
-                        elif isinstance(response, (struct.error, dns.exception.FormError, dns.exception.SyntaxError)):
+                        elif isinstance(response, (struct.error, dns.exception.FormError)):
                             err = RESPONSE_ERROR_FORMERR
                         #XXX need to determine how to handle non-parsing
                         # validation errors with dnspython (e.g., signature with
