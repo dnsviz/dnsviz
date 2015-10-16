@@ -1242,6 +1242,7 @@ class DNSAuthGraph:
                 # Handle errors and warnings for DNSKEY/DS queries
                 if rdtype == dns.rdatatype.DS and zone_obj.parent is not None:
                     z_obj = zone_obj.parent
+                    self.graph_zone_auth(z_obj, False)
                 else:
                     z_obj = zone_obj
                 self.add_errors(name_obj, z_obj, name_obj.name, rdtype, name_obj.response_errors[name_obj.queries[(name_obj.name, rdtype)]])
