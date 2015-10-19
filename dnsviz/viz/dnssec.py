@@ -768,7 +768,7 @@ class DNSAuthGraph:
 
         return self.G.get_node(node_str)
 
-    def _add_errors(self, name_obj, zone_obj, name, rdtype, errors_list, code, icon, status, description):
+    def _add_errors(self, name_obj, zone_obj, name, rdtype, errors_list, code, icon, category, status, description):
         if not errors_list:
             return None
 
@@ -793,7 +793,7 @@ class DNSAuthGraph:
         errors_serialized = collections.OrderedDict()
 
         errors_serialized['description'] = '%s %s/%s' % (description, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
-        errors_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in errors_list]
+        errors_serialized[category] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in errors_list]
         errors_serialized['status'] = status
 
         self.node_info[node_id] = [errors_serialized]
@@ -805,10 +805,10 @@ class DNSAuthGraph:
         return self.G.get_node(node_str)
 
     def add_errors(self, name_obj, zone_obj, name, rdtype, errors_list):
-        return self._add_errors(name_obj, zone_obj, name, rdtype, errors_list, 2, ERROR_ICON, 'ERROR', 'Response errors for')
+        return self._add_errors(name_obj, zone_obj, name, rdtype, errors_list, 2, ERROR_ICON, 'errors', 'ERROR', 'Response errors for')
 
     def add_warnings(self, name_obj, zone_obj, name, rdtype, warnings_list):
-        return self._add_errors(name_obj, zone_obj, name, rdtype, warnings_list, 3, WARNING_ICON, 'WARNING', 'Response warnings for')
+        return self._add_errors(name_obj, zone_obj, name, rdtype, warnings_list, 3, WARNING_ICON, 'warnings', 'WARNING', 'Response warnings for')
 
     def add_dname(self, dname_status, name_obj, zone_obj, id):
         dname_rrset_info = dname_status.synthesized_cname.dname_info
