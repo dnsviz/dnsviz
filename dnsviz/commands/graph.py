@@ -76,7 +76,11 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
     G.remove_extra_edges()
 
     if fmt == 'html':
-        js_img = G.draw('js')
+        try:
+            js_img = G.draw('js')
+        except IOError, e:
+            logger.error(str(e))
+            sys.exit(3)
 
         try:
             template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
@@ -97,6 +101,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
                 codecs.open(filename, 'w', 'utf-8').write(template_str)
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, filename))
+                sys.exit(3)
     else:
         if filename is None:
             fh.write(G.draw(fmt))
@@ -104,7 +109,11 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
             try:
                 G.draw(fmt, path=filename)
             except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, filename))
+                if e.strerror:
+                    logger.error('%s: "%s"' % (e.strerror, filename))
+                else:
+                    logger.error(str(e))
+                sys.exit(3)
 
 def test_m2crypto():
     try:
