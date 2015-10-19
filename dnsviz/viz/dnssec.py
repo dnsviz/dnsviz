@@ -483,7 +483,7 @@ class DNSAuthGraph:
 
             self.node_info[node_str] = [consolidated_ds_serialized]
 
-            self.G.add_edge(parent_bottom_name, node_str, style='invis', minlen='0')
+            self.G.add_edge(parent_bottom_name, node_str, style='invis')
 
             T, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
 
@@ -686,7 +686,7 @@ class DNSAuthGraph:
                 rrset_serialized['errors'] += [w.serialize(consolidate_clients=consolidate_clients, html_format=True) for w in name_obj.rrset_errors[rrset_info]]
 
             self.node_info[node_id] = [rrset_serialized]
-            self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+            self.G.add_edge(zone_bottom_name, node_str, style='invis')
 
         if node_str not in self.node_mapping:
             self.node_mapping[node_str] = set()
@@ -759,7 +759,7 @@ class DNSAuthGraph:
 
             self.node_info[node_id] = [rrset_serialized]
 
-            self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+            self.G.add_edge(zone_bottom_name, node_str, style='invis')
 
         if node_str not in self.node_mapping:
             self.node_mapping[node_str] = set()
@@ -797,7 +797,7 @@ class DNSAuthGraph:
         errors_serialized['status'] = status
 
         self.node_info[node_id] = [errors_serialized]
-        self.G.add_edge(zone_bottom_name, node_str, style='invis', minlen='0')
+        self.G.add_edge(zone_bottom_name, node_str, style='invis')
 
         # no need to map errors
         self.node_mapping[node_str] = set()
@@ -1323,7 +1323,7 @@ class DNSAuthGraph:
                 # add a tail to the cluster
                 self.G.get_edge(zone_top, nsec_node).attr['ltail'] = zone_graph_name
                 # anchor NSEC node to bottom
-                self.G.add_edge(zone_bottom, nsec_node, style='invis', minlen='0')
+                self.G.add_edge(zone_bottom, nsec_node, style='invis')
 
                 for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
                     nsec_cell = nsec_name.canonicalize().to_text()
@@ -1843,10 +1843,10 @@ class DNSAuthGraph:
 
             for n in signing_keys.union(ds_dnskeys):
                 if not (n in zsk_only and ksk_only):
-                    self.G.add_edge(n, self.node_subgraph_name[n], style='invis', minlen='0')
+                    self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 
             for n in non_existent_dnskeys.intersection(ta_dnskeys):
-                self.G.add_edge(n, self.node_subgraph_name[n], style='invis', minlen='0')
+                self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 
             for n in ksks:
                 n_is_signing_key = n in signing_keys
