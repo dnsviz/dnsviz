@@ -1320,6 +1320,7 @@ class PMTUExceeded(ResponseError):
     description_template = '%(description)s'
     required_params = ['pmtu_lower_bound', 'pmtu_upper_bound']
     references = ['RFC 6891, Sec. 6.2.6']
+    use_effective_query_tag = False
 
     def __init__(self, **kwargs):
         super(PMTUExceeded, self).__init__(**kwargs)
