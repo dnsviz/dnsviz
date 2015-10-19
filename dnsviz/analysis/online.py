@@ -57,6 +57,9 @@ class IPv4ConnectivityException(NetworkConnectivityException):
 class IPv6ConnectivityException(NetworkConnectivityException):
     pass
 
+class NoNameservers(NetworkConnectivityException):
+    pass
+
 ROOT_NS_IPS = set([
         IPAddr('198.41.0.4'), IPAddr('2001:503:ba3e::2:30'),   # A
         IPAddr('192.228.79.201'),                              # B
@@ -1118,6 +1121,13 @@ class Analyst(object):
 
     def _detect_ceiling(self, ceiling):
         if ceiling == dns.name.root or ceiling is None:
+
+            # make sure we can communicate with a resolver; we must be able to
+            # resolve the root
+            server, response = self.resolver.query(dns.name.root, dns.rdatatype.NS)
+            if server is None:
+                raise NetworkConnectivityException('No network connectivity available!')
+
             return ceiling, None
 
         # if there is a ceiling, but the name is not a subdomain
@@ -2042,6 +2052,13 @@ class RecursiveAnalyst(Analyst):
         if (name_obj.nxrrset_name, name_obj.nxrrset_rdtype) not in queries:
             name_obj.nxrrset_name = None
             name_obj.nxrrset_rdtype = None
+
+    def _handle_explicit_delegations(self, name_obj):
+        super(RecursiveAnalyst, self)._handle_explicit_delegations(name_obj)
+
+        # if there are no servers configured, then we fail
+        if not name_obj.get_auth_ns_ip_mapping():
+            raise NoNameservers('No resolvers specified to query!')
 
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
