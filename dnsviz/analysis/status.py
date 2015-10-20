@@ -625,7 +625,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
             pass
         return d
 
-class NSECStatusNoAnswer(NSECStatus):
+class NSECStatusNODATA(NSECStatus):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
@@ -705,15 +705,15 @@ class NSECStatusNoAnswer(NSECStatus):
                     self.validation_status = NSEC_STATUS_INVALID
             else:
                 if self.has_rdtype:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.errors.append(Errors.StypeInBitmapNODATANSEC(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
                     self.validation_status = NSEC_STATUS_INVALID
             if self.nsec_names_covering_qname:
-                self.errors.append(Errors.SnameCoveredNoAnswerNSEC(sname=fmt.humanize_name(self.qname)))
+                self.errors.append(Errors.SnameCoveredNODATANSEC(sname=fmt.humanize_name(self.qname)))
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name: # implies wildcard_name, which implies nsec_names_covering_qname
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.StypeInBitmapNoDataNSEC(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
+                self.errors.append(Errors.StypeInBitmapNODATANSEC(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
             if self.nsec_names_covering_origin:
                 self.validation_status = NSEC_STATUS_INVALID
                 qname, nsec_names = self.nsec_names_covering_origin.items()[0]
@@ -721,7 +721,7 @@ class NSECStatusNoAnswer(NSECStatus):
                 self.errors.append(Errors.LastNSECNextNotZone(nsec_owner=fmt.humanize_name(nsec_rrset.name), next_name=fmt.humanize_name(nsec_rrset[0].next), zone_name=fmt.humanize_name(self.origin)))
         else:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.NoNSECMatchingSnameNoData(sname=fmt.humanize_name(self.qname)))
+            self.errors.append(Errors.NoNSECMatchingSnameNODATA(sname=fmt.humanize_name(self.qname)))
 
         # if it validation_status, we project out just the pertinent NSEC records
         # otherwise clone it by projecting them all
@@ -1123,7 +1123,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
                 d['superfluous_closest_encloser'] = True
         return d
 
-class NSEC3StatusNoAnswer(NSEC3Status):
+class NSEC3StatusNODATA(NSEC3Status):
     def __init__(self, qname, rdtype, origin, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
@@ -1226,35 +1226,35 @@ class NSEC3StatusNoAnswer(NSEC3Status):
             # RFC 5155, section 8.5, 8.6
             else:
                 if self.has_rdtype:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.errors.append(Errors.StypeInBitmapNODATANSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_cname:
-                    self.errors.append(Errors.StypeInBitmapNoDataNSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(dns.rdatatype.CNAME)))
+                    self.errors.append(Errors.StypeInBitmapNODATANSEC3(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(dns.rdatatype.CNAME)))
                     self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name:
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNoData(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
+                    self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNODATA(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
-                self.errors.append(Errors.StypeInBitmapWildcardNoDataNSEC3(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
+                self.errors.append(Errors.StypeInBitmapWildcardNODATANSEC3(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
         elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNoData(sname=fmt.humanize_name(self.qname)))
+                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNODATA(sname=fmt.humanize_name(self.qname)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
         else:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
                 if self.rdtype == dns.rdatatype.DS:
-                    cls = Errors.NoNSEC3MatchingSnameDSNoData
+                    cls = Errors.NoNSEC3MatchingSnameDSNODATA
                 else:
-                    cls = Errors.NoNSEC3MatchingSnameNoData
+                    cls = Errors.NoNSEC3MatchingSnameNODATA
                 self.errors.append(cls(sname=fmt.humanize_name(self.qname)))
             if invalid_algs:
                 self.errors.append(invalid_alg_err)

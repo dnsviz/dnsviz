@@ -880,7 +880,7 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             # if it is NXDOMAIN, not type DS
-            if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNoAnswer)) and nsec_status.opt_out:
+            if isinstance(nsec_status, (Status.NSEC3StatusNXDOMAIN, Status.NSEC3StatusNODATA)) and nsec_status.opt_out:
                 bgcolor = 'lightgray'
             else:
                 bgcolor = '#ffffff'

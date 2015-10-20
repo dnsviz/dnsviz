@@ -413,11 +413,11 @@ class NextClosestEncloserNotCoveredNameError(NextClosestEncloserNotCovered):
     _abstract = False
     references = ['RFC 5155, Sec. 8.4']
 
-class NextClosestEncloserNotCoveredNoDataDS(NextClosestEncloserNotCovered):
+class NextClosestEncloserNotCoveredNODATADS(NextClosestEncloserNotCovered):
     _abstract = False
     references = ['RFC 5155, Sec. 8.6']
 
-class NextClosestEncloserNotCoveredWildcardNoData(NextClosestEncloserNotCovered):
+class NextClosestEncloserNotCoveredWildcardNODATA(NextClosestEncloserNotCovered):
     _abstract = False
     references = ['RFC 5155, Sec. 8.7']
 
@@ -462,11 +462,11 @@ class NoClosestEncloserNameError(NoClosestEncloser):
     _abstract = False
     references = ['RFC 5155, Sec. 8.4']
 
-class NoClosestEncloserNoDataDS(NoClosestEncloser):
+class NoClosestEncloserNODATADS(NoClosestEncloser):
     _abstract = False
     references = ['RFC 5155, Sec. 8.6']
 
-class NoClosestEncloserWildcardNoData(NoClosestEncloser):
+class NoClosestEncloserWildcardNODATA(NoClosestEncloser):
     _abstract = False
     references = ['RFC 5155, Sec. 8.7']
 
@@ -542,12 +542,12 @@ class StypeInBitmap(NSECError):
     description_template = "The %(stype)s bit was set in the bitmap of the %(nsec_type)s RR corresponding to the SNAME (%(sname)s)."
     required_params = ['stype', 'sname']
 
-class StypeInBitmapNoData(StypeInBitmap):
+class StypeInBitmapNODATA(StypeInBitmap):
     pass
 
-class StypeInBitmapNoDataNSEC(StypeInBitmapNoData):
+class StypeInBitmapNODATANSEC(StypeInBitmapNODATA):
     '''
-    >>> e = StypeInBitmapNoDataNSEC(stype='A', sname='foo.baz.')
+    >>> e = StypeInBitmapNODATANSEC(stype='A', sname='foo.baz.')
     >>> e.description
     'The A bit was set in the bitmap of the NSEC RR corresponding to the SNAME (foo.baz.).'
     '''
@@ -556,24 +556,24 @@ class StypeInBitmapNoDataNSEC(StypeInBitmapNoData):
     references = ['RFC 4035, Sec. 3.1.3.1']
     nsec_type = 'NSEC'
 
-class StypeInBitmapNoDataNSEC3(StypeInBitmapNoData):
+class StypeInBitmapNODATANSEC3(StypeInBitmapNODATA):
     _abstract = False
     references = ['RFC 5155, Sec. 8.5']
     nsec_type = 'NSEC3'
 
-class StypeInBitmapNoDataDSNSEC3(StypeInBitmapNoDataNSEC3):
+class StypeInBitmapNODATADSNSEC3(StypeInBitmapNODATANSEC3):
     _abstract = False
     references = ['RFC 5155, Sec. 8.6']
 
-class StypeInBitmapWildcardNoData(StypeInBitmap):
+class StypeInBitmapWildcardNODATA(StypeInBitmap):
     pass
 
-class StypeInBitmapWildcardNoDataNSEC(StypeInBitmapWildcardNoData):
+class StypeInBitmapWildcardNODATANSEC(StypeInBitmapWildcardNODATA):
     _abstract = False
     references = ['RFC 4035, Sec. 3.1.3.4']
     nsec_type = 'NSEC'
 
-class StypeInBitmapWildcardNoDataNSEC3(StypeInBitmapWildcardNoData):
+class StypeInBitmapWildcardNODATANSEC3(StypeInBitmapWildcardNODATA):
     _abstract = False
     references = ['RFC 5155, Sec. 8.7']
     nsec_type = 'NSEC3'
@@ -584,9 +584,9 @@ class NoNSECMatchingSname(NSECError):
     required_params = ['sname']
     nsec_type = 'NSEC'
 
-class NoNSECMatchingSnameNoData(NoNSECMatchingSname):
+class NoNSECMatchingSnameNODATA(NoNSECMatchingSname):
     '''
-    >>> e = NoNSECMatchingSnameNoData(sname='foo.baz.')
+    >>> e = NoNSECMatchingSnameNODATA(sname='foo.baz.')
     >>> e.description
     'No NSEC RR matches the SNAME (foo.baz.).'
     '''
@@ -594,7 +594,7 @@ class NoNSECMatchingSnameNoData(NoNSECMatchingSname):
     _abstract = False
     references = ['RFC 4035, Sec. 3.1.3.1']
 
-class NoNSECMatchingSnameWildcardNoData(NoNSECMatchingSname):
+class NoNSECMatchingSnameWildcardNODATA(NoNSECMatchingSname):
     _abstract = False
     references = ['RFC 4035, Sec. 3.1.3.4']
 
@@ -604,9 +604,9 @@ class NoNSEC3MatchingSname(NSECError):
     required_params = ['sname']
     nsec_type = 'NSEC3'
 
-class NoNSEC3MatchingSnameNoData(NoNSEC3MatchingSname):
+class NoNSEC3MatchingSnameNODATA(NoNSEC3MatchingSname):
     '''
-    >>> e = NoNSEC3MatchingSnameNoData(sname='foo.baz.')
+    >>> e = NoNSEC3MatchingSnameNODATA(sname='foo.baz.')
     >>> e.description
     'No NSEC3 RR matches the SNAME (foo.baz.).'
     '''
@@ -614,7 +614,7 @@ class NoNSEC3MatchingSnameNoData(NoNSEC3MatchingSname):
     _abstract = False
     references = ['RFC 5155, Sec. 8.5']
 
-class NoNSEC3MatchingSnameDSNoData(NoNSEC3MatchingSname):
+class NoNSEC3MatchingSnameDSNODATA(NoNSEC3MatchingSname):
     _abstract = False
     references = ['RFC 5155, Sec. 8.6']
 
@@ -656,22 +656,22 @@ class WildcardCoveredAnswerNSEC3(WildcardCoveredAnswer):
     references = ['RFC 5155, Sec. 8.8']
     nsec_type = 'NSEC3'
 
-class WildcardCoveredNoData(WildcardCovered):
+class WildcardCoveredNODATA(WildcardCovered):
     pass
 
-class WildcardCoveredNoDataNSEC(WildcardCoveredNoData):
+class WildcardCoveredNODATANSEC(WildcardCoveredNODATA):
     _abstract = False
     references = ['RFC 4035, Sec. 3.1.3.4']
     nsec_type = 'NSEC'
 
-class WildcardCoveredNoDataNSEC3(WildcardCoveredNoData):
+class WildcardCoveredNODATANSEC3(WildcardCoveredNODATA):
     _abstract = False
     references = ['RFC 5155, Sec. 8.7']
     nsec_type = 'NSEC3'
 
-class SnameCoveredNoAnswerNSEC(NSECError):
+class SnameCoveredNODATANSEC(NSECError):
     '''
-    >>> e = SnameCoveredNoAnswerNSEC(sname='foo.baz.')
+    >>> e = SnameCoveredNODATANSEC(sname='foo.baz.')
     >>> e.description
     "The NSEC RR covers the SNAME (foo.baz.), indicating that it doesn't exist."
     '''

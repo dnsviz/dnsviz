@@ -1845,7 +1845,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self.nodata_status[neg_response_info] = \
                         self._populate_negative_response_status(query, neg_response_info, \
                                 Errors.SOAOwnerNotZoneForNODATA, Errors.MissingSOAForNODATA, Errors.UpwardReferral, \
-                                Errors.MissingNSECForNODATA, Status.NSECStatusNoAnswer, Status.NSEC3StatusNoAnswer, \
+                                Errors.MissingNSECForNODATA, Status.NSECStatusNODATA, Status.NSEC3StatusNODATA, \
                                 self.nodata_warnings[neg_response_info], self.nodata_errors[neg_response_info], \
                                 supported_algs)
 
