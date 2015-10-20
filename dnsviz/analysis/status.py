@@ -595,7 +595,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
                 self.errors.append(Errors.WildcardExpansionInvalid(sname=fmt.humanize_name(self.qname), wildcard=fmt.humanize_name(self.wildcard_name), next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
         else:
             self.validation_status = NSEC_STATUS_INVALID
-            self.errors.append(Errors.SnameNotCoveredWildcardAnswer(sname=self.qname))
+            self.errors.append(Errors.SnameNotCoveredWildcardAnswer(sname=fmt.humanize_name(self.qname)))
 
         if self.nsec_names_covering_wildcard:
             self.validation_status = NSEC_STATUS_INVALID
@@ -925,7 +925,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
                     wildcard_name = self.get_wildcard()
-                    self.errors.append(Errors.WildcardNotCoveredNSEC3(wildcard=wildcard_name))
+                    self.errors.append(Errors.WildcardNotCoveredNSEC3(wildcard=fmt.humanize_name(wildcard_name)))
                 if invalid_algs and invalid_alg_err not in self.errors:
                     self.errors.append(invalid_alg_err)
 
