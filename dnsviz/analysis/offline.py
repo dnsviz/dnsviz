@@ -1380,7 +1380,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_error_resolving:
             names_error_resolving.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
+            self.zone_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
 
         if names_with_glue_mismatch:
             names_with_glue_mismatch.sort()
@@ -1397,7 +1397,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_missing_auth:
             names_missing_auth.sort()
-            self.delegation_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
+            self.zone_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
 
         ips_from_parent = self.get_servers_in_parent()
         ips_from_parent_ipv4 = filter(lambda x: x.version == 4, ips_from_parent)
@@ -1414,7 +1414,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 reference = 'parent'
             else:
                 reference = 'parent or child'
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv4(reference=reference))
+            self.zone_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv4(reference=reference))
 
         if not (ips_from_parent_ipv6 or ips_from_child_ipv6) and warn_no_ipv6:
             if ips_from_parent_ipv6:
@@ -1423,7 +1423,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 reference = 'parent'
             else:
                 reference = 'parent or child'
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv6(reference=reference))
+            self.zone_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv6(reference=reference))
 
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
@@ -1674,32 +1674,32 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             err = Errors.ServerUnresponsiveUDP()
             for server, client in unresponsive_udp:
                 err.add_server_client(server, client, None)
-            self.delegation_errors[dns.rdatatype.DS].append(err)
+            self.zone_errors.append(err)
 
         if unresponsive_tcp:
             err = Errors.ServerUnresponsiveTCP()
             for server, client in unresponsive_tcp:
                 err.add_server_client(server, client, None)
-            self.delegation_errors[dns.rdatatype.DS].append(err)
+            self.zone_errors.append(err)
 
         if invalid_response_udp:
             err = Errors.ServerInvalidResponseUDP()
             for server, client in invalid_response_udp:
                 err.add_server_client(server, client, None)
-            self.delegation_errors[dns.rdatatype.DS].append(err)
+            self.zone_errors.append(err)
 
         if invalid_response_tcp:
             err = Errors.ServerInvalidResponseTCP()
             for server, client in invalid_response_tcp:
                 err.add_server_client(server, client, None)
-            self.delegation_errors[dns.rdatatype.DS].append(err)
+            self.zone_errors.append(err)
 
         if self.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
             if not_authoritative:
                 err = Errors.ServerNotAuthoritative()
                 for server, client in not_authoritative:
                     err.add_server_client(server, client, None)
-                self.delegation_errors[dns.rdatatype.DS].append(err)
+                self.zone_errors.append(err)
 
     def _populate_negative_response_status(self, query, neg_response_info, \
             bad_soa_error_cls, missing_soa_error_cls, upward_referral_error_cls, missing_nsec_error_cls, \
