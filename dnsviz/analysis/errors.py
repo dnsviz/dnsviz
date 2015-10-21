@@ -1530,16 +1530,27 @@ class ServerUnresponsiveTCP(ServerUnresponsive):
     code = 'SERVER_UNRESPONSIVE_TCP'
     proto = 'TCP'
 
-class ServerInvalidResponse(DelegationError):
+class ServerInvalidResponseUDP(DelegationError):
     '''
-    >>> e = ServerInvalidResponse()
+    >>> e = ServerInvalidResponseUDP()
     >>> e.description
-    'The server(s) responded with a malformed response or with an invalid RCODE.'
+    'The server(s) responded over UDP with a malformed response or with an invalid RCODE.'
     '''
 
     _abstract = False
-    code = 'SERVER_INVALID_RESPONSE'
-    description_template = 'The server(s) responded with a malformed response or with an invalid RCODE.'
+    code = 'SERVER_INVALID_RESPONSE_UDP'
+    description_template = 'The server(s) responded over UDP with a malformed response or with an invalid RCODE.'
+
+class ServerInvalidResponseTCP(DelegationError):
+    '''
+    >>> e = ServerInvalidResponseTCP()
+    >>> e.description
+    'The server(s) responded over TCP with a malformed response or with an invalid RCODE.'
+    '''
+
+    _abstract = False
+    code = 'SERVER_INVALID_RESPONSE_TCP'
+    description_template = 'The server(s) responded over TCP with a malformed response or with an invalid RCODE.'
 
 class ServerNotAuthoritative(DelegationError):
     '''
