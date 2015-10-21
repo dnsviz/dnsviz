@@ -210,7 +210,8 @@ class OnlineDomainNameAnalysis(object):
         self._responsive_servers_clients_udp = set()
         self._responsive_servers_clients_tcp = set()
         self._auth_servers_clients = set()
-        self._valid_servers_clients = set()
+        self._valid_servers_clients_udp = set()
+        self._valid_servers_clients_tcp = set()
 
     def __repr__(self):
         return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
@@ -401,7 +402,10 @@ class OnlineDomainNameAnalysis(object):
         is_authoritative = response.is_authoritative()
 
         if response.is_valid_response():
-            self._valid_servers_clients.add((server, client))
+            if response.effective_tcp:
+                self._valid_servers_clients_tcp.add((server, client))
+            else:
+                self._valid_servers_clients_udp.add((server, client))
         if is_authoritative:
             if query.rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
                 self._auth_servers_clients.add((server, client))
@@ -592,11 +596,21 @@ class OnlineDomainNameAnalysis(object):
             self._designated_servers = servers
         return self._designated_servers
 
-    def get_valid_servers(self, proto=None):
+    def get_valid_servers_udp(self, proto=None):
         '''Return the set of servers that responded with a valid (rcode of
         NOERROR or NXDOMAIN) response.'''
 
-        valid_servers = set([x[0] for x in self._valid_servers_clients])
+        valid_servers = set([x[0] for x in self._valid_servers_clients_udp])
+        if proto is not None:
+            return set(filter(lambda x: x.version == proto, valid_servers))
+        else:
+            return valid_servers
+
+    def get_valid_servers_tcp(self, proto=None):
+        '''Return the set of servers that responded with a valid (rcode of
+        NOERROR or NXDOMAIN) response.'''
+
+        valid_servers = set([x[0] for x in self._valid_servers_clients_tcp])
         if proto is not None:
             return set(filter(lambda x: x.version == proto, valid_servers))
         else:
@@ -650,7 +664,7 @@ class OnlineDomainNameAnalysis(object):
         or were explicitly designated by NS and glue or authoritative IP and
         returned a valid (rcode of NOERROR or NXDOMAIN) response.'''
 
-        return self.get_auth_or_designated_servers(proto, no_cache).intersection(self.get_valid_servers(proto))
+        return self.get_auth_or_designated_servers(proto, no_cache).intersection(self.get_valid_servers_udp(proto))
 
     def get_stealth_servers(self):
         '''Return the set of servers that authoritatively but weren't
@@ -2150,7 +2164,7 @@ class RecursiveAnalyst(Analyst):
                 name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
                 # if we got any type of valid response, then continue
-                if name_obj.get_valid_servers():
+                if name_obj.get_valid_servers_udp() or name_obj.get_valid_servers_tcp():
 
                     # analyze ancestry
                     parent_obj, dlv_parent_obj, nxdomain_ancestor = \

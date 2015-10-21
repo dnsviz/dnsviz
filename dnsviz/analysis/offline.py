@@ -1651,8 +1651,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         unresponsive_udp = servers_queried_udp.difference(self._responsive_servers_clients_udp)
         unresponsive_tcp = servers_queried_tcp.difference(self._responsive_servers_clients_tcp)
-        invalid_response = servers_queried.intersection(self._responsive_servers_clients_udp).difference(self._valid_servers_clients)
-        not_authoritative = servers_queried.intersection(self._valid_servers_clients).difference(self._auth_servers_clients)
+        invalid_response_udp = servers_queried.intersection(self._responsive_servers_clients_udp).difference(self._valid_servers_clients_udp)
+        invalid_response_tcp = servers_queried.intersection(self._responsive_servers_clients_tcp).difference(self._valid_servers_clients_tcp)
+        not_authoritative = servers_queried.intersection(self._valid_servers_clients_udp.union(self._valid_servers_clients_tcp)).difference(self._auth_servers_clients)
 
         if unresponsive_udp:
             err = Errors.ServerUnresponsiveUDP()
@@ -1666,9 +1667,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 err.add_server_client(server, client, None)
             self.delegation_errors[dns.rdatatype.DS].append(err)
 
-        if invalid_response:
-            err = Errors.ServerInvalidResponse()
-            for server, client in invalid_response:
+        if invalid_response_udp:
+            err = Errors.ServerInvalidResponseUDP()
+            for server, client in invalid_response_udp:
+                err.add_server_client(server, client, None)
+            self.delegation_errors[dns.rdatatype.DS].append(err)
+
+        if invalid_response_tcp:
+            err = Errors.ServerInvalidResponseTCP()
+            for server, client in invalid_response_tcp:
                 err.add_server_client(server, client, None)
             self.delegation_errors[dns.rdatatype.DS].append(err)
 
