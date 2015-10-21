@@ -523,11 +523,13 @@ class NSECStatusNXDOMAIN(NSECStatus):
         if show_id:
             d['id'] = 'NSEC'
 
+        if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
+
         if nsec_list:
             d['nsec'] = nsec_list
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
             if self.nsec_names_covering_qname:
                 qname, nsec_names = self.nsec_names_covering_qname.items()[0]
                 nsec_name = list(nsec_names)[0]
@@ -765,11 +767,13 @@ class NSECStatusNODATA(NSECStatus):
         if show_id:
             d['id'] = 'NSEC'
 
+        if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
+
         if nsec_list:
             d['nsec'] = nsec_list
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
             if self.nsec_for_qname is not None:
                 d['sname_nsec_match'] = formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())
 
@@ -972,11 +976,13 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         if show_id:
             d['id'] = 'NSEC3'
 
+        if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
+
         if nsec3_list:
             d['nsec3'] = nsec3_list
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
             if self.opt_out is not None:
                 d['opt_out'] = self.opt_out
 
@@ -1309,11 +1315,13 @@ class NSEC3StatusNODATA(NSEC3Status):
         if show_id:
             d['id'] = 'NSEC3'
 
+        if loglevel <= logging.DEBUG:
+            d['description'] = formatter(unicode(self))
+
         if nsec3_list:
             d['nsec3'] = nsec3_list
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
             if self.opt_out is not None:
                 d['opt_out'] = self.opt_out
 
