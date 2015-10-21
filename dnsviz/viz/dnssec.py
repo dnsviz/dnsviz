@@ -1039,6 +1039,15 @@ class DNSAuthGraph:
         if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
             return []
 
+        cname_nodes = []
+        # if this name is a alias, then graph the CNAME, unless this is a
+        # recursive analysis
+        if name_obj.analysis_type != ANALYSIS_TYPE_RECURSIVE:
+            if name in name_obj.cname_targets:
+                for target, cname_obj in name_obj.cname_targets[name].items():
+                    if cname_obj is not None:
+                        cname_nodes.extend(self.graph_rrset_auth(cname_obj, target, rdtype))
+
         id = 10
         query = name_obj.queries[(name, rdtype)]
         node_to_cname_mapping = set()
@@ -1086,7 +1095,7 @@ class DNSAuthGraph:
             # if this is a CNAME record, create a node-to-target mapping
             if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                 for my_node in my_nodes:
-                    node_to_cname_mapping.add((my_node, rrset_info.rrset[0].target))
+                    node_to_cname_mapping.add(my_node)
 
             self.processed_rrsets[(my_name, rdtype)] += my_nodes
 
@@ -1162,7 +1171,7 @@ class DNSAuthGraph:
                 self.processed_rrsets[(name, rdtype)] = []
             self.processed_rrsets[(name, rdtype)].append(warning_node)
 
-        for alias_node, target in node_to_cname_mapping:
+        for alias_node in node_to_cname_mapping:
             # if this is a recursive analysis, then we've already graphed the
             # node, above, so we graph its hierarchy and then retrieve it from
             # self.processed_rrsets
@@ -1173,9 +1182,6 @@ class DNSAuthGraph:
                     cname_nodes = self.processed_rrsets[(target, rdtype)]
                 except KeyError:
                     cname_nodes = []
-            else:
-                cname_obj = name_obj.get_name(target)
-                cname_nodes = self.graph_rrset_auth(cname_obj, target, rdtype)
 
             for cname_node in cname_nodes:
                 self.add_alias(alias_node, cname_node)
