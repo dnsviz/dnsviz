@@ -146,15 +146,20 @@ The following is an example of the output:
 .P
 The output above is divided into several sections, each corresponding to the
 domain name that starts the section (e.g., example.com).  Following the headers
-of names that correspond to zones (root excepted) is a set of characters within
-brackets.  The first character within brackets is one of the following:
+of names that correspond to zones are two sets of characters, each within
+brackets.  The characters within the first set of brackets represent the status
+of the zone.  The characters within the second set of brackets represent the
+status of the delegation (note that this second set of bracketed characters
+will not be present for the root zone).
+
+The first character within each set of brackets is one of the following:
 
 .IP .
-secure delegation
+secure zone or delegation
 .IP -
-insecure delegation
+insecure zone or delegation
 .IP !
-bogus delegation
+bogus zone or delegation
 .IP ?
 lame or incomplete delegation
 
