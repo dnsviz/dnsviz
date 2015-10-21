@@ -565,6 +565,7 @@ class DNSAuthGraph:
             S.add_node(bottom_name, shape='point', style='invis')
             self.node_subgraph_name[top_name] = top_name
             self.node_subgraph_name[bottom_name] = top_name
+            self.node_reverse_mapping[zone_obj] = top_name
 
         return S, node_str, bottom_name, top_name
 

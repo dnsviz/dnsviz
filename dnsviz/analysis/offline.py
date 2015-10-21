@@ -101,6 +101,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.ds_status_by_ds = None
         self.ds_status_by_dnskey = None
 
+        self.zone_errors = None
+        self.zone_warnings = None
+        self.zone_status = None
+
         self.delegation_warnings = None
         self.delegation_errors = None
         self.delegation_status = None
@@ -388,19 +392,27 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if parent_obj.stub:
                 continue
 
-            status = None
-            warnings = []
-            errors = []
+            zone_status = None
+            zone_warnings = []
+            zone_errors = []
+            delegation_status = None
+            delegation_warnings = []
+            delegation_errors = []
+
+            if parent_obj.is_zone():
+                zone_status = Status.delegation_status_mapping[parent_obj.zone_status]
+                zone_warnings = [w.terse_description for w in parent_obj.zone_status]
+                zone_errors = [e.terse_description for e in parent_obj.zone_status]
+                if parent_obj.parent is not None:
+                    delegation_status = Status.delegation_status_mapping[parent_obj.delegation_status[dns.rdatatype.DS]]
+                    delegation_warnings = [w.terse_description for w in parent_obj.delegation_warnings[dns.rdatatype.DS]]
+                    delegation_errors = [e.terse_description for e in parent_obj.delegation_errors[dns.rdatatype.DS]]
             if parent_obj.parent is not None:
                 ds_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DS)
-                if parent_obj.is_zone():
-                    status = Status.delegation_status_mapping[parent_obj.delegation_status[dns.rdatatype.DS]]
-                    warnings = [w.terse_description for w in parent_obj.delegation_warnings[dns.rdatatype.DS]]
-                    errors = [e.terse_description for e in parent_obj.delegation_errors[dns.rdatatype.DS]]
             else:
                 ds_response_info = None
 
-            name_tup = (fmt.humanize_name(parent_obj.name), status, warnings, errors, [])
+            name_tup = (fmt.humanize_name(parent_obj.name), zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, [])
             tup.append(name_tup)
 
             if ds_response_info is not None:
@@ -1416,6 +1428,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
         self.ds_status_by_dnskey = {}
+        self.zone_errors = []
+        self.zone_warnings = []
+        self.zone_status = []
         self.delegation_errors = {}
         self.delegation_warnings = {}
         self.delegation_status = {}
@@ -1912,7 +1927,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def populate_response_component_status(self, G):
         response_component_status = {}
         for obj in G.node_reverse_mapping:
-            if isinstance(obj, (Response.DNSKEYMeta, Response.RRsetInfo, Response.NSECSet, Response.NegativeResponseInfo)):
+            if isinstance(obj, (Response.DNSKEYMeta, Response.RRsetInfo, Response.NSECSet, Response.NegativeResponseInfo, self.__class__)):
                 node_str = G.node_reverse_mapping[obj]
                 status = G.status_for_node(node_str)
                 response_component_status[obj] = status
@@ -2256,6 +2271,60 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
+    def _serialize_zone_status(self, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
+        d = collections.OrderedDict()
+
+        if loglevel <= logging.DEBUG:
+            glue_ip_mapping = self.get_glue_ip_mapping()
+            auth_ns_ip_mapping = self.get_auth_ns_ip_mapping()
+            d['servers'] = collections.OrderedDict()
+            names = list(self.get_ns_names())
+            names.sort()
+            for name in names:
+                name_str = name.canonicalize().to_text()
+                d['servers'][name_str] = collections.OrderedDict()
+                if name in glue_ip_mapping and glue_ip_mapping[name]:
+                    servers = list(glue_ip_mapping[name])
+                    servers.sort()
+                    d['servers'][name_str]['glue'] = servers
+                if name in auth_ns_ip_mapping and auth_ns_ip_mapping[name]:
+                    servers = list(auth_ns_ip_mapping[name])
+                    servers.sort()
+                    d['servers'][name_str]['auth'] = servers
+            if not d['servers']:
+                del d['servers']
+
+            stealth_servers = self.get_stealth_servers()
+            if stealth_servers:
+                stealth_mapping = {}
+                for server in stealth_servers:
+                    names, ancestor_name = self.get_ns_name_for_ip(server)
+                    for name in names:
+                        if name not in stealth_mapping:
+                            stealth_mapping[name] = []
+                        stealth_mapping[name].append(server)
+
+                names = list(stealth_mapping)
+                names.sort()
+                for name in names:
+                    name_str = name.canonicalize().to_text()
+                    servers = stealth_mapping[name]
+                    servers.sort()
+                    d['servers'][name_str] = collections.OrderedDict((
+                        ('stealth', servers),
+                    ))
+
+        if loglevel <= logging.INFO and self.response_component_status is not None:
+            d['status'] = Status.delegation_status_mapping[self.response_component_status[self]]
+
+        if self.zone_warnings and loglevel <= logging.WARNING:
+            d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.zone_warnings]
+
+        if self.zone_errors and loglevel <= logging.ERROR:
+            d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.zone_errors]
+
+        return d
+
     def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, ancestry_only=False, level=RDTYPES_ALL, trace=None, follow_mx=True, html_format=False):
         if d is None:
             d = collections.OrderedDict()
@@ -2355,6 +2424,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 d[name_str]['dnskey'] = dnskey_serialized
 
         if self.is_zone():
+            zone_serialized = self._serialize_zone_status(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+            if zone_serialized:
+                d[name_str]['zone'] = zone_serialized
+
             if self.parent is not None and not is_dlv:
                 delegation_serialized = self._serialize_delegation_status(dns.rdatatype.DS, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if delegation_serialized:
