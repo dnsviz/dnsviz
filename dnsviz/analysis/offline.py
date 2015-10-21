@@ -400,7 +400,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             delegation_errors = []
 
             if parent_obj.is_zone():
-                zone_status = Status.delegation_status_mapping[parent_obj.zone_status]
+                if self.response_component_status is not None:
+                    zone_status = Status.delegation_status_mapping[self.response_component_status[parent_obj]]
+                else:
+                    zone_status = Status.delegation_status_mapping[Status.INSECURE]
                 zone_warnings = [w.terse_description for w in parent_obj.zone_status]
                 zone_errors = [e.terse_description for e in parent_obj.zone_status]
                 if parent_obj.parent is not None:
@@ -416,7 +419,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tup.append(name_tup)
 
             if ds_response_info is not None:
-                name_tup[4].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DS, ds_response_info, False))
+                name_tup[7].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DS, ds_response_info, False))
 
             # if we only care about DS for the name itself, then don't
             # serialize the DNSKEY response
@@ -428,7 +431,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 pass
             else:
                 dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
-                name_tup[4].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False))
+                name_tup[7].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False))
 
             parent_is_signed = parent_obj.signed
 
@@ -440,7 +443,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # in this case, or in the case where the name is not a zone (and
         # thus changes), we create a new tuple.
         if parent_obj is None or response_info.qname != parent_obj.name or name_tup is None:
-            name_tup = (fmt.humanize_name(response_info.qname), None, [], [], [])
+            name_tup = (fmt.humanize_name(response_info.qname), None, [], [], None, [], [], [])
             tup.append(name_tup)
 
         for response_info in response_info_list:
@@ -454,7 +457,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     response_info.rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
                 continue
 
-            name_tup[4].extend(response_info.name_obj._serialize_response_component_list_simple(response_info.rdtype, response_info, True))
+            name_tup[7].extend(response_info.name_obj._serialize_response_component_list_simple(response_info.rdtype, response_info, True))
 
             # queue the cnames for later serialization
             for info, cname_info in response_info.response_info_list:

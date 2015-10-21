@@ -200,7 +200,7 @@ def _textualize_status_output_response(rdtype_str, status, warnings, errors, rda
 
     return s
 
-def _textualize_status_output_name(name, status, warnings, errors, responses, show_color):
+def _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses, show_color):
     s = ''
 
     name_template = '%(status_color)s%(name)s%(color_reset)s%(status_color_rdata)s%(status_rdata)s%(color_reset)s\n'
@@ -219,10 +219,14 @@ def _textualize_status_output_name(name, status, warnings, errors, responses, sh
     if show_color:
         params['status_color'] = TERM_COLOR_MAP['BOLD']
         params['color_reset'] = TERM_COLOR_MAP['RESET']
-    if status is not None:
-        params['status_rdata'] = ' ' + _errors_warnings_str(status, warnings, errors, show_color)
+    if zone_status is not None:
+        params['status_rdata'] += ' ' + _errors_warnings_str(zone_status, zone_warnings, zone_errors, show_color)
         if show_color:
-            params['status_color_rdata'] = TERM_COLOR_MAP[status]
+            params['status_color_rdata'] = TERM_COLOR_MAP[zone_status]
+    if delegation_status is not None:
+        params['status_rdata'] += ' ' + _errors_warnings_str(delegation_status, delegation_warnings, delegation_errors, show_color)
+        if show_color:
+            params['status_color_rdata'] = TERM_COLOR_MAP[delegation_status]
     s += name_template % params
 
     for rdtype_str, status, warnings, errors, rdata, children in responses:
@@ -232,8 +236,8 @@ def _textualize_status_output_name(name, status, warnings, errors, responses, sh
 
 def textualize_status_output(names, show_color):
     s = ''
-    for name, status, warnings, errors, responses in names:
-        s += _textualize_status_output_name(name, status, warnings, errors, responses, show_color)
+    for name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses in names:
+        s += _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses, show_color)
 
     return s
 
