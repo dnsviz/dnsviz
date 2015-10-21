@@ -685,7 +685,7 @@ class NSECStatusNODATA(NSECStatus):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -1204,7 +1204,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         self._set_validation_status(nsec_set_info)
 
     def __unicode__(self):
-        return u'NSEC3 record(s) proving non-existence (No Data) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
+        return u'NSEC3 record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
