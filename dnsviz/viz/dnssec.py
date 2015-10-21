@@ -554,18 +554,34 @@ class DNSAuthGraph:
 
         S = self.G.get_subgraph(node_str)
         if S is None:
+            img_str = ''
+            if zone_obj.zone_errors:
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
+            elif zone_obj.zone_warnings:
+                img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
+
             if zone_obj.analysis_end is not None:
-                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD></TR><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
-                        (12, zone_obj, 10, fmt.datetime_to_str(zone_obj.analysis_end))
+                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR><TR><TD ALIGN="LEFT" COLSPAN="2"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
+                        (12, zone_obj, img_str, 10, fmt.datetime_to_str(zone_obj.analysis_end))
             else:
-                label_str = u'<<FONT POINT-SIZE="%d">%s</FONT>>' % \
-                        (12, zone_obj)
-            S = self.G.add_subgraph(name=node_str, label=label_str, labeljust='l', penwidth='0.5')
+                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR></TABLE>>' % \
+                        (12, zone_obj, img_str)
+            S = self.G.add_subgraph(name=node_str, label=label_str, labeljust='l', penwidth='0.5', id=top_name)
             S.add_node(top_name, shape='point', style='invis')
             S.add_node(bottom_name, shape='point', style='invis')
             self.node_subgraph_name[top_name] = top_name
             self.node_subgraph_name[bottom_name] = top_name
             self.node_reverse_mapping[zone_obj] = top_name
+
+            consolidate_clients = zone_obj.single_client()
+            zone_serialized = collections.OrderedDict()
+            zone_serialized['description'] = '%s zone' % (zone_obj)
+            if zone_obj.zone_errors:
+                zone_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in zone_obj.zone_errors]
+            if zone_obj.zone_warnings:
+                zone_serialized['warnings'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in zone_obj.zone_warnings]
+
+            self.node_info[top_name] = [zone_serialized]
 
         return S, node_str, bottom_name, top_name
 
@@ -1503,7 +1519,10 @@ class DNSAuthGraph:
             self._add_trust_to_orphaned_nodes(zone_node_str, [])
 
         for n in self.G.nodes():
-            if n.attr['shape'] not in ('ellipse', 'rectangle') and not n.startswith('NSEC'):
+            # set the status of (only) the cluster top node as well
+            if n.attr['shape'] == 'point' and n.endswith('_top'):
+                pass
+            elif n.attr['shape'] not in ('ellipse', 'rectangle') and not n.startswith('NSEC'):
                 continue
             self._set_non_existent_color(n)
             self._set_nsec_color(n)
