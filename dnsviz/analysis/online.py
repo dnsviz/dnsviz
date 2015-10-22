@@ -76,9 +76,6 @@ ROOT_NS_IPS = set([
         IPAddr('202.12.27.33'), IPAddr('2001:dc3::35'),        # M
 ])
 
-ROOT_NS_IPS_6 = set(filter(lambda x: x.version == 6, ROOT_NS_IPS))
-ROOT_NS_IPS_4 = ROOT_NS_IPS.difference(ROOT_NS_IPS_6)
-
 ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
@@ -1166,6 +1163,22 @@ class Analyst(object):
                 return ceiling, True
         return self._detect_ceiling(ceiling.parent())
 
+    def _root_servers(self, proto=None):
+        key = None
+        if dns.name.root in self.explicit_delegations:
+            key = dns.name.root
+        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+            key = WILDCARD_EXPLICIT_DELEGATION
+        if key is not None:
+            servers = set([s for (n,s) in self.explicit_delegations[key]])
+        else:
+            servers = ROOT_NS_IPS
+        if proto == 4:
+            servers = set(filter(lambda x: x.version == 4, servers))
+        elif proto == 6:
+            servers = set(filter(lambda x: x.version == 6, servers))
+        return servers
+
     def _is_referral_of_type(self, rdtype):
         '''Return True if analysis of this name was invoked as a dependency (specified by
         rdtype) for another name; False otherwise.  Examples are CNAME, NS, MX.'''
@@ -1713,7 +1726,7 @@ class Analyst(object):
 
     def _analyze_delegation(self, name_obj):
         if name_obj.parent is None:
-            parent_auth_servers = ROOT_NS_IPS
+            parent_auth_servers = self._root_servers()
         elif name_obj.parent.stub:
             parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         else:
@@ -1980,10 +1993,7 @@ class Analyst(object):
             raise NetworkConnectivityException('No network connectivity available!')
 
     def _root_responsive(self, proto):
-        if proto == 4:
-            servers = list(ROOT_NS_IPS_4)
-        elif proto == 6:
-            servers = list(ROOT_NS_IPS_6)
+        servers = list(self._root_servers(proto))
         checker = Resolver.Resolver(servers, Q.SimpleDNSQuery, max_attempts=1, shuffle=True, transport_handler=self.transport_handler)
         try:
             checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
