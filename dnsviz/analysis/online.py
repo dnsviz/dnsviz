@@ -1039,6 +1039,7 @@ class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
 
 class Analyst(object):
     analysis_model = ActiveDomainNameAnalysis
+    simple_query = Q.SimpleDNSQuery
     diagnostic_query = Q.DiagnosticQuery
     tcp_diagnostic_query = Q.TCPDiagnosticQuery
     pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
@@ -1994,7 +1995,7 @@ class Analyst(object):
 
     def _root_responsive(self, proto):
         servers = list(self._root_servers(proto))
-        checker = Resolver.Resolver(servers, Q.SimpleDNSQuery, max_attempts=1, shuffle=True, transport_handler=self.transport_handler)
+        checker = Resolver.Resolver(servers, self.simple_query, max_attempts=1, shuffle=True, transport_handler=self.transport_handler)
         try:
             checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
             return True
@@ -2009,6 +2010,7 @@ class PrivateAnalyst(Analyst):
     allow_private_query = True
 
 class RecursiveAnalyst(Analyst):
+    simple_query = Q.RecursiveDNSQuery
     diagnostic_query = Q.RecursiveDiagnosticQuery
     tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
     pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
