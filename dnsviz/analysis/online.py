@@ -2181,21 +2181,17 @@ class RecursiveAnalyst(Analyst):
                 # set analysis_end
                 name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
 
-                # if we got any type of valid response, then continue
-                if name_obj.get_valid_servers_udp() or name_obj.get_valid_servers_tcp():
+                # sanity check - if we weren't able to get responses from any
+                # servers, check that we actually have connectivity
+                self._check_connectivity(name_obj)
 
-                    # analyze ancestry
-                    parent_obj, dlv_parent_obj, nxdomain_ancestor = \
-                            self._analyze_ancestry(name, name_obj.has_ns)
+                # analyze ancestry
+                parent_obj, dlv_parent_obj, nxdomain_ancestor = \
+                        self._analyze_ancestry(name, name_obj.has_ns)
 
-                    name_obj.parent = parent_obj
-                    name_obj.dlv_parent = dlv_parent_obj
-                    name_obj.nxdomain_ancestor = nxdomain_ancestor
-
-                else:
-                    name_obj.parent = None
-                    name_obj.dlv_parent = None
-                    name_obj.nxdomain_ancestor = None
+                name_obj.parent = parent_obj
+                name_obj.dlv_parent = dlv_parent_obj
+                name_obj.nxdomain_ancestor = nxdomain_ancestor
 
                 self._finalize_analysis_proper(name_obj)
             finally:
@@ -2271,6 +2267,12 @@ class RecursiveAnalyst(Analyst):
                 self._add_query(name_obj, query, True)
 
         return name_obj
+
+    def _require_connectivity_ipv4(self, name_obj):
+        return bool(name_obj.clients_ipv4)
+
+    def _require_connectivity_ipv6(self, name_obj):
+        return bool(name_obj.clients_ipv6)
 
 class PrivateRecursiveAnalyst(RecursiveAnalyst):
     allow_loopback_query = True
