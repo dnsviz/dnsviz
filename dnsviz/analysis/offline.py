@@ -1383,7 +1383,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_error_resolving:
             names_error_resolving.sort()
-            self.zone_errors[dns.rdatatype.DS].append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
+            self.zone_errors.append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
 
         if names_with_glue_mismatch:
             names_with_glue_mismatch.sort()
@@ -1400,7 +1400,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_missing_auth:
             names_missing_auth.sort()
-            self.zone_errors[dns.rdatatype.DS].append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
+            self.zone_errors.append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
 
         ips_from_parent = self.get_servers_in_parent()
         ips_from_parent_ipv4 = filter(lambda x: x.version == 4, ips_from_parent)
@@ -1417,7 +1417,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 reference = 'parent'
             else:
                 reference = 'parent or child'
-            self.zone_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv4(reference=reference))
+            self.zone_warnings.append(Errors.NoNSAddressesForIPv4(reference=reference))
 
         if not (ips_from_parent_ipv6 or ips_from_child_ipv6) and warn_no_ipv6:
             if ips_from_parent_ipv6:
@@ -1426,7 +1426,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 reference = 'parent'
             else:
                 reference = 'parent or child'
-            self.zone_warnings[dns.rdatatype.DS].append(Errors.NoNSAddressesForIPv6(reference=reference))
+            self.zone_warnings.append(Errors.NoNSAddressesForIPv6(reference=reference))
 
     def _populate_delegation_status(self, supported_algs, supported_digest_algs):
         self.ds_status_by_ds = {}
