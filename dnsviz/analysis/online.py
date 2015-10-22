@@ -1947,11 +1947,17 @@ class Analyst(object):
         name_obj.nxrrset_name = name_obj.name
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
+    def _require_connectivity_ipv4(self, name_obj):
+        return bool(filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4))
+
+    def _require_connectivity_ipv6(self, name_obj):
+        return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
+
     def _check_connectivity(self, name_obj):
-        if name_obj.get_auth_or_designated_servers(4) and filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4) and not name_obj.get_responsive_servers_udp(4):
+        if name_obj.get_auth_or_designated_servers(4) and self._require_connectivity_ipv4(name_obj) and not name_obj.get_responsive_servers_udp(4):
             if self._root_responsive(4) is False:
                 raise IPv4ConnectivityException('Public IPv4 network unreachable!')
-        if name_obj.get_auth_or_designated_servers(6) and filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6) and not name_obj.get_responsive_servers_udp(6):
+        if name_obj.get_auth_or_designated_servers(6) and self._require_connectivity_ipv6(name_obj) and not name_obj.get_responsive_servers_udp(6):
             if self._root_responsive(6) is False:
                 raise IPv6ConnectivityException('Public IPv6 network unreachable!')
 
