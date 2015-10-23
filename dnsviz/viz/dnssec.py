@@ -625,10 +625,6 @@ class DNSAuthGraph:
             line_color = COLORS['invalid']
             line_style = 'dashed'
 
-        #XXX cruft - is this needed? why?
-        #if line_color == COLORS['secure'] and dnskey_node == signed_node and signer_obj.name == zone_obj.name:
-        #    S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(signer_obj.name)
-
         attrs = {}
         edge_id = 'RRSIG-%s|%s|%s|%s' % (signed_node.replace('*', '_'), dnskey_node, line_color.lstrip('#'), line_style)
         edge_key = '%s-%s' % (line_color, line_style)
