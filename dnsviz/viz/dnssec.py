@@ -1115,7 +1115,7 @@ class DNSAuthGraph:
             # if this is a CNAME record, create a node-to-target mapping
             if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                 for my_node in my_nodes:
-                    node_to_cname_mapping.add(my_node)
+                    node_to_cname_mapping.add((my_node, rrset_info.rrset[0].target))
 
             self.processed_rrsets[(my_name, rdtype)] += my_nodes
 
@@ -1191,7 +1191,7 @@ class DNSAuthGraph:
                 self.processed_rrsets[(name, rdtype)] = []
             self.processed_rrsets[(name, rdtype)].append(warning_node)
 
-        for alias_node in node_to_cname_mapping:
+        for alias_node, target in node_to_cname_mapping:
             # if this is a recursive analysis, then we've already graphed the
             # node, above, so we graph its hierarchy and then retrieve it from
             # self.processed_rrsets
