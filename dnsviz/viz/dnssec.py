@@ -633,6 +633,13 @@ class DNSAuthGraph:
             edge_id += '|%s' % port.replace('*', '_')
             edge_key += '|%s' % port
 
+        # if this DNSKEY is signing data in a zone above itself (e.g., DS
+        # records), then remove constraint from the edge
+        signed_node_zone = self.node_subgraph_name[signed_node][8:-4]
+        dnskey_node_zone = self.node_subgraph_name[dnskey_node][8:-4]
+        if not signed_node_zone.endswith(dnskey_node_zone):
+            attrs['constraint'] = 'false'
+
         try:
             edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
         except KeyError:
