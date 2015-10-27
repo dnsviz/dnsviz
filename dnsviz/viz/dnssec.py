@@ -1349,7 +1349,7 @@ class DNSAuthGraph:
                 # add a tail to the cluster
                 self.G.get_edge(zone_top, nsec_node).attr['ltail'] = zone_graph_name
                 # anchor NSEC node to bottom
-                self.G.add_edge(zone_bottom, nsec_node, style='invis')
+                self.G.add_edge(parent_bottom, nsec_node, style='invis')
 
                 for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
                     nsec_cell = nsec_name.canonicalize().to_text()
