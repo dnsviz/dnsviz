@@ -1487,7 +1487,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # there is at least one match
         dnskey_server_client_responses = set()
         for dnskey_query in dnskey_multiquery.queries.values():
-            for server in dnskey_query.responses:
+            # for responsive servers consider only those designated as
+            # authoritative
+            for server in set(dnskey_query.responses).intersection(self.zone.get_auth_or_designated_servers()):
                 bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client in dnskey_query.responses[server]:
                     response = dnskey_query.responses[server][client]
@@ -1649,11 +1651,30 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             except IndexError:
                 pass
             else:
-                err = Errors.NoNSInParent(parent=fmt.humanize_name(self.parent_name()))
-                err.servers_clients.update(ds_nxdomain_info.servers_clients)
-                self.delegation_errors[rdtype].append(err)
-                if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
-                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
+                # now check if there is a parent server that is providing an
+                # NXDOMAIN for the referral.  If so, this is due to the
+                # delegation not being found on all servers.
+                try:
+                    delegation_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == self.referral_rdtype, self.queries[(name, self.referral_rdtype)].nxdomain_info)[0]
+                except IndexError:
+                    # if there were not NXDOMAINs received in response to the
+                    # referral query, then use all the servers/clients
+                    servers_clients = ds_nxdomain_info.servers_clients
+                else:
+                    # if there were NXDOMAINs received in response to the
+                    # referral query, then filter those out
+                    servers_clients = set(ds_nxdomain_info.servers_clients).difference(delegation_nxdomain_info.servers_clients)
+
+                # if there were any remaining NXDOMAIN responses, then add the
+                # error
+                if servers_clients:
+                    err = Errors.NoNSInParent(parent=fmt.humanize_name(self.parent_name()))
+                    for server, client in servers_clients:
+                        for response in ds_nxdomain_info.servers_clients[(server, client)]:
+                            err.add_server_client(server, client, response)
+                    self.delegation_errors[rdtype].append(err)
+                    if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
+                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
 
     def _populate_server_status(self):
         if not self.is_zone():
@@ -1821,6 +1842,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for (qname, rdtype), query in self.queries.items():
 
             for neg_response_info in query.nxdomain_info:
+                # make sure this query was made to a server designated as
+                # authoritative
+                if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(self.zone.get_auth_or_designated_servers()):
+                    continue
                 self.nxdomain_warnings[neg_response_info] = []
                 self.nxdomain_errors[neg_response_info] = []
                 self.nxdomain_status[neg_response_info] = \
@@ -1887,6 +1912,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         servers_responsive = set()
         for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
             servers_responsive.update([(server,client,query.responses[server][client]) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick)])
+
+        # only consider those servers that are supposed to answer authoritatively
+        servers_responsive.intersection_update(self.zone.get_auth_or_designated_servers())
 
         # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():
@@ -2181,6 +2209,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     d['answer'].append(rrset_serialized)
 
         for neg_response_info in query.nxdomain_info:
+            # make sure this query was made to a server designated as
+            # authoritative
+            if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(self.zone.get_auth_or_designated_servers()):
+                continue
             # only look at qname
             if neg_response_info.qname == query.qname or self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 neg_response_serialized = self._serialize_negative_response_info(neg_response_info, self.nxdomain_status, self.nxdomain_warnings, self.nxdomain_errors, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)

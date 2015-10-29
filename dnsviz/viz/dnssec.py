@@ -1120,6 +1120,11 @@ class DNSAuthGraph:
             self.processed_rrsets[(my_name, rdtype)] += my_nodes
 
         for neg_response_info in query.nxdomain_info:
+            # make sure this query was made to a server designated as
+            # authoritative
+            if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(name_obj.zone.get_auth_or_designated_servers()):
+                continue
+
             # only do qname, unless analysis type is recursive
             if not (neg_response_info.qname == name or name_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE):
                 continue
