@@ -404,7 +404,20 @@ class OnlineDomainNameAnalysis(object):
             else:
                 self._valid_servers_clients_udp.add((server, client))
         if is_authoritative:
-            if query.rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
+            # we're marking servers as authoritative for the zone. if the query
+            # type is DS or DLV, then query is to the parent zone, so its
+            # authoritativeness means nothing to us.
+            if query.rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                pass
+            # If this response comes from a parent server, and the response was
+            # NXDOMAIN, then don't count it as authoritative.  Either it was
+            # the child of a zone, in which case _auth_servers_clients doesn't
+            # matter (since _auth_servers_clients is only used for zones), or
+            # it was a zone itself, and not all servers in the parent carry the
+            # delegation
+            elif response.message.rcode() == dns.rcode.NXDOMAIN and bailiwick != self.name:
+                pass
+            else:
                 self._auth_servers_clients.add((server, client))
 
         if not response.is_complete_response():
