@@ -1736,7 +1736,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         soa_owner_name_for_servers = {}
         servers_without_soa = set()
         servers_missing_nsec = set()
-        for server, client in neg_response_info.servers_clients:
+        # populate NXDOMAIN status for only those responses that are from
+        # servers authoritative or designated as such
+        for server, client in set(neg_response_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
             for response in neg_response_info.servers_clients[(server, client)]:
                 servers_without_soa.add((server, client, response))
                 servers_missing_nsec.add((server, client, response))
@@ -1746,22 +1748,26 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
 
-            for server, client in soa_rrset_info.servers_clients:
+            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
+
+            # make sure this query was made to a server designated as
+            # authoritative
+            if not set([s for (s,c) in soa_rrset_info.servers_clients]).intersection(self.zone.get_auth_or_designated_servers()):
+                continue
+
+            if soa_owner_name != qname_obj.zone.name:
+                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=fmt.humanize_name(soa_owner_name), zone_name=fmt.humanize_name(qname_obj.zone.name)), errors, None, None, None)
+            else:
+                err = None
+
+            for server, client in set(soa_rrset_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
                 for response in soa_rrset_info.servers_clients[(server, client)]:
                     servers_without_soa.remove((server, client, response))
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
 
-            if soa_owner_name != qname_obj.zone.name:
-                err = Errors.DomainNameAnalysisError.insert_into_list(bad_soa_error_cls(soa_owner_name=fmt.humanize_name(soa_owner_name), zone_name=fmt.humanize_name(qname_obj.zone.name)), errors, None, None, None)
-                if neg_response_info.qname == query.qname:
-                    err.servers_clients.update(soa_rrset_info.servers_clients)
-                else:
-                    for server,client in soa_rrset_info.servers_clients:
-                        for response in soa_rrset_info.servers_clients[(server,client)]:
-                            if response.recursion_desired_and_available():
-                                err.add_server_client(server, client, response)
-
-            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
+                    if err is not None:
+                        if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
+                            err.add_server_client(server, client, response)
 
         for server,client,response in servers_without_soa:
             if neg_response_info.qname == query.qname or response.recursion_desired_and_available():
@@ -1790,22 +1796,27 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         statuses = []
         status_by_response = {}
         for nsec_set_info in neg_response_info.nsec_set_info:
-            if nsec_set_info.use_nsec3:
-                status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
-                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
-            else:
-                status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
-                        soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name), nsec_set_info)
+            status_by_soa_name = {}
 
             for nsec_rrset_info in nsec_set_info.rrsets.values():
                 self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
 
-            if status.validation_status == Status.NSEC_STATUS_VALID:
-                if status not in statuses:
-                    statuses.append(status)
-
-            for server, client in nsec_set_info.servers_clients:
+            for server, client in set(nsec_set_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
                 for response in nsec_set_info.servers_clients[(server,client)]:
+                    soa_owner_name = soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name)
+                    if soa_owner_name not in status_by_soa_name:
+                        if nsec_set_info.use_nsec3:
+                            status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
+                                    soa_owner_name, nsec_set_info)
+                        else:
+                            status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
+                                    soa_owner_name, nsec_set_info)
+                        if status.validation_status == Status.NSEC_STATUS_VALID:
+                            if status not in statuses:
+                                statuses.append(status)
+                        status_by_soa_name[soa_owner_name] = status
+                    status = status_by_soa_name[soa_owner_name]
+
                     if (server,client,response) in servers_missing_nsec:
                         servers_missing_nsec.remove((server,client,response))
                     if status.validation_status == Status.NSEC_STATUS_VALID:
@@ -1842,10 +1853,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for (qname, rdtype), query in self.queries.items():
 
             for neg_response_info in query.nxdomain_info:
-                # make sure this query was made to a server designated as
-                # authoritative
-                if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(self.zone.get_auth_or_designated_servers()):
-                    continue
                 self.nxdomain_warnings[neg_response_info] = []
                 self.nxdomain_errors[neg_response_info] = []
                 self.nxdomain_status[neg_response_info] = \
