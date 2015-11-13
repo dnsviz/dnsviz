@@ -53,6 +53,20 @@ _logger = logging.getLogger(__name__)
 class FoundYXDOMAIN(Exception):
     pass
 
+class AggregateResponseInfo(object):
+    def __init__(self, qname, rdtype, name_obj, zone_obj):
+        self.qname = qname
+        self.rdtype = rdtype
+        self.name_obj = name_obj
+        self.zone_obj = zone_obj
+        self.response_info_list = []
+
+    def __repr__(self):
+        return '<%s %s/%s>' % (self.__class__.__name__, self.qname, dns.rdatatype.to_text(self.rdtype))
+
+    def add_response_info(self, response_info, cname_info):
+        self.response_info_list.append((response_info, cname_info))
+
 class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     RDTYPES_ALL = 0
     RDTYPES_ALL_SAME_NAME = 1
@@ -194,6 +208,83 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if active_ksks:
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
+
+    def _create_response_info_recursive(self, name, rdtype, name_to_info_mapping, rrset_to_cname_mapping):
+        zone_obj = self.get_name(name).zone
+        info_obj = AggregateResponseInfo(name, rdtype, self, zone_obj)
+        for info in name_to_info_mapping[name]:
+            if info in rrset_to_cname_mapping:
+                cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping)
+            else:
+                cname_info = None
+            info_obj.add_response_info(info, cname_info)
+        return info_obj
+
+    def _get_response_info(self, name, rdtype):
+        query = self.queries[(name, rdtype)]
+        name_to_info_mapping = {}
+        rrset_to_cname_mapping = {}
+
+        name_to_info_mapping[name] = []
+
+        for rrset_info in query.answer_info:
+
+            # only do qname, unless analysis type is recursive
+            if not (rrset_info.rrset.name == name or self.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            # if this is a CNAME record, create an info-to-target mapping
+            if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+                rrset_to_cname_mapping[rrset_info] = rrset_info.rrset[0].target
+
+            # map name to info and name_obj
+            if rrset_info.rrset.name not in name_to_info_mapping:
+                name_to_info_mapping[rrset_info.rrset.name] = []
+            name_to_info_mapping[rrset_info.rrset.name].append(rrset_info)
+
+        for neg_response_info in query.nxdomain_info + query.nodata_info:
+            # only do qname, unless analysis type is recursive
+            if not (neg_response_info.qname == name or self.analysis_type == ANALYSIS_TYPE_RECURSIVE):
+                continue
+
+            # make sure this query was made to a server designated as
+            # authoritative
+            z_obj = self.zone
+            if neg_response_info.rdtype == dns.rdatatype.DS:
+                z_obj = self.zone.parent
+            if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(z_obj.get_auth_or_designated_servers()):
+                continue
+
+            if neg_response_info.qname not in name_to_info_mapping:
+                name_to_info_mapping[neg_response_info.qname] = []
+            name_to_info_mapping[neg_response_info.qname].append(neg_response_info)
+
+        for error in self.response_errors[query]:
+            name_to_info_mapping[name].append(error)
+
+        for warning in self.response_warnings[query]:
+            name_to_info_mapping[name].append(warning)
+
+        info_obj = AggregateResponseInfo(name, rdtype, self, self.zone)
+        for info in name_to_info_mapping[name]:
+            if info in rrset_to_cname_mapping:
+                if self.analysis_type == ANALYSIS_TYPE_RECURSIVE:
+                    cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping)
+                else:
+                    cname_obj = self.get_name(rrset_to_cname_mapping[info])
+                    cname_info = cname_obj.get_response_info(rrset_to_cname_mapping[info], rdtype)
+            else:
+                cname_info = None
+            info_obj.add_response_info(info, cname_info)
+
+        return info_obj
+
+    def get_response_info(self, name, rdtype):
+        if not hasattr(self, '_response_info') or self._response_info is None:
+            self._response_info = {}
+        if (name, rdtype) not in self._response_info:
+            self._response_info[(name, rdtype)] = self._get_response_info(name, rdtype)
+        return self._response_info[(name, rdtype)]
 
     def _serialize_nsec_set_simple(self, nsec_set_info, neg_status, response_info):
         nsec_tup = []
