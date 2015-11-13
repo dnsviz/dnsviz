@@ -774,6 +774,14 @@ class OnlineDomainNameAnalysis(object):
             if not (neg_response_info.qname == name or self.analysis_type == ANALYSIS_TYPE_RECURSIVE):
                 continue
 
+            # make sure this query was made to a server designated as
+            # authoritative
+            z_obj = self.zone
+            if neg_response_info.rdtype == dns.rdatatype.DS:
+                z_obj = self.zone.parent
+            if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(z_obj.get_auth_or_designated_servers()):
+                continue
+
             if neg_response_info.qname not in name_to_info_mapping:
                 name_to_info_mapping[neg_response_info.qname] = []
             name_to_info_mapping[neg_response_info.qname].append(neg_response_info)
