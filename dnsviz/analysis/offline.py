@@ -1109,12 +1109,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
         if qname_obj is not None:
+            # if the response was complete (not truncated), then mark any
+            # response flag issues as errors.  Otherwise, mark them as
+            # warnings.
+            if response.is_complete_response():
+                group = errors
+            else:
+                group = warnings
             if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
                 if not response.is_authoritative():
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), errors, server, client, response)
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), group, server, client, response)
             elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 if response.recursion_desired() and not response.recursion_available():
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), errors, server, client, response)
+                    Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), group, server, client, response)
 
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
