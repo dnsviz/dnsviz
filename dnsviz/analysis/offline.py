@@ -1736,9 +1736,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         soa_owner_name_for_servers = {}
         servers_without_soa = set()
         servers_missing_nsec = set()
+
+        #TODO Handle the case where a parent server sends NXDOMAIN for a
+        # delegated child, even when other parent servers, send a proper
+        # referral.
+
         # populate NXDOMAIN status for only those responses that are from
         # servers authoritative or designated as such
-        for server, client in set(neg_response_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
+        auth_servers = qname_obj.zone.get_auth_or_designated_servers()
+        for server, client in neg_response_info.servers_clients:
+            if server not in auth_servers:
+                continue
             for response in neg_response_info.servers_clients[(server, client)]:
                 servers_without_soa.add((server, client, response))
                 servers_missing_nsec.add((server, client, response))
@@ -1752,7 +1760,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # make sure this query was made to a server designated as
             # authoritative
-            if not set([s for (s,c) in soa_rrset_info.servers_clients]).intersection(self.zone.get_auth_or_designated_servers()):
+            if not set([s for (s,c) in soa_rrset_info.servers_clients]).intersection(auth_servers):
                 continue
 
             if soa_owner_name != qname_obj.zone.name:
@@ -1760,7 +1768,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             else:
                 err = None
 
-            for server, client in set(soa_rrset_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
+            for server, client in soa_rrset_info.servers_clients:
+                if server not in auth_servers:
+                    continue
                 for response in soa_rrset_info.servers_clients[(server, client)]:
                     servers_without_soa.remove((server, client, response))
                     soa_owner_name_for_servers[(server,client,response)] = soa_owner_name
@@ -1801,7 +1811,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for nsec_rrset_info in nsec_set_info.rrsets.values():
                 self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
 
-            for server, client in set(nsec_set_info.servers_clients).intersection(qname_obj.zone.get_auth_or_designated_servers()):
+            for server, client in nsec_set_info.servers_clients:
+                if server not in auth_servers:
+                    continue
                 for response in nsec_set_info.servers_clients[(server,client)]:
                     soa_owner_name = soa_owner_name_for_servers.get((server,client,response), qname_obj.zone.name)
                     if soa_owner_name not in status_by_soa_name:
