@@ -250,7 +250,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # make sure this query was made to a server designated as
             # authoritative
             z_obj = self.zone
-            if neg_response_info.rdtype == dns.rdatatype.DS:
+            if self.is_zone() and neg_response_info.rdtype == dns.rdatatype.DS:
                 z_obj = self.zone.parent
             if not set([s for (s,c) in neg_response_info.servers_clients]).intersection(z_obj.get_auth_or_designated_servers()):
                 continue
