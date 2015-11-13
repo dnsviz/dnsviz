@@ -1150,7 +1150,12 @@ class DNSAuthGraph:
 
                 id += 1
             for soa_rrset_info in neg_response_info.soa_rrset_info:
-                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, my_zone_obj, id)
+                # If no servers match the authoritative servers, then put this in the parent zone
+                if not set([s for (s,c) in soa_rrset_info.servers_clients]).intersection(my_zone_obj.get_auth_or_designated_servers()) and my_zone_obj.parent is not None:
+                    z_obj = my_zone_obj.parent
+                else:
+                    z_obj = my_zone_obj
+                soa_rrset_node = self.add_rrset(soa_rrset_info, None, name_obj, z_obj, id)
                 self.add_rrsigs(name_obj, my_zone_obj, soa_rrset_info, soa_rrset_node)
                 id += 1
 
