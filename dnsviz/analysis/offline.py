@@ -817,7 +817,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for (qname, rdtype), query in self.queries.items():
 
             qname_obj = self.get_name(qname)
-            if rdtype == dns.rdatatype.DS:
+            if rdtype == dns.rdatatype.DS and \
+                    qname_obj.name == qname and qname_obj.is_zone():
                 qname_obj = qname_obj.parent
             elif rdtype == dns.rdatatype.DLV and qname == qname_obj.dlv_name:
                 qname_obj = qname_obj.dlv_parent
@@ -1390,7 +1391,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             for rrset_info in items_to_validate:
                 qname_obj = self.get_name(rrset_info.rrset.name)
-                if rdtype == dns.rdatatype.DS:
+                if rdtype == dns.rdatatype.DS and \
+                        qname_obj.name == rrset_info.rrset.name and qname_obj.is_zone():
                     qname_obj = qname_obj.parent
                 elif rdtype == dns.rdatatype.DLV:
                     qname_obj = qname_obj.dlv_parent
@@ -1821,7 +1823,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs):
 
         qname_obj = self.get_name(neg_response_info.qname)
-        if query.rdtype == dns.rdatatype.DS:
+        if query.rdtype == dns.rdatatype.DS and \
+                qname_obj.name == neg_response_info.qname and qname_obj.is_zone():
             qname_obj = qname_obj.parent
 
         soa_owner_name_for_servers = {}
