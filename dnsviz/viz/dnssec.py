@@ -1822,6 +1822,7 @@ class DNSAuthGraph:
     def remove_extra_edges(self, show_redundant=False):
         #XXX this assumes DNSKEYs with same name as apex
         for S in self.G.subgraphs():
+            non_dnskey = set()
             all_dnskeys = set()
             ds_dnskeys = set()
             ta_dnskeys = set()
@@ -1834,6 +1835,8 @@ class DNSAuthGraph:
 
             for n in S.nodes():
                 if not n.startswith('DNSKEY-'):
+                    if n.attr['shape'] != 'point':
+                        non_dnskey.add(n)
                     continue
 
                 all_dnskeys.add(n)
@@ -1865,11 +1868,11 @@ class DNSAuthGraph:
 
             seps = ds_dnskeys.union(ta_dnskeys).intersection(ksks).difference(revoked_dnskeys)
             ksk_only = ksks.difference(zsks).difference(revoked_dnskeys)
-            zsk_only = zsks.difference(revoked_dnskeys)
+            zsk_only = zsks.difference(ksks).difference(revoked_dnskeys)
 
-            # if all keys have only KSK roles,
-            # then try to distinguish using SEP bit
-            if ksk_only and not zsk_only and sep_bit:
+            # if all keys have only KSK roles (i.e., none are signing the zone
+            # data), then try to distinguish using SEP bit
+            if ksk_only and not zsks and sep_bit:
                 ksk_only.intersection_update(sep_bit)
 
             if seps:
@@ -1877,22 +1880,77 @@ class DNSAuthGraph:
             else:
                 if ksk_only:
                     signing_keys = ksk_only
-                else:
+                elif ksks:
                     signing_keys = ksks
+                elif sep_bit:
+                    signing_keys = sep_bit
+                else:
+                    signing_keys = all_dnskeys
 
-            for n in signing_keys.union(ds_dnskeys):
-                if not (n in zsk_only and ksk_only):
+            if signing_keys:
+                non_signing_keys = all_dnskeys.difference(signing_keys)
+                link_to_non_signing_keys = set()
+
+                # In the case where a SEP (or potential SEP) is signing zone data,
+                # and there are other SEPs that are not signing zone data, don't
+                # add an edge to the top.  This will make the other SEPs "higher".
+                ksk_only_signing_keys = signing_keys.intersection(ksk_only)
+                for n in signing_keys:
+                    if n in zsks and ksk_only_signing_keys:
+                        pass
+                    else:
+                        link_to_non_signing_keys.add(n)
+                        self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
+
+                if non_signing_keys:
+                    # check that any non-signing keys are linked to a key above
+                    # them--except non-existent DNSKEYs corresponding to DS
+                    # trust anchors, which will already be on top.
+                    for n in non_signing_keys:
+                        if n in non_existent_dnskeys:
+                            if n in ds_dnskeys or n in ta_dnskeys:
+                                self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
+                        else:
+                            for m in link_to_non_signing_keys:
+                                if not self.G.has_edge(n, m):
+                                    self.G.add_edge(n, m, style='invis')
+
+                    intermediate_keys = non_signing_keys
+                else:
+                    intermediate_keys = signing_keys
+
+                # link non-keys to intermediate DNSKEYs
+                for n in non_dnskey:
+                    if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
+                        continue
+                    for m in intermediate_keys:
+                        if m in ds_dnskeys and m in non_existent_dnskeys:
+                            pass
+                        else:
+                            self.G.add_edge(n, m, style='invis')
+
+            else:
+                # For all non-existent non-DNSKEYs, add an edge to the top
+                for n in non_dnskey:
+                    if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
+                        continue
                     self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
-
-            for n in non_existent_dnskeys.intersection(ta_dnskeys):
-                self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 
             for n in ksks:
                 n_is_signing_key = n in signing_keys
-                n_is_ksk = n in ksk_only
+                n_is_zsk = n in zsks
 
-                retain_edge_default = n_is_signing_key or \
-                        (n_is_ksk and not signing_keys_for_dnskey[n].intersection(seps))
+                # We generally want an edge from this key to other keys if a)
+                # it is a signing_key or b) it doesn't sign the zone (i.e., is
+                # is not a ZSK) and it is not signed by any SEPs
+                if n_is_signing_key:
+                    retain_edge_default = True
+                elif n_is_zsk:
+                    retain_edge_default = False
+                elif signing_keys_for_dnskey[n].intersection(seps):
+                    retain_edge_default = False
+                else:
+                    retain_edge_default = True
 
                 for e in self.G.in_edges(n):
                     m = e[0]
@@ -1906,7 +1964,11 @@ class DNSAuthGraph:
                     if retain_edge:
                         m_is_signing_key = m in signing_keys
                         m_is_zsk = m in zsk_only
-                        if m_is_signing_key and not (m_is_zsk and n_is_ksk):
+                        if not m_is_signing_key:
+                            pass
+                        elif m_is_zsk and not n_is_zsk:
+                            pass
+                        else:
                             retain_edge = False
 
                     if not retain_edge:
