@@ -1831,6 +1831,7 @@ class DNSAuthGraph:
             sep_bit = set()
             revoked_dnskeys = set()
             non_existent_dnskeys = set()
+            existing_dnskeys = set()
             signing_keys_for_dnskey = {}
 
             for n in S.nodes():
@@ -1865,6 +1866,8 @@ class DNSAuthGraph:
                     revoked_dnskeys.add(n)
                 if non_existent:
                     non_existent_dnskeys.add(n)
+                else:
+                    existing_dnskeys.add(n)
 
             seps = ds_dnskeys.union(ta_dnskeys).intersection(ksks).difference(revoked_dnskeys)
             ksk_only = ksks.difference(zsks).difference(revoked_dnskeys)
@@ -1924,10 +1927,12 @@ class DNSAuthGraph:
                     if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
                         continue
                     for m in intermediate_keys:
+                        # we only link to non-existent DNSKEYs corresponding to
+                        # DS records if there aren't any existing DNSKEYs.
                         if m in ds_dnskeys and m in non_existent_dnskeys:
-                            pass
-                        else:
-                            self.G.add_edge(n, m, style='invis')
+                            if existing_dnskeys:
+                                continue
+                        self.G.add_edge(n, m, style='invis')
 
             else:
                 # For all non-existent non-DNSKEYs, add an edge to the top
