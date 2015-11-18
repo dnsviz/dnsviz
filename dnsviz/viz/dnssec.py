@@ -1242,7 +1242,7 @@ class DNSAuthGraph:
         for signed_keys, rrset_info in name_obj.get_dnskey_sets():
             for rrsig in name_obj.rrsig_status[rrset_info]:
                 signer_obj = name_obj.get_name(rrsig.signer)
-                if rrsig.signer != name_obj.name:
+                if rrsig.signer != name_obj.name and not is_dlv:
                     self.graph_zone_auth(signer_obj, False)
                 for dnskey in name_obj.rrsig_status[rrset_info][rrsig]:
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
@@ -1274,7 +1274,7 @@ class DNSAuthGraph:
             if (name_obj.name, rdtype) in name_obj.queries:
 
                 # Handle errors and warnings for DNSKEY/DS queries
-                if rdtype == dns.rdatatype.DS and zone_obj.parent is not None:
+                if rdtype == dns.rdatatype.DS and zone_obj.parent is not None and not is_dlv:
                     z_obj = zone_obj.parent
                     self.graph_zone_auth(z_obj, False)
                 else:
