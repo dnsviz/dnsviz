@@ -483,8 +483,6 @@ class DNSAuthGraph:
 
             self.node_info[node_str] = [consolidated_ds_serialized]
 
-            self.G.add_edge(parent_bottom_name, node_str, style='invis')
-
             T, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
 
             self.add_ds_map(name, node_str, ds_statuses, zone_obj, parent_obj)
