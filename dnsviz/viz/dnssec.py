@@ -1971,14 +1971,12 @@ class DNSAuthGraph:
 
                     retain_edge = retain_edge_default
 
+                    # The exception is if m is also a signing key that doesn't
+                    # also sign the zone while n does sign the zone.
                     if retain_edge:
                         m_is_signing_key = m in signing_keys
                         m_is_zsk = m in zsk_only
-                        if not m_is_signing_key:
-                            pass
-                        elif m_is_zsk and not n_is_zsk:
-                            pass
-                        else:
+                        if m_is_signing_key and not m_is_zsk and n_is_zsk:
                             retain_edge = False
 
                     if not retain_edge:
