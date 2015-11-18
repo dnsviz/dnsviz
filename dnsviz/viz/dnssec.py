@@ -1920,6 +1920,13 @@ class DNSAuthGraph:
                 else:
                     intermediate_keys = signing_keys
 
+                # if there are ZSKs, then make those the intermediate keys,
+                # instead of using all the signing (or non-signing) keys
+                if zsk_only:
+                    intermediate_keys = zsk_only
+                elif zsks:
+                    intermediate_keys = zsks
+
                 # link non-keys to intermediate DNSKEYs
                 for n in non_dnskey:
                     if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
@@ -1943,9 +1950,9 @@ class DNSAuthGraph:
                 n_is_signing_key = n in signing_keys
                 n_is_zsk = n in zsks
 
-                # We generally want an edge from this key to other keys if a)
-                # it is a signing_key or b) it doesn't sign the zone (i.e., is
-                # is not a ZSK) and it is not signed by any SEPs
+                # We generally want an edge from this key (n) to other keys if
+                # a) it is a signing_key or b) it doesn't sign the zone (i.e.,
+                # is is not a ZSK) and it is not signed by any SEPs
                 if n_is_signing_key:
                     retain_edge_default = True
                 elif n_is_zsk:
