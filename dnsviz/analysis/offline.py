@@ -2030,11 +2030,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         # buid a list of responsive servers
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         servers_responsive = set()
-        for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
-            servers_responsive.update([(server,client,query.responses[server][client]) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick)])
-
+        servers_authoritative = self.zone.get_auth_or_designated_servers()
         # only consider those servers that are supposed to answer authoritatively
-        servers_responsive.intersection_update(self.zone.get_auth_or_designated_servers())
+        for query in self.queries[(self.name, dns.rdatatype.DNSKEY)].queries.values():
+            servers_responsive.update([(server,client,query.responses[server][client]) for (server,client) in query.servers_with_valid_complete_response(bailiwick_map, default_bailiwick) if server in servers_authoritative])
 
         # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():
