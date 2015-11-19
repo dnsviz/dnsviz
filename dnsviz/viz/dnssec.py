@@ -1008,8 +1008,8 @@ class DNSAuthGraph:
 
         #XXX consider adding this node (using, e.g., clustering)
         #rrset_node = self.add_rrset(rrset_info, None, zone_obj, zone_obj, id)
-        #self.G.add_edge(rrset_node, nxdomain_node, color=COLORS['secure'], style='solid', dir='back')
-        #self.G.add_edge(rrset_node, wildcard_node, color=COLORS['secure'], style='solid', dir='back')
+        #self.G.add_edge(rrset_node, nxdomain_node, color=COLORS['secure'], style='invis', dir='back')
+        #self.G.add_edge(rrset_node, wildcard_node, color=COLORS['secure'], style='invis', dir='back')
         #return rrset_node
 
     def add_alias(self, alias, target):
@@ -1889,30 +1889,64 @@ class DNSAuthGraph:
                     signing_keys = all_dnskeys
 
             if signing_keys:
-                non_signing_keys = all_dnskeys.difference(signing_keys)
-                link_to_non_signing_keys = set()
-
-                # In the case where a SEP (or potential SEP) is signing zone data,
-                # and there are other SEPs that are not signing zone data, don't
-                # add an edge to the top.  This will make the other SEPs "higher".
-                ksk_only_signing_keys = signing_keys.intersection(ksk_only)
-                for n in signing_keys:
-                    if n in zsks and ksk_only_signing_keys:
+                # Now look for signing keys in disjoint "islands"
+                for n in all_dnskeys.difference(signing_keys):
+                    if set(self.G.out_neighbors(n)).intersection(signing_keys):
+                        # If this key is already signed by a signing key, then
+                        # it's not in an island.
                         pass
                     else:
-                        link_to_non_signing_keys.add(n)
+                        # Otherwise, find out what keys are connected to this one
+                        neighbors = set(self.G.neighbors(n))
+
+                        # If this key is ksk only, then it is always a "signing
+                        # key".
+                        if n in ksk_only:
+                            signing_keys.add(n)
+
+                        # If this key is not a ksk, and there are ksks, then
+                        # it's not a "signing key".
+                        elif n not in ksks and neighbors.intersection(ksks):
+                            pass
+
+                        # If this key does not have its sep bit set, and there
+                        # are others that do, then it's not a "signing key".
+                        elif n not in sep_bit and neighbors.intersection(sep_bit):
+                            pass
+
+                        # Otherwise, it's on the same rank as all the others,
+                        # so it is a "signing key".
+                        else:
+                            signing_keys.add(n)
+
+                # In the case where a signing key is signing zone data, and
+                # there are other signing keys that are not signing zone data,
+                # don't add an edge to the top.  This will make the other
+                # signing keys appear "higher".
+                for n in list(signing_keys):
+                    if n in zsks and set(self.G.neighbors(n)).intersection(signing_keys).intersection(ksk_only):
+                        signing_keys.remove(n)
+                    else:
                         self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 
+                # Now handle all the keys not "signing"
+                non_signing_keys = all_dnskeys.difference(signing_keys)
+
                 if non_signing_keys:
-                    # check that any non-signing keys are linked to a key above
-                    # them--except non-existent DNSKEYs corresponding to DS
-                    # trust anchors, which will already be on top.
+                    # If there are any keys that are "not signing", then
+                    # determine whether they should be connected to the signing
+                    # keys, to the top, or left alone.
                     for n in non_signing_keys:
+
+                        # non-existent DNSKEYs corresponding to DS and trust
+                        # anchors should be connected to the top.
                         if n in non_existent_dnskeys:
                             if n in ds_dnskeys or n in ta_dnskeys:
                                 self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
-                        else:
-                            for m in link_to_non_signing_keys:
+
+                        # If not linked to any other DNSKEYs, then link to signing keys
+                        elif not filter(lambda x: x.startswith('DNSKEY'), self.G.out_neighbors(n)):
+                            for m in signing_keys:
                                 if not self.G.has_edge(n, m):
                                     self.G.add_edge(n, m, style='invis')
 
@@ -1947,21 +1981,7 @@ class DNSAuthGraph:
                     self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 
             for n in ksks:
-                n_is_signing_key = n in signing_keys
-                n_is_zsk = n in zsks
-
-                # We generally want an edge from this key (n) to other keys if
-                # a) it is a signing_key or b) it doesn't sign the zone (i.e.,
-                # is is not a ZSK) and it is not signed by any SEPs
-                if n_is_signing_key:
-                    retain_edge_default = True
-                elif n_is_zsk:
-                    retain_edge_default = False
-                elif signing_keys_for_dnskey[n].intersection(seps):
-                    retain_edge_default = False
-                else:
-                    retain_edge_default = True
-
+                retain_edge_default = n in signing_keys
                 for e in self.G.in_edges(n):
                     m = e[0]
                     if not m.startswith('DNSKEY-'):
@@ -1969,15 +1989,10 @@ class DNSAuthGraph:
                     if n == m:
                         continue
 
-                    retain_edge = retain_edge_default
-
-                    # The exception is if m is also a signing key that doesn't
-                    # also sign the zone while n does sign the zone.
-                    if retain_edge:
-                        m_is_signing_key = m in signing_keys
-                        m_is_zsk = m in zsk_only
-                        if m_is_signing_key and not m_is_zsk and n_is_zsk:
-                            retain_edge = False
+                    if retain_edge_default and m in signing_keys:
+                        retain_edge = False
+                    else:
+                        retain_edge = retain_edge_default
 
                     if not retain_edge:
                         if show_redundant:
