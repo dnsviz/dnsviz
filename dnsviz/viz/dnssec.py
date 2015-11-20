@@ -1887,34 +1887,40 @@ class DNSAuthGraph:
                     top_level_keys = all_dnskeys
 
             if top_level_keys:
-                # Now look for top-level keys in disjoint "islands"
-                for n in all_dnskeys.difference(top_level_keys):
-                    if set(self.G.out_neighbors(n)).intersection(top_level_keys):
-                        # If this key is already signed by a top-level, then
-                        # it's not in an island.
-                        pass
-                    else:
-                        # Otherwise, find out what keys are connected to this one
-                        neighbors = set(self.G.neighbors(n))
 
-                        # If this key is ksk only, then it is always a top-level key.
-                        if n in ksk_only:
-                            top_level_keys.add(n)
-
-                        # If this key is not a ksk, and there are ksks, then
-                        # it's not a top-level key.
-                        elif n not in ksks and neighbors.intersection(ksks):
+                # If there aren't any KSKs or ZSKs, then signing roles are
+                # unknown, and the top-level keys are organized by SEP bit.
+                # Because there are no roles, every key is an "island" (i.e.,
+                # not signed by any top-level keys), so only look for "islands"
+                # if there are ZSKs or KSKs.
+                if zsks or ksks:
+                    for n in all_dnskeys.difference(top_level_keys):
+                        if set(self.G.out_neighbors(n)).intersection(top_level_keys):
+                            # If this key is already signed by a top-level, then
+                            # it's not in an island.
                             pass
-
-                        # If this key does not have its sep bit set, and there
-                        # are others that do, then it's not a top-level key.
-                        elif n not in sep_bit and neighbors.intersection(sep_bit):
-                            pass
-
-                        # Otherwise, it's on the same rank as all the others,
-                        # so it is a top-level key.
                         else:
-                            top_level_keys.add(n)
+                            # Otherwise, find out what keys are connected to this one
+                            neighbors = set(self.G.neighbors(n))
+
+                            # If this key is ksk only, then it is always a top-level key.
+                            if n in ksk_only:
+                                top_level_keys.add(n)
+
+                            # If this key is not a ksk, and there are ksks, then
+                            # it's not a top-level key.
+                            elif n not in ksks and neighbors.intersection(ksks):
+                                pass
+
+                            # If this key does not have its sep bit set, and there
+                            # are others that do, then it's not a top-level key.
+                            elif n not in sep_bit and neighbors.intersection(sep_bit):
+                                pass
+
+                            # Otherwise, it's on the same rank as all the others,
+                            # so it is a top-level key.
+                            else:
+                                top_level_keys.add(n)
 
                 # In the case where a top-level key is signing zone data, and
                 # there are other top-level keys that are not signing zone data,
