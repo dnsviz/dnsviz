@@ -222,7 +222,8 @@ class Resolver:
                 if not q.responses:
                     server = list(q.servers)[0]
                     valid_servers[query_tuple].remove(server)
-                    last_responses[query_tuple] = server, None
+                    if not valid_servers[query_tuple]:
+                        last_responses[query_tuple] = server, None
                     continue
 
                 server, client_response = q.responses.items()[0]
