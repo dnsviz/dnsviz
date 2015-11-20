@@ -996,7 +996,39 @@ class Analyst(object):
 
         self.name = name
         self.dlv_domain = dlv_domain
-        self.ceiling = self._detect_ceiling(ceiling)[0]
+
+        if explicit_delegations is None:
+            self.explicit_delegations = {}
+        else:
+            self.explicit_delegations = explicit_delegations
+
+        resolver = self.resolver
+
+        # if an ancestor of the name (not wildcard!) is explicitly delegated,
+        # then set the ceiling to the lowest ancestor with an explicit
+        # delegation.
+        c = self.name
+        try:
+            while True:
+                if c in self.explicit_delegations:
+                    break
+                c = c.parent()
+        except dns.name.NoParent:
+            # if no ancestors are explicitly delegated, then don't modify the
+            # ceiling
+            pass
+        else:
+            # if ceiling was not specified, if there is a ceiling, but the name
+            # is not a subdomain of the ceiling, or if the lowest explicit
+            # delegation is a subdomain of the specified ceiling, then replace
+            # it with the modified lowest ancestor that is explicitly
+            # delegated.
+            if ceiling is None or not self.name.is_subdomain(ceiling) or c.is_subdomain(ceiling):
+                ceiling = c
+                resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_handler=self.transport_handler)
+
+        self.ceiling = self._detect_ceiling(ceiling, resolver)[0]
+        self._fix_explicit_delegation()
 
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
@@ -1017,10 +1049,6 @@ class Analyst(object):
 
         assert not explicit_only or extra_rdtypes is not None or self._force_dnskey_query(name), 'If explicit_only is specified, then extra_rdtypes must be specified or force_dnskey must be true.'
 
-        if explicit_delegations is None:
-            self.explicit_delegations = {}
-        else:
-            self.explicit_delegations = explicit_delegations
         self.extra_rdtypes = extra_rdtypes
         self.explicit_only = explicit_only
         if analysis_cache is None:
@@ -1061,12 +1089,12 @@ class Analyst(object):
             except KeyError:
                 return
 
-    def _detect_ceiling(self, ceiling):
+    def _detect_ceiling(self, ceiling, resolver):
         if ceiling == dns.name.root or ceiling is None:
 
             # make sure we can communicate with a resolver; we must be able to
             # resolve the root
-            server, response = self.resolver.query(dns.name.root, dns.rdatatype.NS)
+            server, response = resolver.query(dns.name.root, dns.rdatatype.NS)
             if server is None:
                 raise NetworkConnectivityException('No network connectivity available!')
 
@@ -1078,7 +1106,7 @@ class Analyst(object):
             ceiling = self.name
 
         try:
-            ans = self.resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            ans = resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
             try:
                 ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 return ceiling, False
@@ -1087,12 +1115,30 @@ class Analyst(object):
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             pass
         except dns.exception.DNSException:
-            parent_ceiling, fail = self._detect_ceiling(ceiling.parent())
+            parent_ceiling, fail = self._detect_ceiling(ceiling.parent(), resolver)
             if fail:
                 return parent_ceiling, True
             else:
                 return ceiling, True
-        return self._detect_ceiling(ceiling.parent())
+        return self._detect_ceiling(ceiling.parent(), resolver)
+
+    def _fix_explicit_delegation(self):
+        if self.ceiling is None:
+            return
+
+        # at this point, if self.name or any ancestor below self.ceiling has an
+        # explicit delegation, then it is obsolete and needs to be applied to
+        # self.ceiling instead.
+        n = self.name
+        explicit_delegation = None
+        while n != self.ceiling:
+            if n in self.explicit_delegations:
+                if explicit_delegation is None:
+                    explicit_delegation = self.explicit_delegations[n]
+                del self.explicit_delegations[n]
+            n = n.parent()
+        if explicit_delegation is not None:
+            self.explicit_delegations[self.ceiling] = explicit_delegation
 
     def _root_servers(self, proto=None):
         key = None
