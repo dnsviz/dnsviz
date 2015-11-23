@@ -1997,7 +1997,7 @@ class RecursiveAnalyst(Analyst):
 
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
-    def _detect_ceiling(self, ceiling):
+    def _detect_ceiling(self, ceiling, resolver):
         # if there is a ceiling, but the name is not a subdomain
         # of the ceiling, then use the name itself as a base
         if ceiling is not None and not self.name.is_subdomain(ceiling):
