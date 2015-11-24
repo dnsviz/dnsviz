@@ -335,6 +335,9 @@ class _DNSQueryTransport:
 
             # handle the new queries
             if self._notify_read_fd in rlist_out:
+                # empty the pipe
+                os.read(self._notify_read_fd, 65535)
+
                 while True:
                     try:
                         qtm = self._query_queue.get_nowait()
@@ -353,9 +356,6 @@ class _DNSQueryTransport:
                             qtm.cleanup()
                     except Queue.Empty:
                         break
-
-                # empty the pipe
-                os.read(self._notify_read_fd, 65535)
 
 class DNSQueryTransport:
     def __init__(self):
