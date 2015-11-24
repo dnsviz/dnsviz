@@ -347,6 +347,8 @@ class _DNSQueryTransport:
                         except socket.error, e:
                             qtm.err = e
                             qtm.cleanup()
+                            if qtm in self._event_map:
+                                self._event_map[qtm].set()
                         else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
