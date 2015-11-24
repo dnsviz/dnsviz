@@ -164,6 +164,70 @@ class DNSQueryTransportMeta:
             return False
         return True
 
+    def do_read(self):
+        # UDP
+        if self.sock.type == socket.SOCK_DGRAM:
+            try:
+                self.res = self.sock.recv(65536)
+                if self.check_response_consistency():
+                    self.cleanup()
+                    return True
+                else:
+                    self.res = ''
+            except socket.error, e:
+                self.err = e
+                self.cleanup()
+                return True
+
+        # TCP
+        else:
+            try:
+                if self.res_len is None:
+                    if self.res_len_buf:
+                        buf = self.sock.recv(1)
+                    else:
+                        buf = self.sock.recv(2)
+                    if buf == '':
+                        raise EOFError()
+
+                    self.res_len_buf += buf
+                    if len(self.res_len_buf) == 2:
+                        self.res_len = struct.unpack('!H', self.res_len_buf)[0]
+
+                if self.res_len is not None:
+                    buf = self.sock.recv(self.res_len - self.res_index)
+                    if buf == '':
+                        raise EOFError()
+
+                    self.res += buf
+                    self.res_index = len(self.res)
+
+                    if self.res_index >= self.res_len:
+                        self.cleanup()
+                        return True
+
+            except (socket.error, EOFError), e:
+                if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
+                    pass
+                else:
+                    self.err = e
+                    self.cleanup()
+                    return True
+
+    def do_write(self):
+        try:
+            self.req_index += self.sock.send(self.req[self.req_index:])
+            if self.req_index >= self.req_len:
+                return True
+        except socket.error, e:
+            self.err = e
+            self.cleanup()
+            return True
+
+    def do_timeout(self):
+        self.err = dns.exception.Timeout()
+        self.cleanup()
+
 class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
     require_queryid_match = False
     require_question_case_match = False
@@ -229,15 +293,12 @@ class _DNSQueryTransport:
             for fd in wlist_out:
                 qtm = query_meta[fd]
 
-                try:
-                    qtm.req_index += qtm.sock.send(qtm.req[qtm.req_index:])
-                    if qtm.req_index >= qtm.req_len:
+                if qtm.do_write():
+                    if qtm.err is not None:
+                        finished_fds.append(fd)
+                    else:
                         wlist_in.remove(fd)
                         rlist_in.append(fd)
-                except socket.error, e:
-                    qtm.err = e
-                    qtm.cleanup()
-                    finished_fds.append(fd)
 
             # handle the responses
             for fd in rlist_out:
@@ -246,54 +307,8 @@ class _DNSQueryTransport:
 
                 qtm = query_meta[fd]
 
-                # UDP
-                if qtm.sock.type == socket.SOCK_DGRAM:
-                    try:
-                        qtm.res = qtm.sock.recv(65536)
-                        if qtm.check_response_consistency():
-                            qtm.cleanup()
-                            finished_fds.append(fd)
-                        else:
-                            qtm.res = ''
-                    except socket.error, e:
-                        qtm.err = e
-                        qtm.cleanup()
-                        finished_fds.append(fd)
-
-                # TCP
-                else:
-                    try:
-                        if qtm.res_len is None:
-                            if qtm.res_len_buf:
-                                buf = qtm.sock.recv(1)
-                            else:
-                                buf = qtm.sock.recv(2)
-                            if buf == '':
-                                raise EOFError()
-
-                            qtm.res_len_buf += buf
-                            if len(qtm.res_len_buf) == 2:
-                                qtm.res_len = struct.unpack('!H', qtm.res_len_buf)[0]
-
-                        if qtm.res_len is not None:
-                            buf = qtm.sock.recv(qtm.res_len - qtm.res_index)
-                            if buf == '':
-                                raise EOFError()
-
-                            qtm.res += buf
-                            qtm.res_index = len(qtm.res)
-
-                            if qtm.res_index >= qtm.res_len:
-                                qtm.cleanup()
-                                finished_fds.append(fd)
-
-                    except (socket.error, EOFError), e:
-                        if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
-                            pass
-                        else:
-                            qtm.err = e
-                            qtm.cleanup()
-                            finished_fds.append(fd)
+                if qtm.do_read():
+                    finished_fds.append(fd)
 
             # handle the expired queries
             future_index = bisect.bisect_right(expirations, ((time.time(), None)))
@@ -304,8 +319,7 @@ class _DNSQueryTransport:
                 if qtm.end_time is not None:
                     continue
 
-                qtm.err = dns.exception.Timeout()
-                qtm.cleanup()
+                qtm.do_timeout()
                 finished_fds.append(qtm.sockfd)
             expirations = expirations[future_index:]
 
