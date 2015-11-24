@@ -344,16 +344,16 @@ class _DNSQueryTransport:
                         try:
                             qtm.prepare()
                             qtm.connect()
-
+                        except socket.error, e:
+                            qtm.err = e
+                            qtm.cleanup()
+                        else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
                             fd = qtm.sock.fileno()
                             query_meta[fd] = qtm
                             bisect.insort(expirations, (qtm.expiration, qtm))
                             wlist_in.append(fd)
-                        except socket.error, e:
-                            qtm.err = e
-                            qtm.cleanup()
                     except Queue.Empty:
                         break
 
