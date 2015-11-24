@@ -1304,7 +1304,7 @@ class Analyst(object):
         # to client-side connectivity failure), then raise a connectivity
         # failure
         if not query.responses:
-            self._raise_connectivity_error_local()
+            self._raise_connectivity_error_local(query.servers)
 
         name_obj.add_query(query, detect_ns)
 
@@ -1959,9 +1959,14 @@ class Analyst(object):
         else: # self.try_ipv6
             raise IPv6ConnectivityException('No IPv6 servers to query!')
 
-    def _raise_connectivity_error_local(self):
+    def _raise_connectivity_error_local(self, servers):
         if self.try_ipv4 and self.try_ipv6:
-            pass
+            # if we are configured to try both IPv4 and IPv6, then use servers
+            # to determine which one is missing
+            if not filter(lambda x: x.version == 4, servers):
+                raise IPv4ConnectivityException('No IPv4 servers to query!')
+            if not filter(lambda x: x.version == 6, servers):
+                raise IPv6ConnectivityException('No IPv6 servers to query!')
         elif self.try_ipv4:
             raise IPv4ConnectivityException('No IPv4 network connectivity available!')
         elif self.try_ipv6:
