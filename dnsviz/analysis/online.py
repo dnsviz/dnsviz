@@ -1956,7 +1956,7 @@ class Analyst(object):
             raise NetworkConnectivityException('No servers to query!')
         elif self.try_ipv4:
             raise IPv4ConnectivityException('No IPv4 servers to query!')
-        elif self.try_ipv6:
+        else: # self.try_ipv6
             raise IPv6ConnectivityException('No IPv6 servers to query!')
 
     def _raise_connectivity_error_local(self):
