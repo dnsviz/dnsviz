@@ -53,7 +53,7 @@ class DNSQueryTransportMeta(object):
 
         self.res = None
         self.res_len = None
-        self.res_len_buf = None
+        self.res_buf = None
         self.res_index = None
         self.err = None
 
@@ -75,7 +75,7 @@ class DNSQueryTransportMeta(object):
         self._prepare_socket()
         self.req_index = 0
         self.res = ''
-        self.res_len_buf = ''
+        self.res_buf = ''
         self.res_index = 0
 
     def _prepare_socket(self):
@@ -208,16 +208,16 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         else:
             try:
                 if self.res_len is None:
-                    if self.res_len_buf:
+                    if self.res_buf:
                         buf = self.sock.recv(1)
                     else:
                         buf = self.sock.recv(2)
                     if buf == '':
                         raise EOFError()
 
-                    self.res_len_buf += buf
-                    if len(self.res_len_buf) == 2:
-                        self.res_len = struct.unpack('!H', self.res_len_buf)[0]
+                    self.res_buf += buf
+                    if len(self.res_buf) == 2:
+                        self.res_len = struct.unpack('!H', self.res_buf)[0]
 
                 if self.res_len is not None:
                     buf = self.sock.recv(self.res_len - self.res_index)
