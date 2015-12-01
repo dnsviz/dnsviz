@@ -336,7 +336,7 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
             try:
                 content = json.loads(self.res)
             except ValueError:
-                raise HTTPQueryTransportError('JSON decoding of HTTP response failed')
+                raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
 
             if 'err' in content and content['err'] is not None:
                 if content['err'] == 'NETWORK_ERROR':
@@ -345,7 +345,7 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                         try:
                             self.errno = int(content['errno'])
                         except ValueError:
-                            raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response')
+                            raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response: %s' % content['errno'])
                 elif content['err'] == 'TIMEOUT':
                     self.err = dns.exception.Timeout()
                 else:
@@ -358,13 +358,13 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                 try:
                     self.res = base64.b64decode(content['res'])
                 except TypeError:
-                    raise HTTPQueryTransportError('Base64 decoding of DNS response failed')
+                    raise HTTPQueryTransportError('Base64 decoding of DNS response failed: %s' % content['res'])
 
             if 'src' in content:
                 try:
                     self.src = IPAddr(content['src'])
                 except ValueError:
-                    raise HTTPQueryTransportError('Invalid source IP address found in HTTP response')
+                    raise HTTPQueryTransportError('Invalid source IP address found in HTTP response: %s' % content['src'])
             elif not isinstance(self.err, socket.error):
                 raise HTTPQueryTransportError('No source IP address included in HTTP response')
 
@@ -372,9 +372,9 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                 try:
                     self.sport = int(content['sport'])
                 except ValueError:
-                    raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response')
+                    raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response: %s' % content['sport'])
                 if self.sport < 0 or self.sport > 65535:
-                    raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response')
+                    raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response %s' % content['sport'])
             elif not isinstance(self.err, socket.error):
                 raise HTTPQueryTransportError('No source port value included in HTTP response')
 
@@ -382,9 +382,9 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                 try:
                     self.start_time = float(content['start_time'])
                 except ValueError:
-                    raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response')
+                    raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response: %s' % content['start_time'])
                 if self.start_time < 0:
-                    raise HTTPQueryTransportError('Negative value provided for start time in HTTP response')
+                    raise HTTPQueryTransportError('Negative value provided for start time in HTTP response: %s' % content['start_time'])
             else:
                 raise HTTPQueryTransportError('No start time value included in HTTP response')
 
@@ -392,9 +392,9 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                 try:
                     self.end_time = float(content['end_time'])
                 except ValueError:
-                    raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response')
+                    raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response: %s' % content['end_time'])
                 if self.end_time < 0:
-                    raise HTTPQueryTransportError('Negative value provided for end time in HTTP response')
+                    raise HTTPQueryTransportError('Negative value provided for end time in HTTP response: %s' % content['end_time'])
             else:
                 raise HTTPQueryTransportError('No end time value included in HTTP response')
 
