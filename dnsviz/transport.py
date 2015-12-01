@@ -122,12 +122,15 @@ class DNSQueryTransportMeta(object):
             if e.errno != socket.errno.EINPROGRESS:
                 raise
 
-    def cleanup(self):
+    def _stop_clock(self):
         self.end_time = time.time()
         if self.start_time is None:
             self.start_time = self.end_time
         if self.sock is not None:
             self.sock.close()
+
+    def cleanup(self):
+        self._stop_clock()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
