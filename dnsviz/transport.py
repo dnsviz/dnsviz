@@ -168,7 +168,7 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         else:
             self.transport_type = socket.SOCK_DGRAM
 
-    def check_response_consistency(self):
+    def _check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self.queryid_wire:
             return False
         # if a question case match is required :
@@ -186,7 +186,7 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         if self.sock.type == socket.SOCK_DGRAM:
             try:
                 self.res = self.sock.recv(65536)
-                if self.check_response_consistency():
+                if self._check_response_consistency():
                     self.cleanup()
                     return True
                 else:
