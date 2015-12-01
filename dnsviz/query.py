@@ -1298,6 +1298,11 @@ class ExecutableDNSQuery(DNSQuery):
                         err = RESPONSE_ERROR_NETWORK_ERROR
                     elif isinstance(response, (struct.error, dns.exception.FormError)):
                         err = RESPONSE_ERROR_FORMERR
+                    # if there was an error with the higher-level transport of
+                    # the query, rather than the transport of the native query
+                    # itself, then raise an error
+                    elif isinstance(response, transport.HTTPQueryTransportError):
+                        raise response
                     #XXX need to determine how to handle non-parsing
                     # validation errors with dnspython (e.g., signature with
                     # no keyring)
