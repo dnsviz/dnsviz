@@ -39,7 +39,6 @@ MAX_WAIT_FOR_REQUEST=30
 
 class DNSQueryTransportMeta(object):
     require_queryid_match = True
-    require_question_case_match = True
 
     def __init__(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
         self.req = msg
@@ -159,7 +158,6 @@ class DNSQueryTransportMeta(object):
 
 class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
     require_queryid_match = False
-    require_question_case_match = False
 
 class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
     def __init__(self, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
@@ -178,14 +176,6 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
 
     def _check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self._queryid_wire:
-            return False
-        # if a question case match is required :
-        # check that if the question count is greater than 0 and
-        # there is actually a question section (message > 12), then
-        # make sure the case matches
-        if self.require_question_case_match and \
-                self.res[4:6] != '\x00\x00' and len(self.res) > 12 and \
-                self.res[12:12+len(self._question_wire)] != self._question_wire:
             return False
         return True
 
