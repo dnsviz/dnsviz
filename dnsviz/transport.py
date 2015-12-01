@@ -148,11 +148,14 @@ class DNSQueryTransportMeta(object):
         self.end_time = time.time()
         if self.start_time is None:
             self.start_time = self.end_time
-        if self.sock is not None:
-            self.sock.close()
 
     def cleanup(self):
+        # set start (and end) times, as appropriate
         self._set_end_time()
+
+        # close socket
+        if self.sock is not None:
+            self.sock.close()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
