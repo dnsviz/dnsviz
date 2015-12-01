@@ -22,9 +22,11 @@
 import base64
 import bisect
 import fcntl
+import json
 import os
 import Queue
 import random
+import re
 import select
 import socket
 import struct
@@ -37,6 +39,15 @@ from ipaddr import IPAddr
 
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
+HTTP_HEADER_END_RE = re.compile(r'(\r\n\r\n|\n\n|\r\r)')
+HTTP_STATUS_RE = re.compile(r'^HTTP/\S+ (?P<status>\d+) ')
+CONTENT_LENGTH_RE = re.compile(r'^Content-Length: (?P<length>\d+)', re.MULTILINE)
+CHUNKED_ENCODING_RE = re.compile(r'^Transfer-Encoding: chunked(\r\n|\r|\n)', re.MULTILINE)
+CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
+CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
+
+class HTTPQueryTransportError(Exception):
+    pass
 
 class DNSQueryTransportMeta(object):
     require_queryid_match = True
@@ -269,6 +280,223 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
 
     def do_timeout(self):
         self.err = dns.exception.Timeout()
+        self.cleanup()
+
+class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
+    def __init__(self, http_host, http_port, http_path, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
+        try:
+            addrinfo = socket.getaddrinfo(http_host, http_port)
+        except socket.gaierror:
+            raise HTTPQueryTransportError('Unable to resolve name of HTTP host')
+        http_dst = IPAddr(addrinfo[0][4][0])
+
+        data = self._post_data(msg, dst, tcp, timeout, dport, src, sport)
+        req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\nContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (http_path, http_host, len(data), data)
+        super(DNSQueryTransportMetaHTTP, self).__init__(req, http_dst, True, timeout*2, http_port, None, None, processed_queue)
+
+        self.chunked_encoding = None
+
+    def _post_data(self, msg, dst, tcp, timeout, dport, src, sport):
+        msg = base64.b64encode(msg)
+        if tcp:
+            tcp = 't'
+        else:
+            tcp = 'f'
+        s = 'msg=%s&dst=%s&tcp=%s&timeout=%f' % (msg, dst, tcp, timeout)
+        if dport is not None:
+            s += '&dport=%d' % dport
+        if src is not None:
+            s += '&src=%s' % src
+        if sport is not None:
+            s += '&sport=%d' % sport
+        return s
+
+    def _set_socket_info(self):
+        pass
+
+    def _stop_clock(self):
+        pass
+
+    def cleanup(self):
+        try:
+            # if there is no content, raise an exception
+            if self.res is None:
+                raise HTTPQueryTransportError('No content in HTTP response')
+
+            # load the json content
+            try:
+                content = json.loads(self.res)
+            except ValueError:
+                raise HTTPQueryTransportError('JSON decoding of HTTP response failed')
+
+            if 'err' in content and content['err'] is not None:
+                if content['err'] == 'NETWORK_ERROR':
+                    self.err = socket.error()
+                    if 'errno' in content and content['errno'] is not None:
+                        try:
+                            self.errno = int(content['errno'])
+                        except ValueError:
+                            raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response')
+                elif content['errno'] == 'TIMEOUT':
+                    self.err = dns.exception.Timeout()
+                else:
+                    self.err = HTTPQueryTransportError('Unknown DNS response error in HTTP response')
+
+            elif not ('res' in content and content['res'] is not None):
+                raise HTTPQueryTransportError('No DNS response or response error found in HTTP response')
+
+            else:
+                try:
+                    self.res = base64.b64decode(content['res'])
+                except TypeError:
+                    raise HTTPQueryTransportError('Base64 decoding of DNS response failed')
+
+            if 'src' in content:
+                try:
+                    self.src = IPAddr(content['src'])
+                except ValueError:
+                    raise HTTPQueryTransportError('Invalid source IP address found in HTTP response')
+            elif not isinstance(self.err, socket.error):
+                raise HTTPQueryTransportError('No source IP address included in HTTP response')
+
+            if 'sport' in content:
+                try:
+                    self.sport = int(content['sport'])
+                except ValueError:
+                    raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response')
+                if self.sport < 0 or self.sport > 65535:
+                    raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response')
+            elif not isinstance(self.err, socket.error):
+                raise HTTPQueryTransportError('No source port value included in HTTP response')
+
+        except HTTPQueryTransportError, e:
+            self.err = e
+
+        super(DNSQueryTransportMetaHTTP, self).cleanup()
+
+    def do_write(self):
+        val = super(DNSQueryTransportMetaHTTP, self).do_write()
+        if self.err is not None:
+            self.err = HTTPQueryTransportError('Error making HTTP request: %s' % self.err)
+        return val
+
+    def do_read(self):
+        try:
+            buf = self.sock.recv(65536)
+            if buf == '':
+                raise EOFError
+            self.res_len_buf += buf
+
+            # still reading status and headers
+            if self.chunked_encoding is None and self.res_len is None:
+                headers_end_match = HTTP_HEADER_END_RE.search(self.res_len_buf)
+                if headers_end_match is not None:
+                    headers = self.res_len_buf[:headers_end_match.start()]
+                    self.res_len_buf = self.res_len_buf[headers_end_match.end():]
+
+                    # check HTTP status
+                    status_match = HTTP_STATUS_RE.search(headers)
+                    if status_match is None:
+                        self.err = HTTPQueryTransportError('Malformed HTTP status line')
+                        self.cleanup()
+                        return True
+                    status = int(status_match.group('status'))
+                    if status != 200:
+                        self.err = HTTPQueryTransportError('%d HTTP status' % status)
+                        self.cleanup()
+                        return True
+
+                    # get content length or determine whether "chunked"
+                    # transfer encoding is used
+                    content_length_match = CONTENT_LENGTH_RE.search(headers)
+                    if content_length_match is not None:
+                        self.chunked_encoding = False
+                        self.res_len = int(content_length_match.group('length'))
+                    else:
+                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(headers) is not None
+
+            # handle chunked encoding first
+            if self.chunked_encoding:
+                # look through as many chunks as are readily available
+                # (without having to read from socket again)
+                while self.res_len_buf:
+                    if self.res_len is None:
+                        # looking for chunk length
+
+                        # strip off beginning CRLF, if any
+                        # (this is for chunks after the first one)
+                        crlf_start_match = CRLF_START_RE.search(self.res_len_buf)
+                        if crlf_start_match is not None:
+                            self.res_len_buf = self.res_len_buf[crlf_start_match.end():]
+
+                        # find the chunk length
+                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_len_buf)
+                        if chunk_len_match is not None:
+                            self.res_len = int(chunk_len_match.group('length'), 16)
+                            self.res_len_buf = self.res_len_buf[chunk_len_match.end():]
+                            self.res_index = 0
+                        else:
+                            # if we don't currently know the length of the next
+                            # chunk, and we don't have enough data to find the
+                            # length, then break out of the loop because we
+                            # don't have any more data to go off of.
+                            break
+
+                    if self.res_len is not None:
+                        # we know a length of the current chunk
+
+                        if self.res_len == 0:
+                            # no chunks left, so clean up and return
+                            self.cleanup()
+                            return True
+
+                        # read remaining bytes
+                        bytes_remaining = self.res_len - self.res_index
+                        if len(self.res_len_buf) > bytes_remaining:
+                            self.res += self.res_len_buf[:bytes_remaining]
+                            self.res_index = 0
+                            self.res_len_buf = self.res_len_buf[bytes_remaining:]
+                            self.res_len = None
+                        else:
+                            self.res += self.res_len_buf
+                            self.res_index += len(self.res_len_buf)
+                            self.res_len_buf = ''
+
+            elif self.chunked_encoding == False:
+                # output is not chunked, so we're either reading until we've
+                # read all the bytes specified by the content-length header (if
+                # specified) or until the server closes the connection (or we
+                # time out)
+                if self.res_len is not None:
+                    bytes_remaining = self.res_len - self.res_index
+                    self.res += self.res_len_buf[:bytes_remaining]
+                    self.res_len_buf = self.res_len_buf[bytes_remaining:]
+                    self.res_index = len(self.res)
+
+                    if self.res_index >= self.res_len:
+                        self.cleanup()
+                        return True
+                else:
+                    self.res += self.res_len_buf
+                    self.res_len_buf = ''
+
+        except (socket.error, EOFError), e:
+            if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
+                pass
+            else:
+                # if we weren't passed any content length header, and we're not
+                # using chunked encoding, then don't throw an error.  If the
+                # content was bad, then it will be reflected in the decoding of
+                # the content
+                if self.chunked_encoding == False and self.res_len is None:
+                    pass
+                else:
+                    self.err = e
+                self.cleanup()
+                return True
+
+    def do_timeout(self):
+        self.err = HTTPQueryTransportError('HTTP request timed out')
         self.cleanup()
 
 class _DNSQueryTransport:
