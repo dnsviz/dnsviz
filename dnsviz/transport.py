@@ -130,7 +130,7 @@ class DNSQueryTransportMeta(object):
 
     def connect(self):
         self.expiration = self.timeout + time.time()
-        self.start_time = time.time()
+        self._set_start_time()
         self._connect_socket()
         self._set_socket_info()
 
@@ -140,6 +140,9 @@ class DNSQueryTransportMeta(object):
         except socket.error, e:
             if e.errno != socket.errno.EINPROGRESS:
                 raise
+
+    def _set_start_time(self):
+        self.start_time = time.time()
 
     def _set_end_time(self):
         self.end_time = time.time()
@@ -312,6 +315,9 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
         return s
 
     def _set_socket_info(self):
+        pass
+
+    def _set_start_time(self):
         pass
 
     def _set_end_time(self):
