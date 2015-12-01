@@ -209,7 +209,7 @@ class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
     require_queryid_match = False
 
 class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
-    def __init__(self, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
+    def __init__(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
         super(DNSQueryTransportMetaNative, self).__init__(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
 
         self._queryid_wire = self.req[:2]
@@ -283,7 +283,7 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         self.cleanup()
 
 class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
-    def __init__(self, http_host, http_port, http_path, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
+    def __init__(self, http_host, http_port, http_path, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
         try:
             addrinfo = socket.getaddrinfo(http_host, http_port)
         except socket.gaierror:
