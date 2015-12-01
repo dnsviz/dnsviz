@@ -19,6 +19,7 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import base64
 import bisect
 import fcntl
 import os
@@ -162,6 +163,36 @@ class DNSQueryTransportMeta(object):
 
     def do_timeout(self):
         raise NotImplemented
+
+    def serialize_response(self):
+        if self.res is not None:
+            res = base64.b64encode(self.res)
+        else:
+            res = None
+        if self.err is None:
+            err = None
+            errno = None
+        else:
+            if isinstance(self.err, (socket.error, EOFError)):
+                err = 'NETWORK_ERROR'
+            elif isinstance(self.err, dns.exception.Timeout):
+                err = 'TIMEOUT'
+            else:
+                err = 'ERROR'
+            if hasattr(self.err, 'errno'):
+                errno = self.err.errno
+            else:
+                errno = None
+        d = {
+                'res': res,
+                'src': self.src,
+                'sport': self.sport,
+                'start_time': self.start_time,
+                'end_time': self.end_time,
+                'err': err,
+                'errno': errno,
+        }
+        return d
 
 class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
     require_queryid_match = False
