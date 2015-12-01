@@ -499,6 +499,26 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
         self.err = HTTPQueryTransportError('HTTP request timed out')
         self.cleanup()
 
+class DNSQueryTransportMetaFactory(object):
+    cls = DNSQueryTransportMeta
+
+    def build(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
+        return self.cls(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+
+class DNSQueryTransportMetaNativeFactory(DNSQueryTransportMetaFactory):
+    cls = DNSQueryTransportMetaNative
+
+class DNSQueryTransportMetaHTTPFactory(DNSQueryTransportMetaFactory):
+    cls = DNSQueryTransportMetaHTTP
+
+    def __init__(self, http_host, http_port, http_path):
+        self.http_host = http_host
+        self.http_port = http_port
+        self.http_path = http_path
+
+    def build(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
+        return self.cls(self.http_host, self.http_port, self.http_path, msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+
 class _DNSQueryTransport:
     '''A class that handles'''
 
