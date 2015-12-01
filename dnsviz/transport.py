@@ -378,8 +378,35 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
             elif not isinstance(self.err, socket.error):
                 raise HTTPQueryTransportError('No source port value included in HTTP response')
 
+            if 'start_time' in content:
+                try:
+                    self.start_time = float(content['start_time'])
+                except ValueError:
+                    raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response')
+                if self.start_time < 0:
+                    raise HTTPQueryTransportError('Negative value provided for start time in HTTP response')
+            else:
+                raise HTTPQueryTransportError('No start time value included in HTTP response')
+
+            if 'end_time' in content:
+                try:
+                    self.end_time = float(content['end_time'])
+                except ValueError:
+                    raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response')
+                if self.end_time < 0:
+                    raise HTTPQueryTransportError('Negative value provided for end time in HTTP response')
+            else:
+                raise HTTPQueryTransportError('No end time value included in HTTP response')
+
+            if self.end_time < self.start_time:
+                raise HTTPQueryTransportError('End time is before start time in HTTP response')
+
         except HTTPQueryTransportError, e:
             self.err = e
+
+            # an exception means that the start time or end time didn't get set
+            # properly, so we do it here
+            super(DNSQueryTransportMetaHTTP, self)._set_end_time()
 
         super(DNSQueryTransportMetaHTTP, self).cleanup()
 
