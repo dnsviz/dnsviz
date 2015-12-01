@@ -107,13 +107,16 @@ class DNSQueryTransportMeta(object):
                         raise
         self.sockfd = self.sock.fileno()
 
+    def _set_socket_info(self):
+        src, sport = self.sock.getsockname()[:2]
+        self.src = IPAddr(src)
+        self.sport = sport
+
     def connect(self):
         self.expiration = self.timeout + time.time()
         self.start_time = time.time()
         self._connect_socket()
-        src, sport = self.sock.getsockname()[:2]
-        self.src = IPAddr(src)
-        self.sport = sport
+        self._set_socket_info()
 
     def _connect_socket(self):
         try:
