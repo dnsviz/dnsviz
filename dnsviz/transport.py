@@ -41,7 +41,7 @@ class DNSQueryTransportMeta(object):
     require_queryid_match = True
     require_question_case_match = True
 
-    def __init__(self, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
+    def __init__(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
         self.req = msg
         self.req_len = len(self.req)
         self.req_index = None
