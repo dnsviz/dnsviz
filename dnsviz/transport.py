@@ -46,6 +46,11 @@ class DNSQueryTransportMeta(object):
         self.req_len = len(self.req)
         self.req_index = None
 
+        if tcp:
+            self.transport_type = socket.SOCK_STREAM
+        else:
+            self.transport_type = socket.SOCK_DGRAM
+
         self.res = None
         self.res_len = None
         self.res_len_buf = None
@@ -168,11 +173,8 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         self._question_wire = self.req[12:index]
 
         if tcp:
-            self.transport_type = socket.SOCK_STREAM
             self.req = struct.pack('!H', self.req_len) + self.req
             self.req_len += struct.calcsize('H')
-        else:
-            self.transport_type = socket.SOCK_DGRAM
 
     def _check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self._queryid_wire:
