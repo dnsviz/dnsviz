@@ -385,14 +385,14 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
             buf = self.sock.recv(65536)
             if buf == '':
                 raise EOFError
-            self.res_len_buf += buf
+            self.res_buf += buf
 
             # still reading status and headers
             if self.chunked_encoding is None and self.res_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(self.res_len_buf)
+                headers_end_match = HTTP_HEADER_END_RE.search(self.res_buf)
                 if headers_end_match is not None:
-                    headers = self.res_len_buf[:headers_end_match.start()]
-                    self.res_len_buf = self.res_len_buf[headers_end_match.end():]
+                    headers = self.res_buf[:headers_end_match.start()]
+                    self.res_buf = self.res_buf[headers_end_match.end():]
 
                     # check HTTP status
                     status_match = HTTP_STATUS_RE.search(headers)
@@ -419,21 +419,21 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
             if self.chunked_encoding:
                 # look through as many chunks as are readily available
                 # (without having to read from socket again)
-                while self.res_len_buf:
+                while self.res_buf:
                     if self.res_len is None:
                         # looking for chunk length
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(self.res_len_buf)
+                        crlf_start_match = CRLF_START_RE.search(self.res_buf)
                         if crlf_start_match is not None:
-                            self.res_len_buf = self.res_len_buf[crlf_start_match.end():]
+                            self.res_buf = self.res_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_len_buf)
+                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_buf)
                         if chunk_len_match is not None:
                             self.res_len = int(chunk_len_match.group('length'), 16)
-                            self.res_len_buf = self.res_len_buf[chunk_len_match.end():]
+                            self.res_buf = self.res_buf[chunk_len_match.end():]
                             self.res_index = 0
                         else:
                             # if we don't currently know the length of the next
@@ -452,15 +452,15 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
 
                         # read remaining bytes
                         bytes_remaining = self.res_len - self.res_index
-                        if len(self.res_len_buf) > bytes_remaining:
-                            self.res += self.res_len_buf[:bytes_remaining]
+                        if len(self.res_buf) > bytes_remaining:
+                            self.res += self.res_buf[:bytes_remaining]
                             self.res_index = 0
-                            self.res_len_buf = self.res_len_buf[bytes_remaining:]
+                            self.res_buf = self.res_buf[bytes_remaining:]
                             self.res_len = None
                         else:
-                            self.res += self.res_len_buf
-                            self.res_index += len(self.res_len_buf)
-                            self.res_len_buf = ''
+                            self.res += self.res_buf
+                            self.res_index += len(self.res_buf)
+                            self.res_buf = ''
 
             elif self.chunked_encoding == False:
                 # output is not chunked, so we're either reading until we've
@@ -469,16 +469,16 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                 # time out)
                 if self.res_len is not None:
                     bytes_remaining = self.res_len - self.res_index
-                    self.res += self.res_len_buf[:bytes_remaining]
-                    self.res_len_buf = self.res_len_buf[bytes_remaining:]
+                    self.res += self.res_buf[:bytes_remaining]
+                    self.res_buf = self.res_buf[bytes_remaining:]
                     self.res_index = len(self.res)
 
                     if self.res_index >= self.res_len:
                         self.cleanup()
                         return True
                 else:
-                    self.res += self.res_len_buf
-                    self.res_len_buf = ''
+                    self.res += self.res_buf
+                    self.res_buf = ''
 
         except (socket.error, EOFError), e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
