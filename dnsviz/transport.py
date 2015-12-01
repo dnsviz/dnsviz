@@ -346,7 +346,7 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
                             self.errno = int(content['errno'])
                         except ValueError:
                             raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response')
-                elif content['errno'] == 'TIMEOUT':
+                elif content['err'] == 'TIMEOUT':
                     self.err = dns.exception.Timeout()
                 else:
                     self.err = HTTPQueryTransportError('Unknown DNS response error in HTTP response')
