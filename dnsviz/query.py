@@ -641,7 +641,7 @@ class MaxTimeoutsHandler(ActionIndependentDNSResponseHandler):
 class DNSQueryHandler:
     '''A handler associated with a DNS query to a server.'''
 
-    def __init__(self, request, params, response_handlers, lifetime, server, client, port):
+    def __init__(self, request, params, response_handlers, lifetime, server, client, port, transport_factory):
         self.request = request
         self.params = params
         self._response_handlers = response_handlers
@@ -649,6 +649,7 @@ class DNSQueryHandler:
         self._server = server
         self._client = client
         self._port = port
+        self._transport_factory = transport_factory
 
         for handler in self._response_handlers:
             handler.set_context(self.params, self.history, self.request)
@@ -667,7 +668,7 @@ class DNSQueryHandler:
         self.params['wait'] = 0
 
     def get_query_transport_meta(self, response_queue):
-        return transport.DNSQueryTransportMetaNative(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
+        return self._transport_factory.build(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
                 self._port, src=self._client, sport=self.params['sport'], processed_queue=response_queue)
 
     def get_remaining_lifetime(self):
@@ -1181,7 +1182,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         self._executed = False
 
-    def get_query_handler(self, server):
+    def get_query_handler(self, server, transport_factory):
         request = dns.message.Message()
         request.flags = self.flags
         request.find_rrset(request.question, self.qname, self.rdclass, self.rdtype, create=True, force_unique=True)
@@ -1202,7 +1203,7 @@ class ExecutableDNSQuery(DNSQuery):
         if self.lifetime is not None:
             response_handlers.append(LifetimeHandler(self.lifetime).build())
 
-        return DNSQueryHandler(request, params, response_handlers, self.lifetime, server, client, self.port)
+        return DNSQueryHandler(request, params, response_handlers, self.lifetime, server, client, self.port, transport_factory)
 
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
@@ -1212,6 +1213,10 @@ class ExecutableDNSQuery(DNSQuery):
         if th is None:
             # this starts a thread that stops when th goes out of scope
             th = transport.DNSQueryTransport()
+
+        transport_factories = kwargs.get('transport_factories', None)
+        if transport_factories is None:
+            transport_factories = (transport.DNSQueryTransportMetaNativeFactory(),)
 
         request_list = []
         response_queue = Queue.Queue()
@@ -1223,12 +1228,13 @@ class ExecutableDNSQuery(DNSQuery):
         query_handlers = {}
         for query in queries:
             queries_to_execute[query] = set()
-            for server in query.servers.difference(query.responses):
-                qh = query.get_query_handler(server)
-                qtm = qh.get_query_transport_meta(response_queue)
-                bisect.insort(request_list, (qh.query_time, qtm))
-                query_handlers[qtm] = query, qh
-                queries_to_execute[query].add(qh)
+            for transport_factory in transport_factories:
+                for server in query.servers.difference(query.responses):
+                    qh = query.get_query_handler(server, transport_factory)
+                    qtm = qh.get_query_transport_meta(response_queue)
+                    bisect.insort(request_list, (qh.query_time, qtm))
+                    query_handlers[qtm] = query, qh
+                    queries_to_execute[query].add(qh)
 
         while queries_to_execute:
             while request_list and time.time() >= request_list[0][0]:
