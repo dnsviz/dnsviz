@@ -352,7 +352,7 @@ class _DNSQueryTransport:
             # handle the new queries
             if self._notify_read_fd in rlist_out:
                 # empty the pipe
-                os.read(self._notify_read_fd, 65535)
+                os.read(self._notify_read_fd, 65536)
 
                 while True:
                     try:
