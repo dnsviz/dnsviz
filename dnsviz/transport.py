@@ -37,7 +37,7 @@ from ipaddr import IPAddr
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
 
-class DNSQueryTransportMeta:
+class DNSQueryTransportMeta(object):
     require_queryid_match = True
     require_question_case_match = True
 
@@ -45,20 +45,6 @@ class DNSQueryTransportMeta:
         self.req = msg
         self.req_len = len(self.req)
         self.req_index = None
-
-        self.queryid_wire = self.req[:2]
-        index = 12
-        while ord(self.req[index]) != 0:
-            index += ord(self.req[index]) + 1
-        index += 4
-        self.question_wire = self.req[12:index]
-
-        if tcp:
-            self.transport_type = socket.SOCK_STREAM
-            self.req = struct.pack('!H', self.req_len) + self.req
-            self.req_len += struct.calcsize('H')
-        else:
-            self.transport_type = socket.SOCK_DGRAM
 
         self.res = None
         self.res_len = None
@@ -151,6 +137,37 @@ class DNSQueryTransportMeta:
         if self._processed_queue is not None:
             self._processed_queue.put(self)
 
+    def do_write(self):
+        raise NotImplemented
+
+    def do_read(self):
+        raise NotImplemented
+
+    def do_timeout(self):
+        raise NotImplemented
+
+class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
+    require_queryid_match = False
+    require_question_case_match = False
+
+class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
+    def __init__(self, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
+        super(DNSQueryTransportMetaNative, self).__init__(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+
+        self.queryid_wire = self.req[:2]
+        index = 12
+        while ord(self.req[index]) != 0:
+            index += ord(self.req[index]) + 1
+        index += 4
+        self.question_wire = self.req[12:index]
+
+        if tcp:
+            self.transport_type = socket.SOCK_STREAM
+            self.req = struct.pack('!H', self.req_len) + self.req
+            self.req_len += struct.calcsize('H')
+        else:
+            self.transport_type = socket.SOCK_DGRAM
+
     def check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self.queryid_wire:
             return False
@@ -227,10 +244,6 @@ class DNSQueryTransportMeta:
     def do_timeout(self):
         self.err = dns.exception.Timeout()
         self.cleanup()
-
-class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
-    require_queryid_match = False
-    require_question_case_match = False
 
 class _DNSQueryTransport:
     '''A class that handles'''
