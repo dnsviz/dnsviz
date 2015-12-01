@@ -1278,56 +1278,57 @@ class ExecutableDNSQuery(DNSQuery):
                     qtm = qh.get_query_transport_meta(response_queue)
                     bisect.insort(request_list, (qh.query_time, qtm))
                     query_handlers[qtm] = query, qh
+                    continue
+
                 # otherwise store away the response (or error), history, and response time
+                if isinstance(response, dns.message.Message):
+                    msg = response
+                    err = None
+                    errno1 = None
                 else:
-                    if isinstance(response, dns.message.Message):
-                        msg = response
-                        err = None
+                    msg = None
+                    if isinstance(response, dns.exception.Timeout):
+                        err = RESPONSE_ERROR_TIMEOUT
+                    elif isinstance(response, (socket.error, EOFError)):
+                        err = RESPONSE_ERROR_NETWORK_ERROR
+                    elif isinstance(response, (struct.error, dns.exception.FormError)):
+                        err = RESPONSE_ERROR_FORMERR
+                    #XXX need to determine how to handle non-parsing
+                    # validation errors with dnspython (e.g., signature with
+                    # no keyring)
+                    else:
+                        err = RESPONSE_ERROR_OTHER
+                    if hasattr(response, 'errno'):
+                        errno1 = response.errno
+                    else:
                         errno1 = None
+                response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query)
+
+                # if client IP is not specified, and there is a socket
+                # failure, then src might be None
+                if qtm.src is not None:
+                    src = IPAddr(qtm.src)
+                else:
+                    src = qtm.src
+
+                # If we were unable to bind to the source address, then
+                # this is an error
+                if err == RESPONSE_ERROR_NETWORK_ERROR and errno1 == errno.EADDRNOTAVAIL:
+                    if qh._client is not None:
+                        raise SourceAddressBINDError('Unable to bind to local address %s' % qh._client)
                     else:
-                        msg = None
-                        if isinstance(response, dns.exception.Timeout):
-                            err = RESPONSE_ERROR_TIMEOUT
-                        elif isinstance(response, (socket.error, EOFError)):
-                            err = RESPONSE_ERROR_NETWORK_ERROR
-                        elif isinstance(response, (struct.error, dns.exception.FormError)):
-                            err = RESPONSE_ERROR_FORMERR
-                        #XXX need to determine how to handle non-parsing
-                        # validation errors with dnspython (e.g., signature with
-                        # no keyring)
-                        else:
-                            err = RESPONSE_ERROR_OTHER
-                        if hasattr(response, 'errno'):
-                            errno1 = response.errno
-                        else:
-                            errno1 = None
-                    response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query)
+                        raise SourceAddressBINDError('Unable to bind to local address')
 
-                    # if client IP is not specified, and there is a socket
-                    # failure, then src might be None
-                    if qtm.src is not None:
-                        src = IPAddr(qtm.src)
-                    else:
-                        src = qtm.src
+                # if src is None, then it is a connectivity issue on our
+                # side, so don't record it in the responses
+                if src is None:
+                    queries_aborted[query].add(IPAddr(qtm.dst))
+                else:
+                    query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
 
-                    # If we were unable to bind to the source address, then
-                    # this is an error
-                    if err == RESPONSE_ERROR_NETWORK_ERROR and errno1 == errno.EADDRNOTAVAIL:
-                        if qh._client is not None:
-                            raise SourceAddressBINDError('Unable to bind to local address %s' % qh._client)
-                        else:
-                            raise SourceAddressBINDError('Unable to bind to local address')
-
-                    # if src is None, then it is a connectivity issue on our
-                    # side, so don't record it in the responses
-                    if src is None:
-                        queries_aborted[query].add(IPAddr(qtm.dst))
-                    else:
-                        query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
-
-                    if not query.servers.difference(set(query.responses).union(queries_aborted[query])):
-                        queries_to_execute.remove(query)
-                        query._executed = True
+                if not query.servers.difference(set(query.responses).union(queries_aborted[query])):
+                    queries_to_execute.remove(query)
+                    query._executed = True
 
     def require_executed(func):
         def _func(self, *args, **kwargs):
