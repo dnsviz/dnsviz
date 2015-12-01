@@ -157,12 +157,12 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
     def __init__(self, msg, dst, tcp, timeout, dport=53, src=None, sport=None, processed_queue=None):
         super(DNSQueryTransportMetaNative, self).__init__(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
 
-        self.queryid_wire = self.req[:2]
+        self._queryid_wire = self.req[:2]
         index = 12
         while ord(self.req[index]) != 0:
             index += ord(self.req[index]) + 1
         index += 4
-        self.question_wire = self.req[12:index]
+        self._question_wire = self.req[12:index]
 
         if tcp:
             self.transport_type = socket.SOCK_STREAM
@@ -172,7 +172,7 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
             self.transport_type = socket.SOCK_DGRAM
 
     def _check_response_consistency(self):
-        if self.require_queryid_match and self.res[:2] != self.queryid_wire:
+        if self.require_queryid_match and self.res[:2] != self._queryid_wire:
             return False
         # if a question case match is required :
         # check that if the question count is greater than 0 and
@@ -180,7 +180,7 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         # make sure the case matches
         if self.require_question_case_match and \
                 self.res[4:6] != '\x00\x00' and len(self.res) > 12 and \
-                self.res[12:12+len(self.question_wire)] != self.question_wire:
+                self.res[12:12+len(self._question_wire)] != self._question_wire:
             return False
         return True
 
