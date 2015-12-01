@@ -141,7 +141,7 @@ class DNSQueryTransportMeta(object):
             if e.errno != socket.errno.EINPROGRESS:
                 raise
 
-    def _stop_clock(self):
+    def _set_end_time(self):
         self.end_time = time.time()
         if self.start_time is None:
             self.start_time = self.end_time
@@ -149,7 +149,7 @@ class DNSQueryTransportMeta(object):
             self.sock.close()
 
     def cleanup(self):
-        self._stop_clock()
+        self._set_end_time()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
@@ -314,7 +314,7 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
     def _set_socket_info(self):
         pass
 
-    def _stop_clock(self):
+    def _set_end_time(self):
         pass
 
     def cleanup(self):
