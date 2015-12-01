@@ -148,7 +148,14 @@ class DNSQueryTransportMeta(object):
             self._processed_queue.put(self)
 
     def do_write(self):
-        raise NotImplemented
+        try:
+            self.req_index += self.sock.send(self.req[self.req_index:])
+            if self.req_index >= self.req_len:
+                return True
+        except socket.error, e:
+            self.err = e
+            self.cleanup()
+            return True
 
     def do_read(self):
         raise NotImplemented
@@ -228,16 +235,6 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
                     self.err = e
                     self.cleanup()
                     return True
-
-    def do_write(self):
-        try:
-            self.req_index += self.sock.send(self.req[self.req_index:])
-            if self.req_index >= self.req_len:
-                return True
-        except socket.error, e:
-            self.err = e
-            self.cleanup()
-            return True
 
     def do_timeout(self):
         self.err = dns.exception.Timeout()
