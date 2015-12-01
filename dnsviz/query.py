@@ -667,7 +667,7 @@ class DNSQueryHandler:
         self.params['wait'] = 0
 
     def get_query_transport_meta(self, response_queue):
-        return transport.DNSQueryTransportMeta(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
+        return transport.DNSQueryTransportMetaNative(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
                 self._port, src=self._client, sport=self.params['sport'], processed_queue=response_queue)
 
     def get_remaining_lifetime(self):
