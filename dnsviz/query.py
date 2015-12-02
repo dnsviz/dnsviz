@@ -1332,7 +1332,7 @@ class ExecutableDNSQuery(DNSQuery):
                 # if src is None, then it is a connectivity issue on our
                 # side, so don't record it in the responses
                 if src is not None:
-                    query.add_response(IPAddr(qtm.dst), src, response_obj, query.bailiwick)
+                    query.add_response(qh._server, src, response_obj, query.bailiwick)
 
                 # Remove this query handler from the set of those associated
                 # with this query.  If there are no query handlers left to
