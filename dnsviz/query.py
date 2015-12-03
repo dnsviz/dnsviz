@@ -641,21 +641,21 @@ class MaxTimeoutsHandler(ActionIndependentDNSResponseHandler):
 class DNSQueryHandler:
     '''A handler associated with a DNS query to a server.'''
 
-    def __init__(self, request, params, response_handlers, lifetime, server, client, port, transport_factory):
+    def __init__(self, query, request, params, response_handlers, server, client, transport_factory):
+        self.query = query
         self.request = request
         self.params = params
         self._response_handlers = response_handlers
         self.history = []
         self._server = server
         self._client = client
-        self._port = port
         self._transport_factory = transport_factory
 
         for handler in self._response_handlers:
             handler.set_context(self.params, self.history, self.request)
 
-        if lifetime is not None:
-            self._expiration = time.time() + lifetime
+        if query.lifetime is not None:
+            self._expiration = time.time() + query.lifetime
         else:
             self._expiration = None
 
@@ -669,7 +669,7 @@ class DNSQueryHandler:
 
     def get_query_transport_meta(self, response_queue):
         return self._transport_factory.build(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
-                self._port, src=self._client, sport=self.params['sport'], processed_queue=response_queue)
+                self.query.port, src=self._client, sport=self.params['sport'], processed_queue=response_queue)
 
     def get_remaining_lifetime(self):
         if self._expiration is None:
@@ -1203,7 +1203,7 @@ class ExecutableDNSQuery(DNSQuery):
         if self.lifetime is not None:
             response_handlers.append(LifetimeHandler(self.lifetime).build())
 
-        return DNSQueryHandler(request, params, response_handlers, self.lifetime, server, client, self.port, transport_factory)
+        return DNSQueryHandler(self, request, params, response_handlers, server, client, transport_factory)
 
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
@@ -1233,7 +1233,7 @@ class ExecutableDNSQuery(DNSQuery):
                     qh = query.get_query_handler(server, transport_factory)
                     qtm = qh.get_query_transport_meta(response_queue)
                     bisect.insort(request_list, (qh.query_time, qtm))
-                    query_handlers[qtm] = query, qh
+                    query_handlers[qtm] = qh
                     queries_to_execute[query].add(qh)
 
         while queries_to_execute:
@@ -1254,7 +1254,8 @@ class ExecutableDNSQuery(DNSQuery):
 
             else:
                 # find its matching query meta information
-                query, qh = query_handlers.pop(qtm)
+                qh = query_handlers.pop(qtm)
+                query = qh.query
 
                 # define response as either a Message created from parsing
                 # the wire response or an Exception
@@ -1282,7 +1283,7 @@ class ExecutableDNSQuery(DNSQuery):
                 if response is None:
                     qtm = qh.get_query_transport_meta(response_queue)
                     bisect.insort(request_list, (qh.query_time, qtm))
-                    query_handlers[qtm] = query, qh
+                    query_handlers[qtm] = qh
                     continue
 
                 # otherwise store away the response (or error), history, and response time
