@@ -555,7 +555,7 @@ class DNSQueryTransportMetaHTTPFactory(DNSQueryTransportMetaFactory):
     def build(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
         return self.cls(self.http_host, self.http_port, self.http_path, msg, dst, tcp, timeout, dport, src, sport, processed_queue)
 
-class _DNSQueryTransport:
+class _DNSQueryTransportManager:
     '''A class that handles'''
 
     #TODO might need FD_SETSIZE to support lots of fds
@@ -682,9 +682,9 @@ class _DNSQueryTransport:
                     except Queue.Empty:
                         break
 
-class DNSQueryTransport:
+class DNSQueryTransportManager:
     def __init__(self):
-        self._th = _DNSQueryTransport()
+        self._th = _DNSQueryTransportManager()
 
     def __del__(self):
         self.close()

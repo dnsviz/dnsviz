@@ -983,16 +983,16 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_handler']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager']
 
     def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, transport_handler=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, transport_manager=None):
 
-        if transport_handler is None:
-            self.transport_handler = transport.DNSQueryTransport()
+        if transport_manager is None:
+            self.transport_manager = transport.DNSQueryTransportManager()
         else:
-            self.transport_handler = transport_handler
-        self.resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_handler=self.transport_handler)
+            self.transport_manager = transport_manager
+        self.resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1025,7 +1025,7 @@ class Analyst(object):
             # delegated.
             if ceiling is None or not self.name.is_subdomain(ceiling) or c.is_subdomain(ceiling):
                 ceiling = c
-                resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_handler=self.transport_handler)
+                resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_manager=self.transport_manager)
 
         self.ceiling = self._detect_ceiling(ceiling, resolver)[0]
         self._fix_explicit_delegation()
@@ -1696,7 +1696,7 @@ class Analyst(object):
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
-        Q.ExecutableDNSQuery.execute_queries(*queries.values(), th=self.transport_handler)
+        Q.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self.transport_manager)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
                 self._add_query(name_obj, query)
@@ -1739,7 +1739,7 @@ class Analyst(object):
 
             self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
             query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
-            query.execute(th=self.transport_handler)
+            query.execute(tm=self.transport_manager)
             referral_queries[rdtype] = query
 
             # if NXDOMAIN was received, then double-check with the secondary
@@ -1868,7 +1868,7 @@ class Analyst(object):
                     queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
 
             # actually execute the queries, then store the results
-            Q.ExecutableDNSQuery.execute_queries(*queries, th=self.transport_handler)
+            Q.ExecutableDNSQuery.execute_queries(*queries, tm=self.transport_manager)
             for query in queries:
                 self._add_query(name_obj, query, True)
 
@@ -1976,7 +1976,7 @@ class Analyst(object):
 
     def _root_responsive(self, proto):
         servers = list(self._root_servers(proto))
-        checker = Resolver.Resolver(servers, self.simple_query, max_attempts=1, shuffle=True, transport_handler=self.transport_handler)
+        checker = Resolver.Resolver(servers, self.simple_query, max_attempts=1, shuffle=True, transport_manager=self.transport_manager)
         try:
             checker.query_for_answer(dns.name.root, dns.rdatatype.NS, dns.rdataclass.IN)
             return True
@@ -2086,7 +2086,7 @@ class RecursiveAnalyst(Analyst):
             self._handle_explicit_delegations(name_obj)
             servers = name_obj.zone.get_auth_or_designated_servers()
             servers = self._filter_servers(servers)
-            resolver = Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD, transport_handler=self.transport_handler)
+            resolver = Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
             try:
                 ans = resolver.query_for_answer(name, dns.rdatatype.NS, dns.rdataclass.IN)
@@ -2213,7 +2213,7 @@ class RecursiveAnalyst(Analyst):
 
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
         query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-        query.execute(th=self.transport_handler)
+        query.execute(tm=self.transport_manager)
         self._add_query(name_obj, query, True)
 
         # if there were no valid responses, then exit out early
@@ -2235,7 +2235,7 @@ class RecursiveAnalyst(Analyst):
                 # because there is no parent on the name_obj)
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-                query.execute(th=self.transport_handler)
+                query.execute(tm=self.transport_manager)
                 self._add_query(name_obj, query)
 
         # for non-TLDs make NS queries after all others
@@ -2244,7 +2244,7 @@ class RecursiveAnalyst(Analyst):
             if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
-                query.execute(th=self.transport_handler)
+                query.execute(tm=self.transport_manager)
                 self._add_query(name_obj, query, True)
 
         return name_obj

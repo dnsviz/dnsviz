@@ -47,7 +47,7 @@ from dnsviz.util import get_client_address
 logger = logging.getLogger('dnsviz.analysis.online')
 
 # this needs to be global because of multiprocessing
-th = None
+tm = None
 resolver = None
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
@@ -65,15 +65,15 @@ def _raise_eof(signum, frame):
     # KeyboardInterrupt
     raise EOFError
 
-def _init_th():
-    global th
-    th = transport.DNSQueryTransport()
+def _init_tm():
+    global tm
+    tm = transport.DNSQueryTransportManager()
 
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
 
 def _init_subprocess():
-    _init_th()
+    _init_tm()
     _init_interrupt_handler()
 
 def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock)):
@@ -82,7 +82,7 @@ def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_handler=th)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -327,7 +327,7 @@ Options:
 ''' % (err))
 
 def main(argv):
-    global th
+    global tm
     global resolver
 
     try:
@@ -337,8 +337,8 @@ def main(argv):
             usage(str(e))
             sys.exit(1)
 
-        th = transport.DNSQueryTransport()
-        resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_handler=th)
+        tm = transport.DNSQueryTransportManager()
+        resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
 
         # get all the -x options
         explicit_delegations = {}
@@ -648,11 +648,11 @@ def main(argv):
         logger.error('Interrupted.')
         sys.exit(4)
 
-    # th is global (because of possible multiprocessing), so we need to
+    # tm is global (because of possible multiprocessing), so we need to
     # explicitly close it here
     finally:
-        if th is not None:
-            th.close()
+        if tm is not None:
+            tm.close()
 
 if __name__ == "__main__":
     main(sys.argv)

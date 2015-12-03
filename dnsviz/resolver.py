@@ -90,7 +90,7 @@ class DNSAnswerNoAnswerAllowed(DNSAnswer):
 class Resolver:
     '''A simple stub DNS resolver.'''
 
-    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False, client_ipv4=None, client_ipv6=None, port=53, transport_handler=None):
+    def __init__(self, servers, query_cls, timeout=1.0, max_attempts=5, lifetime=15.0, shuffle=False, client_ipv4=None, client_ipv6=None, port=53, transport_manager=None):
         if lifetime is None and max_attempts is None:
             raise ValueError("At least one of lifetime or max_attempts must be specified for a Resolver instance.")
 
@@ -103,7 +103,7 @@ class Resolver:
         self._client_ipv4 = client_ipv4
         self._client_ipv6 = client_ipv6
         self._port = port
-        self._transport_handler = transport_handler
+        self._transport_manager = transport_manager
 
     @classmethod
     def from_file(cls, resolv_conf, query_cls, **kwargs):
@@ -214,7 +214,7 @@ class Resolver:
 
                     attempts[query_tuple] += 1
 
-            query.ExecutableDNSQuery.execute_queries(*queries.values(), th=self._transport_handler)
+            query.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self._transport_manager)
 
             for query_tuple, q in queries.items():
                 # no response means we didn't even try because we don't have

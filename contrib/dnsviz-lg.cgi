@@ -1,4 +1,4 @@
-#!/opt/local/Library/Frameworks/Python.framework/Versions/2.7/bin/python
+#!/usr/bin/env python
 #
 # This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
 # analysis, and visualization.
@@ -173,13 +173,13 @@ def main():
         timeout = 3.0
 
     try:
-        th = transport.DNSQueryTransport()
+        tm = transport.DNSQueryTransportManager()
         t = transport.DNSQueryTransportMetaNative(msg, dst, tcp, timeout, dport, src=src, sport=sport)
-        th.query(t)
+        tm.query(t)
         f = t.serialize_response()
         print json.dumps(f)
     finally:
-        th.close()
+        tm.close()
 
 if __name__ == '__main__':
     main()

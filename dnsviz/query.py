@@ -1209,10 +1209,10 @@ class ExecutableDNSQuery(DNSQuery):
     def execute_queries(cls, *queries, **kwargs):
         '''Excecute the query to a given server, and handle it appropriately.'''
 
-        th = kwargs.get('th', None)
-        if th is None:
-            # this starts a thread that stops when th goes out of scope
-            th = transport.DNSQueryTransport()
+        tm = kwargs.get('tm', None)
+        if tm is None:
+            # this starts a thread that stops when tm goes out of scope
+            tm = transport.DNSQueryTransportManager()
 
         transport_factories = kwargs.get('transport_factories', None)
         if transport_factories is None:
@@ -1238,7 +1238,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         while queries_to_execute:
             while request_list and time.time() >= request_list[0][0]:
-                th.query_nowait(request_list.pop(0)[1])
+                tm.query_nowait(request_list.pop(0)[1])
 
             t = time.time()
             if request_list and t < request_list[0][0]:
@@ -1360,8 +1360,8 @@ class ExecutableDNSQuery(DNSQuery):
             self._executed = True
 
     @require_not_executed
-    def execute(self, ignore_queryid=True, th=None):
-        self.execute_queries(self, ignore_queryid=ignore_queryid, th=th)
+    def execute(self, ignore_queryid=True, tm=None):
+        self.execute_queries(self, ignore_queryid=ignore_queryid, tm=tm)
 
     join = require_executed(DNSQuery.join)
     project = require_executed(DNSQuery.project)
