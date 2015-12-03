@@ -1224,19 +1224,16 @@ class ExecutableDNSQuery(DNSQuery):
         ignore_queryid = kwargs.get('ignore_queryid', True)
         response_wire_map = {}
 
-        queries_to_execute = {}
         query_handlers = {}
         for query in queries:
-            queries_to_execute[query] = set()
             for transport_factory in transport_factories:
                 for server in query.servers.difference(query.responses):
                     qh = query.get_query_handler(server, transport_factory)
                     qtm = qh.get_query_transport_meta(response_queue)
                     bisect.insort(request_list, (qh.query_time, qtm))
                     query_handlers[qtm] = qh
-                    queries_to_execute[query].add(qh)
 
-        while queries_to_execute:
+        while query_handlers:
             while request_list and time.time() >= request_list[0][0]:
                 tm.query_nowait(request_list.pop(0)[1])
 
@@ -1335,13 +1332,8 @@ class ExecutableDNSQuery(DNSQuery):
                 if src is not None:
                     query.add_response(qh._server, src, response_obj, query.bailiwick)
 
-                # Remove this query handler from the set of those associated
-                # with this query.  If there are no query handlers left to
-                # execute for this query, then mark the query as executed.
-                queries_to_execute[query].remove(qh)
-                if not queries_to_execute[query]:
-                    del queries_to_execute[query]
-                    query._executed = True
+                # This query is now executed, at least in part
+                query._executed = True
 
     def require_executed(func):
         def _func(self, *args, **kwargs):
