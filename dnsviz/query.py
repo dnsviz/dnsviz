@@ -641,7 +641,7 @@ class MaxTimeoutsHandler(ActionIndependentDNSResponseHandler):
 class DNSQueryHandler:
     '''A handler associated with a DNS query to a server.'''
 
-    def __init__(self, query, request, params, response_handlers, server, client, transport_factory):
+    def __init__(self, query, request, params, response_handlers, server, client, th_factory):
         self.query = query
         self.request = request
         self.params = params
@@ -1214,9 +1214,9 @@ class ExecutableDNSQuery(DNSQuery):
             # this starts a thread that stops when tm goes out of scope
             tm = transport.DNSQueryTransportManager()
 
-        transport_factories = kwargs.get('transport_factories', None)
-        if transport_factories is None:
-            transport_factories = (transport.DNSQueryTransportMetaNativeFactory(),)
+        th_factories = kwargs.get('th_factories', None)
+        if th_factories is None:
+            th_factories = (transport.DNSQueryTransportMetaNativeFactory(),)
 
         request_list = []
         response_queue = Queue.Queue()
@@ -1226,9 +1226,9 @@ class ExecutableDNSQuery(DNSQuery):
 
         query_handlers = {}
         for query in queries:
-            for transport_factory in transport_factories:
+            for th_factory in th_factories:
                 for server in query.servers.difference(query.responses):
-                    qh = query.get_query_handler(server, transport_factory)
+                    qh = query.get_query_handler(server, th_factory)
                     qtm = qh.get_query_transport_meta(response_queue)
                     bisect.insort(request_list, (qh.query_time, qtm))
                     query_handlers[qtm] = qh
