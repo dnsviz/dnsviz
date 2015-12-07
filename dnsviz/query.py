@@ -1377,8 +1377,8 @@ class ExecutableDNSQuery(DNSQuery):
             self._executed = True
 
     @require_not_executed
-    def execute(self, ignore_queryid=True, tm=None):
-        self.execute_queries(self, ignore_queryid=ignore_queryid, tm=tm)
+    def execute(self, ignore_queryid=True, tm=None, th_factories=None):
+        self.execute_queries(self, ignore_queryid=ignore_queryid, tm=tm, th_factories=th_factories)
 
     join = require_executed(DNSQuery.join)
     project = require_executed(DNSQuery.project)
