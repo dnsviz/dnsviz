@@ -1150,6 +1150,8 @@ class TTLDistinguishingMultiQueryAggregateDNSResponse(MultiQueryAggregateDNSResp
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
 
+    default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
+
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
             client_ipv4, client_ipv6, port,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
@@ -1215,7 +1217,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         th_factories = kwargs.get('th_factories', None)
         if th_factories is None:
-            th_factories = (transport.DNSQueryTransportHandlerDNSFactory(),)
+            th_factories = (cls.default_th_factory,)
 
         request_list = []
         response_queue = Queue.Queue()
@@ -1266,6 +1268,7 @@ class ExecutableDNSQuery(DNSQuery):
             except Queue.Empty:
                 continue
             th.finalize()
+
             newth = th.factory.build(processed_queue=response_queue)
             query_time = None
             for qtm in th.qtms:
