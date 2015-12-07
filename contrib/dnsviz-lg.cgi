@@ -39,6 +39,12 @@ import time
 MAX_QUERIES = 1000
 FALSE_RE = re.compile(r'^(0|f(alse)?)?$', re.IGNORECASE)
 
+LOOPBACK_IPV4_RE = re.compile(r'^127')
+LOOPBACK_IPV6 = IPAddr('::1')
+RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
+LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
+UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
+
 def options_from_wire(value):
     value = base64.b64decode(value)
     options = []
@@ -158,6 +164,19 @@ def get_qtm(form, index):
         dst = get_field_value(form, dst_key, IPAddr, ValueError)
     else:
         return None
+
+    # check for local addresses
+    allow_private_query = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
+    allow_loopback_query = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
+    if not allow_private_query and (RFC_1918_RE.search(dst) is not None or \
+            LINK_LOCAL_RE.search(dst) is not None or \
+            UNIQ_LOCAL_RE.search(dst) is not None):
+        sys.stdout.write('Querying %s not allowed\n' % dst)
+        sys.exit(0)
+    if not allow_loopback_query and (LOOPBACK_IPV4_RE.search(dst) is not None or \
+            dst == LOOPBACK_IPV6):
+        sys.stdout.write('Querying %s not allowed\n' % dst)
+        sys.exit(0)
 
     if src_key in form:
         src = get_field_value(form, src_key, IPAddr, ValueError)
