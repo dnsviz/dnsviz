@@ -21,6 +21,7 @@
 
 import base64
 import bisect
+import collections
 import fcntl
 import json
 import os
@@ -32,6 +33,7 @@ import socket
 import struct
 import threading
 import time
+import urllib
 
 import dns.exception
 
@@ -50,17 +52,58 @@ class HTTPQueryTransportError(Exception):
     pass
 
 class DNSQueryTransportMeta(object):
-    require_queryid_match = True
+    def __init__(self, req, dst, tcp, timeout, dport, src=None, sport=None):
+        self.req = req
+        self.dst = dst
+        self.tcp = tcp
+        self.timeout = timeout
+        self.dport = dport
+        self.src = src
+        self.sport = sport
 
-    def __init__(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
-        self.req = msg
-        self.req_len = len(self.req)
-        self.req_index = None
+        self.res = None
+        self.err = None
 
-        if tcp:
-            self.transport_type = socket.SOCK_STREAM
+        self.start_time = None
+        self.end_time = None
+
+    def serialize_response(self):
+        if self.res is not None:
+            res = base64.b64encode(self.res)
         else:
-            self.transport_type = socket.SOCK_DGRAM
+            res = None
+        if self.err is None:
+            err = None
+            errno = None
+        else:
+            if isinstance(self.err, (socket.error, EOFError)):
+                err = 'NETWORK_ERROR'
+            elif isinstance(self.err, dns.exception.Timeout):
+                err = 'TIMEOUT'
+            else:
+                err = 'ERROR'
+            if hasattr(self.err, 'errno'):
+                errno = self.err.errno
+            else:
+                errno = None
+        d = collections.OrderedDict((
+                ('res', res),
+                ('src', self.src),
+                ('sport', self.sport),
+                ('start_time', self.start_time),
+                ('end_time', self.end_time),
+                ('err', err),
+                ('errno', errno),
+        ))
+        return d
+
+class DNSQueryTransportHandler(object):
+    singleton = False
+
+    def __init__(self, processed_queue=None, factory=None):
+        self.req = None
+        self.req_len = None
+        self.req_index = None
 
         self.res = None
         self.res_len = None
@@ -68,13 +111,16 @@ class DNSQueryTransportMeta(object):
         self.res_index = None
         self.err = None
 
-        self.dst = dst
-        self.dport = dport
-        self.src = src
-        self.sport = sport
+        self.dst = None
+        self.dport = None
+        self.src = None
+        self.sport = None
 
-        self.timeout = timeout
+        self.transport_type = None
+
+        self.timeout = None
         self._processed_queue = processed_queue
+        self.factory = factory
 
         self.expiration = None
         self.sock = None
@@ -82,7 +128,31 @@ class DNSQueryTransportMeta(object):
         self.start_time = None
         self.end_time = None
 
+        self.qtms = []
+
+    def _set_timeout(self, qtm):
+        if self.timeout is None or qtm.timeout > self.timeout:
+            self.timeout = qtm.timeout
+
+    def add_qtm(self, qtm):
+        if self.singleton and self.qtms:
+            raise TypeError('Only one DNSQueryTransportMeta instance allowed for DNSQueryTransportHandlers of singleton type!')
+        self.qtms.append(qtm)
+        self._set_timeout(qtm)
+
+    def finalize(self):
+        assert self.res is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
+
+        # clear out any partial responses if there was an error
+        if self.err is not None:
+            self.res = None
+
+    def init_req(self):
+        raise NotImplemented
+
     def prepare(self):
+        assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
+
         self._prepare_socket()
         self.req_index = 0
         self.res = ''
@@ -150,16 +220,12 @@ class DNSQueryTransportMeta(object):
             self.start_time = self.end_time
 
     def cleanup(self):
-        # set start (and end) times, as appropriate
+        # set end (and start, if necessary) times, as appropriate
         self._set_end_time()
 
         # close socket
         if self.sock is not None:
             self.sock.close()
-
-        # clear out any partial responses if there was an error
-        if self.err is not None:
-            self.res = None
 
         # place in processed queue, if specified
         if self._processed_queue is not None:
@@ -181,42 +247,32 @@ class DNSQueryTransportMeta(object):
     def do_timeout(self):
         raise NotImplemented
 
-    def serialize_response(self):
-        if self.res is not None:
-            res = base64.b64encode(self.res)
-        else:
-            res = None
-        if self.err is None:
-            err = None
-            errno = None
-        else:
-            if isinstance(self.err, (socket.error, EOFError)):
-                err = 'NETWORK_ERROR'
-            elif isinstance(self.err, dns.exception.Timeout):
-                err = 'TIMEOUT'
-            else:
-                err = 'ERROR'
-            if hasattr(self.err, 'errno'):
-                errno = self.err.errno
-            else:
-                errno = None
-        d = {
-                'res': res,
-                'src': self.src,
-                'sport': self.sport,
-                'start_time': self.start_time,
-                'end_time': self.end_time,
-                'err': err,
-                'errno': errno,
-        }
-        return d
+class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
+    require_queryid_match = True
+    singleton = True
 
-class DNSQueryTransportMetaLoose(DNSQueryTransportMeta):
-    require_queryid_match = False
+    def finalize(self):
+        super(DNSQueryTransportHandlerDNS, self).finalize()
+        qtm = self.qtms[0]
+        qtm.src = self.src
+        qtm.sport = self.sport
+        qtm.res = self.res
+        qtm.err = self.err
+        qtm.start_time = self.start_time
+        qtm.end_time = self.end_time
 
-class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
-    def __init__(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
-        super(DNSQueryTransportMetaNative, self).__init__(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+    def init_req(self):
+        assert self.qtms, 'At least one DNSQueryTransportMeta must be added before init_req() can be called'
+
+        qtm = self.qtms[0]
+
+        self.dst = qtm.dst
+        self.dport = qtm.dport
+        self.src = qtm.src
+        self.sport = qtm.sport
+
+        self.req = qtm.req
+        self.req_len = len(qtm.req)
 
         self._queryid_wire = self.req[:2]
         index = 12
@@ -225,9 +281,12 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         index += 4
         self._question_wire = self.req[12:index]
 
-        if tcp:
+        if qtm.tcp:
+            self.transport_type = socket.SOCK_STREAM
             self.req = struct.pack('!H', self.req_len) + self.req
             self.req_len += struct.calcsize('H')
+        else:
+            self.transport_type = socket.SOCK_DGRAM
 
     def _check_response_consistency(self):
         if self.require_queryid_match and self.res[:2] != self._queryid_wire:
@@ -288,130 +347,150 @@ class DNSQueryTransportMetaNative(DNSQueryTransportMeta):
         self.err = dns.exception.Timeout()
         self.cleanup()
 
-class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
-    def __init__(self, http_host, http_port, http_path, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
+class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
+    require_queryid_match = False
+
+class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
+    singleton = False
+
+    def __init__(self, host, port, path, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
+
+        self.host = host
+        self.path = path
+
         try:
-            addrinfo = socket.getaddrinfo(http_host, http_port)
+            addrinfo = socket.getaddrinfo(host, port)
         except socket.gaierror:
             raise HTTPQueryTransportError('Unable to resolve name of HTTP host')
-        http_dst = IPAddr(addrinfo[0][4][0])
+        self.dst = IPAddr(addrinfo[0][4][0])
 
-        data = self._post_data(msg, dst, tcp, timeout, dport, src, sport)
-        req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\nContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (http_path, http_host, len(data), data)
-        super(DNSQueryTransportMetaHTTP, self).__init__(req, http_dst, True, timeout*2, http_port, None, None, processed_queue)
+        self.transport_type = socket.SOCK_STREAM
+        self.dport = port
 
         self.chunked_encoding = None
 
-    def _post_data(self, msg, dst, tcp, timeout, dport, src, sport):
-        msg = base64.b64encode(msg)
+    def _set_timeout(self, qtm):
+        timeout2 = qtm.timeout * 2
+        if self.timeout is None or timeout2 > self.timeout:
+            self.timeout = timeout2
+
+    def _finalize_qtm(self, index, content):
+        qtm = self.qtms[index]
+        try:
+            qtm_content = content[index]
+        except IndexError:
+            raise HTTPQueryTransportError('DNS response missing from HTTP response')
+
+        if 'err' in qtm_content and qtm_content['err'] is not None:
+            if qtm_content['err'] == 'NETWORK_ERROR':
+                qtm.err = socket.error()
+                if 'errno' in qtm_content and qtm_content['errno'] is not None:
+                    try:
+                        qtm.err.errno = int(qtm_content['errno'])
+                    except ValueError:
+                        raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response: %s' % qtm_content['errno'])
+            elif qtm_content['err'] == 'TIMEOUT':
+                qtm.err = dns.exception.Timeout()
+            else:
+                raise HTTPQueryTransportError('Unknown DNS response error in HTTP response: %s' % qtm_content['err'])
+
+        elif not ('res' in qtm_content and qtm_content['res'] is not None):
+            raise HTTPQueryTransportError('No DNS response or response error found in HTTP response')
+
+        else:
+            try:
+                qtm.res = base64.b64decode(qtm_content['res'])
+            except TypeError:
+                raise HTTPQueryTransportError('Base64 decoding of DNS response failed: %s' % qtm_content['res'])
+
+        if 'src' in qtm_content and qtm_content['src'] is not None:
+            try:
+                qtm.src = IPAddr(qtm_content['src'])
+            except ValueError:
+                raise HTTPQueryTransportError('Invalid source IP address found in HTTP response: %s' % qtm_content['src'])
+        elif not isinstance(qtm.err, socket.error):
+            raise HTTPQueryTransportError('No source IP address included in HTTP response')
+
+        if 'sport' in qtm_content and qtm_content['sport'] is not None:
+            try:
+                qtm.sport = int(qtm_content['sport'])
+            except ValueError:
+                raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response: %s' % qtm_content['sport'])
+            if qtm.sport < 0 or qtm.sport > 65535:
+                raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response %s' % qtm_content['sport'])
+        elif not isinstance(qtm.err, socket.error):
+            raise HTTPQueryTransportError('No source port value included in HTTP response')
+
+        if 'start_time' in qtm_content and qtm_content['start_time'] is not None:
+            try:
+                qtm.start_time = float(qtm_content['start_time'])
+            except ValueError:
+                raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response: %s' % qtm_content['start_time'])
+            if qtm.start_time < 0:
+                raise HTTPQueryTransportError('Negative value provided for start time in HTTP response: %s' % qtm_content['start_time'])
+        else:
+            raise HTTPQueryTransportError('No start time value included in HTTP response')
+
+        if 'end_time' in qtm_content and qtm_content['end_time'] is not None:
+            try:
+                qtm.end_time = float(qtm_content['end_time'])
+            except ValueError:
+                raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response: %s' % qtm_content['end_time'])
+            if qtm.end_time < 0:
+                raise HTTPQueryTransportError('Negative value provided for end time in HTTP response: %s' % qtm_content['end_time'])
+        else:
+            raise HTTPQueryTransportError('No end time value included in HTTP response')
+
+        if qtm.end_time < qtm.start_time:
+            raise HTTPQueryTransportError('End time is before start time in HTTP response')
+
+    def finalize(self):
+        super(DNSQueryTransportHandlerHTTP, self).finalize()
+
+        # if there was an error, then re-raise it here
+        if self.err is not None:
+            raise self.err
+
+        # if there is no content, raise an exception
+        if self.res is None:
+            raise HTTPQueryTransportError('No content in HTTP response')
+
+        # load the json content
+        try:
+            content = json.loads(self.res)
+        except ValueError:
+            raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
+
+        for i in range(len(self.qtms)):
+            self._finalize_qtm(i, content)
+
+    def _post_data(self, index, msg, dst, tcp, timeout, dport, src, sport):
+        msg = urllib.quote(base64.b64encode(msg))
         if tcp:
             tcp = 't'
         else:
             tcp = 'f'
-        s = 'msg=%s&dst=%s&tcp=%s&timeout=%f' % (msg, dst, tcp, timeout)
+        s = 'msg%d=%s&dst%d=%s&tcp%d=%s&timeout%d=%f' % (index, msg, index, dst, index, tcp, index, timeout)
         if dport is not None:
-            s += '&dport=%d' % dport
+            s += '&dport%d=%d' % (index, dport)
         if src is not None:
-            s += '&src=%s' % src
+            s += '&src%d=%s' % (index, src)
         if sport is not None:
-            s += '&sport=%d' % sport
+            s += '&sport%d=%d' % (index, sport)
         return s
 
-    def _set_socket_info(self):
-        pass
-
-    def _set_start_time(self):
-        pass
-
-    def _set_end_time(self):
-        pass
-
-    def cleanup(self):
-        try:
-            # if there is no content, raise an exception
-            if self.res is None:
-                raise HTTPQueryTransportError('No content in HTTP response')
-
-            # load the json content
-            try:
-                content = json.loads(self.res)
-            except ValueError:
-                raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
-
-            if 'err' in content and content['err'] is not None:
-                if content['err'] == 'NETWORK_ERROR':
-                    self.err = socket.error()
-                    if 'errno' in content and content['errno'] is not None:
-                        try:
-                            self.errno = int(content['errno'])
-                        except ValueError:
-                            raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response: %s' % content['errno'])
-                elif content['err'] == 'TIMEOUT':
-                    self.err = dns.exception.Timeout()
-                else:
-                    raise HTTPQueryTransportError('Unknown DNS response error in HTTP response: %s' % content['err'])
-
-            elif not ('res' in content and content['res'] is not None):
-                raise HTTPQueryTransportError('No DNS response or response error found in HTTP response')
-
-            else:
-                try:
-                    self.res = base64.b64decode(content['res'])
-                except TypeError:
-                    raise HTTPQueryTransportError('Base64 decoding of DNS response failed: %s' % content['res'])
-
-            if 'src' in content:
-                try:
-                    self.src = IPAddr(content['src'])
-                except ValueError:
-                    raise HTTPQueryTransportError('Invalid source IP address found in HTTP response: %s' % content['src'])
-            elif not isinstance(self.err, socket.error):
-                raise HTTPQueryTransportError('No source IP address included in HTTP response')
-
-            if 'sport' in content:
-                try:
-                    self.sport = int(content['sport'])
-                except ValueError:
-                    raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response: %s' % content['sport'])
-                if self.sport < 0 or self.sport > 65535:
-                    raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response %s' % content['sport'])
-            elif not isinstance(self.err, socket.error):
-                raise HTTPQueryTransportError('No source port value included in HTTP response')
-
-            if 'start_time' in content:
-                try:
-                    self.start_time = float(content['start_time'])
-                except ValueError:
-                    raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response: %s' % content['start_time'])
-                if self.start_time < 0:
-                    raise HTTPQueryTransportError('Negative value provided for start time in HTTP response: %s' % content['start_time'])
-            else:
-                raise HTTPQueryTransportError('No start time value included in HTTP response')
-
-            if 'end_time' in content:
-                try:
-                    self.end_time = float(content['end_time'])
-                except ValueError:
-                    raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response: %s' % content['end_time'])
-                if self.end_time < 0:
-                    raise HTTPQueryTransportError('Negative value provided for end time in HTTP response: %s' % content['end_time'])
-            else:
-                raise HTTPQueryTransportError('No end time value included in HTTP response')
-
-            if self.end_time < self.start_time:
-                raise HTTPQueryTransportError('End time is before start time in HTTP response')
-
-        except HTTPQueryTransportError, e:
-            self.err = e
-
-            # an exception means that the start time or end time didn't get set
-            # properly, so we do it here
-            super(DNSQueryTransportMetaHTTP, self)._set_end_time()
-
-        super(DNSQueryTransportMetaHTTP, self).cleanup()
+    def init_req(self):
+        data = ''
+        for i in range(len(self.qtms)):
+            qtm = self.qtms[i]
+            data += '&' + self._post_data(i, qtm.req, qtm.dst, qtm.tcp, qtm.timeout, qtm.dport, qtm.src, qtm.sport)
+        data = data[1:]
+        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\nContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, len(data), data)
+        self.req_len = len(self.req)
 
     def do_write(self):
-        val = super(DNSQueryTransportMetaHTTP, self).do_write()
+        val = super(DNSQueryTransportHandlerHTTP, self).do_write()
         if self.err is not None:
             self.err = HTTPQueryTransportError('Error making HTTP request: %s' % self.err)
         return val
@@ -535,25 +614,25 @@ class DNSQueryTransportMetaHTTP(DNSQueryTransportMeta):
         self.err = HTTPQueryTransportError('HTTP request timed out')
         self.cleanup()
 
-class DNSQueryTransportMetaFactory(object):
-    cls = DNSQueryTransportMeta
+class DNSQueryTransportHandlerFactory(object):
+    cls = DNSQueryTransportHandler
 
-    def build(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
-        return self.cls(msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+        self.kwargs['factory'] = self
 
-class DNSQueryTransportMetaNativeFactory(DNSQueryTransportMetaFactory):
-    cls = DNSQueryTransportMetaNative
+    def build(self, **kwargs):
+        for name in self.kwargs:
+            if name not in kwargs:
+                kwargs[name] = self.kwargs[name]
+        return self.cls(*self.args, **kwargs)
 
-class DNSQueryTransportMetaHTTPFactory(DNSQueryTransportMetaFactory):
-    cls = DNSQueryTransportMetaHTTP
+class DNSQueryTransportHandlerDNSFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerDNS
 
-    def __init__(self, http_host, http_port, http_path):
-        self.http_host = http_host
-        self.http_port = http_port
-        self.http_path = http_path
-
-    def build(self, msg, dst, tcp, timeout, dport, src=None, sport=None, processed_queue=None):
-        return self.cls(self.http_host, self.http_port, self.http_path, msg, dst, tcp, timeout, dport, src, sport, processed_queue)
+class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerHTTP
 
 class _DNSQueryTransportManager:
     '''A class that handles'''

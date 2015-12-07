@@ -641,7 +641,7 @@ class MaxTimeoutsHandler(ActionIndependentDNSResponseHandler):
 class DNSQueryHandler:
     '''A handler associated with a DNS query to a server.'''
 
-    def __init__(self, query, request, params, response_handlers, server, client, th_factory):
+    def __init__(self, query, request, params, response_handlers, server, client):
         self.query = query
         self.request = request
         self.params = params
@@ -649,7 +649,6 @@ class DNSQueryHandler:
         self.history = []
         self._server = server
         self._client = client
-        self._transport_factory = transport_factory
 
         for handler in self._response_handlers:
             handler.set_context(self.params, self.history, self.request)
@@ -667,9 +666,9 @@ class DNSQueryHandler:
     def _reset_wait(self):
         self.params['wait'] = 0
 
-    def get_query_transport_meta(self, response_queue):
-        return self._transport_factory.build(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
-                self.query.port, src=self._client, sport=self.params['sport'], processed_queue=response_queue)
+    def get_query_transport_meta(self):
+        return transport.DNSQueryTransportMeta(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
+                self.query.port, src=self._client, sport=self.params['sport'])
 
     def get_remaining_lifetime(self):
         if self._expiration is None:
@@ -1182,7 +1181,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         self._executed = False
 
-    def get_query_handler(self, server, transport_factory):
+    def get_query_handler(self, server):
         request = dns.message.Message()
         request.flags = self.flags
         request.find_rrset(request.question, self.qname, self.rdclass, self.rdtype, create=True, force_unique=True)
@@ -1203,7 +1202,7 @@ class ExecutableDNSQuery(DNSQuery):
         if self.lifetime is not None:
             response_handlers.append(LifetimeHandler(self.lifetime).build())
 
-        return DNSQueryHandler(self, request, params, response_handlers, server, client, transport_factory)
+        return DNSQueryHandler(self, request, params, response_handlers, server, client)
 
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
@@ -1216,7 +1215,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         th_factories = kwargs.get('th_factories', None)
         if th_factories is None:
-            th_factories = (transport.DNSQueryTransportMetaNativeFactory(),)
+            th_factories = (transport.DNSQueryTransportHandlerDNSFactory(),)
 
         request_list = []
         response_queue = Queue.Queue()
@@ -1225,13 +1224,31 @@ class ExecutableDNSQuery(DNSQuery):
         response_wire_map = {}
 
         query_handlers = {}
-        for query in queries:
-            for th_factory in th_factories:
-                for server in query.servers.difference(query.responses):
-                    qh = query.get_query_handler(server, th_factory)
-                    qtm = qh.get_query_transport_meta(response_queue)
-                    bisect.insort(request_list, (qh.query_time, qtm))
+        query_time = None
+        for th_factory in th_factories:
+            if not th_factory.cls.singleton:
+                th = th_factory.build(processed_queue=response_queue)
+
+            for query in queries:
+                for server in query.servers:
+                    qh = query.get_query_handler(server)
+                    qtm = qh.get_query_transport_meta()
                     query_handlers[qtm] = qh
+
+                    if th_factory.cls.singleton:
+                        th = th_factory.build(processed_queue=response_queue)
+                        th.add_qtm(qtm)
+                        th.init_req()
+                        bisect.insort(request_list, (qh.query_time, th))
+                    else:
+                        # find the maximum query time
+                        if query_time is None or qh.query_time > query_time:
+                            query_time = qh.query_time
+                        th.add_qtm(qtm)
+
+            if not th_factory.cls.singleton:
+                th.init_req()
+                bisect.insort(request_list, (query_time, th))
 
         while query_handlers:
             while request_list and time.time() >= request_list[0][0]:
@@ -1245,11 +1262,13 @@ class ExecutableDNSQuery(DNSQuery):
 
             try:
                 # pull a response from the queue
-                qtm = response_queue.get(timeout=timeout)
+                th = response_queue.get(timeout=timeout)
             except Queue.Empty:
-                pass
-
-            else:
+                continue
+            th.finalize()
+            newth = th.factory.build(processed_queue=response_queue)
+            query_time = None
+            for qtm in th.qtms:
                 # find its matching query meta information
                 qh = query_handlers.pop(qtm)
                 query = qh.query
@@ -1278,9 +1297,12 @@ class ExecutableDNSQuery(DNSQuery):
 
                 # if no response was returned, then resubmit the modified query
                 if response is None:
-                    qtm = qh.get_query_transport_meta(response_queue)
-                    bisect.insort(request_list, (qh.query_time, qtm))
+                    qtm = qh.get_query_transport_meta()
+                    # find the maximum query time
+                    if query_time is None or qh.query_time > query_time:
+                        query_time = qh.query_time
                     query_handlers[qtm] = qh
+                    newth.add_qtm(qtm)
                     continue
 
                 # otherwise store away the response (or error), history, and response time
@@ -1296,11 +1318,6 @@ class ExecutableDNSQuery(DNSQuery):
                         err = RESPONSE_ERROR_NETWORK_ERROR
                     elif isinstance(response, (struct.error, dns.exception.FormError)):
                         err = RESPONSE_ERROR_FORMERR
-                    # if there was an error with the higher-level transport of
-                    # the query, rather than the transport of the native query
-                    # itself, then raise an error
-                    elif isinstance(response, transport.HTTPQueryTransportError):
-                        raise response
                     #XXX need to determine how to handle non-parsing
                     # validation errors with dnspython (e.g., signature with
                     # no keyring)
@@ -1334,6 +1351,10 @@ class ExecutableDNSQuery(DNSQuery):
 
                 # This query is now executed, at least in part
                 query._executed = True
+
+            if newth.qtms:
+                newth.init_req()
+                bisect.insort(request_list, (query_time, newth))
 
     def require_executed(func):
         def _func(self, *args, **kwargs):

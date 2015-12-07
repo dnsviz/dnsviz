@@ -24,6 +24,7 @@ import base64
 import cgi
 import json
 import os
+import Queue
 import re
 import struct
 import sys
@@ -35,6 +36,7 @@ from dnsviz import transport
 
 import time
 
+MAX_QUERIES = 1000
 FALSE_RE = re.compile(r'^(0|f(alse)?)?$', re.IGNORECASE)
 
 def options_from_wire(value):
@@ -65,121 +67,160 @@ def get_field_value(form, name, validate_func, error_cls):
     try:
         return validate_func(form[name].value)
     except error_cls:
-        print 'Invalid value for %s: %s' % (name, form[name].value)
+        sys.stdout.write('Invalid value for %s: %s\n' % (name, form[name].value))
         sys.exit(0)
 
-def msg_in_parts_from_form(form):
-    if 'flags' in form:
-        flags = get_field_value(form, 'flags', int, ValueError)
+def msg_in_parts_from_form(form, index):
+    flags_key = 'flags%d' % index
+    qname_key = 'qname%d' % index
+    qclass_key = 'qclass%d' % index
+    qtype_key = 'qtype%d' % index
+    edns_version_key = 'edns_version%d' % index
+    edns_flags_key = 'edns_flags%d' % index
+    edns_max_udp_payload_key = 'edns_max_udp_payload%d' % index
+    edns_options_key = 'edns_options%d' % index
+
+    if flags_key in form:
+        flags = get_field_value(form, flags_key, int, ValueError)
     else:
         flags = 0
 
-    if 'qname' in form:
-        qname = get_field_value(form, 'qname', dns.name.from_text, dns.exception.DNSException)
-        if 'qclass' in form:
-            qclass = get_field_value(form, 'qclass', dns.rdataclass.from_text, dns.exception.DNSException)
+    if qname_key in form:
+        qname = get_field_value(form, qname_key, dns.name.from_text, dns.exception.DNSException)
+        if qclass_key in form:
+            qclass = get_field_value(form, qclass_key, dns.rdataclass.from_text, dns.exception.DNSException)
         else:
             qclass = dns.rdataclass.IN
-        if 'qtype' in form:
-            qtype = get_field_value(form, 'qtype', dns.rdatatype.from_text, dns.exception.DNSException)
+        if qtype_key in form:
+            qtype = get_field_value(form, qtype_key, dns.rdatatype.from_text, dns.exception.DNSException)
         else:
             qtype = dns.rdatatype.A
     else:
         qname = dns.name.root
-        if 'qclass' in form:
-            qclass = get_field_value(form, 'qclass', dns.rdataclass.from_text, dns.exception.DNSException)
+        if qclass_key in form:
+            qclass = get_field_value(form, qclass_key, dns.rdataclass.from_text, dns.exception.DNSException)
         else:
             qclass = dns.rdataclass.IN
-        if 'qtype' in form:
-            qtype = get_field_value(form, 'qtype', dns.rdatatype.from_text, dns.exception.DNSException)
+        if qtype_key in form:
+            qtype = get_field_value(form, qtype_key, dns.rdatatype.from_text, dns.exception.DNSException)
         else:
             qtype = dns.rdatatype.NS
 
-    if 'edns_version' in form:
-        edns_version = get_field_value(form, 'edns_version', positive_int, ValueError)
-        if 'edns_flags' in form:
-            edns_flags = get_field_value(form, 'edns_flags', positive_int, ValueError)
+    if edns_version_key in form:
+        edns_version = get_field_value(form, edns_version_key, positive_int, ValueError)
+        if edns_flags_key in form:
+            edns_flags = get_field_value(form, edns_flags_key, positive_int, ValueError)
         else:
             edns_flags = 0
-        if 'edns_max_udp_payload' in form:
-            edns_max_udp_payload = get_field_value(form, 'edns_max_udp_payload', positive_int, ValueError)
+        if edns_max_udp_payload_key in form:
+            edns_max_udp_payload = get_field_value(form, edns_max_udp_payload_key, positive_int, ValueError)
         else:
             edns_max_udp_payload = 4096
-        if 'edns_options' in form:
-            edns_options = get_field_value(form, 'edns_options', option_from_wire, (TypeError, struct.error, dns.exception.DNSException))
+        if edns_options_key in form:
+            edns_options = get_field_value(form, edns_options_key, options_from_wire, (TypeError, struct.error, dns.exception.DNSException))
         else:
             edns_options = []
 
     req = dns.message.Message()
     req.flags = flags
     req.find_rrset(req.question, qname, qclass, qtype, create=True, force_unique=True)
-    if 'edns_version' in form:
+    if edns_version_key in form:
         req.use_edns(edns_version, edns_flags, edns_max_udp_payload, edns_options)
     return req.to_wire()
 
-def msg_from_form(form):
+def msg_from_form(form, index):
+    msg_key = 'msg%d' % index
+
     # if the message itself was encoded in the form, then simply decode and
     # return it
-    if 'msg' in form:
+    if msg_key in form:
         try:
-            return base64.b64decode(form['msg'].value)
+            return base64.b64decode(form[msg_key].value)
         except TypeError:
-            print 'Error decoding JSON: %s' % form['msg'].value
+            sys.stdout.write('Error decoding JSON: %s' % form[msg_key].value)
             sys.exit(0)
 
     # otherwise, collect the parts from the form and compile a message
     else:
-        return msg_in_parts_from_form(form)
+        return msg_in_parts_from_form(form, index)
 
-def main():
-    print 'Content-type: application/json'
-    print
-    if os.environ.get('REQUEST_METHOD', '') != 'POST':
-        print ''
+def get_qtm(form, index):
+    dst_key = 'dst%d' % index
+    src_key = 'src%d' % index
+    dport_key = 'dport%d' % index
+    sport_key = 'sport%d' % index
+    tcp_key = 'tcp%d' % index
+    timeout_key = 'timeout%d' % index
+
+    # a destination is the minimum value we need to make a query.  If it
+    # doesn't exist, then we simply return None
+    if dst_key in form:
+        dst = get_field_value(form, dst_key, IPAddr, ValueError)
     else:
-        form = cgi.FieldStorage()
+        return None
 
-    msg = msg_from_form(form)
-
-    if 'dst' in form:
-        dst = get_field_value(form, 'dst', IPAddr, ValueError)
-    else:
-        print 'No server specified'
-        sys.exit(0)
-
-    if 'src' in form:
-        src = get_field_value(form, 'src', IPAddr, ValueError)
+    if src_key in form:
+        src = get_field_value(form, src_key, IPAddr, ValueError)
     else:
         src = None
 
-    if 'dport' in form:
-        dport = get_field_value(form, 'dport', positive_int, ValueError)
+    if dport_key in form:
+        dport = get_field_value(form, dport_key, positive_int, ValueError)
     else:
         dport = 53
 
-    if 'sport' in form:
-        sport = get_field_value(form, 'sport', positive_int, ValueError)
+    if sport_key in form:
+        sport = get_field_value(form, sport_key, positive_int, ValueError)
     else:
         sport = None
 
-    if 'tcp' in form:
-        tcp = not bool(get_field_value(form, 'tcp', FALSE_RE.search, Exception))
+    if tcp_key in form:
+        tcp = not bool(get_field_value(form, tcp_key, FALSE_RE.search, Exception))
     else:
         tcp = False
 
-    if 'timeout' in form:
-        timeout = get_field_value(form, 'timeout', positive_float, ValueError)
+    if timeout_key in form:
+        timeout = get_field_value(form, timeout_key, positive_float, ValueError)
     else:
         timeout = 3.0
 
+    msg = msg_from_form(form, index)
+    return transport.DNSQueryTransportMeta(msg, dst, tcp, timeout, dport, src=src, sport=sport)
+
+def main():
+    sys.stdout.write('Content-type: application/json\n\n')
+    if os.environ.get('REQUEST_METHOD', '') != 'POST':
+        sys.exit(0)
+    else:
+        form = cgi.FieldStorage()
+
+    response_queue = Queue.Queue()
+    queries_in_waiting = set()
+    th_factory = transport.DNSQueryTransportHandlerDNSFactory()
+    tm = transport.DNSQueryTransportManager()
+    qtms = []
     try:
-        tm = transport.DNSQueryTransportManager()
-        t = transport.DNSQueryTransportMetaNative(msg, dst, tcp, timeout, dport, src=src, sport=sport)
-        tm.query(t)
-        f = t.serialize_response()
-        print json.dumps(f)
+        for i in range(MAX_QUERIES):
+            qtm = get_qtm(form, i)
+            if qtm is None:
+                break
+            qtms.append(qtm)
+            th = th_factory.build(processed_queue=response_queue)
+            th.add_qtm(qtm)
+            th.init_req()
+            tm.query_nowait(th)
+            queries_in_waiting.add(th)
+
+        while queries_in_waiting:
+            th = response_queue.get()
+            th.finalize()
+            queries_in_waiting.remove(th)
+
     finally:
         tm.close()
+
+    response_data = [qtm.serialize_response() for qtm in qtms]
+    sys.stdout.write(json.dumps(response_data))
 
 if __name__ == '__main__':
     main()
