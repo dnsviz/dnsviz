@@ -67,7 +67,11 @@ class DNSQueryTransportMeta(object):
         self.start_time = None
         self.end_time = None
 
-    def serialize_response(self):
+    def serialize(self):
+        if self.req is not None:
+            req = base64.b64encode(self.req)
+        else:
+            req = None
         if self.res is not None:
             res = base64.b64encode(self.res)
         else:
@@ -87,8 +91,11 @@ class DNSQueryTransportMeta(object):
             else:
                 errno = None
         d = collections.OrderedDict((
+                ('req', req),
                 ('res', res),
+                ('dst', self.dst),
                 ('src', self.src),
+                ('dport', self.dport),
                 ('sport', self.sport),
                 ('start_time', self.start_time),
                 ('end_time', self.end_time),
