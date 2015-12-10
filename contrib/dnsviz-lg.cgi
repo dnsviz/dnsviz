@@ -31,19 +31,13 @@ import sys
 
 import dns.edns, dns.message, dns.name, dns.rdatatype, dns.rdataclass
 
-from dnsviz.ipaddr import IPAddr
+from dnsviz.ipaddr import *
 from dnsviz import transport
 
 import time
 
 MAX_QUERIES = 1000
 FALSE_RE = re.compile(r'^(0|f(alse)?)?$', re.IGNORECASE)
-
-LOOPBACK_IPV4_RE = re.compile(r'^127')
-LOOPBACK_IPV6 = IPAddr('::1')
-RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
-LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
-UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
 
 def options_from_wire(value):
     value = base64.b64decode(value)
