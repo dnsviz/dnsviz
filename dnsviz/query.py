@@ -1150,7 +1150,7 @@ class TTLDistinguishingMultiQueryAggregateDNSResponse(MultiQueryAggregateDNSResp
 class ExecutableDNSQuery(DNSQuery):
     '''An executable DNS Query.'''
 
-    default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
+    default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
             client_ipv4, client_ipv6, port,

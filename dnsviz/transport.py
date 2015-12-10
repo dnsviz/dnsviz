@@ -106,6 +106,8 @@ class DNSQueryTransportMeta(object):
 
 class DNSQueryTransportHandler(object):
     singleton = False
+    allow_loopback_query = False
+    allow_private_query = False
 
     def __init__(self, processed_queue=None, factory=None):
         self.req = None
@@ -255,8 +257,9 @@ class DNSQueryTransportHandler(object):
         raise NotImplemented
 
 class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
-    require_queryid_match = True
     singleton = True
+
+    require_queryid_match = True
 
     def finalize(self):
         super(DNSQueryTransportHandlerDNS, self).finalize()
@@ -353,6 +356,10 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
     def do_timeout(self):
         self.err = dns.exception.Timeout()
         self.cleanup()
+
+class DNSQueryTransportHandlerDNSPrivate(DNSQueryTransportHandlerDNS):
+    allow_loopback_query = True
+    allow_private_query = True
 
 class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
     require_queryid_match = False
@@ -621,6 +628,10 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         self.err = HTTPQueryTransportError('HTTP request timed out')
         self.cleanup()
 
+class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
+    allow_loopback_query = True
+    allow_private_query = True
+
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
 
@@ -638,8 +649,14 @@ class DNSQueryTransportHandlerFactory(object):
 class DNSQueryTransportHandlerDNSFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerDNS
 
+class DNSQueryTransportHandlerDNSPrivateFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerDNSPrivate
+
 class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerHTTP
+
+class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerHTTPPrivate
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
@@ -767,6 +784,10 @@ class _DNSQueryTransportManager:
                             wlist_in.append(fd)
                     except Queue.Empty:
                         break
+
+class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
+    allow_loopback_query = True
+    allow_private_query = True
 
 class DNSQueryTransportManager:
     def __init__(self):
