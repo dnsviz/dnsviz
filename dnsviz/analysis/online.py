@@ -39,7 +39,7 @@ import uuid
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
 import dnsviz.format as fmt
-from dnsviz.ipaddr import IPAddr
+from dnsviz.ipaddr import *
 import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
@@ -80,12 +80,6 @@ ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
 E164_ARPA_NAME = dns.name.from_text('e164', ARPA_NAME)
-
-LOOPBACK_IPV4_RE = re.compile(r'^127')
-LOOPBACK_IPV6 = IPAddr('::1')
-RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
-LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
-UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
 
 DANE_PORT_RE = re.compile(r'^_(\d+)$')
 SRV_PORT_RE = re.compile(r'^_.*[^\d].*$')
