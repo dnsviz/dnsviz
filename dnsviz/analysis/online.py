@@ -2082,13 +2082,6 @@ class RecursiveAnalyst(Analyst):
             name_obj.nxrrset_name = None
             name_obj.nxrrset_rdtype = None
 
-    def _handle_explicit_delegations(self, name_obj):
-        super(RecursiveAnalyst, self)._handle_explicit_delegations(name_obj)
-
-        # if there are no servers configured, then we fail
-        if not name_obj.get_auth_ns_ip_mapping():
-            raise NoNameservers('No resolvers specified to query!')
-
     def _analyze_stub(self, name):
         name_obj = self._get_name_for_analysis(name, stub=True)
         if name_obj.analysis_end is not None:
@@ -2209,7 +2202,11 @@ class RecursiveAnalyst(Analyst):
         self._handle_explicit_delegations(name_obj)
 
         servers = name_obj.zone.get_auth_or_designated_servers()
+        if not servers:
+            raise NoNameservers('No resolvers specified to query!')
         servers = self._filter_servers(servers)
+        if not servers:
+            raise NoNameservers('No resolvers available to query!')
 
         # make common query first to prime the cache
 
