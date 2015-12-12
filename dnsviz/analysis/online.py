@@ -1966,13 +1966,24 @@ class Analyst(object):
             raise IPv6ConnectivityException('No IPv6 servers to query!')
 
     def _raise_connectivity_error_local(self, servers):
+        '''Raise a network connectivity exception.  The class of exception and
+        message associated with the exception are determined based on: whether
+        IPv4 or IPv6 is specified to be attempted; whether there were IPv4 or
+        IPv6 servers to query.'''
+
         if self.try_ipv4 and self.try_ipv6:
             # if we are configured to try both IPv4 and IPv6, then use servers
             # to determine which one is missing
-            if not filter(lambda x: x.version == 4, servers):
-                raise IPv4ConnectivityException('No IPv4 servers to query!')
-            if not filter(lambda x: x.version == 6, servers):
-                raise IPv6ConnectivityException('No IPv6 servers to query!')
+            has_v4 = bool(filter(lambda x: x.version == 4, servers))
+            has_v6 = bool(filter(lambda x: x.version == 6, servers))
+            if has_v4 and has_v6:
+                # if both IPv4 and IPv6 servers were attempted, then there was
+                # no network connectivity for either protocol
+                raise NetworkConnectivityException('No network connectivity available!')
+            elif has_v4:
+                raise IPv4ConnectivityException('No IPv4 network connectivity available!')
+            else: # has_v6
+                raise IPv6ConnectivityException('No IPv6 network connectivity available!')
         elif self.try_ipv4:
             raise IPv4ConnectivityException('No IPv4 network connectivity available!')
         elif self.try_ipv6:
