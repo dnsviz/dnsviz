@@ -1299,11 +1299,11 @@ class Analyst(object):
             return False
         return True
 
-    def _add_query(self, name_obj, query, detect_ns=False):
+    def _add_query(self, name_obj, query, detect_ns=False, iterative=False):
         # if this query is empty (i.e., nothing was actually asked, e.g., due
         # to client-side connectivity failure), then raise a connectivity
         # failure
-        if not query.responses:
+        if not query.responses and not iterative:
             self._raise_connectivity_error_local(query.servers)
 
         name_obj.add_query(query, detect_ns)
@@ -1872,7 +1872,7 @@ class Analyst(object):
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries, tm=self.transport_manager, th_factories=self.th_factories)
             for query in queries:
-                self._add_query(name_obj, query, True)
+                self._add_query(name_obj, query, True, True)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
 
