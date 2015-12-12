@@ -38,6 +38,7 @@ import time
 import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype
 
+from ipaddr import *
 from response import *
 import transport
 
@@ -135,6 +136,9 @@ class AcceptResponse(Exception):
 
 class SourceAddressBINDError(Exception):
     '''An error resulting from unsuccessfully trying to bind to an address.'''
+    pass
+
+class NoValidServersToQuery(Exception):
     pass
 
 class DNSQueryRetryAttempt:
@@ -1232,7 +1236,14 @@ class ExecutableDNSQuery(DNSQuery):
                 th = th_factory.build(processed_queue=response_queue)
 
             for query in queries:
+                qtm_for_server = False
                 for server in query.servers:
+                    if not th_factory.cls.allow_loopback_query and (LOOPBACK_IPV4_RE.match(server) or server == LOOPBACK_IPV6):
+                        continue
+                    if not th_factory.cls.allow_private_query and (RFC_1918_RE.match(server) or LINK_LOCAL_RE.match(server) or UNIQ_LOCAL_RE.match(server)):
+                        continue
+
+                    qtm_for_server = True
                     qh = query.get_query_handler(server)
                     qtm = qh.get_query_transport_meta()
                     query_handlers[qtm] = qh
@@ -1247,6 +1258,9 @@ class ExecutableDNSQuery(DNSQuery):
                         if query_time is None or qh.query_time > query_time:
                             query_time = qh.query_time
                         th.add_qtm(qtm)
+
+                if not qtm_for_server:
+                    raise NoValidServersToQuery('No valid servers to query!')
 
             if not th_factory.cls.singleton:
                 th.init_req()
