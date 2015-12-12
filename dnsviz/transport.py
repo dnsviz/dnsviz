@@ -383,6 +383,8 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
            else: # scheme == 'https'
                self.dport = 443
         self.path = parse_result.path
+        self.username = parse_result.username
+        self.password = parse_result.password
 
         if scheme == 'https':
             raise Exception('HTTPs not yet supported')
@@ -507,13 +509,25 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
             s += '&sport%d=%d' % (index, sport)
         return s
 
+    def _authentication_header(self):
+        if not self.username:
+            return ''
+
+        # set username/password
+        username = self.username
+        if self.password:
+            username += ':' + self.password
+        return 'Authorization: Basic %s\n' % (base64.b64encode(username))
+
     def init_req(self):
         data = ''
         for i in range(len(self.qtms)):
             qtm = self.qtms[i]
             data += '&' + self._post_data(i, qtm.req, qtm.dst, qtm.tcp, qtm.timeout, qtm.dport, qtm.src, qtm.sport)
+        # remove the beginning '&'
         data = data[1:]
-        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\nContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, len(data), data)
+
+        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
 
     def do_write(self):
