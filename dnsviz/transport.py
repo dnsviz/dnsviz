@@ -527,7 +527,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         # remove the beginning '&'
         data = data[1:]
 
-        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: */*\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
+        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: application/json\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
 
     def do_write(self):
