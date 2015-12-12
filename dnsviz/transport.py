@@ -34,6 +34,7 @@ import struct
 import threading
 import time
 import urllib
+import urlparse
 
 import dns.exception
 
@@ -367,20 +368,32 @@ class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
     singleton = False
 
-    def __init__(self, host, port, path, processed_queue=None, factory=None):
+    def __init__(self, url, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
 
-        self.host = host
-        self.path = path
+        parse_result = urlparse.urlparse(url)
+        scheme = parse_result.scheme
+        if not scheme or scheme not in ('http', 'https'):
+            scheme = 'http'
+        self.host = parse_result.hostname
+        self.dport = parse_result.port
+        if self.dport is None:
+           if scheme == 'http':
+               self.dport = 80
+           else: # scheme == 'https'
+               self.dport = 443
+        self.path = parse_result.path
+
+        if scheme == 'https':
+            raise Exception('HTTPs not yet supported')
 
         try:
-            addrinfo = socket.getaddrinfo(host, port)
+            addrinfo = socket.getaddrinfo(self.host, self.dport)
         except socket.gaierror:
             raise HTTPQueryTransportError('Unable to resolve name of HTTP host')
         self.dst = IPAddr(addrinfo[0][4][0])
 
         self.transport_type = socket.SOCK_STREAM
-        self.dport = port
 
         self.chunked_encoding = None
 
