@@ -1944,6 +1944,10 @@ class Analyst(object):
         return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
 
     def _check_connectivity(self, name_obj):
+        if self.ceiling is not None and self.ceiling in self.explicit_delegations:
+            # this check is only useful if not the desdendant of an explicit
+            # delegation
+            return
         if name_obj.get_auth_or_designated_servers(4) and self._require_connectivity_ipv4(name_obj) and not name_obj.get_responsive_servers_udp(4):
             if self._root_responsive(4) is False:
                 raise IPv4ConnectivityException('IPv4 network is unreachable!')
@@ -2253,6 +2257,14 @@ class RecursiveAnalyst(Analyst):
 
     def _require_connectivity_ipv6(self, name_obj):
         return bool(name_obj.clients_ipv6)
+
+    def _check_connectivity(self, name_obj):
+        if self._require_connectivity_ipv4(name_obj) and not name_obj.get_responsive_servers_udp(4):
+            if self._root_responsive(4) is False:
+                raise IPv4ConnectivityException('IPv4 resolvers are not responsive!')
+        if self._require_connectivity_ipv6(name_obj) and not name_obj.get_responsive_servers_udp(6):
+            if self._root_responsive(6) is False:
+                raise IPv6ConnectivityException('IPv6 resolvers are not responsive!')
 
 class PrivateRecursiveAnalyst(RecursiveAnalyst):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
