@@ -1457,6 +1457,8 @@ class Analyst(object):
                 except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
                     name_obj.parent = self._analyze_stub(name.parent()).zone
                 except dns.exception.DNSException:
+                    if name == dns.name.root:
+                        raise NetworkConnectivityException('DNS resolver is unresponsive!')
                     name_obj.parent = self._analyze_stub(name.parent()).zone
 
             name_obj.analysis_end = datetime.datetime.now(fmt.utc).replace(microsecond=0)
