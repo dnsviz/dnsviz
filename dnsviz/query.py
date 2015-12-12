@@ -309,7 +309,7 @@ class ReduceUDPMaxPayloadOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        if timeouts >= self._timeouts and self._request.payload > self._reduced_payload:
+        if not self._params['tcp'] and timeouts >= self._timeouts and self._request.payload > self._reduced_payload:
             self._request.payload = self._reduced_payload
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
@@ -322,7 +322,7 @@ class ClearEDNSFlagOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        if timeouts >= self._timeouts and (self._request.ednsflags & self._flag):
+        if not self._params['tcp'] and timeouts >= self._timeouts and (self._request.ednsflags & self._flag):
             self._request.ednsflags &= ~(self._flag & 0xffff)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CLEAR_EDNS_FLAG, self._flag)
 
@@ -335,7 +335,7 @@ class ChangeEDNSVersionOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        if timeouts >= self._timeouts and self._request.edns != self._edns:
+        if not self._params['tcp'] and timeouts >= self._timeouts and self._request.edns != self._edns:
             self._request.use_edns(self._edns, self._request.ednsflags, self._request.payload, options=self._request.options)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_EDNS_VERSION, self._edns)
 
@@ -349,7 +349,7 @@ class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
         filtered_options = filter(lambda x: self._otype == x.otype, self._request.options)
-        if timeouts >= self._timeouts and filtered_options:
+        if not self._params['tcp'] and timeouts >= self._timeouts and filtered_options:
             self._request.options.remove(filtered_options[0])
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, self._otype)
 
@@ -362,7 +362,7 @@ class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        if timeouts >= self._timeouts and self._request.edns >= 0:
+        if not self._params['tcp'] and timeouts >= self._timeouts and self._request.edns >= 0:
             self._request.use_edns(False)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_DISABLE_EDNS, None)
 
