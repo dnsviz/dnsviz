@@ -400,7 +400,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         self.chunked_encoding = None
 
     def _set_timeout(self, qtm):
-        timeout2 = qtm.timeout * 2
+        timeout2 = qtm.timeout + 5
         if self.timeout is None or timeout2 > self.timeout:
             self.timeout = timeout2
 
