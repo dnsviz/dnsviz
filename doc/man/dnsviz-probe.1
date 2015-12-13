@@ -71,6 +71,25 @@ address.
 
 The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
+.IP "-u <url>"
+Specify the URL (HTTP only) for a DNS looking glass that will send the diagnostic
+queries, rather than sending them locally.
+
+Examples:
+.RS
+.P
+http://www.example.com/cgi-bin/dnsviz-lg.cgi
+.P
+Issue DNS queries from www.example.com using the cgi scripg dnsviz-lg.cgi
+.RE
+
+.RS
+.P
+http://username:password@www.example.com/cgi-bin/dnsviz-lg.cgi
+.P
+Same, but use HTTP Basic authentication
+.RE
+
 .IP "-a <ancestor>"
 Issue diagnostic queries of each domain name through the specified ancestor.  The
 default for recursive mode is "." (i.e., issue queries all the way to the
