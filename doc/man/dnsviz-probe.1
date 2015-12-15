@@ -72,8 +72,8 @@ address.
 The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
 .IP "-u <url>"
-Specify the URL (HTTP only) for a DNS looking glass that will send the diagnostic
-queries, rather than sending them locally.
+Specify the URL (HTTP/HTTPS only) for a DNS looking glass that will send the
+diagnostic queries, rather than sending them locally.
 
 Examples:
 .RS
@@ -89,6 +89,12 @@ http://username:password@www.example.com/cgi-bin/dnsviz-lg.cgi
 .P
 Same, but use HTTP Basic authentication
 .RE
+
+This option is only supported when using python version 2.7.9 or greater.
+
+.IP -k
+When \fI-u\fP is used to specify the URL of a DNS looking glass, don't verify
+the server-side TLS cert.
 
 .IP "-a <ancestor>"
 Issue diagnostic queries of each domain name through the specified ancestor.  The

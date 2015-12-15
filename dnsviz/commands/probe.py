@@ -314,6 +314,7 @@ Options:
     -6             - use IPv6 only
     -b             - specify a source IPv4 or IPv6 address for queries
     -u <url>       - URL for DNS looking glass
+    -k             - Do not verify TLS cert for DNS looking glass using HTTPS
     -a <ancestor>  - query the ancestry of each domain name through ancestor
     -R <type>[,<type>...]
                    - perform analysis using only the specified type(s)
@@ -334,7 +335,7 @@ def main(argv):
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:mpo:a:R:x:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:EAs:Fh')
         except getopt.GetoptError, e:
             usage(str(e))
             sys.exit(1)
@@ -473,7 +474,15 @@ def main(argv):
         edns_diagnostics = '-E' in opts
 
         if '-u' in opts:
-            th_factories = (transport.DNSQueryTransportHandlerHTTPPrivateFactory(opts['-u']),)
+
+            # check that version is >= 2.7.9 if HTTPS is requested
+            if opts['-u'].startswith('https'):
+                vers0, vers1, vers2 = sys.version_info[:3]
+                if (2, 7, 9) > (vers0, vers1, vers2):
+                    sys.stderr.write('''python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n''')
+                    sys.exit(1)
+
+            th_factories = (transport.DNSQueryTransportHandlerHTTPPrivateFactory(opts['-u'], insecure='-k' in opts),)
         else:
             th_factories = None
 

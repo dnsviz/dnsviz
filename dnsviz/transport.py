@@ -30,6 +30,7 @@ import random
 import re
 import select
 import socket
+import ssl
 import struct
 import threading
 import time
@@ -368,13 +369,17 @@ class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
     singleton = False
 
-    def __init__(self, url, processed_queue=None, factory=None):
+    def __init__(self, url, insecure=False, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
 
         parse_result = urlparse.urlparse(url)
         scheme = parse_result.scheme
-        if not scheme or scheme not in ('http', 'https'):
+        if not scheme:
             scheme = 'http'
+        elif scheme not in ('http', 'https'):
+            raise HTTPQueryTransportError('Invalid schema: %s' % schema)
+
+        self.use_ssl = scheme == 'https'
         self.host = parse_result.hostname
         self.dport = parse_result.port
         if self.dport is None:
@@ -385,9 +390,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         self.path = parse_result.path
         self.username = parse_result.username
         self.password = parse_result.password
-
-        if scheme == 'https':
-            raise Exception('HTTPs not yet supported')
+        self.insecure = insecure
 
         try:
             addrinfo = socket.getaddrinfo(self.host, self.dport)
@@ -403,6 +406,17 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         timeout2 = qtm.timeout + 5
         if self.timeout is None or timeout2 > self.timeout:
             self.timeout = timeout2
+
+    def _prepare_socket(self):
+        super(DNSQueryTransportHandlerHTTP, self)._prepare_socket()
+
+        if self.use_ssl:
+            #XXX this is python >= 2.7.9 only
+            ctx = ssl.create_default_context()
+            if self.insecure:
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
 
     def _finalize_qtm(self, index, content):
         qtm = self.qtms[index]
