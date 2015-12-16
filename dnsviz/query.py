@@ -139,6 +139,9 @@ class SourceAddressBINDError(Exception):
     pass
 
 class NoValidServersToQuery(Exception):
+    '''An exception raised when a query is executed and the collective
+    transport handlers designated don't have the proper network capabilities to
+    issue queries to all the servers.'''
     pass
 
 class DNSQueryRetryAttempt:
@@ -155,6 +158,8 @@ class DNSQueryRetryAttempt:
         return '<Retry: %s -> %s>' % (retry_causes[self.cause], retry_actions[self.action])
 
     def serialize(self):
+        '''Return a serialized version of the query.'''
+
         d = collections.OrderedDict()
         d['response_time'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
@@ -167,6 +172,9 @@ class DNSQueryRetryAttempt:
 
     @classmethod
     def deserialize(cls, d):
+        '''Return an instance built from a serialized version of the
+        DNSQueryRetryAttempt.'''
+
         # compatibility with version 1.0
         if isinstance(d['response_time'], float):
             response_time = d['response_time']
