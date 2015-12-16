@@ -156,7 +156,7 @@ class DNSQueryRetryAttempt:
 
     def serialize(self):
         d = collections.OrderedDict()
-        d['response_time'] = self.response_time
+        d['response_time'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
             d['cause_arg'] = self.cause_arg
@@ -167,7 +167,11 @@ class DNSQueryRetryAttempt:
 
     @classmethod
     def deserialize(cls, d):
-        response_time = d['response_time']
+        # compatibility with version 1.0
+        if isinstance(d['response_time'], float):
+            response_time = d['response_time']
+        else:
+            response_time = d['response_time']/1000.0
         cause = retry_cause_codes[d['cause']]
         if 'cause_arg' in d:
             cause_arg = d['cause_arg']

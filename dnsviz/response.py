@@ -484,10 +484,10 @@ class DNSResponse:
 
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
-        d['response_time'] = self.response_time
+        d['response_time'] = int(self.response_time * 1000)
         d['retries'] = self.retries()
         if self.history:
-            d['cumulative_response_time'] = self.total_response_time()
+            d['cumulative_response_time'] = int(self.total_response_time() * 1000)
             d['effective_query_options'] = collections.OrderedDict((
                 ('flags', self.effective_flags),
                 ('edns_version', self.effective_edns),
@@ -522,7 +522,7 @@ class DNSResponse:
             d['message'] = base64.b64encode(self.message.to_wire())
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
-        d['response_time'] = self.response_time
+        d['response_time'] = int(self.response_time * 1000)
         d['history'] = []
         for retry in self.history:
             d['history'].append(retry.serialize())
@@ -561,7 +561,11 @@ class DNSResponse:
                 else:
                     error = Q.RESPONSE_ERROR_OTHER
 
-        response_time = d['response_time']
+        # compatibility with version 1.0
+        if isinstance(d['response_time'], float):
+            response_time = d['response_time']
+        else:
+            response_time = d['response_time']/1000.0
         history = []
         for retry in d['history']:
             history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
