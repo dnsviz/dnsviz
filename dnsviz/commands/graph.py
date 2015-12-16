@@ -221,8 +221,19 @@ def main(argv):
             sys.exit(3)
 
         # check version
-        if '_meta._dnsviz.' in analysis_structured and 'version' in analysis_structured['_meta._dnsviz.'] and analysis_structured['_meta._dnsviz.']['version'] > DNS_RAW_VERSION:
-            logger.error('Unsupported version: "%s"' % analysis_structured['_meta._dnsviz.']['version'])
+        if '_meta._dnsviz.' not in analysis_structured or 'version' not in analysis_structured['_meta._dnsviz.']:
+            logger.error('No version information in JSON input.')
+            sys.exit(3)
+        try:
+            major_vers, minor_vers = map(int, str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1))
+        except ValueError:
+            logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
+            sys.exit(3)
+        # ensure major version is a match and minor version is no greater
+        # than the current minor version
+        curr_major_vers, curr_minor_vers = map(int, str(DNS_RAW_VERSION).split('.', 1))
+        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+            logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
             sys.exit(3)
 
         names = []
