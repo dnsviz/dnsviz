@@ -46,7 +46,7 @@ from dnsviz import transport
 
 _logger = logging.getLogger(__name__)
 
-DNS_RAW_VERSION = 1.0
+DNS_RAW_VERSION = 1.1
 
 class NetworkConnectivityException(Exception):
     pass
