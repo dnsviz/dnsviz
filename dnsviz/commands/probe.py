@@ -482,7 +482,7 @@ def main(argv):
                     sys.stderr.write('''python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n''')
                     sys.exit(1)
 
-            th_factories = (transport.DNSQueryTransportHandlerHTTPPrivateFactory(opts['-u'], insecure='-k' in opts),)
+            th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
         else:
             th_factories = None
 
