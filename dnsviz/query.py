@@ -134,8 +134,16 @@ class AcceptResponse(Exception):
     acceptable response or error condition has been satisfied.'''
     pass
 
-class SourceAddressBINDError(Exception):
+class BindError(Exception):
+    '''An error resulting from unsuccessfully trying to bind to an address or port.'''
+    pass
+
+class SourceAddressBindError(BindError):
     '''An error resulting from unsuccessfully trying to bind to an address.'''
+    pass
+
+class PortBindError(BindError):
+    '''An error resulting from unsuccessfully trying to bind to a port.'''
     pass
 
 class NoValidServersToQuery(Exception):
@@ -1365,13 +1373,30 @@ class ExecutableDNSQuery(DNSQuery):
                 else:
                     src = qtm.src
 
-                # If we were unable to bind to the source address, then
-                # this is an error
-                if err == RESPONSE_ERROR_NETWORK_ERROR and errno1 == errno.EADDRNOTAVAIL:
-                    if qh._client is not None:
-                        raise SourceAddressBINDError('Unable to bind to local address %s' % qh._client)
-                    else:
-                        raise SourceAddressBINDError('Unable to bind to local address')
+                # If this was a network error, determine if it was a binding
+                # error
+                if err == RESPONSE_ERROR_NETWORK_ERROR:
+                    if errno1 == errno.EADDRNOTAVAIL:
+                        # Address not unavailable
+                        if qh._client is not None:
+                            raise SourceAddressBindError('Unable to bind to local address %s (%s)' % (qh._client, errno.errorcode[errno1]))
+                        else:
+                            raise SourceAddressBindError('Unable to bind to local address (%s)' % (errno.errorcode[errno1]))
+                    elif errno1 == errno.EADDRINUSE or \
+                            (errno1 == errno.EACCES and qtm.src is None):
+                        # Address/port in use (EADDRINUSE) or insufficient
+                        # permissions to bind to port
+                        if qh.params['sport'] is not None:
+                            raise PortBindError('Unable to bind to local port %d (%s)' % (qh.params['sport'], errno.errorcode[errno1]))
+                        else:
+                            raise PortBindError('Unable to bind to local port (%s)' % (errno.errorcode[errno1]))
+                    elif qtm.src is None and errno1 != errno.EHOSTUNREACH:
+                        # If source is None it didn't bind properly.  If errno1
+                        # is also EHOSTUNREACH, it is because there was no
+                        # proper IPv4 or IPv6 connectivity (which is handled
+                        # elsewhere); otherwise, it was something unknown, so
+                        # raise an error.
+                        raise BindError('Unable to bind to local address (%s)' % (errno.errorcode.get(errno1, "unknown")))
 
                 # if src is None, then it is a connectivity issue on our
                 # side, so don't record it in the responses
