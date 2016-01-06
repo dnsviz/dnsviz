@@ -320,6 +320,13 @@ class DNSQueryTransportHandler(object):
     def do_timeout(self):
         raise NotImplemented
 
+    def serialize(self):
+        d = {
+            'version': DNS_TRANSPORT_VERSION,
+            'requests': [q.serialize_request() for q in self.qtms]
+        }
+        return d
+
 class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
     singleton = True
 
@@ -576,11 +583,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
             self._finalize_qtm(i, content['responses'])
 
     def _post_data(self):
-        d = {
-            'version': DNS_TRANSPORT_VERSION,
-            'requests': [q.serialize_request() for q in self.qtms]
-        }
-        return json.dumps(d)
+        return 'content=' + urllib.quote(json.dumps(self.serialize()))
 
     def _authentication_header(self):
         if not self.username:
@@ -593,7 +596,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         return 'Authorization: Basic %s\n' % (base64.b64encode(username))
 
     def init_req(self):
-        data = 'content=' + urllib.quote(self._post_data())
+        data = self._post_data()
         self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: application/json\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
 
