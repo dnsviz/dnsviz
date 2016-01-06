@@ -70,6 +70,19 @@ class DNSQueryTransportMeta(object):
         self.start_time = None
         self.end_time = None
 
+    def serialize_request(self):
+        d = collections.OrderedDict()
+        d['req'] = base64.b64encode(self.req)
+        d['dst'] = self.dst
+        d['dport'] = self.dport
+        if self.src is not None:
+            d['src'] = self.src
+        if self.sport is not None:
+            d['sport'] = self.sport
+        d['tcp'] = self.tcp
+        d['timeout'] = int(self.timeout*1000)
+        return d
+
     def serialize_response(self):
         d = collections.OrderedDict()
         if self.res is not None:
