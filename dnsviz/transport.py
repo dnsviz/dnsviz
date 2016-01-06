@@ -89,8 +89,7 @@ class DNSQueryTransportMeta(object):
                     d['errno'] = errno_name
         d['src'] = self.src
         d['sport'] = self.sport
-        d['start_time'] = self.start_time
-        d['end_time'] = self.end_time
+        d['elapsed'] = int((self.end_time - self.start_time)*1000)
         return d
 
 class DNSQueryTransportHandler(object):
@@ -452,28 +451,17 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         elif not isinstance(qtm.err, socket.error):
             raise HTTPQueryTransportError('No source port value included in HTTP response')
 
-        if 'start_time' in qtm_content and qtm_content['start_time'] is not None:
+        if 'elapsed' in qtm_content and qtm_content['elapsed'] is not None:
             try:
-                qtm.start_time = float(qtm_content['start_time'])
+                elapsed = int(qtm_content['elapsed'])
             except ValueError:
-                raise HTTPQueryTransportError('Non-float value provided for start time in HTTP response: %s' % qtm_content['start_time'])
-            if qtm.start_time < 0:
-                raise HTTPQueryTransportError('Negative value provided for start time in HTTP response: %s' % qtm_content['start_time'])
+                raise HTTPQueryTransportError('Non-numeric value provided for elapsed time in HTTP response: %s' % qtm_content['elapsed'])
+            if elapsed < 0:
+                raise HTTPQueryTransportError('Negative value provided for elapsed time in HTTP response: %s' % qtm_content['elapsed'])
         else:
-            raise HTTPQueryTransportError('No start time value included in HTTP response')
-
-        if 'end_time' in qtm_content and qtm_content['end_time'] is not None:
-            try:
-                qtm.end_time = float(qtm_content['end_time'])
-            except ValueError:
-                raise HTTPQueryTransportError('Non-float value provided for end time in HTTP response: %s' % qtm_content['end_time'])
-            if qtm.end_time < 0:
-                raise HTTPQueryTransportError('Negative value provided for end time in HTTP response: %s' % qtm_content['end_time'])
-        else:
-            raise HTTPQueryTransportError('No end time value included in HTTP response')
-
-        if qtm.end_time < qtm.start_time:
-            raise HTTPQueryTransportError('End time is before start time in HTTP response')
+            raise HTTPQueryTransportError('Elapsed time not included in HTTP response')
+        qtm.end_time = time.time()
+        qtm.start_time = qtm.end_time - (elapsed/1000.0)
 
     def finalize(self):
         super(DNSQueryTransportHandlerHTTP, self).finalize()
