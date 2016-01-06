@@ -123,10 +123,14 @@ def main():
     finally:
         tm.close()
 
-    ret = {
-        'version': transport.DNS_TRANSPORT_VERSION,
-        'responses': [qtm.serialize_response() for qtm in qtms],
-    }
+    try:
+        ret = {
+            'version': transport.DNS_TRANSPORT_VERSION,
+            'responses': [qtm.serialize_response() for qtm in qtms],
+        }
+    except transport.TransportMetaSerializationError, e:
+        sys.stdout.write('Error serializing response information: %s' % e)
+        sys.exit(0)
     sys.stdout.write(json.dumps(ret))
 
 if __name__ == '__main__':

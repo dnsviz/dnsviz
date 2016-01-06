@@ -95,7 +95,7 @@ class DNSQueryTransportMeta(object):
         try:
             req = base64.b64decode(d['req'])
         except TypeError:
-            raise TransportMetaDeserializationError('Error Base-64 decoding DNS request: %s' % d['req'])
+            raise TransportMetaDeserializationError('Base64 decoding DNS request failed: %s' % d['req'])
 
         if 'dst' not in d or d['dst'] is None:
             raise TransportMetaDeserializationError('Missing "dst" field in input.')
@@ -167,6 +167,60 @@ class DNSQueryTransportMeta(object):
         d['sport'] = self.sport
         d['elapsed'] = int((self.end_time - self.start_time)*1000)
         return d
+
+    def deserialize_response(self, d):
+        if 'err' in d and d['err'] is not None:
+            if d['err'] == 'NETWORK_ERROR':
+                self.err = socket.error()
+                if 'errno' in d and d['errno'] is not None:
+                    if hasattr(errno, d['errno']):
+                        self.err.errno = getattr(errno, d['errno'])
+                    else:
+                        raise TransportMetaDeserializationError('Unknown errno name: %s' % d['errno'])
+            elif d['err'] == 'TIMEOUT':
+                self.err = dns.exception.Timeout()
+            else:
+                raise TransportMetaDeserializationError('Unknown DNS response error: %s' % d['err'])
+
+        elif not ('res' in d and d['res'] is not None):
+            raise TransportMetaDeserializationError('Missing DNS response or response error in input.')
+
+        else:
+            try:
+                self.res = base64.b64decode(d['res'])
+            except TypeError:
+                raise TransportMetaDeserializationError('Base64 decoding of DNS response failed: %s' % d['res'])
+
+        if 'src' in d and d['src'] is not None:
+            try:
+                self.src = IPAddr(d['src'])
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid source IP address: %s' % d['src'])
+        elif not isinstance(self.err, socket.error):
+            raise TransportMetaDeserializationError('Missing "src" field in input')
+
+        if 'sport' in d and d['sport'] is not None:
+            try:
+                self.sport = int(d['sport'])
+                if self.sport < 0 or self.sport > 65535:
+                    raise ValueError()
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid source port: %s' % d['sport'])
+        elif not isinstance(self.err, socket.error):
+            raise TransportMetaDeserializationError('Missing "sport" field in input.')
+
+        if 'elapsed' in d and d['elapsed'] is not None:
+            try:
+                elapsed = int(d['elapsed'])
+                if elapsed < 0:
+                    raise ValueError()
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid elapsed value: %s' % d['elapsed'])
+        else:
+            raise TransportMetaDeserializationError('Missing "elapsed" field in input.')
+
+        self.end_time = time.time()
+        self.start_time = self.end_time - (elapsed/1000.0)
 
 class DNSQueryTransportHandler(object):
     singleton = False
@@ -320,7 +374,7 @@ class DNSQueryTransportHandler(object):
     def do_timeout(self):
         raise NotImplemented
 
-    def serialize(self):
+    def serialize_requests(self):
         d = {
             'version': DNS_TRANSPORT_VERSION,
             'requests': [q.serialize_request() for q in self.qtms]
@@ -487,65 +541,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
                 ctx.verify_mode = ssl.CERT_NONE
             self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
 
-    def _finalize_qtm(self, index, content):
-        qtm = self.qtms[index]
-        try:
-            qtm_content = content[index]
-        except IndexError:
-            raise HTTPQueryTransportError('DNS response missing from HTTP response')
-
-        if 'err' in qtm_content and qtm_content['err'] is not None:
-            if qtm_content['err'] == 'NETWORK_ERROR':
-                qtm.err = socket.error()
-                if 'errno' in qtm_content and qtm_content['errno'] is not None:
-                    if hasattr(errno, qtm_content['errno']):
-                        qtm.err.errno = getattr(errno, qtm_content['errno'])
-                    else:
-                        raise HTTPQueryTransportError('Unknown errno name provided in HTTP response: %s' % qtm_content['errno'])
-            elif qtm_content['err'] == 'TIMEOUT':
-                qtm.err = dns.exception.Timeout()
-            else:
-                raise HTTPQueryTransportError('Unknown DNS response error in HTTP response: %s' % qtm_content['err'])
-
-        elif not ('res' in qtm_content and qtm_content['res'] is not None):
-            raise HTTPQueryTransportError('No DNS response or response error found in HTTP response')
-
-        else:
-            try:
-                qtm.res = base64.b64decode(qtm_content['res'])
-            except TypeError:
-                raise HTTPQueryTransportError('Base64 decoding of DNS response failed: %s' % qtm_content['res'])
-
-        if 'src' in qtm_content and qtm_content['src'] is not None:
-            try:
-                qtm.src = IPAddr(qtm_content['src'])
-            except ValueError:
-                raise HTTPQueryTransportError('Invalid source IP address found in HTTP response: %s' % qtm_content['src'])
-        elif not isinstance(qtm.err, socket.error):
-            raise HTTPQueryTransportError('No source IP address included in HTTP response')
-
-        if 'sport' in qtm_content and qtm_content['sport'] is not None:
-            try:
-                qtm.sport = int(qtm_content['sport'])
-            except ValueError:
-                raise HTTPQueryTransportError('Non-numeric value provided for source port in HTTP response: %s' % qtm_content['sport'])
-            if qtm.sport < 0 or qtm.sport > 65535:
-                raise HTTPQueryTransportError('Invalid value provided for source port in HTTP response %s' % qtm_content['sport'])
-        elif not isinstance(qtm.err, socket.error):
-            raise HTTPQueryTransportError('No source port value included in HTTP response')
-
-        if 'elapsed' in qtm_content and qtm_content['elapsed'] is not None:
-            try:
-                elapsed = int(qtm_content['elapsed'])
-            except ValueError:
-                raise HTTPQueryTransportError('Non-numeric value provided for elapsed time in HTTP response: %s' % qtm_content['elapsed'])
-            if elapsed < 0:
-                raise HTTPQueryTransportError('Negative value provided for elapsed time in HTTP response: %s' % qtm_content['elapsed'])
-        else:
-            raise HTTPQueryTransportError('Elapsed time not included in HTTP response')
-        qtm.end_time = time.time()
-        qtm.start_time = qtm.end_time - (elapsed/1000.0)
-
     def finalize(self):
         super(DNSQueryTransportHandlerHTTP, self).finalize()
 
@@ -580,10 +575,15 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
             raise HTTPQueryTransportError('No response information in HTTP response.')
 
         for i in range(len(self.qtms)):
-            self._finalize_qtm(i, content['responses'])
+            try:
+                self.qtms[i].deserialize_response(content['responses'][i])
+            except IndexError:
+                raise HTTPQueryTransportError('Response information missing from HTTP response')
+            except TransportMetaDeserializationError, e:
+                raise HTTPQueryTransportError(str(e))
 
     def _post_data(self):
-        return 'content=' + urllib.quote(json.dumps(self.serialize()))
+        return 'content=' + urllib.quote(json.dumps(self.serialize_requests()))
 
     def _authentication_header(self):
         if not self.username:
