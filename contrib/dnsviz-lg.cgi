@@ -71,7 +71,7 @@ def main():
         # load the json content
         try:
             content = json.loads(form['content'].value)
-        except TypeError:
+        except ValueError:
             sys.stdout.write('JSON decoding of HTTP request failed: %s\n' % form['content'])
             sys.exit(0)
 
