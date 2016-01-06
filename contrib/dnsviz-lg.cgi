@@ -232,7 +232,7 @@ def main():
     finally:
         tm.close()
 
-    response_data = [qtm.serialize() for qtm in qtms]
+    response_data = [qtm.serialize_response() for qtm in qtms]
     sys.stdout.write(json.dumps(response_data))
 
 if __name__ == '__main__':
