@@ -22,6 +22,7 @@
 import base64
 import bisect
 import collections
+import errno
 import fcntl
 import json
 import os
@@ -69,41 +70,27 @@ class DNSQueryTransportMeta(object):
         self.start_time = None
         self.end_time = None
 
-    def serialize(self):
-        if self.req is not None:
-            req = base64.b64encode(self.req)
-        else:
-            req = None
+    def serialize_response(self):
+        d = collections.OrderedDict()
         if self.res is not None:
-            res = base64.b64encode(self.res)
+            d['res'] = base64.b64encode(self.res)
         else:
-            res = None
-        if self.err is None:
-            err = None
-            errno = None
-        else:
+            d['res'] = None
+        if self.err is not None:
             if isinstance(self.err, (socket.error, EOFError)):
-                err = 'NETWORK_ERROR'
+                d['err'] = 'NETWORK_ERROR'
             elif isinstance(self.err, dns.exception.Timeout):
-                err = 'TIMEOUT'
+                d['err'] = 'TIMEOUT'
             else:
-                err = 'ERROR'
+                d['err'] = 'ERROR'
             if hasattr(self.err, 'errno'):
-                errno = self.err.errno
-            else:
-                errno = None
-        d = collections.OrderedDict((
-                ('req', req),
-                ('res', res),
-                ('dst', self.dst),
-                ('src', self.src),
-                ('dport', self.dport),
-                ('sport', self.sport),
-                ('start_time', self.start_time),
-                ('end_time', self.end_time),
-                ('err', err),
-                ('errno', errno),
-        ))
+                errno_name = errno.errorcode.get(self.err.errno, None)
+                if errno_name is not None:
+                    d['errno'] = errno_name
+        d['src'] = self.src
+        d['sport'] = self.sport
+        d['start_time'] = self.start_time
+        d['end_time'] = self.end_time
         return d
 
 class DNSQueryTransportHandler(object):
@@ -429,10 +416,10 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
             if qtm_content['err'] == 'NETWORK_ERROR':
                 qtm.err = socket.error()
                 if 'errno' in qtm_content and qtm_content['errno'] is not None:
-                    try:
-                        qtm.err.errno = int(qtm_content['errno'])
-                    except ValueError:
-                        raise HTTPQueryTransportError('Non-numeric value provided for errno in HTTP response: %s' % qtm_content['errno'])
+                    if hasattr(errno, qtm_content['errno']):
+                        qtm.err.errno = getattr(errno, qtm_content['errno'])
+                    else:
+                        raise HTTPQueryTransportError('Unknown errno name provided in HTTP response: %s' % qtm_content['errno'])
             elif qtm_content['err'] == 'TIMEOUT':
                 qtm.err = dns.exception.Timeout()
             else:
