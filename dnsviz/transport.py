@@ -42,7 +42,7 @@ import dns.exception
 
 from ipaddr import IPAddr
 
-DNS_LG_VERSION = 1.0
+DNS_TRANSPORT_VERSION = 1.0
 
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
@@ -54,6 +54,9 @@ CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
 CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
 
 class HTTPQueryTransportError(Exception):
+    pass
+
+class TransportMetaDeserializationError(Exception):
     pass
 
 class DNSQueryTransportMeta(object):
@@ -84,6 +87,64 @@ class DNSQueryTransportMeta(object):
         d['tcp'] = self.tcp
         d['timeout'] = int(self.timeout*1000)
         return d
+
+    @classmethod
+    def deserialize_request(cls, d):
+        if 'req' not in d or d['req'] is None:
+            raise TransportMetaDeserializationError('Missing "req" field in input.')
+        try:
+            req = base64.b64decode(d['req'])
+        except TypeError:
+            raise TransportMetaDeserializationError('Error Base-64 decoding DNS request: %s' % d['req'])
+
+        if 'dst' not in d or d['dst'] is None:
+            raise TransportMetaDeserializationError('Missing "dst" field in input.')
+        try:
+            dst = IPAddr(d['dst'])
+        except ValueError:
+            raise TransportMetaDeserializationError('Invalid destination IP address: %s' % d['dst'])
+
+        if 'dport' not in d or d['dport'] is None:
+            raise TransportMetaDeserializationError('Missing "dport" field in input.')
+        try:
+            dport = int(d['dport'])
+            if dport < 0 or dport > 65535:
+                raise ValueError()
+        except ValueError:
+            raise TransportMetaDeserializationError('Invalid destination port: %s' % d['dport'])
+
+        if 'src' not in d or d['src'] is None:
+            src = None
+        else:
+            try:
+                src = IPAddr(d['src'])
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid source IP address: %s' % d['src'])
+
+        if 'sport' not in d or d['sport'] is None:
+            sport = None
+        else:
+            try:
+                sport = int(d['sport'])
+                if sport < 0 or sport > 65535:
+                    raise ValueError()
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid source port: %s' % d['sport'])
+
+        if 'tcp' not in d or d['tcp'] is None:
+            raise TransportMetaDeserializationError('Missing "tcp" field in input.')
+        else:
+            tcp = bool(d['tcp'])
+
+        if 'timeout' not in d or d['timeout'] is None:
+            raise TransportMetaDeserializationError('Missing "timeout" field in input.')
+        else:
+            try:
+                timeout = int(d['timeout'])/1000.0
+            except ValueError:
+                raise TransportMetaDeserializationError('Invalid timeout value: %s' % d['timeout'])
+
+        return cls(req, dst, tcp, timeout, dport, src, sport)
 
     def serialize_response(self):
         d = collections.OrderedDict()
@@ -504,7 +565,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(DNS_LG_VERSION).split('.', 1))
+        curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             raise HTTPQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
 
@@ -514,20 +575,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         for i in range(len(self.qtms)):
             self._finalize_qtm(i, content['responses'])
 
-    def _post_data(self, index, msg, dst, tcp, timeout, dport, src, sport):
-        msg = urllib.quote(base64.b64encode(msg))
-        if tcp:
-            tcp = 't'
-        else:
-            tcp = 'f'
-        s = 'msg%d=%s&dst%d=%s&tcp%d=%s&timeout%d=%f' % (index, msg, index, dst, index, tcp, index, timeout)
-        if dport is not None:
-            s += '&dport%d=%d' % (index, dport)
-        if src is not None:
-            s += '&src%d=%s' % (index, src)
-        if sport is not None:
-            s += '&sport%d=%d' % (index, sport)
-        return s
+    def _post_data(self):
+        d = {
+            'version': DNS_TRANSPORT_VERSION,
+            'requests': [q.serialize_request() for q in self.qtms]
+        }
+        return json.dumps(d)
 
     def _authentication_header(self):
         if not self.username:
@@ -540,13 +593,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         return 'Authorization: Basic %s\n' % (base64.b64encode(username))
 
     def init_req(self):
-        data = ''
-        for i in range(len(self.qtms)):
-            qtm = self.qtms[i]
-            data += '&' + self._post_data(i, qtm.req, qtm.dst, qtm.tcp, qtm.timeout, qtm.dport, qtm.src, qtm.sport)
-        # remove the beginning '&'
-        data = data[1:]
-
+        data = 'content=' + urllib.quote(self._post_data())
         self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: application/json\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
 

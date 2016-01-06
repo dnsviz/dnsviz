@@ -20,185 +20,36 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import base64
 import cgi
 import json
 import os
 import Queue
 import re
-import struct
 import sys
-
-import dns.edns, dns.message, dns.name, dns.rdatatype, dns.rdataclass
 
 from dnsviz.ipaddr import *
 from dnsviz import transport
 
-import time
-
-MAX_QUERIES = 1000
 FALSE_RE = re.compile(r'^(0|f(alse)?)?$', re.IGNORECASE)
 
-def options_from_wire(value):
-    value = base64.b64decode(value)
-    options = []
-    index = 0
-    while index < len(value):
-        (otype, olen) = struct.unpack('!HH', value[index:index + 4])
-        index += 4
-        opt = dns.edns.option_from_wire(otype, value, index, olen)
-        options.append(opt)
-        index += olen
-    return options
+try:
+    MAX_QUERIES = int(os.environ.get('MAX_QUERIES', 100))
+except ValueError:
+    MAX_QUERIES = 100
+ALLOW_PRIVATE_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
+ALLOW_LOOPBACK_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
 
-def positive_int(value):
-    value = int(value)
-    if value < 0:
-        raise ValueError
-    return value
-
-def positive_float(value):
-    value = float(value)
-    if value < 0.0:
-        raise ValueError
-    return value
-
-def get_field_value(form, name, validate_func, error_cls):
-    try:
-        return validate_func(form[name].value)
-    except error_cls:
-        sys.stdout.write('Invalid value for %s: %s\n' % (name, form[name].value))
-        sys.exit(0)
-
-def msg_in_parts_from_form(form, index):
-    flags_key = 'flags%d' % index
-    qname_key = 'qname%d' % index
-    qclass_key = 'qclass%d' % index
-    qtype_key = 'qtype%d' % index
-    edns_version_key = 'edns_version%d' % index
-    edns_flags_key = 'edns_flags%d' % index
-    edns_max_udp_payload_key = 'edns_max_udp_payload%d' % index
-    edns_options_key = 'edns_options%d' % index
-
-    if flags_key in form:
-        flags = get_field_value(form, flags_key, int, ValueError)
-    else:
-        flags = 0
-
-    if qname_key in form:
-        qname = get_field_value(form, qname_key, dns.name.from_text, dns.exception.DNSException)
-        if qclass_key in form:
-            qclass = get_field_value(form, qclass_key, dns.rdataclass.from_text, dns.exception.DNSException)
-        else:
-            qclass = dns.rdataclass.IN
-        if qtype_key in form:
-            qtype = get_field_value(form, qtype_key, dns.rdatatype.from_text, dns.exception.DNSException)
-        else:
-            qtype = dns.rdatatype.A
-    else:
-        qname = dns.name.root
-        if qclass_key in form:
-            qclass = get_field_value(form, qclass_key, dns.rdataclass.from_text, dns.exception.DNSException)
-        else:
-            qclass = dns.rdataclass.IN
-        if qtype_key in form:
-            qtype = get_field_value(form, qtype_key, dns.rdatatype.from_text, dns.exception.DNSException)
-        else:
-            qtype = dns.rdatatype.NS
-
-    if edns_version_key in form:
-        edns_version = get_field_value(form, edns_version_key, positive_int, ValueError)
-        if edns_flags_key in form:
-            edns_flags = get_field_value(form, edns_flags_key, positive_int, ValueError)
-        else:
-            edns_flags = 0
-        if edns_max_udp_payload_key in form:
-            edns_max_udp_payload = get_field_value(form, edns_max_udp_payload_key, positive_int, ValueError)
-        else:
-            edns_max_udp_payload = 4096
-        if edns_options_key in form:
-            edns_options = get_field_value(form, edns_options_key, options_from_wire, (TypeError, struct.error, dns.exception.DNSException))
-        else:
-            edns_options = []
-
-    req = dns.message.Message()
-    req.flags = flags
-    req.find_rrset(req.question, qname, qclass, qtype, create=True, force_unique=True)
-    if edns_version_key in form:
-        req.use_edns(edns_version, edns_flags, edns_max_udp_payload, edns_options)
-    return req.to_wire()
-
-def msg_from_form(form, index):
-    msg_key = 'msg%d' % index
-
-    # if the message itself was encoded in the form, then simply decode and
-    # return it
-    if msg_key in form:
-        try:
-            return base64.b64decode(form[msg_key].value)
-        except TypeError:
-            sys.stdout.write('Error decoding JSON: %s' % form[msg_key].value)
-            sys.exit(0)
-
-    # otherwise, collect the parts from the form and compile a message
-    else:
-        return msg_in_parts_from_form(form, index)
-
-def get_qtm(form, index):
-    dst_key = 'dst%d' % index
-    src_key = 'src%d' % index
-    dport_key = 'dport%d' % index
-    sport_key = 'sport%d' % index
-    tcp_key = 'tcp%d' % index
-    timeout_key = 'timeout%d' % index
-
-    # a destination is the minimum value we need to make a query.  If it
-    # doesn't exist, then we simply return None
-    if dst_key in form:
-        dst = get_field_value(form, dst_key, IPAddr, ValueError)
-    else:
-        return None
-
+def check_dst(dst):
     # check for local addresses
-    allow_private_query = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
-    allow_loopback_query = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
-    if not allow_private_query and (RFC_1918_RE.search(dst) is not None or \
+    if not ALLOW_PRIVATE_QUERY and (RFC_1918_RE.search(dst) is not None or \
             LINK_LOCAL_RE.search(dst) is not None or \
             UNIQ_LOCAL_RE.search(dst) is not None):
         sys.stdout.write('Querying %s not allowed\n' % dst)
         sys.exit(0)
-    if not allow_loopback_query and (LOOPBACK_IPV4_RE.search(dst) is not None or \
+    if not ALLOW_LOOPBACK_QUERY and (LOOPBACK_IPV4_RE.search(dst) is not None or \
             dst == LOOPBACK_IPV6):
         sys.stdout.write('Querying %s not allowed\n' % dst)
         sys.exit(0)
-
-    if src_key in form:
-        src = get_field_value(form, src_key, IPAddr, ValueError)
-    else:
-        src = None
-
-    if dport_key in form:
-        dport = get_field_value(form, dport_key, positive_int, ValueError)
-    else:
-        dport = 53
-
-    if sport_key in form:
-        sport = get_field_value(form, sport_key, positive_int, ValueError)
-    else:
-        sport = None
-
-    if tcp_key in form:
-        tcp = not bool(get_field_value(form, tcp_key, FALSE_RE.search, Exception))
-    else:
-        tcp = False
-
-    if timeout_key in form:
-        timeout = get_field_value(form, timeout_key, positive_float, ValueError)
-    else:
-        timeout = 3.0
-
-    msg = msg_from_form(form, index)
-    return transport.DNSQueryTransportMeta(msg, dst, tcp, timeout, dport, src=src, sport=sport)
 
 def main():
     sys.stdout.write('Content-type: application/json\n\n')
@@ -213,10 +64,50 @@ def main():
     tm = transport.DNSQueryTransportManager()
     qtms = []
     try:
-        for i in range(MAX_QUERIES):
-            qtm = get_qtm(form, i)
-            if qtm is None:
-                break
+        if 'content' not in form:
+            sys.stdout.write('No "content" field found in input\n')
+            sys.exit(0)
+
+        # load the json content
+        try:
+            content = json.loads(form['content'])
+        except ValueError:
+            sys.stdout.write('JSON decoding of HTTP request failed: %s\n' % form['content'])
+            sys.exit(0)
+
+        if 'version' not in content:
+            sys.stdout.write('No version information in HTTP response.\n')
+            sys.exit(0)
+        try:
+            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+        except ValueError:
+            sys.stdout.write('Version of JSON input in HTTP response is invalid: %s\n' % content['version'])
+            sys.exit(0)
+
+        # ensure major version is a match and minor version is no greater
+        # than the current minor version
+        curr_major_vers, curr_minor_vers = map(int, str(transportDNS_TRANSPORT_VERSION).split('.', 1))
+        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+            sys.stdout.write('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+            sys.exit(0)
+
+        if 'requests' not in content:
+            sys.stdout.write('No request information in HTTP request.')
+            sys.exit(0)
+
+        for i, qtm_serialized in enumerate(content['requests']):
+            if i >= MAX_QUERIES:
+                sys.stdout.write('Maximum requests exceeded.')
+                sys.exit(0)
+
+            try:
+                qtm = DNSQueryTransportMeta.deserialize_request(qtm_serialized)
+            except transport.TransportMetaDeserializationError, e:
+                sys.stdout.write('Error deserializing request information: %s' % e)
+                sys.exit(0)
+
+            check_dst(qtm.dst)
+
             qtms.append(qtm)
             th = th_factory.build(processed_queue=response_queue)
             th.add_qtm(qtm)
@@ -233,7 +124,7 @@ def main():
         tm.close()
 
     ret = {
-        'version': transport.DNS_LG_VERSION,
+        'version': transport.DNS_TRANSPORT_VERSION,
         'responses': [qtm.serialize_response() for qtm in qtms],
     }
     sys.stdout.write(json.dumps(ret))
