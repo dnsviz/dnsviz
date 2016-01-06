@@ -9,7 +9,7 @@
 # DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
 # certain rights in this software.
 #
-# Copyright 2014-2015 VeriSign, Inc.
+# Copyright 2014-2016 VeriSign, Inc.
 #
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
