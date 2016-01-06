@@ -26,6 +26,7 @@
 #
 
 import base64
+import errno
 import cgi
 import collections
 import datetime
@@ -47,11 +48,11 @@ from util import tuple_to_dict
 class DNSResponse:
     '''A DNS response, including meta information'''
 
-    def __init__(self, message, msg_size, error, errno, history, response_time, query, review_history=True):
+    def __init__(self, message, msg_size, error, errno1, history, response_time, query, review_history=True):
         self.message = message
         self.msg_size = msg_size
         self.error = error
-        self.errno = errno
+        self.errno = errno1
         self.history = history
         self.response_time = response_time
 
@@ -457,8 +458,10 @@ class DNSResponse:
 
         if self.message is None:
             d['error'] = Q.response_errors[self.error]
-            if self.errno:
-                d['errno'] = self.errno
+            if self.errno is not None:
+                errno_name = errno.errorcode.get(self.errno, None)
+                if errno_name is not None:
+                    d['errno'] = errno_name
         else:
             d['rcode'] = dns.rcode.to_text(self.message.rcode())
             if self.message.edns >= 0:
@@ -516,8 +519,10 @@ class DNSResponse:
         if self.message is None:
             d['message'] = None
             d['error'] = Q.response_errors[self.error]
-            if self.errno:
-                d['errno'] = self.errno
+            if self.errno is not None:
+                errno_name = errno.errorcode.get(self.errno, None)
+                if errno_name is not None:
+                    d['errno'] = errno_name
         else:
             d['message'] = base64.b64encode(self.message.to_wire())
         if self.msg_size is not None:
@@ -541,9 +546,16 @@ class DNSResponse:
         else:
             error = None
         if 'errno' in d:
-            errno = d['errno']
+            # compatibility with version 1.0
+            if isinstance(d['errno'], int):
+                errno1 = d['errno']
+            else:
+                if hasattr(errno, d['errno']):
+                    errno1 = getattr(errno, d['errno'])
+                else:
+                    errno1 = None
         else:
-            errno = None
+            errno1 = None
 
         if d['message'] is None:
             message = None
@@ -569,7 +581,7 @@ class DNSResponse:
         history = []
         for retry in d['history']:
             history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
-        return DNSResponse(message, msg_size, error, errno, history, response_time, query)
+        return DNSResponse(message, msg_size, error, errno1, history, response_time, query)
 
 class DNSResponseComponent(object):
     def __init__(self):

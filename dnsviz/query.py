@@ -172,7 +172,12 @@ class DNSQueryRetryAttempt:
         d['response_time'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
-            d['cause_arg'] = self.cause_arg
+            if self.cause == RETRY_CAUSE_NETWORK_ERROR:
+                errno_name = errno.errorcode.get(self.cause_arg, None)
+                if errno_name is not None:
+                    d['cause_arg'] = errno_name
+            else:
+                d['cause_arg'] = self.cause_arg
         d['action'] = retry_actions.get(self.action, 'UNKNOWN')
         if self.action_arg is not None:
             d['action_arg'] = self.action_arg
@@ -190,7 +195,17 @@ class DNSQueryRetryAttempt:
             response_time = d['response_time']/1000.0
         cause = retry_cause_codes[d['cause']]
         if 'cause_arg' in d:
-            cause_arg = d['cause_arg']
+            if cause == RETRY_CAUSE_NETWORK_ERROR:
+                # compatibility with version 1.0
+                if isinstance(d['cause_arg'], int):
+                    cause_arg = d['cause_arg']
+                else:
+                    if hasattr(errno, d['cause_arg']):
+                        cause_arg = getattr(errno, d['cause_arg'])
+                    else:
+                        cause_arg = None
+            else:
+                cause_arg = d['cause_arg']
         else:
             cause_arg = None
         action = retry_action_codes[d['action']]
