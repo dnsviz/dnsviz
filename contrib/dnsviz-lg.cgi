@@ -232,8 +232,11 @@ def main():
     finally:
         tm.close()
 
-    response_data = [qtm.serialize_response() for qtm in qtms]
-    sys.stdout.write(json.dumps(response_data))
+    ret = {
+        'version': transport.DNS_LG_VERSION,
+        'responses': [qtm.serialize_response() for qtm in qtms],
+    }
+    sys.stdout.write(json.dumps(ret))
 
 if __name__ == '__main__':
     main()

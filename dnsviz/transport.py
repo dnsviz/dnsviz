@@ -42,6 +42,8 @@ import dns.exception
 
 from ipaddr import IPAddr
 
+DNS_LG_VERSION = 1.0
+
 MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
 HTTP_HEADER_END_RE = re.compile(r'(\r\n\r\n|\n\n|\r\r)')
@@ -493,8 +495,24 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
         except ValueError:
             raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
 
+        if 'version' not in content:
+            raise HTTPQueryTransportError('No version information in HTTP response.')
+        try:
+            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+        except ValueError:
+            raise HTTPQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
+
+        # ensure major version is a match and minor version is no greater
+        # than the current minor version
+        curr_major_vers, curr_minor_vers = map(int, str(DNS_LG_VERSION).split('.', 1))
+        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+            raise HTTPQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+
+        if 'responses' not in content:
+            raise HTTPQueryTransportError('No response information in HTTP response.')
+
         for i in range(len(self.qtms)):
-            self._finalize_qtm(i, content)
+            self._finalize_qtm(i, content['responses'])
 
     def _post_data(self, index, msg, dst, tcp, timeout, dport, src, sport):
         msg = urllib.quote(base64.b64encode(msg))
