@@ -70,8 +70,8 @@ def main():
 
         # load the json content
         try:
-            content = json.loads(form['content'])
-        except ValueError:
+            content = json.loads(form['content'].value)
+        except TypeError:
             sys.stdout.write('JSON decoding of HTTP request failed: %s\n' % form['content'])
             sys.exit(0)
 
@@ -86,7 +86,7 @@ def main():
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(transportDNS_TRANSPORT_VERSION).split('.', 1))
+        curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             sys.stdout.write('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
             sys.exit(0)
@@ -101,7 +101,7 @@ def main():
                 sys.exit(0)
 
             try:
-                qtm = DNSQueryTransportMeta.deserialize_request(qtm_serialized)
+                qtm = transport.DNSQueryTransportMeta.deserialize_request(qtm_serialized)
             except transport.TransportMetaDeserializationError, e:
                 sys.stdout.write('Error deserializing request information: %s' % e)
                 sys.exit(0)
