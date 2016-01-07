@@ -333,7 +333,6 @@ class DNSQueryTransportHandler(object):
         self.sport = sport
 
     def connect(self):
-        self.expiration = self.timeout + time.time()
         self._set_start_time()
         self._connect_socket()
         self._set_socket_info()
@@ -349,6 +348,7 @@ class DNSQueryTransportHandler(object):
                 raise
 
     def _set_start_time(self):
+        self.expiration = self.timeout + time.time()
         self.start_time = time.time()
 
     def _set_end_time(self):
