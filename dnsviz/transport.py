@@ -297,12 +297,12 @@ class DNSQueryTransportHandler(object):
     def _create_socket(self):
         af = self._get_af()
         self.sock = socket.socket(af, self.transport_type)
+        self.sockfd = self.sock.fileno()
 
     def _prepare_socket(self):
         self._create_socket()
         self.sock.setblocking(0)
         self._bind_socket()
-        self.sockfd = self.sock.fileno()
 
     def _bind_socket(self):
         if self.src is not None:
