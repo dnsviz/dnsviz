@@ -295,6 +295,7 @@ class DNSQueryTransportHandler(object):
         self.sock = socket.socket(af, self.transport_type)
         self.sock.setblocking(0)
         self._bind_socket()
+        self.sockfd = self.sock.fileno()
 
     def _bind_socket(self):
         if self.src is not None:
@@ -318,7 +319,6 @@ class DNSQueryTransportHandler(object):
                     i += 1
                     if i > MAX_PORT_BIND_ATTEMPTS or e.errno != socket.errno.EADDRINUSE:
                         raise
-        self.sockfd = self.sock.fileno()
 
     def _set_socket_info(self):
         src, sport = self.sock.getsockname()[:2]
