@@ -489,9 +489,51 @@ class DNSQueryTransportHandlerDNSPrivate(DNSQueryTransportHandlerDNS):
 class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
     require_queryid_match = False
 
-class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
+class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
     singleton = False
 
+    def finalize(self):
+        super(DNSQueryTransportHandlerMulti, self).finalize()
+
+        # if there was an error, then re-raise it here
+        if self.err is not None:
+            raise self.err
+
+        # if there is no content, raise an exception
+        if self.res is None:
+            raise HTTPQueryTransportError('No content in HTTP response')
+
+        # load the json content
+        try:
+            content = json.loads(self.res)
+        except ValueError:
+            raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
+
+        if 'version' not in content:
+            raise HTTPQueryTransportError('No version information in HTTP response.')
+        try:
+            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+        except ValueError:
+            raise HTTPQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
+
+        # ensure major version is a match and minor version is no greater
+        # than the current minor version
+        curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
+        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+            raise HTTPQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+
+        if 'responses' not in content:
+            raise HTTPQueryTransportError('No response information in HTTP response.')
+
+        for i in range(len(self.qtms)):
+            try:
+                self.qtms[i].deserialize_response(content['responses'][i])
+            except IndexError:
+                raise HTTPQueryTransportError('Response information missing from HTTP response')
+            except TransportMetaDeserializationError, e:
+                raise HTTPQueryTransportError(str(e))
+
+class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def __init__(self, url, insecure=False, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
 
@@ -540,47 +582,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandler):
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
             self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
-
-    def finalize(self):
-        super(DNSQueryTransportHandlerHTTP, self).finalize()
-
-        # if there was an error, then re-raise it here
-        if self.err is not None:
-            raise self.err
-
-        # if there is no content, raise an exception
-        if self.res is None:
-            raise HTTPQueryTransportError('No content in HTTP response')
-
-        # load the json content
-        try:
-            content = json.loads(self.res)
-        except ValueError:
-            raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
-
-        if 'version' not in content:
-            raise HTTPQueryTransportError('No version information in HTTP response.')
-        try:
-            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
-        except ValueError:
-            raise HTTPQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
-
-        # ensure major version is a match and minor version is no greater
-        # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
-        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-            raise HTTPQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
-
-        if 'responses' not in content:
-            raise HTTPQueryTransportError('No response information in HTTP response.')
-
-        for i in range(len(self.qtms)):
-            try:
-                self.qtms[i].deserialize_response(content['responses'][i])
-            except IndexError:
-                raise HTTPQueryTransportError('Response information missing from HTTP response')
-            except TransportMetaDeserializationError, e:
-                raise HTTPQueryTransportError(str(e))
 
     def _post_data(self):
         return 'content=' + urllib.quote(json.dumps(self.serialize_requests()))
