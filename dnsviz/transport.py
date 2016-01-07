@@ -583,8 +583,8 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         if self.timeout is None or timeout2 > self.timeout:
             self.timeout = timeout2
 
-    def _prepare_socket(self):
-        super(DNSQueryTransportHandlerHTTP, self)._prepare_socket()
+    def _create_socket(self):
+        super(DNSQueryTransportHandlerHTTP, self)._create_socket()
 
         if self.use_ssl:
             #XXX this is python >= 2.7.9 only
