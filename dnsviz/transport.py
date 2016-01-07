@@ -331,9 +331,12 @@ class DNSQueryTransportHandler(object):
         self._connect_socket()
         self._set_socket_info()
 
+    def _get_connect_arg(self):
+        return (self.dst, self.dport)
+
     def _connect_socket(self):
         try:
-            self.sock.connect((self.dst, self.dport))
+            self.sock.connect(self._get_connect_arg())
         except socket.error, e:
             if e.errno != socket.errno.EINPROGRESS:
                 raise
