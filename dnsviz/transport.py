@@ -289,6 +289,9 @@ class DNSQueryTransportHandler(object):
         self._create_socket()
         self._configure_socket()
         self._bind_socket()
+        self._set_start_time()
+        self._connect_socket()
+        self._set_socket_info()
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -331,11 +334,6 @@ class DNSQueryTransportHandler(object):
         src, sport = self.sock.getsockname()[:2]
         self.src = IPAddr(src)
         self.sport = sport
-
-    def connect(self):
-        self._set_start_time()
-        self._connect_socket()
-        self._set_socket_info()
 
     def _get_connect_arg(self):
         return (self.dst, self.dport)
@@ -879,7 +877,6 @@ class _DNSQueryTransportManager:
                         qtm = self._query_queue.get_nowait()
                         try:
                             qtm.prepare()
-                            qtm.connect()
                         except socket.error, e:
                             qtm.err = e
                             qtm.cleanup()
