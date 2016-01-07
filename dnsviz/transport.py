@@ -286,12 +286,14 @@ class DNSQueryTransportHandler(object):
         self.res_buf = ''
         self.res_index = 0
 
-    def _prepare_socket(self):
+    def _get_af(self):
         if self.dst.version == 6:
-            af = socket.AF_INET6
+            return socket.AF_INET6
         else:
-            af = socket.AF_INET
+            return socket.AF_INET
 
+    def _prepare_socket(self):
+        af = self._get_af()
         self.sock = socket.socket(af, self.transport_type)
         self.sock.setblocking(0)
         self._bind_socket()
