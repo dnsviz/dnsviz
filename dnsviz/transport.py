@@ -784,17 +784,17 @@ class _DNSQueryTransportManager:
         self._close.set()
         os.write(self._notify_write_fd, struct.pack('!B', 0))
 
-    def query(self, qtm):
-        self._event_map[qtm] = threading.Event()
-        self._query(qtm)
-        self._event_map[qtm].wait()
-        del self._event_map[qtm]
+    def query(self, qh):
+        self._event_map[qh] = threading.Event()
+        self._query(qh)
+        self._event_map[qh].wait()
+        del self._event_map[qh]
 
-    def query_nowait(self, qtm):
-        self._query(qtm)
+    def query_nowait(self, qh):
+        self._query(qh)
 
-    def _query(self, qtm):
-        self._query_queue.put(qtm)
+    def _query(self, qh):
+        self._query_queue.put(qh)
         os.write(self._notify_write_fd, struct.pack('!B', 0))
 
     def _loop(self):
@@ -825,10 +825,10 @@ class _DNSQueryTransportManager:
 
             # handle the requests
             for fd in wlist_out:
-                qtm = query_meta[fd]
+                qh = query_meta[fd]
 
-                if qtm.do_write():
-                    if qtm.err is not None:
+                if qh.do_write():
+                    if qh.err is not None:
                         finished_fds.append(fd)
                     else:
                         wlist_in.remove(fd)
@@ -839,22 +839,22 @@ class _DNSQueryTransportManager:
                 if fd == self._notify_read_fd:
                     continue
 
-                qtm = query_meta[fd]
+                qh = query_meta[fd]
 
-                if qtm.do_read():
+                if qh.do_read():
                     finished_fds.append(fd)
 
             # handle the expired queries
             future_index = bisect.bisect_right(expirations, ((time.time(), None)))
             for i in range(future_index):
-                qtm = expirations[i][1]
+                qh = expirations[i][1]
 
                 # perhaps this query actually finished earlier in the loop
-                if qtm.end_time is not None:
+                if qh.end_time is not None:
                     continue
 
-                qtm.do_timeout()
-                finished_fds.append(qtm.sockfd)
+                qh.do_timeout()
+                finished_fds.append(qh.sockfd)
             expirations = expirations[future_index:]
 
             # for any fds that need to be finished, do it now
@@ -874,20 +874,20 @@ class _DNSQueryTransportManager:
 
                 while True:
                     try:
-                        qtm = self._query_queue.get_nowait()
+                        qh = self._query_queue.get_nowait()
                         try:
-                            qtm.prepare()
+                            qh.prepare()
                         except socket.error, e:
-                            qtm.err = e
-                            qtm.cleanup()
-                            if qtm in self._event_map:
-                                self._event_map[qtm].set()
+                            qh.err = e
+                            qh.cleanup()
+                            if qh in self._event_map:
+                                self._event_map[qh].set()
                         else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
-                            fd = qtm.sock.fileno()
-                            query_meta[fd] = qtm
-                            bisect.insort(expirations, (qtm.expiration, qtm))
+                            fd = qh.sock.fileno()
+                            query_meta[fd] = qh
+                            bisect.insort(expirations, (qh.expiration, qh))
                             wlist_in.append(fd)
                     except Queue.Empty:
                         break
@@ -903,11 +903,11 @@ class DNSQueryTransportManager:
     def __del__(self):
         self.close()
 
-    def query(self, qtm):
-        return self._th.query(qtm)
+    def query(self, qh):
+        return self._th.query(qh)
 
-    def query_nowait(self, qtm):
-        return self._th.query_nowait(qtm)
+    def query_nowait(self, qh):
+        return self._th.query_nowait(qh)
 
     def close(self):
         return self._th.close()
