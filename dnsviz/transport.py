@@ -281,7 +281,6 @@ class DNSQueryTransportHandler(object):
         assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
         self._prepare_socket()
-        self.req_index = 0
         self.res = ''
         self.res_buf = ''
         self.res_index = 0
@@ -413,6 +412,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
 
         self.req = qtm.req
         self.req_len = len(qtm.req)
+        self.req_index = 0
 
         self._queryid_wire = self.req[:2]
         index = 12
@@ -605,6 +605,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         data = self._post_data()
         self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: application/json\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
+        self.req_index = 0
 
     def do_write(self):
         val = super(DNSQueryTransportHandlerHTTP, self).do_write()
