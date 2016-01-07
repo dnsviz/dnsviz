@@ -294,9 +294,12 @@ class DNSQueryTransportHandler(object):
         else:
             return socket.AF_INET
 
-    def _prepare_socket(self):
+    def _create_socket(self):
         af = self._get_af()
         self.sock = socket.socket(af, self.transport_type)
+
+    def _prepare_socket(self):
+        self._create_socket()
         self.sock.setblocking(0)
         self._bind_socket()
         self.sockfd = self.sock.fileno()
