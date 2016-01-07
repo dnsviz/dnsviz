@@ -286,7 +286,9 @@ class DNSQueryTransportHandler(object):
         assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
         self._init_res_buffer()
-        self._prepare_socket()
+        self._create_socket()
+        self._configure_socket()
+        self._bind_socket()
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -301,11 +303,6 @@ class DNSQueryTransportHandler(object):
 
     def _configure_socket(self):
         self.sock.setblocking(0)
-
-    def _prepare_socket(self):
-        self._create_socket()
-        self._configure_socket()
-        self._bind_socket()
 
     def _bind_socket(self):
         if self.src is not None:
