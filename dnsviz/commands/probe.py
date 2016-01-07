@@ -88,7 +88,7 @@ def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv
     except KeyboardInterrupt:
         raise
     # report exceptions related to network connectivity
-    except (NetworkConnectivityException, transport.HTTPQueryTransportError), e:
+    except (NetworkConnectivityException, transport.RemoteQueryTransportError), e:
         logger.error('Error analyzing %s: %s' % (fmt.humanize_name(name), e))
     # don't report EOFError, as that is what is raised if there is a
     # KeyboardInterrupt in ParallelAnalyst

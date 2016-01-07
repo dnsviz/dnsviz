@@ -53,7 +53,7 @@ CHUNKED_ENCODING_RE = re.compile(r'^Transfer-Encoding: chunked(\r\n|\r|\n)', re.
 CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
 CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
 
-class HTTPQueryTransportError(Exception):
+class RemoteQueryTransportError(Exception):
     pass
 
 class TransportMetaDeserializationError(Exception):
@@ -501,37 +501,37 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # if there is no content, raise an exception
         if self.res is None:
-            raise HTTPQueryTransportError('No content in HTTP response')
+            raise RemoteQueryTransportError('No content in HTTP response')
 
         # load the json content
         try:
             content = json.loads(self.res)
         except ValueError:
-            raise HTTPQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
+            raise RemoteQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
 
         if 'version' not in content:
-            raise HTTPQueryTransportError('No version information in HTTP response.')
+            raise RemoteQueryTransportError('No version information in HTTP response.')
         try:
             major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
         except ValueError:
-            raise HTTPQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
+            raise RemoteQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
         curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-            raise HTTPQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+            raise RemoteQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
 
         if 'responses' not in content:
-            raise HTTPQueryTransportError('No response information in HTTP response.')
+            raise RemoteQueryTransportError('No response information in HTTP response.')
 
         for i in range(len(self.qtms)):
             try:
                 self.qtms[i].deserialize_response(content['responses'][i])
             except IndexError:
-                raise HTTPQueryTransportError('Response information missing from HTTP response')
+                raise RemoteQueryTransportError('Response information missing from HTTP response')
             except TransportMetaDeserializationError, e:
-                raise HTTPQueryTransportError(str(e))
+                raise RemoteQueryTransportError(str(e))
 
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def __init__(self, url, insecure=False, processed_queue=None, factory=None):
@@ -542,7 +542,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         if not scheme:
             scheme = 'http'
         elif scheme not in ('http', 'https'):
-            raise HTTPQueryTransportError('Invalid schema: %s' % schema)
+            raise RemoteQueryTransportError('Invalid schema: %s' % schema)
 
         self.use_ssl = scheme == 'https'
         self.host = parse_result.hostname
@@ -560,7 +560,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         try:
             addrinfo = socket.getaddrinfo(self.host, self.dport)
         except socket.gaierror:
-            raise HTTPQueryTransportError('Unable to resolve name of HTTP host')
+            raise RemoteQueryTransportError('Unable to resolve name of HTTP host')
         self.dst = IPAddr(addrinfo[0][4][0])
 
         self.transport_type = socket.SOCK_STREAM
@@ -604,7 +604,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def do_write(self):
         val = super(DNSQueryTransportHandlerHTTP, self).do_write()
         if self.err is not None:
-            self.err = HTTPQueryTransportError('Error making HTTP request: %s' % self.err)
+            self.err = RemoteQueryTransportError('Error making HTTP request: %s' % self.err)
         return val
 
     def do_read(self):
@@ -624,12 +624,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     # check HTTP status
                     status_match = HTTP_STATUS_RE.search(headers)
                     if status_match is None:
-                        self.err = HTTPQueryTransportError('Malformed HTTP status line')
+                        self.err = RemoteQueryTransportError('Malformed HTTP status line')
                         self.cleanup()
                         return True
                     status = int(status_match.group('status'))
                     if status != 200:
-                        self.err = HTTPQueryTransportError('%d HTTP status' % status)
+                        self.err = RemoteQueryTransportError('%d HTTP status' % status)
                         self.cleanup()
                         return True
 
@@ -723,7 +723,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                 return True
 
     def do_timeout(self):
-        self.err = HTTPQueryTransportError('HTTP request timed out')
+        self.err = RemoteQueryTransportError('HTTP request timed out')
         self.cleanup()
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
