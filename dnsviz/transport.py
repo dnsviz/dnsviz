@@ -622,6 +622,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.req_len = len(self.req)
         self.req_index = 0
 
+    def prepare(self):
+        super(DNSQueryTransportHandlerHTTP, self).prepare()
+        if self.err is not None:
+            self.err = RemoteQueryTransportError('Error making HTTP connection: %s' % self.err)
+
     def do_write(self):
         val = super(DNSQueryTransportHandlerHTTP, self).do_write()
         if self.err is not None:
