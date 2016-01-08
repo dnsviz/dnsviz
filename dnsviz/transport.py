@@ -562,7 +562,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         if not scheme:
             scheme = 'http'
         elif scheme not in ('http', 'https'):
-            raise RemoteQueryTransportError('Invalid schema: %s' % schema)
+            raise RemoteQueryTransportError('Invalid scheme: %s' % scheme)
 
         self.use_ssl = scheme == 'https'
         self.host = parse_result.hostname
