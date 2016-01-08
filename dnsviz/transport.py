@@ -286,11 +286,15 @@ class DNSQueryTransportHandler(object):
         assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
         self._init_res_buffer()
-        self._create_socket()
-        self._configure_socket()
-        self._bind_socket()
-        self._set_start_time()
-        self._connect_socket()
+        try:
+            self._create_socket()
+            self._configure_socket()
+            self._bind_socket()
+            self._set_start_time()
+            self._connect_socket()
+        except socket.error, e:
+            self.err = e
+            self.cleanup()
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -876,11 +880,8 @@ class _DNSQueryTransportManager:
                 while True:
                     try:
                         qh = self._query_queue.get_nowait()
-                        try:
-                            qh.prepare()
-                        except socket.error, e:
-                            qh.err = e
-                            qh.cleanup()
+                        qh.prepare()
+                        if qh.err is not None:
                             if qh in self._event_map:
                                 self._event_map[qh].set()
                         else:
