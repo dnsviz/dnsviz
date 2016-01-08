@@ -291,7 +291,6 @@ class DNSQueryTransportHandler(object):
         self._bind_socket()
         self._set_start_time()
         self._connect_socket()
-        self._set_socket_info()
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -357,6 +356,8 @@ class DNSQueryTransportHandler(object):
     def cleanup(self):
         # set end (and start, if necessary) times, as appropriate
         self._set_end_time()
+
+        self._set_socket_info()
 
         # close socket
         if self.sock is not None:
