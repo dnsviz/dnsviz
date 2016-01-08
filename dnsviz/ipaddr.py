@@ -39,39 +39,36 @@ class IPAddr(str):
         obj.version = vers
         return obj
 
-    def __lt__(self, other):
+    def _check_class_for_cmp(self, other):
         if self.__class__ != other.__class__:
             raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+
+    def __lt__(self, other):
+        self._check_class_for_cmp(other)
         return cmp(self, other) < 0
 
     def __le__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+        self._check_class_for_cmp(other)
         return cmp(self, other) <= 0
 
     def __eq__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+        self._check_class_for_cmp(other)
         return cmp(self, other) == 0
 
     def __ne__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
-        return cmp(self, other) != 0
+        self._check_class_for_cmp(other)
+        return cmp(self, other) == 0
 
     def __gt__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+        self._check_class_for_cmp(other)
         return cmp(self, other) > 0
 
     def __ge__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+        self._check_class_for_cmp(other)
         return cmp(self, other) >= 0
 
     def __cmp__(self, other):
-        if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+        self._check_class_for_cmp(other)
         if len(self._ipaddr_bytes) < len(other._ipaddr_bytes):
             return -1
         elif len(self._ipaddr_bytes) > len(other._ipaddr_bytes):
