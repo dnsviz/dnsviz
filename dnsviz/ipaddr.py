@@ -52,10 +52,14 @@ class IPAddr(str):
         return cmp(self, other) <= 0
 
     def __eq__(self, other):
+        if other is None:
+            return False
         self._check_class_for_cmp(other)
         return cmp(self, other) == 0
 
     def __ne__(self, other):
+        if other is None:
+            return True
         self._check_class_for_cmp(other)
         return cmp(self, other) == 0
 
