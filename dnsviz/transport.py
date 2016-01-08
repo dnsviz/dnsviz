@@ -268,7 +268,7 @@ class DNSQueryTransportHandler(object):
         self._set_timeout(qtm)
 
     def _check_source(self):
-        if self.src in (ANY_IPV6, ANY_IPV4):
+        if self.src is not None and self.src in (ANY_IPV6, ANY_IPV4):
             self.src = None
 
     def finalize(self):
