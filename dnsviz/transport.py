@@ -521,35 +521,35 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # if there is no content, raise an exception
         if self.res is None:
-            raise RemoteQueryTransportError('No content in HTTP response')
+            raise RemoteQueryTransportError('No content in response')
 
         # load the json content
         try:
             content = json.loads(self.res)
         except ValueError:
-            raise RemoteQueryTransportError('JSON decoding of HTTP response failed: %s' % self.res)
+            raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
 
         if 'version' not in content:
-            raise RemoteQueryTransportError('No version information in HTTP response.')
+            raise RemoteQueryTransportError('No version information in response.')
         try:
             major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
         except ValueError:
-            raise RemoteQueryTransportError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
+            raise RemoteQueryTransportError('Version of JSON input in response is invalid: %s' % content['version'])
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
         curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-            raise RemoteQueryTransportError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+            raise RemoteQueryTransportError('Version %d.%d of JSON input in response is incompatible with this software.' % (major_vers, minor_vers))
 
         if 'responses' not in content:
-            raise RemoteQueryTransportError('No response information in HTTP response.')
+            raise RemoteQueryTransportError('No DNS response information in response.')
 
         for i in range(len(self.qtms)):
             try:
                 self.qtms[i].deserialize_response(content['responses'][i])
             except IndexError:
-                raise RemoteQueryTransportError('Response information missing from HTTP response')
+                raise RemoteQueryTransportError('DNS response information missing from response')
             except TransportMetaDeserializationError, e:
                 raise RemoteQueryTransportError(str(e))
 
