@@ -41,7 +41,7 @@ class IPAddr(str):
 
     def _check_class_for_cmp(self, other):
         if self.__class__ != other.__class__:
-            raise TypeError('Cannot compare IPAddr to non-IPAddr!')
+            raise TypeError('Cannot compare IPAddr to %s!' % other.__class__.__name__)
 
     def __lt__(self, other):
         self._check_class_for_cmp(other)
