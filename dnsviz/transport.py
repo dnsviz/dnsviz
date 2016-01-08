@@ -744,7 +744,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                 if self.chunked_encoding == False and self.res_len is None:
                     pass
                 else:
-                    self.err = e
+                    self.err = RemoteQueryTransportError('Error communicating with HTTP server: %s' % e)
                 self.cleanup()
                 return True
 
