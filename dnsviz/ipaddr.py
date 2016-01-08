@@ -100,3 +100,6 @@ LOOPBACK_IPV6 = IPAddr('::1')
 RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
 LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
 UNIQ_LOCAL_RE = re.compile(r'^fd[0-9a-f]{2}:', re.IGNORECASE)
+
+ANY_IPV6 = IPAddr('::')
+ANY_IPV4 = IPAddr('0.0.0.0')

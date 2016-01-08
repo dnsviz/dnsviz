@@ -40,7 +40,7 @@ import urlparse
 
 import dns.exception
 
-from ipaddr import IPAddr
+from ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
 
 DNS_TRANSPORT_VERSION = 1.0
 
@@ -267,8 +267,14 @@ class DNSQueryTransportHandler(object):
         self.qtms.append(qtm)
         self._set_timeout(qtm)
 
+    def _check_source(self):
+        if self.src in (ANY_IPV6, ANY_IPV4):
+            self.src = None
+
     def finalize(self):
         assert self.res is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
+
+        self._check_source()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
@@ -315,9 +321,9 @@ class DNSQueryTransportHandler(object):
             src = self.src
         else:
             if self.sock.family == socket.AF_INET6:
-                src = IPAddr('::')
+                src = ANY_IPV6
             else:
-                src = IPAddr('0.0.0.0')
+                src = ANY_IPV4
 
         if self.sport is not None:
             self.sock.bind((src, self.sport))
