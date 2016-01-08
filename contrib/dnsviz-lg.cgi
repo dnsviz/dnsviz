@@ -33,9 +33,9 @@ from dnsviz import transport
 FALSE_RE = re.compile(r'^(0|f(alse)?)?$', re.IGNORECASE)
 
 try:
-    MAX_QUERIES = int(os.environ.get('MAX_QUERIES', 100))
+    MAX_QUERIES = int(os.environ.get('MAX_QUERIES', 200))
 except ValueError:
-    MAX_QUERIES = 100
+    MAX_QUERIES = 200
 ALLOW_PRIVATE_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
 ALLOW_LOOPBACK_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
 
