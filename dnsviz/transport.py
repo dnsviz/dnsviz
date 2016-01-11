@@ -617,11 +617,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         username = self.username
         if self.password:
             username += ':' + self.password
-        return 'Authorization: Basic %s\n' % (base64.b64encode(username))
+        return 'Authorization: Basic %s\r\n' % (base64.b64encode(username))
 
     def init_req(self):
         data = self._post_data()
-        self.req = 'POST %s HTTP/1.1\nHost: %s\nUser-Agent: DNSViz/0.5.0\nAccept: application/json\n%sContent-Length: %d\nContent-Type: application/x-www-form-urlencoded\n\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
+        self.req = 'POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.0\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
         self.req_len = len(self.req)
         self.req_index = 0
 

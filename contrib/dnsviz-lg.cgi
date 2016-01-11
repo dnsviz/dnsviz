@@ -53,7 +53,7 @@ def check_dst(dst):
         raise RemoteQueryError('Querying %s not allowed' % dst)
 
 def main():
-    sys.stdout.write('Content-type: application/json\n\n')
+    sys.stdout.write('Content-type: application/json\r\n\r\n')
     try:
         if os.environ.get('REQUEST_METHOD', '') != 'POST':
             raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
