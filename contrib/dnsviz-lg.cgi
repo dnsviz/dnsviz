@@ -56,9 +56,8 @@ def main():
     sys.stdout.write('Content-type: application/json\n\n')
     try:
         if os.environ.get('REQUEST_METHOD', '') != 'POST':
-            sys.exit(0)
-        else:
-            form = cgi.FieldStorage()
+            raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
+        form = cgi.FieldStorage()
 
         response_queue = Queue.Queue()
         queries_in_waiting = set()
