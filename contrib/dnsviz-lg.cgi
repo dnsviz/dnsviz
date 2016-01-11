@@ -39,98 +39,93 @@ except ValueError:
 ALLOW_PRIVATE_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
 ALLOW_LOOPBACK_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
 
+class RemoteQueryError(Exception):
+    pass
+
 def check_dst(dst):
     # check for local addresses
     if not ALLOW_PRIVATE_QUERY and (RFC_1918_RE.search(dst) is not None or \
             LINK_LOCAL_RE.search(dst) is not None or \
             UNIQ_LOCAL_RE.search(dst) is not None):
-        sys.stdout.write('Querying %s not allowed\n' % dst)
-        sys.exit(0)
+        raise RemoteQueryError('Querying %s not allowed' % dst)
     if not ALLOW_LOOPBACK_QUERY and (LOOPBACK_IPV4_RE.search(dst) is not None or \
             dst == LOOPBACK_IPV6):
-        sys.stdout.write('Querying %s not allowed\n' % dst)
-        sys.exit(0)
+        raise RemoteQueryError('Querying %s not allowed' % dst)
 
 def main():
     sys.stdout.write('Content-type: application/json\n\n')
-    if os.environ.get('REQUEST_METHOD', '') != 'POST':
-        sys.exit(0)
-    else:
-        form = cgi.FieldStorage()
-
-    response_queue = Queue.Queue()
-    queries_in_waiting = set()
-    th_factory = transport.DNSQueryTransportHandlerDNSFactory()
-    tm = transport.DNSQueryTransportManager()
-    qtms = []
     try:
-        if 'content' not in form:
-            sys.stdout.write('No "content" field found in input\n')
+        if os.environ.get('REQUEST_METHOD', '') != 'POST':
             sys.exit(0)
+        else:
+            form = cgi.FieldStorage()
 
-        # load the json content
+        response_queue = Queue.Queue()
+        queries_in_waiting = set()
+        th_factory = transport.DNSQueryTransportHandlerDNSFactory()
+        tm = transport.DNSQueryTransportManager()
+        qtms = []
         try:
-            content = json.loads(form['content'].value)
-        except ValueError:
-            sys.stdout.write('JSON decoding of HTTP request failed: %s\n' % form['content'])
-            sys.exit(0)
+            if 'content' not in form:
+                raise RemoteQueryError('No "content" field found in input')
 
-        if 'version' not in content:
-            sys.stdout.write('No version information in HTTP response.\n')
-            sys.exit(0)
-        try:
-            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
-        except ValueError:
-            sys.stdout.write('Version of JSON input in HTTP response is invalid: %s\n' % content['version'])
-            sys.exit(0)
-
-        # ensure major version is a match and minor version is no greater
-        # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
-        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-            sys.stdout.write('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
-            sys.exit(0)
-
-        if 'requests' not in content:
-            sys.stdout.write('No request information in HTTP request.')
-            sys.exit(0)
-
-        for i, qtm_serialized in enumerate(content['requests']):
-            if i >= MAX_QUERIES:
-                sys.stdout.write('Maximum requests exceeded.')
-                sys.exit(0)
-
+            # load the json content
             try:
-                qtm = transport.DNSQueryTransportMeta.deserialize_request(qtm_serialized)
-            except transport.TransportMetaDeserializationError, e:
-                sys.stdout.write('Error deserializing request information: %s' % e)
-                sys.exit(0)
+                content = json.loads(form['content'].value)
+            except ValueError:
+                raise RemoteQueryError('JSON decoding of HTTP request failed: %s' % form['content'])
 
-            check_dst(qtm.dst)
+            if 'version' not in content:
+                raise RemoteQueryError('No version information in HTTP response.')
+            try:
+                major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+            except ValueError:
+                raise RemoteQueryError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
 
-            qtms.append(qtm)
-            th = th_factory.build(processed_queue=response_queue)
-            th.add_qtm(qtm)
-            th.init_req()
-            tm.query_nowait(th)
-            queries_in_waiting.add(th)
+            # ensure major version is a match and minor version is no greater
+            # than the current minor version
+            curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
+            if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+                raise RemoteQueryError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
 
-        while queries_in_waiting:
-            th = response_queue.get()
-            th.finalize()
-            queries_in_waiting.remove(th)
+            if 'requests' not in content:
+                raise RemoteQueryError('No request information in HTTP request.')
 
-    finally:
-        tm.close()
+            for i, qtm_serialized in enumerate(content['requests']):
+                if i >= MAX_QUERIES:
+                    raise RemoteQueryError('Maximum requests exceeded.')
 
-    try:
+                try:
+                    qtm = transport.DNSQueryTransportMeta.deserialize_request(qtm_serialized)
+                except transport.TransportMetaDeserializationError, e:
+                    raise RemoteQueryError('Error deserializing request information: %s' % e)
+
+                check_dst(qtm.dst)
+
+                qtms.append(qtm)
+                th = th_factory.build(processed_queue=response_queue)
+                th.add_qtm(qtm)
+                th.init_req()
+                tm.query_nowait(th)
+                queries_in_waiting.add(th)
+
+            while queries_in_waiting:
+                th = response_queue.get()
+                th.finalize()
+                queries_in_waiting.remove(th)
+
+        finally:
+            tm.close()
+
         ret = {
             'version': transport.DNS_TRANSPORT_VERSION,
             'responses': [qtm.serialize_response() for qtm in qtms],
         }
-    except transport.TransportMetaSerializationError, e:
-        sys.stdout.write('Error serializing response information: %s' % e)
-        sys.exit(0)
+    except RemoteQueryError, e:
+        ret = {
+            'version': transport.DNS_TRANSPORT_VERSION,
+            'error': str(e),
+        }
     sys.stdout.write(json.dumps(ret))
 
 if __name__ == '__main__':
