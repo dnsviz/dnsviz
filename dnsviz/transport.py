@@ -542,6 +542,9 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             raise RemoteQueryTransportError('Version %d.%d of JSON input in response is incompatible with this software.' % (major_vers, minor_vers))
 
+        if 'error' in content:
+            raise RemoteQueryTransportError('Remote query error: %s' % content['error'])
+
         if 'responses' not in content:
             raise RemoteQueryTransportError('No DNS response information in response.')
 
