@@ -4,5 +4,5 @@ include doc/COPYRIGHT
 include doc/Makefile
 include doc/src/*dot
 include doc/src/*svg
-include contrib/m2crypto.patch contrib/digviz
+include contrib/*
 include external external/*/COPYRIGHT
