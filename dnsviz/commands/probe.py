@@ -479,7 +479,7 @@ def main(argv):
             if opts['-u'].startswith('https'):
                 vers0, vers1, vers2 = sys.version_info[:3]
                 if (2, 7, 9) > (vers0, vers1, vers2):
-                    sys.stderr.write('''python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n''')
+                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
                     sys.exit(1)
 
             th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
