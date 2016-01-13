@@ -1,10 +1,7 @@
 DOT=dot
-#INKSCAPE=inkscape
-INKSCAPE=/Applications/Inkscape.app/Contents/Resources/bin/inkscape
-#SRCDIR=src
-SRCDIR=/Users/cdeccio/dnsviz/doc/src
-#IMGDIR=images
-IMGDIR=/Users/cdeccio/dnsviz/doc/images
+INKSCAPE=inkscape
+SRCDIR=src
+IMGDIR=images
 
 DOTFILES = $(wildcard $(SRCDIR)/*dot)
 DOTPNGFILES = $(DOTFILES:$(SRCDIR)/%.dot=$(IMGDIR)/%.png)
