@@ -29,6 +29,8 @@ import base64
 import struct
 import hashlib
 
+from dnsviz.config import GOST_PATH
+
 try:
     from M2Crypto import EVP, RSA
     from M2Crypto.m2 import hex_to_bn, bn_to_mpi
@@ -44,6 +46,8 @@ _supported_nsec3_algs = set([1])
 GOST_PREFIX = '\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_DIGEST_NAME = 'GOST R 34.11-94'
 
+EC_NOCOMPRESSION = '\x04'
+
 def _check_dsa_support():
     try:
         DSA.pub_key_from_params
@@ -52,18 +56,19 @@ def _check_dsa_support():
         pass
 
 def _check_gost_support():
-    try:
-        _gost_init()
+    if GOST_PATH is not None:
         try:
-            m2.get_digestbyname(GOST_DIGEST_NAME)
-        except AttributeError:
+            _gost_init()
+            try:
+                md = EVP.MessageDigest(GOST_DIGEST_NAME)
+            except ValueError:
+                pass
+            else:
+                _supported_algs.add(12)
+                _supported_digest_algs.add(3)
+            _gost_cleanup()
+        except Engine.EngineError:
             pass
-        else:
-            _supported_algs.add(12)
-            _supported_digest_algs.add(3)
-        _gost_cleanup()
-    except Engine.EngineError:
-        pass
 
 def _check_ec_support():
     try:
@@ -82,7 +87,7 @@ def nsec3_alg_is_supported(alg):
     return alg in _supported_nsec3_algs
 
 def _gost_init():
-    gost = Engine.load_dynamic_engine('gost', '/usr/lib/x86_64-linux-gnu/openssl-1.0.0/engines/libgost.so')
+    gost = Engine.load_dynamic_engine('gost', GOST_PATH)
     gost.init()
     gost.set_default()
 
@@ -106,12 +111,6 @@ except:
 else:
     _check_gost_support()
 
-    class GostMessageDigest(EVP.MessageDigest):
-        def __init__(self, md):
-            self.md=md
-            self.ctx=m2.md_ctx_new()
-            m2.digest_init(self.ctx, self.md)
-
 try:
     from M2Crypto import EC
 except:
@@ -134,8 +133,7 @@ def validate_ds_digest(digest_alg, digest, dnskey_msg):
     elif digest_alg == 3:
         _gost_init()
         try:
-            mdgost = m2.get_digestbyname(GOST_DIGEST_NAME)
-            md = GostMessageDigest(mdgost)
+            md = EVP.MessageDigest(GOST_DIGEST_NAME)
             md.update(dnskey_msg)
             return md.final() == digest
         finally:
@@ -231,7 +229,7 @@ def _dnskey_to_ec(alg, key):
     else:
         raise ValueError('Algorithm not supported')
 
-    return EC.pub_key_from_params(curve, key)
+    return EC.pub_key_from_params(curve, EC_NOCOMPRESSION + key)
 
 def _validate_rrsig_rsa(alg, sig, msg, key):
     pubkey = _dnskey_to_rsa(key)
