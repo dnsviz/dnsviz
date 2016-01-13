@@ -29,6 +29,8 @@ import base64
 import struct
 import hashlib
 
+from dnsviz.config import GOST_PATH
+
 try:
     from M2Crypto import EVP, RSA
     from M2Crypto.m2 import hex_to_bn, bn_to_mpi
@@ -54,18 +56,19 @@ def _check_dsa_support():
         pass
 
 def _check_gost_support():
-    try:
-        _gost_init()
+    if GOST_PATH is not None:
         try:
-            md = EVP.MessageDigest(GOST_DIGEST_NAME)
-        except ValueError:
+            _gost_init()
+            try:
+                md = EVP.MessageDigest(GOST_DIGEST_NAME)
+            except ValueError:
+                pass
+            else:
+                _supported_algs.add(12)
+                _supported_digest_algs.add(3)
+            _gost_cleanup()
+        except Engine.EngineError:
             pass
-        else:
-            _supported_algs.add(12)
-            _supported_digest_algs.add(3)
-        _gost_cleanup()
-    except Engine.EngineError:
-        pass
 
 def _check_ec_support():
     try:
@@ -84,7 +87,7 @@ def nsec3_alg_is_supported(alg):
     return alg in _supported_nsec3_algs
 
 def _gost_init():
-    gost = Engine.load_dynamic_engine('gost', '/usr/lib/x86_64-linux-gnu/openssl-1.0.0/engines/libgost.so')
+    gost = Engine.load_dynamic_engine('gost', GOST_PATH)
     gost.init()
     gost.set_default()
 
