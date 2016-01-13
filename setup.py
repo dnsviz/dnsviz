@@ -92,7 +92,7 @@ else:
     RAPHAEL_FILES = []
 
 setup(name='dnsviz',
-        version='0.5.0-beta',
+        version='0.5.0-beta2',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
