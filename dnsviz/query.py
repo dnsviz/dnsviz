@@ -169,7 +169,7 @@ class DNSQueryRetryAttempt:
         '''Return a serialized version of the query.'''
 
         d = collections.OrderedDict()
-        d['response_time'] = int(self.response_time * 1000)
+        d['time_elapsed'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
             if self.cause == RETRY_CAUSE_NETWORK_ERROR:
@@ -189,10 +189,10 @@ class DNSQueryRetryAttempt:
         DNSQueryRetryAttempt.'''
 
         # compatibility with version 1.0
-        if isinstance(d['response_time'], float):
+        if 'response_time' in d:
             response_time = d['response_time']
         else:
-            response_time = d['response_time']/1000.0
+            response_time = d['time_elapsed']/1000.0
         cause = retry_cause_codes[d['cause']]
         if 'cause_arg' in d:
             if cause == RETRY_CAUSE_NETWORK_ERROR:

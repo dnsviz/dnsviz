@@ -165,7 +165,7 @@ class DNSQueryTransportMeta(object):
                     d['errno'] = errno_name
         d['src'] = self.src
         d['sport'] = self.sport
-        d['elapsed'] = int((self.end_time - self.start_time)*1000)
+        d['time_elapsed'] = int((self.end_time - self.start_time)*1000)
         return d
 
     def deserialize_response(self, d):
@@ -209,15 +209,15 @@ class DNSQueryTransportMeta(object):
         elif not isinstance(self.err, socket.error):
             raise TransportMetaDeserializationError('Missing "sport" field in input.')
 
-        if 'elapsed' in d and d['elapsed'] is not None:
+        if 'time_elapsed' in d and d['time_elapsed'] is not None:
             try:
-                elapsed = int(d['elapsed'])
+                elapsed = int(d['time_elapsed'])
                 if elapsed < 0:
                     raise ValueError()
             except ValueError:
-                raise TransportMetaDeserializationError('Invalid elapsed value: %s' % d['elapsed'])
+                raise TransportMetaDeserializationError('Invalid time elapsed value: %s' % d['time_elapsed'])
         else:
-            raise TransportMetaDeserializationError('Missing "elapsed" field in input.')
+            raise TransportMetaDeserializationError('Missing "time_elapsed" field in input.')
 
         self.end_time = time.time()
         self.start_time = self.end_time - (elapsed/1000.0)
