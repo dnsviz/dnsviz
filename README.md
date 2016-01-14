@@ -29,7 +29,7 @@ powers the Web-based analysis available at http://dnsviz.net/
   or greater is required because of the support for unicode names and HTML-like
   labels, both of which are utilized in the visual output.
 
-* M2Crypto (0.21.1 or later) - https://github.com/martinpaljak/M2Crypto
+* M2Crypto (0.21.1 or later) - https://gitlab.com/m2crypto/m2crypto
 
   M2Crypto is required if cryptographic validation of signatures and digests is
   desired (and thus is highly recommended).  The current code will display
