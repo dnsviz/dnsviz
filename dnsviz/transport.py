@@ -591,9 +591,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.chunked_encoding = None
 
     def _set_timeout(self, qtm):
-        timeout2 = qtm.timeout + 5
-        if self.timeout is None or timeout2 > self.timeout:
-            self.timeout = timeout2
+        if self.timeout is None:
+            # allow 5 seconds for HTTP overhead, as a baseline
+            self.timeout = 5
+        # account for worst case, in which case queries are performed serially
+        # on the remote end
+        self.timeout += qtm.timeout
 
     def _create_socket(self):
         super(DNSQueryTransportHandlerHTTP, self)._create_socket()
