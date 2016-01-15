@@ -762,6 +762,163 @@ class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
     allow_private_query = True
 
+class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
+    def __init__(self, path, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerWebSocket, self).__init__(processed_queue=processed_queue, factory=factory)
+
+        self.dst = path
+        self.transport_type = socket.SOCK_STREAM
+
+        self.mask_mapping = []
+        self.has_more = None
+
+    def _set_timeout(self, qtm):
+        if self.timeout is None:
+            # allow 5 seconds for browser overhead, as a baseline
+            self.timeout = 5
+        # account for worst case, in which case queries are performed serially
+        # on the remote end
+        self.timeout += qtm.timeout
+
+    def _get_af(self):
+        return socket.AF_UNIX
+
+    def _bind_socket(self):
+        pass
+
+    def _set_socket_info(self):
+        pass
+
+    def _get_connect_arg(self):
+        return self.dst
+
+    def prepare(self):
+        super(DNSQueryTransportHandlerWebSocket, self).prepare()
+        if self.err is not None:
+            self.err = RemoteQueryTransportError('Error connecting to UNIX domain socket: %s' % self.err)
+
+    def do_write(self):
+        val = super(DNSQueryTransportHandlerWebSocket, self).do_write()
+        if self.err is not None:
+            self.err = RemoteQueryTransportError('Error writing to UNIX domain socket: %s' % self.err)
+        return val
+
+    def finalize(self):
+        new_res = ''
+        for i, mask_index in enumerate(self.mask_mapping):
+            mask_octets = struct.unpack('!BBBB', self.res[mask_index:mask_index + 4])
+            if i >= len(self.mask_mapping) - 1:
+                buf = self.res[mask_index + 4:]
+            else:
+                buf = self.res[mask_index + 4:self.mask_mapping[i + 1]]
+            for j in range(len(buf)):
+                b = struct.unpack('!B', buf[j])[0]
+                new_res += struct.pack('!B', b ^ mask_octets[j % 4]);
+        self.res = new_res
+
+        super(DNSQueryTransportHandlerWebSocket, self).finalize()
+
+    def init_req(self):
+        data = json.dumps(self.serialize_requests())
+
+        header = '\x81'
+        l = len(data)
+        if l <= 125:
+            header += struct.pack('!B', l)
+        elif l <= 0xffff:
+            header += struct.pack('!BH', 126, l)
+        else: # 0xffff < len <= 2^63
+            header += struct.pack('!BL', 127, l)
+        self.req = header + data
+        self.req_len = len(self.req)
+        self.req_index = 0
+
+    def do_read(self):
+        try:
+            buf = self.sock.recv(65536)
+            if buf == '':
+                raise EOFError
+            self.res_buf += buf
+
+            # look through as many frames as are readily available
+            # (without having to read from socket again)
+            while self.res_buf:
+                if self.res_len is None:
+                    # looking for frame length
+                    if len(self.res_buf) >= 2:
+                        byte0, byte1 = struct.unpack('!BB', self.res_buf[0:2])
+                        byte1b = byte1 & 0x7f
+
+                        # mask must be set
+                        if not byte1 & 0x80:
+                            if self.err is not None:
+                                self.err = RemoteQueryTransportError('Mask bit not set in message from server')
+                                self.cleanup()
+                                return True
+
+                        # check for FIN flag
+                        self.has_more = not bool(byte0 & 0x80)
+
+                        # determine the header length
+                        if byte1b <= 125:
+                            header_len = 2
+                        elif byte1b == 126:
+                            header_len = 4
+                        else: # byte1b == 127:
+                            header_len = 10
+
+                        if len(self.res_buf) >= header_len:
+                            if byte1b <= 125:
+                                self.res_len = byte1b
+                            elif byte1b == 126:
+                                self.res_len = struct.unpack('!H', self.res_buf[2:4])[0]
+                            elif byte1b == 127:
+                                self.res_len = struct.unpack('!Q', self.res_buf[2:10])[0]
+
+                            # handle mask
+                            self.mask_mapping.append(len(self.res))
+                            self.res_len += 4
+
+                            self.res_buf = self.res_buf[header_len:]
+
+                        else:
+                            # if we don't currently know the length of the next
+                            # frame, and we don't have enough data to find the
+                            # length, then break out of the loop because we
+                            # don't have any more data to go off of.
+                            break
+
+                if self.res_len is not None:
+                    # we know a length of the current chunk
+
+                    # read remaining bytes
+                    bytes_remaining = self.res_len - self.res_index
+                    if len(self.res_buf) > bytes_remaining:
+                        self.res += self.res_buf[:bytes_remaining]
+                        self.res_index = 0
+                        self.res_buf = self.res_buf[bytes_remaining:]
+                        self.res_len = None
+                    else:
+                        self.res += self.res_buf
+                        self.res_index += len(self.res_buf)
+                        self.res_buf = ''
+
+                    if self.res_index >= self.res_len and not self.has_more:
+                        self.cleanup()
+                        return True
+
+        except (socket.error, EOFError), e:
+            if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
+                pass
+            else:
+                self.err = e
+                self.cleanup()
+                return True
+
+    def do_timeout(self):
+        self.err = RemoteQueryTransportError('Read of UNIX domain socket timed out')
+        self.cleanup()
+
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
 
@@ -787,6 +944,9 @@ class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
 
 class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerHTTPPrivate
+
+class DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocket
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
