@@ -75,17 +75,17 @@ def main():
                 raise RemoteQueryError('JSON decoding of HTTP request failed: %s' % form['content'])
 
             if 'version' not in content:
-                raise RemoteQueryError('No version information in HTTP response.')
+                raise RemoteQueryError('No version information in HTTP request.')
             try:
                 major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
             except ValueError:
-                raise RemoteQueryError('Version of JSON input in HTTP response is invalid: %s' % content['version'])
+                raise RemoteQueryError('Version of JSON input in HTTP request is invalid: %s' % content['version'])
 
             # ensure major version is a match and minor version is no greater
             # than the current minor version
             curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
             if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-                raise RemoteQueryError('Version %d.%d of JSON input in HTTP response is incompatible with this software.' % (major_vers, minor_vers))
+                raise RemoteQueryError('Version %d.%d of JSON input in HTTP request is incompatible with this software.' % (major_vers, minor_vers))
 
             if 'requests' not in content:
                 raise RemoteQueryError('No request information in HTTP request.')
