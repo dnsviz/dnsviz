@@ -14,7 +14,7 @@ JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
 JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
 RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
-GOST_PATH = "'/usr/lib/x86_64-linux-gnu/openssl-1.0.0/engines/libgost.so'"
+OPENSSL_LIB_DIR = "'/usr/lib/x86_64-linux-gnu'"
 
 def apply_substitutions(filename, install_prefix):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
@@ -32,7 +32,7 @@ def apply_substitutions(filename, install_prefix):
     s = s.replace('__JQUERY_UI_PATH__', JQUERY_UI_PATH)
     s = s.replace('__JQUERY_UI_CSS_PATH__', JQUERY_UI_CSS_PATH)
     s = s.replace('__RAPHAEL_PATH__', RAPHAEL_PATH)
-    s = s.replace('__GOST_PATH__', GOST_PATH)
+    s = s.replace('__OPENSSL_LIB_DIR__', OPENSSL_LIB_DIR)
     out_fh.write(s)
     in_fh.close()
     out_fh.close()

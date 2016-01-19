@@ -28,8 +28,10 @@
 import base64
 import struct
 import hashlib
+import os
+import re
 
-from dnsviz.config import GOST_PATH
+from dnsviz.config import OPENSSL_LIB_DIR
 
 try:
     from M2Crypto import EVP, RSA
@@ -43,8 +45,11 @@ else:
 
 _supported_nsec3_algs = set([1])
 
+OPENSSL_ENGINE_DIR = None
+
 GOST_PREFIX = '\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_DIGEST_NAME = 'GOST R 34.11-94'
+GOST_ENGINE_LIB = 'libgost.so'
 
 EC_NOCOMPRESSION = '\x04'
 
@@ -55,8 +60,32 @@ def _check_dsa_support():
     except AttributeError:
         pass
 
+def _set_ssl_engine_dir():
+    global OPENSSL_ENGINE_DIR
+
+    if OPENSSL_LIB_DIR is None:
+        return
+
+    openssl_version_dirs = []
+    for entry in os.listdir(OPENSSL_LIB_DIR):
+        m = re.search(r'^openssl-(\d+)\.(\d+)\.(\d+)', entry)
+        if m is not None:
+            vers = long(m.group(1)) << 28 | \
+                    long(m.group(2)) << 20 | \
+                    long(m.group(3)) << 12
+            openssl_version_dirs.append((vers, entry))
+    openssl_version_dirs.sort(reverse=True)
+
+    for vers, entry in openssl_version_dirs:
+        engine_dir = os.path.join(OPENSSL_LIB_DIR, entry, 'engines')
+        # ensure that vers is no greater than version number
+        # and that path exists
+        if vers <= m2.OPENSSL_VERSION_NUMBER and os.path.exists(engine_dir):
+            OPENSSL_ENGINE_DIR = engine_dir
+            break
+
 def _check_gost_support():
-    if GOST_PATH is not None:
+    if OPENSSL_ENGINE_DIR is not None:
         try:
             _gost_init()
             try:
@@ -87,7 +116,9 @@ def nsec3_alg_is_supported(alg):
     return alg in _supported_nsec3_algs
 
 def _gost_init():
-    gost = Engine.load_dynamic_engine('gost', GOST_PATH)
+    assert OPENSSL_ENGINE_DIR is not None, "OPENSSL_ENGINE_DIR must be have a value when initializing the GOST engine"
+    gost_path = os.path.join(OPENSSL_ENGINE_DIR, GOST_ENGINE_LIB)
+    gost = Engine.load_dynamic_engine('gost', gost_path)
     gost.init()
     gost.set_default()
 
@@ -106,6 +137,7 @@ else:
 
 try:
     from M2Crypto import Engine, m2
+    _set_ssl_engine_dir()
 except:
     pass
 else:
