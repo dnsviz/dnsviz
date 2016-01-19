@@ -3,6 +3,7 @@
 import glob
 import os
 import stat
+import subprocess
 import sys
 
 from distutils.core import setup
@@ -14,7 +15,7 @@ JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
 JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
 RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
-OPENSSL_LIB_DIR = "'/usr/lib/x86_64-linux-gnu'"
+OPENSSL_LIB_DIR = None
 
 def apply_substitutions(filename, install_prefix):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
@@ -45,6 +46,20 @@ def make_documentation():
     finally:
         os.chdir('..')
 
+def set_openssl_lib_path():
+    global OPENSSL_LIB_DIR
+
+    msg = ''
+    try:
+        libdir = subprocess.check_output(['pkg-config', '--variable=libdir', 'openssl']).strip()
+    except (subprocess.CalledProcessError, OSError), e:
+        libdir = None
+        msg = str(e)
+    if not libdir or not os.path.exists(libdir):
+        sys.stderr.write('Warning: Unable to identify the lib directory for openssl: %s\nProceeding without support for dynamically loaded engines.\n' % msg)
+    else:
+        OPENSSL_LIB_DIR = "'%s'" % libdir
+
 class MyBuild(build):
     def run(self):
         make_documentation()
@@ -52,6 +67,7 @@ class MyBuild(build):
 
 class MyInstall(install):
     def run(self):
+        set_openssl_lib_path()
         # if this an alternate root is specified, then embed the install_data
         # path relative to that alternate root
         if self.root is not None:
