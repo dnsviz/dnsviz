@@ -1405,7 +1405,7 @@ class ExecutableDNSQuery(DNSQuery):
                             raise PortBindError('Unable to bind to local port %d (%s)' % (qh.params['sport'], errno.errorcode[errno1]))
                         else:
                             raise PortBindError('Unable to bind to local port (%s)' % (errno.errorcode[errno1]))
-                    elif qtm.src is None and errno1 != errno.EHOSTUNREACH:
+                    elif qtm.src is None and errno1 not in (errno.EHOSTUNREACH, errno.ENETUNREACH):
                         # If source is None it didn't bind properly.  If errno1
                         # is also EHOSTUNREACH, it is because there was no
                         # proper IPv4 or IPv6 connectivity (which is handled
