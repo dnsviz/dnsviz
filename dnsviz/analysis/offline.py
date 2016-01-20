@@ -1751,19 +1751,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             except IndexError:
                 pass
             else:
-                # now check if there is a parent server that is providing an
-                # NXDOMAIN for the referral.  If so, this is due to the
-                # delegation not being found on all servers.
-                try:
-                    delegation_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == self.referral_rdtype, self.queries[(name, self.referral_rdtype)].nxdomain_info)[0]
-                except IndexError:
-                    # if there were not NXDOMAINs received in response to the
-                    # referral query, then use all the servers/clients
-                    servers_clients = ds_nxdomain_info.servers_clients
+                if self.referral_rdtype is not None:
+                    # now check if there is a parent server that is providing an
+                    # NXDOMAIN for the referral.  If so, this is due to the
+                    # delegation not being found on all servers.
+                    try:
+                        delegation_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == self.referral_rdtype, self.queries[(name, self.referral_rdtype)].nxdomain_info)[0]
+                    except IndexError:
+                        # if there were not NXDOMAINs received in response to the
+                        # referral query, then use all the servers/clients
+                        servers_clients = ds_nxdomain_info.servers_clients
+                    else:
+                        # if there were NXDOMAINs received in response to the
+                        # referral query, then filter those out
+                        servers_clients = set(ds_nxdomain_info.servers_clients).difference(delegation_nxdomain_info.servers_clients)
                 else:
-                    # if there were NXDOMAINs received in response to the
-                    # referral query, then filter those out
-                    servers_clients = set(ds_nxdomain_info.servers_clients).difference(delegation_nxdomain_info.servers_clients)
+                    # if there was no referral query, then use all the
+                    # servers/clients
+                    servers_clients = ds_nxdomain_info.servers_clients
 
                 # if there were any remaining NXDOMAIN responses, then add the
                 # error
