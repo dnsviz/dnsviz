@@ -132,7 +132,7 @@ class OnlineDomainNameAnalysis(object):
 
         # Whether or not the delegation was specified explicitly or learned
         # by delegation.  This is for informational purposes more than
-        # functional purposes.
+        # functional purposes (serialized).
         self.explicit_delegation = False
 
         # The queries issued to and corresponding responses received from the
