@@ -66,7 +66,7 @@ def _set_ssl_engine_dir():
     if OPENSSL_LIB_DIR is None:
         return
 
-    openssl_version_dirs = []
+    openssl_version_dirs = [(0L, '')]
     for entry in os.listdir(OPENSSL_LIB_DIR):
         m = re.search(r'^openssl-(\d+)\.(\d+)\.(\d+)', entry)
         if m is not None:
