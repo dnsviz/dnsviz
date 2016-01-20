@@ -95,7 +95,8 @@ def _check_gost_support():
             else:
                 _supported_algs.add(12)
                 _supported_digest_algs.add(3)
-            _gost_cleanup()
+            finally:
+                _gost_cleanup()
         except Engine.EngineError:
             pass
 
