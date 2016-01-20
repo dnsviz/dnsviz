@@ -49,7 +49,8 @@ OPENSSL_ENGINE_DIR = None
 
 GOST_PREFIX = '\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_DIGEST_NAME = 'GOST R 34.11-94'
-GOST_ENGINE_LIB = 'libgost.so'
+GOST_ENGINE_LIB = 'libgost'
+OPENSSL_ENGINE_EXTENSIONS = ('dylib', 'so')
 
 EC_NOCOMPRESSION = '\x04'
 
@@ -118,16 +119,24 @@ def nsec3_alg_is_supported(alg):
 
 def _gost_init():
     assert OPENSSL_ENGINE_DIR is not None, "OPENSSL_ENGINE_DIR must be have a value when initializing the GOST engine"
-    gost_path = os.path.join(OPENSSL_ENGINE_DIR, GOST_ENGINE_LIB)
-    gost = Engine.load_dynamic_engine('gost', gost_path)
-    gost.init()
-    gost.set_default()
+
+    for ext in OPENSSL_ENGINE_EXTENSIONS:
+        gost_path = os.path.join(OPENSSL_ENGINE_DIR, '%s.%s' % (GOST_ENGINE_LIB, ext))
+        if os.path.exists(gost_path):
+            gost = Engine.load_dynamic_engine('gost', gost_path)
+            gost.init()
+            gost.set_default()
+            break
 
 def _gost_cleanup():
     from M2Crypto import Engine
-    gost = Engine.Engine('gost')
-    gost.finish()
-    Engine.cleanup()
+    try:
+        gost = Engine.Engine('gost')
+    except ValueError:
+        pass
+    else:
+        gost.finish()
+        Engine.cleanup()
 
 try:
     from M2Crypto import DSA
