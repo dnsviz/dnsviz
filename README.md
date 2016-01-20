@@ -40,8 +40,8 @@ powers the Web-based analysis available at http://dnsviz.net/
   12 (GOST R 34.10-2001), 13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve
   P-384 with SHA-384).  However, there are two patches included in the
   `contrib` directory that can be applied to M2Crypto 0.21.1, M2Crypto 0.22.3
-  (`config/m2crypto-pre0.26.patch`), or M2Crypto 0.26
-  (`config/m2crypto-0.26.patch`).  For example:
+  (`config/m2crypto-pre0.23.patch`), or M2Crypto 0.23.0
+  (`config/m2crypto.patch`).  For example:
 
   ```
   $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.26.patch
