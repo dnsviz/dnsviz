@@ -821,8 +821,7 @@ class OnlineDomainNameAnalysis(object):
         name_str = name.canonicalize().to_text()
         d = d1[name_str]
 
-        # use a default analysis type to support previous version
-        analysis_type = analysis_type_codes[d.get('type', 'authoritative')]
+        analysis_type = analysis_type_codes[d['type']]
         stub = d['stub']
 
         if 'parent' in d:
