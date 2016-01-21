@@ -1003,6 +1003,8 @@ class Analyst(object):
 
         resolver = self.resolver
 
+        self.ceiling = ceiling
+
         # if an ancestor of the name (not wildcard!) is explicitly delegated,
         # then set the ceiling to the lowest ancestor with an explicit
         # delegation.
@@ -1026,7 +1028,7 @@ class Analyst(object):
                 ceiling = c
                 resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_manager=self.transport_manager)
 
-        self.ceiling = self._detect_ceiling(ceiling, resolver)[0]
+        self.local_ceiling = self._detect_ceiling(ceiling, resolver)[0]
         self._fix_explicit_delegation()
 
         self.try_ipv4 = try_ipv4
@@ -1122,22 +1124,22 @@ class Analyst(object):
         return self._detect_ceiling(ceiling.parent(), resolver)
 
     def _fix_explicit_delegation(self):
-        if self.ceiling is None:
+        if self.local_ceiling is None:
             return
 
-        # at this point, if self.name or any ancestor below self.ceiling has an
+        # at this point, if self.name or any ancestor below self.local_ceiling has an
         # explicit delegation, then it is obsolete and needs to be applied to
-        # self.ceiling instead.
+        # self.local_ceiling instead.
         n = self.name
         explicit_delegation = None
-        while n != self.ceiling:
+        while n != self.local_ceiling:
             if n in self.explicit_delegations:
                 if explicit_delegation is None:
                     explicit_delegation = self.explicit_delegations[n]
                 del self.explicit_delegations[n]
             n = n.parent()
         if explicit_delegation is not None:
-            self.explicit_delegations[self.ceiling] = explicit_delegation
+            self.explicit_delegations[self.local_ceiling] = explicit_delegation
 
     def _root_servers(self, proto=None):
         key = None
@@ -1477,7 +1479,7 @@ class Analyst(object):
             parent_obj = None
         elif name in self.explicit_delegations:
             parent_obj = None
-        elif self.ceiling is not None and self.ceiling.is_subdomain(name):
+        elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
@@ -1945,7 +1947,7 @@ class Analyst(object):
         return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
 
     def _check_connectivity(self, name_obj):
-        if self.ceiling is not None and self.ceiling in self.explicit_delegations:
+        if self.local_ceiling is not None and self.local_ceiling in self.explicit_delegations:
             # this check is only useful if not the desdendant of an explicit
             # delegation
             return
@@ -2118,7 +2120,7 @@ class RecursiveAnalyst(Analyst):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
-        elif self.ceiling is not None and self.ceiling.is_subdomain(name) and is_zone:
+        elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name) and is_zone:
             parent_obj = self._analyze_stub(name.parent())
         else:
             parent_obj = self._analyze(name.parent())
