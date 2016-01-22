@@ -15,7 +15,7 @@ JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
 JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
 RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
-OPENSSL_LIB_DIR = None
+OPENSSL_LIB_DIR = "None"
 
 def apply_substitutions(filename, install_prefix):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
