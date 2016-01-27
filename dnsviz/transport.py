@@ -919,6 +919,10 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.err = RemoteQueryTransportError('Read of UNIX domain socket timed out')
         self.cleanup()
 
+class DNSQueryTransportHandlerWebSocketPrivate(DNSQueryTransportHandlerWebSocket):
+    allow_loopback_query = True
+    allow_private_query = True
+
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
 
@@ -947,6 +951,9 @@ class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory
 
 class DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerWebSocket
+
+class DNSQueryTransportHandlerWebSocketPrivateFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocketPrivate
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
