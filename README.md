@@ -44,7 +44,7 @@ powers the Web-based analysis available at http://dnsviz.net/
   (`contrib/m2crypto.patch`).  For example:
 
   ```
-  $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.26.patch
+  $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
   ```
 
 ### Build and Install
