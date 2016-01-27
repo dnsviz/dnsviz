@@ -1599,16 +1599,15 @@ class TCPDiagnosticQuery(DNSSECQuery):
 
     response_handlers = [
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3)]
+            ChangeTimeoutOnTimeoutHandler(4.0, 2)]
     # For timeouts:
     #  1 - no change
-    #  2 - no change
-    #  3 - change timeout to 4 seconds
-    #  4 - return
+    #  2 - change timeout to 4 seconds
+    #  3 - return
 
     query_timeout = 2.0
-    max_attempts = 4
-    lifetime = 8.0
+    max_attempts = 3
+    lifetime = 10.0
 
 class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
@@ -1618,17 +1617,16 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
     response_handlers = [
             DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4)]
+            ChangeTimeoutOnTimeoutHandler(4.0, 2),
+            ChangeTimeoutOnTimeoutHandler(8.0, 3)]
     # For timeouts:
     #  1 - no change
-    #  2 - no change
-    #  3 - change timeout to 4 seconds
-    #  4 - change timeout to 8 seconds
-    #  5 - return
+    #  2 - change timeout to 4 seconds
+    #  3 - change timeout to 8 seconds
+    #  4 - return
 
     query_timeout = 2.0
-    max_attempts = 5
+    max_attempts = 4
     lifetime = 18.0
 
 class PMTUDiagnosticQuery(DNSSECQuery):
