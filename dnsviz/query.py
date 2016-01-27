@@ -1636,9 +1636,9 @@ class PMTUDiagnosticQuery(DNSSECQuery):
 
 class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
 
-    response_handlers = [PMTUBoundingHandler(512, 4, 1.0,
+    response_handlers = [PMTUBoundingHandler(512, 5, 1.0,
             (MaxTimeoutsHandler(8),
-                LifetimeHandler(18.0),
+                LifetimeHandler(25.0),
                 ChangeTimeoutOnTimeoutHandler(2.0, 2),
                 ChangeTimeoutOnTimeoutHandler(4.0, 3),
                 ChangeTimeoutOnTimeoutHandler(8.0, 4),
