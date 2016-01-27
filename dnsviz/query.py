@@ -1674,17 +1674,19 @@ class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
 
     response_handlers = [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3)]
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(8.0, 4)]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
+    #  4 - change timeout to 8 seconds
 
     edns_max_udp_payload = 512
 
     query_timeout = 1.0
-    max_attempts = 4
-    lifetime = 8.0
+    max_attempts = 5
+    lifetime = 18.0
 
 class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS version compatibility.'''
