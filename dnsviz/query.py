@@ -730,7 +730,7 @@ class DNSQueryHandler:
                 if retry_action is None:
                     retry_action = handler.handle(response_wire, response, response_time)
                     if retry_action is not None:
-                        if retry_action == RETRY_ACTION_NO_CHANGE:
+                        if retry_action.action == RETRY_ACTION_NO_CHANGE:
                             self.params['sport'] = sport
                         else:
                             self.params['sport'] = None
