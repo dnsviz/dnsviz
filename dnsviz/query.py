@@ -256,39 +256,34 @@ class DNSResponseHandler(object):
 
         raise NotImplemented
 
-    def _get_retry_qty(self, cause=None, consecutive=True):
+    def _get_retry_qty(self, cause):
         '''Return the number of retries associated with the DNS query, optionally limited to
         those with a given cause.'''
 
         if cause is None:
             return len(self._history)
 
-        if consecutive:
-            total = 0
-            for i in range(len(self._history) - 1, -1, -1):
-                if self._history[i].cause == cause:
-                    total += 1
-                else:
-                    break
-            return total
+        total = 0
+        for i in range(len(self._history) - 1, -1, -1):
+            if self._history[i].cause == cause:
+                total += 1
+            else:
+                break
+        return total
 
-        return len(filter(lambda x: x.cause == cause, self._history))
-
-    def _get_num_timeouts(self, response, consecutive=True):
+    def _get_num_timeouts(self, response):
         '''Return the number of retries attributed to timeouts.'''
 
-        timeouts = self._get_retry_qty(RETRY_CAUSE_TIMEOUT, consecutive)
         if isinstance(response, dns.exception.Timeout):
-            timeouts += 1
-        return timeouts
+            return self._get_retry_qty(RETRY_CAUSE_TIMEOUT) + 1
+        return 0
 
     def _get_num_network_errors(self, response):
         '''Return the number of retries attributed to network errors.'''
 
-        errors = self._get_retry_qty(RETRY_CAUSE_NETWORK_ERROR)
         if isinstance(response, (socket.error, EOFError)):
-            errors += 1
-        return errors
+            return self._get_retry_qty(RETRY_CAUSE_NETWORK_ERROR) + 1
+        return 0
 
 class ActionIndependentDNSResponseHandler(DNSResponseHandler):
     '''A DNSResponseHandler that is consulted regardless of whether or not
