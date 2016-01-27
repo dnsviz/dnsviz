@@ -1598,10 +1598,16 @@ class TCPDiagnosticQuery(DNSSECQuery):
     tcp = True
 
     response_handlers = [
-            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]
+            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 4 seconds
+    #  4 - return
 
-    query_timeout = 4.0
-    max_attempts = 2
+    query_timeout = 2.0
+    max_attempts = 4
     lifetime = 8.0
 
 class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
@@ -1611,11 +1617,19 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
     tcp = True
 
     response_handlers = [
-            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler()]
+            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(8.0, 4)]
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - change timeout to 4 seconds
+    #  4 - change timeout to 8 seconds
+    #  5 - return
 
-    query_timeout = 4.0
-    max_attempts = 2
-    lifetime = 8.0
+    query_timeout = 2.0
+    max_attempts = 5
+    lifetime = 18.0
 
 class PMTUDiagnosticQuery(DNSSECQuery):
 
