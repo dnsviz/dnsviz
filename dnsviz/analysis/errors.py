@@ -3,7 +3,7 @@
 # analysis, and visualization.
 # Created by Casey Deccio (casey@deccio.net)
 #
-# Copyright 2016 VeriSign, Inc.
+# Copyright 2015-2016 VeriSign, Inc.
 #
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
