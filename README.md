@@ -41,7 +41,7 @@ powers the Web-based analysis available at http://dnsviz.net/
   P-384 with SHA-384).  However, there are two patches included in the
   `contrib` directory that can be applied to M2Crypto 0.21.1, M2Crypto 0.22.3
   (`contrib/m2crypto-pre0.23.patch`), or M2Crypto 0.23.0
-  (`contrib/m2crypto.patch`).  For example:
+  (`contrib/m2crypto-0.23.patch`).  For example:
 
   ```
   $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
