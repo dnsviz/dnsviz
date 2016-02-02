@@ -885,6 +885,7 @@ class DNSAuthGraph:
         else:
             nsec_rdtype = dns.rdatatype.NSEC
         node_str = self.nsec_node_str(nsec_rdtype, self.id_for_nsec(name, rdtype, nsec_status.__class__, nsec_status.nsec_set_info), name, rdtype)
+        node_id = node_str.replace('*', '_')
         edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
 
         if not self.G.has_node(node_str):
@@ -927,7 +928,7 @@ class DNSAuthGraph:
             label_str += u'</TD></TR></TABLE>>'
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
-            S.add_node(node_str, id=node_str, label=label_str, shape='none')
+            S.add_node(node_str, id=node_id, label=label_str, shape='none')
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
@@ -959,7 +960,7 @@ class DNSAuthGraph:
                     nsec_serialized['errors'] = []
                 nsec_serialized['errors'] += [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in all_errors]
 
-            self.node_info[node_str] = [nsec_serialized]
+            self.node_info[node_id] = [nsec_serialized]
 
             nsec_node = self.G.get_node(node_str)
 
