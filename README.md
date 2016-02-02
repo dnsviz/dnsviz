@@ -29,19 +29,21 @@ powers the Web-based analysis available at http://dnsviz.net/
   or greater is required because of the support for unicode names and HTML-like
   labels, both of which are utilized in the visual output.
 
-* M2Crypto (0.21.1 or later) - https://gitlab.com/m2crypto/m2crypto
+* M2Crypto (0.24.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
   M2Crypto is required if cryptographic validation of signatures and digests is
   desired (and thus is highly recommended).  The current code will display
   warnings if the cryptographic elements cannot be verified.
 
-  Note that support for the following DNSSEC algorithms is not yet available in
-  stock releases of M2Crypto: 3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1),
-  12 (GOST R 34.10-2001), 13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve
-  P-384 with SHA-384).  However, there are two patches included in the
-  `contrib` directory that can be applied to M2Crypto 0.21.1, M2Crypto 0.22.3
-  (`contrib/m2crypto-pre0.23.patch`), or M2Crypto 0.23.0
-  (`contrib/m2crypto-0.23.patch`).  For example:
+	Note that M2Crypto version 0.21.1 or later can be used to validate some
+  DNSSEC algorithms, but support for the following DNSSEC algorithms is not
+	available in releases of M2Crypto prior to 0.24.0 without a patch:
+	3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1), 12 (GOST R 34.10-2001),
+  13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve P-384 with SHA-384).
+  There are two patches included in the `contrib` directory that can be
+  applied to pre-0.24.0 versions to get this functionality:
+	`contrib/m2crypto-pre0.23.patch` or `contrib/m2crypto-0.23.patch`.  For
+  example:
 
   ```
   $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
