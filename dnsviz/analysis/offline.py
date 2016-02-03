@@ -1290,7 +1290,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # no corresponding DNSKEY
             if not self.rrsig_status[rrset_info][rrsig]:
-                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, self.zone.name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
+                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
                 self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
 
         # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
