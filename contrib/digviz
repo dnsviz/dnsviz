@@ -541,14 +541,14 @@ class DigCommandLine:
         else:
             self.arg_index += 1
 
-            # now check for optional class
-            try:
-                rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
-            except (IndexError, dns.rdataclass.UnknownRdataclass):
-                # no class detected; use default rdclass
-                rdclass = None
-            else:
-                self.arg_index += 1
+        # now check for optional class
+        try:
+            rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
+        except (IndexError, dns.rdataclass.UnknownRdataclass):
+            # no class detected; use default rdclass
+            rdclass = None
+        else:
+            self.arg_index += 1
 
         return DigCommandLineQuery(qname, rdtype, rdclass)
 
