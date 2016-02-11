@@ -493,6 +493,25 @@ class DigCommandLine:
         qname = self._get_arg(True)
         return DigCommandLineQuery(qname, None, None)
 
+    def _add_default_option(self):
+        try:
+            self.options['rdclass'] = dns.rdataclass.from_text(self.args[self.arg_index])
+        except dns.rdataclass.UnknownRdataclass:
+            pass
+        else:
+            self.arg_index += 1
+            return True
+
+        try:
+            self.options['rdtype'] = dns.rdatatype.from_text(self.args[self.arg_index])
+        except dns.rdatatype.UnknownRdatatype:
+            pass
+        else:
+            self.arg_index += 1
+            return True
+
+        return False
+
     def _add_qname(self):
         qname = self.args[self.arg_index]
         self.arg_index += 1
@@ -608,6 +627,10 @@ class DigCommandLine:
             # query options
             elif self.args[self.arg_index][0] == '+':
                 self._add_query_option(query)
+
+            # global query class/type
+            elif query is None and self._add_default_option():
+                pass
 
             # name to be queried
             else:
