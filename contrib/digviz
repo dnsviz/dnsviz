@@ -87,6 +87,7 @@ class DigCommandLineQuery:
         self.short = False
         self.trusted_keys = ()
         self.show_ttl = True
+        self.lg_url = None
 
     def process_query_options(self, global_options):
         for arg in global_options + self.query_options:
@@ -271,6 +272,14 @@ class DigCommandLineQuery:
                 self.show_ttl = True
             elif arg in ('+nottlid', '+nottl'):
                 self.show_ttl = False
+            elif arg.startswith('+lg') and \
+                    (len(arg) <= 3 or arg[3] == '='):
+                try:
+                    opt, arg = arg.split('=')
+                except ValueError:
+                    raise CommandLineException('+lg requires a filename argument.')
+                else:
+                    self.lg_url = arg
             else:
                 raise CommandLineException('Option "%s" not recognized.' % arg)
 
@@ -296,10 +305,16 @@ class DigCommandLineQuery:
             tcp = self.tcp
             response_handlers = self.handlers
 
+        if self.lg_url is not None:
+            th_factories = (transport.DNSQueryTransportHandlerHTTPPrivateFactory(self.lg_url),)
+        else:
+            th_factories = None
+
         return Resolver.Resolver(self.nameservers, CustomQuery,
                 timeout=self.query_timeout, max_attempts=self.max_attempts,
                 lifetime=self.lifetime, shuffle=False, client_ipv4=options['client_ipv4'],
-                client_ipv6=options['client_ipv6'], port=options['port'], transport_manager=tm)
+                client_ipv6=options['client_ipv6'], port=options['port'], transport_manager=tm,
+                th_factories=th_factories)
 
     def _get_name(self):
         #TODO qualify name, if necessary
