@@ -306,7 +306,7 @@ class DigCommandLineQuery:
             response_handlers = self.handlers
 
         if self.lg_url is not None:
-            th_factories = (transport.DNSQueryTransportHandlerHTTPPrivateFactory(self.lg_url),)
+            th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url),)
         else:
             th_factories = None
 
