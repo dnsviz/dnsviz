@@ -30,7 +30,10 @@ import dns.flags, dns.exception, dns.name, dns.opcode, dns.rdataclass, dns.rdata
 from dnsviz.ipaddr import IPAddr
 from dnsviz import query as Q
 from dnsviz import resolver as Resolver
+from dnsviz import transport
 from dnsviz.util import get_trusted_keys
+
+tm = transport.DNSQueryTransportManager()
 
 class CommandLineException(Exception):
     pass
@@ -296,7 +299,7 @@ class DigCommandLineQuery:
         return Resolver.Resolver(self.nameservers, CustomQuery,
                 timeout=self.query_timeout, max_attempts=self.max_attempts,
                 lifetime=self.lifetime, shuffle=False, client_ipv4=options['client_ipv4'],
-                client_ipv6=options['client_ipv6'], port=options['port'])
+                client_ipv6=options['client_ipv6'], port=options['port'], transport_manager=tm)
 
     def _get_name(self):
         #TODO qualify name, if necessary
@@ -644,6 +647,9 @@ def main():
         sys.exit(1)
     except KeyboardInterrupt:
         pass
+    # explicitly close tm here
+    finally:
+        tm.close()
 
 if __name__ == "__main__":
     main()
