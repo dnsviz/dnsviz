@@ -436,8 +436,8 @@ class DigCommandLine:
         self.arg_index = 0
 
         self.options = {
-            'rdtype': dns.rdatatype.A,
-            'rdclass': dns.rdataclass.IN,
+            'rdtype': None,
+            'rdclass': None,
             'use_ipv4': None,
             'use_ipv6': None,
             'client_ipv4': None,
@@ -463,6 +463,11 @@ class DigCommandLine:
 
             if not q.nameservers:
                 raise SemanticException('No nameservers to query')
+
+        if self.options['rdtype'] is None:
+            self.options['rdtype'] = dns.rdatatype.A
+        if self.options['rdclass'] is None:
+            self.options['rdclass'] = dns.rdataclass.IN
 
     def query_and_display(self):
         for q in self.queries:
@@ -509,21 +514,23 @@ class DigCommandLine:
         return DigCommandLineQuery(qname, None, None)
 
     def _add_default_option(self):
-        try:
-            self.options['rdclass'] = dns.rdataclass.from_text(self.args[self.arg_index])
-        except dns.rdataclass.UnknownRdataclass:
-            pass
-        else:
-            self.arg_index += 1
-            return True
+        if self.options['rdclass'] is None:
+            try:
+                self.options['rdclass'] = dns.rdataclass.from_text(self.args[self.arg_index])
+            except dns.rdataclass.UnknownRdataclass:
+                pass
+            else:
+                self.arg_index += 1
+                return True
 
-        try:
-            self.options['rdtype'] = dns.rdatatype.from_text(self.args[self.arg_index])
-        except dns.rdatatype.UnknownRdatatype:
-            pass
-        else:
-            self.arg_index += 1
-            return True
+        if self.options['rdtype'] is None:
+            try:
+                self.options['rdtype'] = dns.rdatatype.from_text(self.args[self.arg_index])
+            except dns.rdatatype.UnknownRdatatype:
+                pass
+            else:
+                self.arg_index += 1
+                return True
 
         return False
 
