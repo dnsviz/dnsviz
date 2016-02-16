@@ -257,6 +257,8 @@ class DigCommandLineQuery:
                     (len(arg) <= 12 or arg[12] == '='):
                 try:
                     opt, arg = arg.split('=')
+                    if not arg:
+                        raise ValueError()
                 except ValueError:
                     raise CommandLineException('+trusted-key requires a filename argument.')
                 else:
@@ -276,6 +278,8 @@ class DigCommandLineQuery:
                     (len(arg) <= 3 or arg[3] == '='):
                 try:
                     opt, arg = arg.split('=')
+                    if not arg:
+                        raise ValueError()
                 except ValueError:
                     raise CommandLineException('+lg requires a filename argument.')
                 else:
