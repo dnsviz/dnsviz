@@ -25,6 +25,7 @@ import json
 import os
 import Queue
 import re
+import struct
 import sys
 
 from dnsviz.ipaddr import *
@@ -38,8 +39,16 @@ except ValueError:
     MAX_QUERIES = 200
 ALLOW_PRIVATE_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_PRIVATE_QUERY', 'f')))
 ALLOW_LOOPBACK_QUERY = not bool(FALSE_RE.search(os.environ.get('ALLOW_LOOPBACK_QUERY', 'f')))
+BLACKLIST_FILE = os.environ.get('BLACKLIST_FILE', None)
+WHITELIST_FILE = os.environ.get('WHITELIST_FILE', None)
+
+blacklist = None
+whitelist = None
 
 class RemoteQueryError(Exception):
+    pass
+
+class InvalidName(Exception):
     pass
 
 def check_dst(dst):
@@ -51,6 +60,92 @@ def check_dst(dst):
     if not ALLOW_LOOPBACK_QUERY and (LOOPBACK_IPV4_RE.search(dst) is not None or \
             dst == LOOPBACK_IPV6):
         raise RemoteQueryError('Issuing queries to %s not allowed' % dst)
+
+def get_qname(msg):
+    n = ''
+    index = 12
+    labels = []
+    while True:
+        # no label
+        if index >= len(msg):
+            raise InvalidName()
+        l = struct.unpack('!B', msg[index])[0]
+
+        # no compression allowed in question
+        if l & 0xc0:
+            raise InvalidName()
+
+        # account for label length
+        index += 1
+
+        # not enough message for label
+        if index + l > len(msg):
+            raise InvalidName()
+
+        # zero labels - this is the end
+        if l == 0:
+            break
+
+        # append label to list
+        labels.append(msg[index:index + l])
+
+        index += l
+
+    return '.'.join(labels) + '.'
+
+def import_blacklist():
+    global blacklist
+    global whitelist
+
+    blacklist = set()
+    whitelist = set()
+
+    if BLACKLIST_FILE is None:
+        return
+
+    with open(BLACKLIST_FILE, 'r') as fh:
+        for line in fh:
+            name = line.rstrip().lower()
+            if not name.endswith('.'):
+                name += '.'
+            blacklist.add(name)
+
+    if WHITELIST_FILE is None:
+        return
+
+    with open(WHITELIST_FILE, 'r') as fh:
+        for line in fh:
+            name = line.rstrip().lower()
+            if not name.endswith('.'):
+                name += '.'
+            whitelist.add(name)
+
+def check_qname(msg):
+    global blacklist
+    global whitelist
+
+    try:
+        qname = get_qname(msg)
+    except InvalidName:
+        return
+
+    if blacklist is None:
+        import_blacklist()
+
+    subdomain = qname
+    while True:
+        if subdomain in whitelist:
+            return
+
+        if subdomain in blacklist:
+            raise RemoteQueryError('Querying %s not allowed' % qname)
+
+        try:
+            nextdot = subdomain.index('.')
+        except ValueError:
+            break
+        else:
+            subdomain = subdomain[nextdot+1:]
 
 def main():
     sys.stdout.write('Content-type: application/json\r\n\r\n')
@@ -100,6 +195,7 @@ def main():
                     raise RemoteQueryError('Error deserializing request information: %s' % e)
 
                 check_dst(qtm.dst)
+                check_qname(qtm.req)
 
                 qtms.append(qtm)
                 th = th_factory.build(processed_queue=response_queue)
