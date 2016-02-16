@@ -47,10 +47,10 @@ def check_dst(dst):
     if not ALLOW_PRIVATE_QUERY and (RFC_1918_RE.search(dst) is not None or \
             LINK_LOCAL_RE.search(dst) is not None or \
             UNIQ_LOCAL_RE.search(dst) is not None):
-        raise RemoteQueryError('Querying %s not allowed' % dst)
+        raise RemoteQueryError('Issuing queries to %s not allowed' % dst)
     if not ALLOW_LOOPBACK_QUERY and (LOOPBACK_IPV4_RE.search(dst) is not None or \
             dst == LOOPBACK_IPV6):
-        raise RemoteQueryError('Querying %s not allowed' % dst)
+        raise RemoteQueryError('Issuing queries to %s not allowed' % dst)
 
 def main():
     sys.stdout.write('Content-type: application/json\r\n\r\n')
