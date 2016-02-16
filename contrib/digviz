@@ -428,7 +428,6 @@ class DigCommandLineQuery:
             return ';; the response from %s was malformed' % server
 
     def query_and_display(self, options, filehandle):
-        self.query(options)
         server, response = self.query(options)
         output = self.display(response, server, options)
         filehandle.write(output)
