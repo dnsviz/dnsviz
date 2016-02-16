@@ -281,7 +281,7 @@ class DigCommandLineQuery:
                     if not arg:
                         raise ValueError()
                 except ValueError:
-                    raise CommandLineException('+lg requires a filename argument.')
+                    raise CommandLineException('+lg requires a URL argument.')
                 else:
                     self.lg_url = arg
             else:
