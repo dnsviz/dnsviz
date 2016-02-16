@@ -132,7 +132,7 @@ def check_qname(msg):
     if blacklist is None:
         import_blacklist()
 
-    subdomain = qname
+    subdomain = qname.lower()
     while True:
         if subdomain in whitelist:
             return
