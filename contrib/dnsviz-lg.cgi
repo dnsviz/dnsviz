@@ -148,7 +148,6 @@ def check_qname(msg):
             subdomain = subdomain[nextdot+1:]
 
 def main():
-    sys.stdout.write('Content-type: application/json\r\n\r\n')
     try:
         if os.environ.get('REQUEST_METHOD', '') != 'POST':
             raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
@@ -221,6 +220,7 @@ def main():
             'version': transport.DNS_TRANSPORT_VERSION,
             'error': str(e),
         }
+    sys.stdout.write('Content-type: application/json\r\n\r\n')
     sys.stdout.write(json.dumps(ret))
 
 if __name__ == '__main__':
