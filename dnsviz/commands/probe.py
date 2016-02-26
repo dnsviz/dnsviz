@@ -491,6 +491,7 @@ def main(argv):
                 dlv_domain = dns.name.from_text(opts['-l'])
             except dns.exception.DNSException:
                 usage('The domain name was invalid: "%s"' % opts['-l'])
+                sys.exit(1)
         else:
             dlv_domain = None
 
