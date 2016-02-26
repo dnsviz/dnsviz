@@ -33,6 +33,7 @@ import multiprocessing
 import multiprocessing.managers
 import threading
 import time
+import urlparse
 
 import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
@@ -482,7 +483,14 @@ def main(argv):
                     sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
                     sys.exit(1)
 
-            th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
+            url = urlparse.urlparse(opts['-u'])
+            if url.scheme in ('http', 'https'):
+                th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
+            elif url.scheme == 'ws':
+                th_factories = (transport.DNSQueryTransportHandlerWebSocketFactory(url.path),)
+            else:
+                usage('Invalid URL: "%s"' % opts['-u'])
+                sys.exit(1)
         else:
             th_factories = None
 
