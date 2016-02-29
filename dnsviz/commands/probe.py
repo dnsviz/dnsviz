@@ -487,9 +487,12 @@ def main(argv):
             if url.scheme in ('http', 'https'):
                 th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
             elif url.scheme == 'ws':
+                if url.hostname is not None:
+                    usage('WebSocket URL must designate a local UNIX domain socket.')
+                    sys.exit(1)
                 th_factories = (transport.DNSQueryTransportHandlerWebSocketFactory(url.path),)
             else:
-                usage('Invalid URL: "%s"' % opts['-u'])
+                usage('Unsupported URL scheme: "%s"' % opts['-u'])
                 sys.exit(1)
         else:
             th_factories = None
