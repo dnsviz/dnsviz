@@ -841,6 +841,11 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.req_len = len(self.req)
         self.req_index = 0
 
+    def init_empty_req(self):
+        self.req = '\x81\x00'
+        self.req_len = len(self.req)
+        self.req_index = 0
+
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
@@ -957,11 +962,51 @@ class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
 class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerHTTPPrivate
 
-class DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
+class _DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerWebSocket
 
-class DNSQueryTransportHandlerWebSocketPrivateFactory(DNSQueryTransportHandlerFactory):
+class DNSQueryTransportHandlerWebSocketFactory:
+    def __init__(self, *args, **kwargs):
+        self._f = _DNSQueryTransportHandlerWebSocketFactory(*args, **kwargs)
+
+    def __del__(self):
+        try:
+            qth = self._f.build()
+            qth.init_empty_req()
+            qth.prepare()
+            qth.do_write()
+        except:
+            pass
+
+    @property
+    def cls(self):
+        return self._f.__class__.cls
+
+    def build(self, **kwargs):
+        return self._f.build(**kwargs)
+
+class _DNSQueryTransportHandlerWebSocketPrivateFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerWebSocketPrivate
+
+class DNSQueryTransportHandlerWebSocketPrivateFactory:
+    def __init__(self, *args, **kwargs):
+        self._f = _DNSQueryTransportHandlerWebSocketPrivateFactory(*args, **kwargs)
+
+    def __del__(self):
+        try:
+            qth = self._f.build()
+            qth.init_empty_req()
+            qth.prepare()
+            qth.do_write()
+        except:
+            pass
+
+    @property
+    def cls(self):
+        return self._f.__class__.cls
+
+    def build(self, **kwargs):
+        return self._f.build(**kwargs)
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
