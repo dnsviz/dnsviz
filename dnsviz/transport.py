@@ -226,6 +226,7 @@ class DNSQueryTransportHandler(object):
     singleton = False
     allow_loopback_query = False
     allow_private_query = False
+    timeout_baseline = 0.0
 
     def __init__(self, processed_queue=None, factory=None):
         self.req = None
@@ -290,6 +291,9 @@ class DNSQueryTransportHandler(object):
 
     def prepare(self):
         assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
+
+        if self.timeout is None:
+            self.timeout = self.timeout_baseline
 
         self._init_res_buffer()
         try:
@@ -557,6 +561,8 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
                 raise RemoteQueryTransportError(str(e))
 
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
+    timeout_baseline = 5.0
+
     def __init__(self, url, insecure=False, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
 
@@ -593,7 +599,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def _set_timeout(self, qtm):
         if self.timeout is None:
             # allow 5 seconds for HTTP overhead, as a baseline
-            self.timeout = 5
+            self.timeout = self.timeout_baseline
         # account for worst case, in which case queries are performed serially
         # on the remote end
         self.timeout += qtm.timeout
@@ -763,6 +769,8 @@ class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_private_query = True
 
 class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
+    timeout_baseline = 5.0
+
     def __init__(self, path, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerWebSocket, self).__init__(processed_queue=processed_queue, factory=factory)
 
@@ -775,7 +783,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
     def _set_timeout(self, qtm):
         if self.timeout is None:
             # allow 5 seconds for browser overhead, as a baseline
-            self.timeout = 5
+            self.timeout = self.timeout_baseline
         # account for worst case, in which case queries are performed serially
         # on the remote end
         self.timeout += qtm.timeout
