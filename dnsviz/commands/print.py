@@ -134,6 +134,23 @@ STATUS_MAP = {
     'WARNING': '?',
 }
 
+def _errors_warnings_full(warnings, errors, indent, show_color):
+    # display status, errors, and warnings
+    s = ''
+    for error in errors:
+        if show_color:
+            s += '%s%sE:%s%s\n' % (indent, TERM_COLOR_MAP['ERROR'], error, TERM_COLOR_MAP['RESET'])
+        else:
+            s += '%sE:%s\n' % (indent, error)
+
+    for warning in warnings:
+        if show_color:
+            s += '%s%sW:%s%s\n' % (indent, TERM_COLOR_MAP['WARNING'], warning, TERM_COLOR_MAP['RESET'])
+        else:
+            s += '%sW:%s\n' % (indent, warning)
+
+    return s
+
 def _errors_warnings_str(status, warnings, errors, show_color):
     # display status, errors, and warnings
     error_str = ''
@@ -181,6 +198,8 @@ def _textualize_status_output_response(rdtype_str, status, warnings, errors, rda
     s += response_prefix % params
 
     rdata_set = []
+    subwarnings_all = warnings[:]
+    suberrors_all = errors[:]
     for i, (substatus, subwarnings, suberrors, rdata_item) in enumerate(rdata):
         params['rdata'] = rdata_item
         # display status, errors, and warnings
@@ -192,8 +211,14 @@ def _textualize_status_output_response(rdtype_str, status, warnings, errors, rda
             params['status_color_rdata'] = ''
             params['status_rdata'] = ''
         rdata_set.append(response_rdata % params)
+
+        subwarnings_all.extend(subwarnings)
+        suberrors_all.extend(suberrors)
+
     join_str = join_str_template % params
     s += join_str.join(rdata_set) + '\n'
+
+    s += _errors_warnings_full(subwarnings_all, suberrors_all, '        ' + params['preindent'] + params['indent'], show_color)
 
     for rdtype_str_child, status_child, warnings_child, errors_child, rdata_child, children_child in children:
         s += _textualize_status_output_response(rdtype_str_child, status_child, warnings_child, errors_child, rdata_child, children_child, depth + 1, show_color)
