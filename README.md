@@ -1,5 +1,4 @@
-# DNSViz
-
+# ![DNSViz](doc/images/logo-220x100.png)
 
 ## Description
 
