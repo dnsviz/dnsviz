@@ -428,10 +428,14 @@ class DigCommandLineQuery:
             return ';; the response from %s was malformed' % server
 
     def query_and_display(self, options, filehandle):
-        server, response = self.query(options)
-        output = self.display(response, server, options)
-        filehandle.write(output)
-        filehandle.flush()
+        try:
+            server, response = self.query(options)
+        except transport.RemoteQueryTransportError, e:
+            sys.stderr.write('%s\n' % e)
+        else:
+            output = self.display(response, server, options)
+            filehandle.write(output)
+            filehandle.flush()
 
 class DigCommandLine:
     def __init__(self, args):
