@@ -1117,6 +1117,7 @@ class UnableToRetrieveDNSSECRecords(ResponseError):
     description_template = 'The DNSSEC records necessary to validate the response could not be retrieved from the server.'
     references = ['RFC 4035, Sec. 3.1.1', 'RFC 4035, Sec. 3.1.3']
     required_params = []
+    use_effective_query_tag = False
 
 class MissingRRSIG(ResponseError):
     '''
