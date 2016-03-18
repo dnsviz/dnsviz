@@ -51,7 +51,7 @@ def set_openssl_lib_path():
 
     msg = ''
     try:
-        libdir = subprocess.check_output(['pkg-config', '--variable=libdir', 'openssl']).strip()
+        libdir = subprocess.Popen(['pkg-config', '--variable=libdir', 'openssl'], stdout=subprocess.PIPE).communicate()[0].strip()
     except (subprocess.CalledProcessError, OSError), e:
         libdir = None
         msg = str(e)
