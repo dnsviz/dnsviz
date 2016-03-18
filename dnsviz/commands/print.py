@@ -239,6 +239,9 @@ def _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors
     else:
         params['color_reset'] = ''
 
+    warnings_all = zone_warnings + delegation_warnings
+    errors_all = zone_errors + delegation_errors
+
     params['name'] = name
     params['status_rdata'] = ''
     if show_color:
@@ -253,6 +256,8 @@ def _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors
         if show_color:
             params['status_color_rdata'] = TERM_COLOR_MAP[delegation_status]
     s += name_template % params
+
+    s += _errors_warnings_full(warnings_all, errors_all, '  ', show_color)
 
     for rdtype_str, status, warnings, errors, rdata, children in responses:
         s += _textualize_status_output_response(rdtype_str, status, warnings, errors, rdata, children, 0, show_color)
