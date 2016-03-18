@@ -495,8 +495,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     zone_status = Status.delegation_status_mapping[self.response_component_status[parent_obj]]
                 else:
                     zone_status = Status.delegation_status_mapping[Status.INSECURE]
-                zone_warnings = [w.terse_description for w in parent_obj.zone_status]
-                zone_errors = [e.terse_description for e in parent_obj.zone_status]
+                zone_warnings = [w.terse_description for w in parent_obj.zone_warnings]
+                zone_errors = [e.terse_description for e in parent_obj.zone_errors]
                 if parent_obj.parent is not None:
                     delegation_status = Status.delegation_status_mapping[parent_obj.delegation_status[dns.rdatatype.DS]]
                     delegation_warnings = [w.terse_description for w in parent_obj.delegation_warnings[dns.rdatatype.DS]]
