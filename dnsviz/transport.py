@@ -566,6 +566,8 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def __init__(self, url, insecure=False, processed_queue=None, factory=None):
         super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
 
+        self.transport_type = socket.SOCK_STREAM
+
         parse_result = urlparse.urlparse(url)
         scheme = parse_result.scheme
         if not scheme:
@@ -586,13 +588,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.password = parse_result.password
         self.insecure = insecure
 
+        af = 0
         try:
-            addrinfo = socket.getaddrinfo(self.host, self.dport)
+            addrinfo = socket.getaddrinfo(self.host, self.dport, af, self.transport_type)
         except socket.gaierror:
             raise RemoteQueryTransportError('Unable to resolve name of HTTP host: %s' % self.host)
         self.dst = IPAddr(addrinfo[0][4][0])
-
-        self.transport_type = socket.SOCK_STREAM
 
         self.chunked_encoding = None
 
