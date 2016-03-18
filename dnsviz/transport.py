@@ -589,7 +589,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         try:
             addrinfo = socket.getaddrinfo(self.host, self.dport)
         except socket.gaierror:
-            raise RemoteQueryTransportError('Unable to resolve name of HTTP host')
+            raise RemoteQueryTransportError('Unable to resolve name of HTTP host: %s' % self.host)
         self.dst = IPAddr(addrinfo[0][4][0])
 
         self.transport_type = socket.SOCK_STREAM
