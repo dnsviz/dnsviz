@@ -42,8 +42,11 @@ public class DNSLookingGlassApplet extends Applet {
 		lg = new DNSLookingGlass();
 	}
 
-	public DNSQueryTransportHandler getDNSQueryTransportHandler(String req, String dst, int dport, String src, int sport, long timeout, boolean tcp) throws UnknownHostException {
+	public DNSQueryTransportHandler getDNSQueryTransportHandler(String req, String dst, int dport, String src, int sport, long timeout, boolean tcp) {
 		err = null;
+		if (true) {
+			return null;
+		}
 		try {
 			return lg.getDNSQueryTransportHandler(req, dst, dport, src, sport, timeout, tcp);
 		} catch (Exception ex) {
@@ -52,7 +55,7 @@ public class DNSLookingGlassApplet extends Applet {
 		}
 	}
 
-	public void executeQueries(DNSQueryTransportHandler [] qths) throws IOException {
+	public void executeQueries(DNSQueryTransportHandler [] qths) {
 		err = null;
 		try {
 			lg.executeQueries(qths);
