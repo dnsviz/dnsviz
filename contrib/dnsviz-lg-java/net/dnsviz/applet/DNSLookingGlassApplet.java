@@ -44,9 +44,6 @@ public class DNSLookingGlassApplet extends Applet {
 
 	public DNSQueryTransportHandler getDNSQueryTransportHandler(String req, String dst, int dport, String src, int sport, long timeout, boolean tcp) {
 		err = null;
-		if (true) {
-			return null;
-		}
 		try {
 			return lg.getDNSQueryTransportHandler(req, dst, dport, src, sport, timeout, tcp);
 		} catch (Exception ex) {
