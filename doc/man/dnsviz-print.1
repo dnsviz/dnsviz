@@ -101,7 +101,7 @@ The following is an example of the output:
 .RS 0
 [.]    RRSIG: ./8/19036 (2015-08-20 - 2015-09-03) [.]
 .RS 0
-\fBcom\fP [.]
+\fBcom\fP [.] [.]
 .RS 0
 [.]  DS: 8/30909/2 [.]
 .RS 0
@@ -265,6 +265,12 @@ The NSEC or NSEC3 records (and their RRSIGs) comprising a proof
 are grouped by indentation under the title "PROOF" which is itself indented
 under the negative response line.  Following "PROOF" is a bracketed set of
 characters with the same meaning as those used for DS, DNSKEY, and RRSIG.
+
+.SS Errors and Warnings
+Textual errors and warnings are listed below the response components with which
+the issues are associated.  Each error or warning is listed on its own line and
+prefaced with "E:" or "W:", signifying whether it is an error or warning,
+respectively.
 
 .SH EXIT CODES
 The exit codes are:
