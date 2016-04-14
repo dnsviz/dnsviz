@@ -766,17 +766,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj.populate_status(trusted_keys, trace=trace + [self])
+                    cname_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
-                    mx_obj.populate_status(trusted_keys, trace=trace + [self], follow_mx=False)
+                    mx_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False)
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj.populate_status(trusted_keys, trace=trace + [self])
+                signer_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj.populate_status(trusted_keys, trace=trace + [self])
+                ns_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
 
         # populate status of ancestry
         if self.parent is not None:
