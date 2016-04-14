@@ -26,7 +26,7 @@ var PROTOCOL = 'dns-looking-glass';
 
 function setupSocket(webSocket, filename) {
 	var crypto = require('crypto');
-	var fs = require('fs'); 
+	var fs = require('fs');
 	var net = require('net');
 	var path = require('path');
 	var os = require('os');
@@ -145,8 +145,8 @@ function handleUpgrade(req, socket, head) {
 	var protocols = req.headers['sec-websocket-protocol'];
 	var error = checkHeaders(key, origin, version, protocols);
 	if (error != null) {
-		var errorResponse = 'HTTP/1.1 ' + error.code + ' ' + error.msg + '\r\n' + 
-				error.extraHeader + 
+		var errorResponse = 'HTTP/1.1 ' + error.code + ' ' + error.msg + '\r\n' +
+				error.extraHeader +
 				'Content-Length: ' + error.content.length + '\r\n\r\n' +
 				error.content;
 		socket.write(errorResponse, function() {
