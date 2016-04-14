@@ -121,7 +121,7 @@ setup(name='dnsviz',
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
         requires=[
                 'pygraphviz (>=1.1)',
-                'm2crypto (>=0.21.1)',
+                'm2crypto (>=0.24.0)',
                 'dnspython (>=1.11)',
         ],
         cmdclass={ 'build': MyBuild, 'install': MyInstall },
