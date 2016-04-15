@@ -23,6 +23,14 @@
 import importlib
 import sys
 
+def check_deps():
+    # check dnspython dependency
+    try:
+        import dns.name
+    except ImportError:
+        sys.stderr.write('Error: dnspython does not appear to be installed\n')
+        sys.exit(1)
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -40,6 +48,8 @@ Commands:
 ''' % (err))
 
 def main():
+    check_deps()
+
     if len(sys.argv) < 2:
         usage()
         sys.exit(0)
