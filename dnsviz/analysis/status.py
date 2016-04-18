@@ -435,9 +435,10 @@ class NSECStatus(object):
         return dns.name.Name(('*',) + qname[-i:])
 
 class NSECStatusNXDOMAIN(NSECStatus):
-    def __init__(self, qname, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
         self.qname = qname
         self.origin = origin
+        self.is_zone = is_zone
         self.warnings = []
         self.errors = []
 
@@ -576,9 +577,9 @@ class NSECStatusNXDOMAIN(NSECStatus):
         return d
 
 class NSECStatusWildcard(NSECStatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, wildcard_name, rdtype, origin, is_zone, nsec_set_info):
         self.wildcard_name_from_rrsig = wildcard_name
-        super(NSECStatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
+        super(NSECStatusWildcard, self).__init__(qname, rdtype, origin, is_zone, nsec_set_info)
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -628,10 +629,11 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return d
 
 class NSECStatusNODATA(NSECStatus):
-    def __init__(self, qname, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
+        self.is_zone = is_zone
         self.referral = nsec_set_info.referral
         self.warnings = []
         self.errors = []
@@ -696,7 +698,7 @@ class NSECStatusNODATA(NSECStatus):
         if self.nsec_for_qname is not None:
             # RFC 4034 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
-                if not self.has_ns:
+                if self.is_zone and not self.has_ns:
                     self.errors.append(Errors.ReferralWithoutNSBitNSEC(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_ds:
@@ -839,9 +841,10 @@ class NSEC3Status(object):
         return None
 
 class NSEC3StatusNXDOMAIN(NSEC3Status):
-    def __init__(self, qname, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
         self.qname = qname
         self.origin = origin
+        self.is_zone = is_zone
         self.warnings = []
         self.errors = []
 
@@ -1063,9 +1066,9 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         return d
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, wildcard_name, rdtype, origin, is_zone, nsec_set_info):
         self.wildcard_name = wildcard_name
-        super(NSEC3StatusWildcard, self).__init__(qname, rdtype, origin, nsec_set_info)
+        super(NSEC3StatusWildcard, self).__init__(qname, rdtype, origin, is_zone, nsec_set_info)
 
     def _set_closest_encloser(self, nsec_set_info):
         super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
@@ -1130,10 +1133,11 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         return d
 
 class NSEC3StatusNODATA(NSEC3Status):
-    def __init__(self, qname, rdtype, origin, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
+        self.is_zone = is_zone
         self.referral = nsec_set_info.referral
         self.wildcard_name = None
         self.warnings = []
@@ -1220,7 +1224,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         if self.nsec_for_qname:
             # RFC 4035 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
-                if not self.has_ns:
+                if self.is_zone and not self.has_ns:
                     self.errors.append(Errors.ReferralWithoutNSBitNSEC3(sname=fmt.humanize_name(self.qname)))
                     self.validation_status = NSEC_STATUS_INVALID
                 if self.has_ds:

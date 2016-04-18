@@ -1139,9 +1139,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             status_by_response = {}
             for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
                 if nsec_set_info.use_nsec3:
-                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, nsec_set_info)
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
                 else:
-                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, nsec_set_info)
+                    status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
 
                 for nsec_rrset_info in nsec_set_info.rrsets.values():
                     self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
@@ -1835,8 +1835,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs):
 
         qname_obj = self.get_name(neg_response_info.qname)
-        if query.rdtype == dns.rdatatype.DS and \
-                qname_obj.name == neg_response_info.qname and qname_obj.is_zone():
+        is_zone = qname_obj.name == neg_response_info.qname and qname_obj.is_zone()
+        if query.rdtype == dns.rdatatype.DS and is_zone:
             qname_obj = qname_obj.parent
 
         soa_owner_name_for_servers = {}
@@ -1925,10 +1925,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if soa_owner_name not in status_by_soa_name:
                         if nsec_set_info.use_nsec3:
                             status = nsec3_status_cls(neg_response_info.qname, query.rdtype, \
-                                    soa_owner_name, nsec_set_info)
+                                    soa_owner_name, is_zone, nsec_set_info)
                         else:
                             status = nsec_status_cls(neg_response_info.qname, query.rdtype, \
-                                    soa_owner_name, nsec_set_info)
+                                    soa_owner_name, is_zone, nsec_set_info)
                         if status.validation_status == Status.NSEC_STATUS_VALID:
                             if status not in statuses:
                                 statuses.append(status)
