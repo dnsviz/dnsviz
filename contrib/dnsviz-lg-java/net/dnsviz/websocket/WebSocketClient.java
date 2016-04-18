@@ -78,7 +78,7 @@ public class WebSocketClient {
 		String headers = "GET " + path + " HTTP/1.1\r\n" +
 			"Host: " + host + "\r\n" +
 			"Upgrade: websocket\r\n" +
-			"Connection: Upgrade\r\n" + 
+			"Connection: Upgrade\r\n" +
 			"Sec-WebSocket-Key: " + clientKey + "\r\n" +
 			"Origin: " + origin + "\r\n" +
 			"Sec-WebSocket-Version: " + WEBSOCKET_VERSION + "\r\n\r\n";
@@ -255,7 +255,7 @@ public class WebSocketClient {
 			}
 
 		}
-			
+
 		if (totalLength > 0x7fffffff) {
 			throw new IOException("Total message size too big for array");
 		}
