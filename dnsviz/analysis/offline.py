@@ -1126,7 +1126,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
-                zone_name = wildcard_info.parent()
+                zone_name = wildcard_name.parent()
             else:
                 zone_name = qname_obj.zone.name
 
