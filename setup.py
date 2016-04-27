@@ -82,7 +82,8 @@ DATA_FILES = [('share/dnsviz/icons', ['doc/images/error.png', 'doc/images/warnin
         ('share/dnsviz/css', ['share/css/dnsviz.css']),
         ('share/dnsviz/js', ['share/js/dnsviz.js']),
         ('share/dnsviz/html', ['share/html/dnssec-template.html']),
-        ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt'])]
+        ('share/dnsviz/trusted-keys', ['share/trusted-keys/root.txt']),
+        ('share/dnsviz/hints', ['share/hints/named.root'])]
 MAN_FILES = [('share/man/man1', ['doc/man/dnsviz.1', 'doc/man/dnsviz-probe.1', 'doc/man/dnsviz-grok.1', 'doc/man/dnsviz-graph.1', 'doc/man/dnsviz-print.1', 'doc/man/dnsviz-query.1'])]
 DOC_EXTRA_FILES = [('share/doc/dnsviz', ['doc/dnsviz-graph.html']),
         ('share/doc/dnsviz/images', glob.glob(os.path.join('doc', 'images', '*.png')))]

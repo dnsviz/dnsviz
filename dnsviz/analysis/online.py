@@ -43,6 +43,7 @@ from dnsviz.ipaddr import *
 import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
+from dnsviz import util
 
 _logger = logging.getLogger(__name__)
 
@@ -60,22 +61,18 @@ class IPv6ConnectivityException(NetworkConnectivityException):
 class NoNameservers(NetworkConnectivityException):
     pass
 
-ROOT_NS_IPS = set([
-        IPAddr('198.41.0.4'), IPAddr('2001:503:ba3e::2:30'),   # A
-        IPAddr('192.228.79.201'),                              # B
-        IPAddr('192.33.4.12'),                                 # C
-        IPAddr('199.7.91.13'), IPAddr('2001:500:2d::d'),       # D
-        IPAddr('192.203.230.10'),                              # E
-        IPAddr('192.5.5.241'), IPAddr('2001:500:2f::f'),       # F
-        IPAddr('192.112.36.4'),                                # G
-        IPAddr('198.97.190.53'), IPAddr('2001:500:1::53'),     # H
-        IPAddr('192.36.148.17'), IPAddr('2001:7fe::53'),       # I
-        IPAddr('192.58.128.30'), IPAddr('2001:503:c27::2:30'), # J
-        IPAddr('193.0.14.129'), IPAddr('2001:7fd::1'),         # K
-        IPAddr('199.7.83.42'), IPAddr('2001:500:9f::42'),      # L
-        IPAddr('202.12.27.33'), IPAddr('2001:dc3::35'),        # M
-])
+def _get_root_servers():
+    servers = set()
+    hints = dict(util.get_root_hints())
+    for rdata in hints[(dns.name.root, dns.rdatatype.NS)]:
+        for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+            try:
+                servers.update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
+            except KeyError:
+                pass
+    return servers
 
+ROOT_NS_IPS = _get_root_servers()
 ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)

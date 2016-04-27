@@ -36,6 +36,7 @@ import format as fmt
 from ipaddr import IPAddr
 
 TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
+ROOT_HINTS = os.path.join(DNSVIZ_SHARE_PATH, 'hints', 'named.root')
 
 CR_RE = re.compile(r'\r\n', re.MULTILINE)
 ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
@@ -73,6 +74,24 @@ def get_default_trusted_keys():
     except IOError, e:
         return []
     return get_trusted_keys(tk_str)
+
+def get_hints(s):
+    hints = []
+
+    s = CR_RE.sub('\n', s)
+    s = ZONE_COMMENTS_RE.sub('', s)
+    s = BLANK_LINES_RE.sub(r'\n', s)
+    s = s.strip()
+    m = dns.message.from_text(str(';ANSWER\n'+s))
+    for rrset in m.answer:
+        if rrset.rdtype not in (dns.rdatatype.NS, dns.rdatatype.A, dns.rdatatype.AAAA):
+            continue
+        hints.append(((rrset.name, rrset.rdtype), rrset))
+
+    return hints
+
+def get_root_hints():
+    return get_hints(open(ROOT_HINTS).read())
 
 def get_client_address(server):
     if server.version == 6:
