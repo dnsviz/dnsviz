@@ -355,11 +355,11 @@ class DNSResponse:
         if proper:
             if filter(lambda x: qname == x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
                 return True
-        # if proper referral is NOT requested and qname is a subdomain of
-        # (including equal to) an NS RRset in the authority, then it is a
-        # referral
+        # if proper referral is NOT requested, qname is a subdomain of
+        # (including equal to) an NS RRset in the authority, and qname is not
+        # equal to bailiwick, then it is a referral
         else:
-            if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
+            if filter(lambda x: qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
                 return True
         return False
 
