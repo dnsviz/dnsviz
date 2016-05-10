@@ -76,7 +76,7 @@ def get_default_trusted_keys():
     return get_trusted_keys(tk_str)
 
 def get_hints(s):
-    hints = []
+    hints = {}
 
     s = CR_RE.sub('\n', s)
     s = ZONE_COMMENTS_RE.sub('', s)
@@ -86,7 +86,7 @@ def get_hints(s):
     for rrset in m.answer:
         if rrset.rdtype not in (dns.rdatatype.NS, dns.rdatatype.A, dns.rdatatype.AAAA):
             continue
-        hints.append(((rrset.name, rrset.rdtype), rrset))
+        hints[(rrset.name, rrset.rdtype)] = rrset
 
     return hints
 

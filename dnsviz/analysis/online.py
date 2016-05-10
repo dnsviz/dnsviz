@@ -63,7 +63,7 @@ class NoNameservers(NetworkConnectivityException):
 
 def _get_root_servers():
     servers = set()
-    hints = dict(util.get_root_hints())
+    hints = util.get_root_hints()
     for rdata in hints[(dns.name.root, dns.rdatatype.NS)]:
         for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
             try:
