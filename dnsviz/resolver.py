@@ -19,11 +19,14 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import bisect
 import random
+import threading
 import time
 
 import query
 from ipaddr import IPAddr
+import response as Response
 import transport
 
 import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
@@ -256,6 +259,377 @@ class Resolver:
             last_responses[query_tuple] = responses[query_tuple]
 
         return last_responses
+
+class CacheEntry:
+    def __init__(self, rrset, source, expiration, rcode, soa_rrset):
+        self.rrset = rrset
+        self.source = source
+        self.expiration = expiration
+        self.rcode = rcode
+        self.soa_rrset = soa_rrset
+
+class ServFail(Exception):
+    pass
+
+class FullResolver:
+    '''A full iterative DNS resolver, following hints.'''
+
+    SRC_PRIMARY_ZONE = 0
+    SRC_SECONDARY_ZONE = 1
+    SRC_AUTH_ANS = 2
+    SRC_AUTH_AUTH = 3
+    SRC_GLUE_PRIMARY_ZONE = 4
+    SRC_GLUE_SECONDARY_ZONE = 5
+    SRC_NONAUTH_ANS = 6
+    SRC_ADDITIONAL = 7
+    SRC_NONAUTH_AUTH = 7
+
+    MIN_TTL = 60
+    MAX_CHAIN = 20
+
+    def __init__(self, hints, query_cls, client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
+
+        self._hints = hints
+        self._query_cls = query_cls
+        self._client_ipv4 = client_ipv4
+        self._client_ipv6 = client_ipv6
+        self._transport_manager = transport_manager
+        self._th_factories = th_factories
+
+        self._cache = {}
+        self._expirations = []
+        self._cache_lock = threading.Lock()
+
+    def flush_cache(self):
+        with self._cache_lock:
+            self._cache = {}
+            self._expirations = []
+
+    def expire_cache(self):
+        t = time.time()
+
+        with self._cache_lock:
+            if self._expirations and self._expirations[0] > t:
+                return
+
+            future_index = bisect.bisect_right(self._expirations, (t, None))
+            for i in range(future_index):
+                cache_key = self._expirations[i][1]
+                del self._cache[cache_key]
+            self._expirations = self._expirations[future_index:]
+
+    def cache_put(self, name, rdtype, rrset, source, rcode, soa_rrset, ttl):
+        t = time.time()
+
+        if rrset is not None:
+            expiration = int(t) + max(rrset.ttl, self.MIN_TTL) + 1
+        elif soa_rrset is not None:
+            expiration = int(t) + max(min(soa_rrset.ttl, soa_rrset[0].minimum), self.MIN_TTL) + 1
+        elif ttl is not None:
+            expiration = int(t) + max(ttl, self.MIN_TTL) + 1
+        else:
+            expiration = int(t) + self.MIN_TTL + 1
+
+        key = (name, rdtype)
+        new_entry = CacheEntry(rrset, source, expiration, rcode, soa_rrset)
+
+        with self._cache_lock:
+            try:
+                old_entry = self._cache[key]
+            except KeyError:
+                pass
+            else:
+                if new_entry.source >= old_entry.source:
+                    return
+
+                # remove the old entry from expirations
+                old_index = bisect.bisect_left(self._expirations, (old_entry.expiration, key))
+                old_key = self._expirations.pop(old_index)[1]
+                assert old_key == key, "Old key doesn't match new key!"
+
+            self._cache[key] = new_entry
+            bisect.insort(self._expirations, (expiration, key))
+
+    def cache_get(self, name, rdtype):
+        try:
+            entry = self._cache[(name, rdtype)]
+        except KeyError:
+            return None
+        else:
+            t = time.time()
+            ttl = max(0, int(entry.expiration - t))
+
+            if entry.rrset is not None:
+                entry.rrset.update_ttl(ttl)
+            if entry.soa_rrset is not None:
+                entry.soa_rrset.update_ttl(ttl)
+
+            return entry
+
+    def cache_dump(self):
+        keys = self._cache.keys()
+        keys.sort()
+
+        t = time.time()
+        for key in keys:
+            entry = self._cache[key]
+
+    def query(self, qname, rdtype, rdclass=dns.rdataclass.IN):
+        return self._query(qname, rdtype, rdclass, 0, True)
+
+    def _query(self, qname, rdtype, rdclass, level, require_auth):
+        self.expire_cache()
+
+        # check for max chain length
+        if level > self.MAX_CHAIN:
+            raise ServFail('SERVFAIL - resolution chain too long')
+
+        # first check cache for answer
+        entry = self.cache_get(qname, rdtype)
+        if entry is not None and (not require_auth or entry.source <= self.SRC_NONAUTH_ANS):
+            return [entry.rrset, entry.rcode]
+
+        # next check cache for alias
+        entry = self.cache_get(qname, dns.rdatatype.CNAME)
+        if entry is not None and entry.rrset is not None:
+            return [entry.rrset] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, require_auth)
+
+        # now check for closest enclosing NS, DNAME, or hint
+        closest_zone = qname
+
+        # when rdtype is DS, start at the parent
+        if rdtype == dns.rdatatype.DS and qname != dns.name.root:
+            closest_zone = qname.parent()
+
+        ns_names = {}
+
+        # iterative resolution is necessary, so find the closest zone ancestor or DNAME
+        while True:
+            # if we are a proper superdomain, then look for DNAME
+            if closest_zone != qname:
+                entry = self.cache_get(closest_zone, dns.rdatatype.DNAME)
+                if entry is not None and entry.rrset is not None:
+                    cname_rrset = Response.cname_from_dname(qname, entry.rrset)
+                    return [entry.rrset, cname_rrset] + self._query(cname_rrset[0].target, rdtype, rdclass, level + 1, require_auth)
+
+            # look for NS records in cache
+            entry = self.cache_get(closest_zone, dns.rdatatype.NS)
+            if entry is not None:
+                if entry.rrset is not None:
+                    ns_rrset = entry.rrset
+                    for rdata in entry.rrset:
+                        ns_names[rdata.target] = None
+
+            # look for NS records in hints
+            else:
+                try:
+                    ns_rrset = self._hints[(closest_zone, dns.rdatatype.NS)]
+                except KeyError:
+                    pass
+                else:
+                    for rdata in ns_rrset:
+                        ns_names[rdata.target] = None
+
+            # if there were NS records associated with the names, then
+            # no need to continue
+            if ns_names:
+                break
+
+            # otherwise, continue upwards until some are found
+            try:
+                closest_zone = closest_zone.parent()
+            except dns.name.NoParent:
+                raise ServFail('SERVFAIL - no NS RRs at root')
+
+        ret = None
+        soa_rrset = None
+        rcode = None
+
+        # iterate, following referrals down the namespace tree
+        while True:
+            bailiwick = ns_rrset.name
+            is_referral = False
+
+            # query names first for which there are addresses
+            ns_names_with_addresses = [n for n in ns_names if ns_names[n] is not None]
+            random.shuffle(ns_names_with_addresses)
+            ns_names_without_addresses = list(set(ns_names).difference(ns_names_with_addresses))
+            random.shuffle(ns_names_without_addresses)
+            all_ns_names = ns_names_with_addresses + ns_names_without_addresses
+
+            for query_cls in self._query_cls:
+                # query each server until we get a match
+                for ns_name in all_ns_names:
+                    is_referral = False
+                    if ns_names[ns_name] is None:
+                        # first get the addresses associated with each name
+                        ns_names[ns_name] = set()
+                        for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
+                            a_rrset = None
+                            if ns_name.is_subdomain(bailiwick):
+                                # if in bailiwick, only check cache and hints
+                                entry = self.cache_get(ns_name, a_rdtype)
+                                if entry is not None:
+                                    if entry.rrset is not None:
+                                        a_rrset = entry.rrset
+                                else:
+                                    try:
+                                        a_rrset = self._hints[(ns_name, a_rdtype)]
+                                    except KeyError:
+                                        pass
+                            else:
+                                # otherwise, try cache lookup, and everything
+
+                                l = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, False)
+                                a_rrset = l[-2]
+                                #a_rrset = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, False)[-2]
+
+                            if a_rrset is not None:
+                                for rdata in a_rrset:
+                                    ns_names[ns_name].add(IPAddr(rdata.address))
+                            else:
+                                # NXDOMAIN or NDATA
+                                pass
+
+                    for server in ns_names[ns_name]:
+                        query = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6)
+                        query.execute(tm=self._transport_manager, th_factories=self._th_factories)
+                        is_referral = False
+
+                        if not query.responses:
+                            # No network connectivity
+                            continue
+
+                        server1, client_response = query.responses.items()[0]
+                        client, response = client_response.items()[0]
+
+                        if response.is_valid_response() and response.is_complete_response():
+                            soa_rrset = None
+                            rcode = response.message.rcode()
+
+                            # response is acceptable
+                            try:
+                                # first check for exact match
+                                ret = [filter(lambda x: x.name == qname and x.rdtype == rdtype and x.rdclass == rdclass, response.message.answer)[0]]
+                            except IndexError:
+                                try:
+                                    # now look for DNAME
+                                    dname_rrset = filter(lambda x: qname.is_subdomain(x.name) and qname != x.name and x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                except IndexError:
+                                    try:
+                                        # now look for CNAME
+                                        cname_rrset = filter(lambda x: x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                    except IndexError:
+                                        ret = [None]
+                                        # no answer
+                                        try:
+                                            soa_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.SOA, response.message.authority)[0]
+                                        except IndexError:
+                                            pass
+                                    # cache the NS RRset
+                                    else:
+                                        cname_rrset = filter(lambda x: x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                        ret = [cname_rrset]
+                                else:
+                                    # handle DNAME: return the DNAME, CNAME and (recursively) its chain
+                                    cname_rrset = Response.cname_from_dname(qname, dname_rrset)
+                                    ret = [dname_rrset, cname_rrset]
+
+                            if response.is_referral(qname, rdtype, bailiwick):
+                                is_referral = True
+                                a_rrsets = {}
+                                min_ttl = None
+
+                                # if response is referral, then we follow it
+                                ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.authority)[0]
+                                ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
+                                for ns_name in ns_names:
+                                    if not ns_names[ns_name]:
+                                        ns_names[ns_name] = None
+                                    else: # name is in bailiwick
+                                        for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                            try:
+                                                a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
+                                            except KeyError:
+                                                pass
+                                            else:
+                                                if min_ttl is None or a_rrsets[a_rdtype].ttl < min_ttl:
+                                                    min_ttl = a_rrsets[a_rdtype].ttl
+
+                                        for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                            if a_rdtype in a_rrsets:
+                                                a_rrsets[a_rdtype].update_ttl(min_ttl)
+                                                self.cache_put(ns_name, a_rdtype, a_rrsets[a_rdtype], self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, None)
+                                            else:
+                                                self.cache_put(ns_name, a_rdtype, None, self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, min_ttl)
+
+                                if min_ttl is not None:
+                                    ns_rrset.update_ttl(min_ttl)
+
+                                # cache the NS RRset
+                                self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_NONAUTH_AUTH, rcode, None, None)
+                                break
+
+                            elif response.is_authoritative():
+                                terminal = True
+
+                                # if response is authoritative (and not a referral), then we return it
+                                try:
+                                    ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.authority)[0]
+                                except IndexError:
+                                    pass
+                                else:
+                                    self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_AUTH_AUTH, rcode, None, None)
+
+                                if ret[-1] == None:
+                                    self.cache_put(qname, rdtype, None, self.SRC_AUTH_ANS, rcode, soa_rrset, None)
+
+                                else:
+                                    for rrset in ret:
+                                        self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_AUTH_ANS, rcode, None, None)
+
+                                    if ret[-1].rdtype == dns.rdatatype.CNAME:
+                                        ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, require_auth)
+                                        terminal = False
+
+                                if terminal:
+                                    ret.append(rcode)
+                                return ret
+
+                    # if referral, then break
+                    if is_referral:
+                        break
+
+                # if referral, then break
+                if is_referral:
+                    break
+
+            # if not referral, then we're done iterating
+            if not is_referral:
+                break
+
+            # otherwise continue onward, looking for an authoritative answer
+
+        # return non-authoritative answer
+        if ret is not None:
+            terminal = True
+
+            if ret[-1] == None:
+                self.cache_put(qname, rdtype, None, self.SRC_NONAUTH_ANS, rcode, soa_rrset, None)
+
+            else:
+                for rrset in ret:
+                    self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_NONAUTH_ANS, rcode, None, None)
+
+                if ret[-1].rdtype == dns.rdatatype.CNAME:
+                    ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, require_auth)
+                    terminal = False
+
+            if terminal:
+                ret.append(rcode)
+            return ret
+
+        raise ServFail('SERVFAIL - no valid responses')
 
 def main():
     import sys
