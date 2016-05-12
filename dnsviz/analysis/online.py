@@ -61,18 +61,6 @@ class IPv6ConnectivityException(NetworkConnectivityException):
 class NoNameservers(NetworkConnectivityException):
     pass
 
-def _get_root_servers():
-    servers = set()
-    hints = util.get_root_hints()
-    for rdata in hints[(dns.name.root, dns.rdatatype.NS)]:
-        for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
-            try:
-                servers.update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
-            except KeyError:
-                pass
-    return servers
-
-ROOT_NS_IPS = _get_root_servers()
 ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
 INADDR_ARPA_NAME = dns.name.from_text('in-addr', ARPA_NAME)
@@ -1008,7 +996,7 @@ class Analyst(object):
         c = self.name
         try:
             while True:
-                if c in self.explicit_delegations:
+                if (c, dns.rdatatype.NS) in self.explicit_delegations:
                     break
                 c = c.parent()
         except dns.name.NoParent:
@@ -1023,7 +1011,7 @@ class Analyst(object):
             # delegated.
             if ceiling is None or not self.name.is_subdomain(ceiling) or c.is_subdomain(ceiling):
                 ceiling = c
-                resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_manager=self.transport_manager)
+                resolver = Resolver.Resolver(list(self._get_servers_from_hints(c, self.explicit_delegations)), self.simple_query, transport_manager=self.transport_manager)
 
         self.local_ceiling = self._detect_ceiling(ceiling, resolver)[0]
         self._fix_explicit_delegation()
@@ -1130,24 +1118,32 @@ class Analyst(object):
         n = self.name
         explicit_delegation = None
         while n != self.local_ceiling:
-            if n in self.explicit_delegations:
+            if (n, dns.rdatatype.NS) in self.explicit_delegations:
                 if explicit_delegation is None:
-                    explicit_delegation = self.explicit_delegations[n]
-                del self.explicit_delegations[n]
+                    explicit_delegation = self.explicit_delegations[(n, dns.rdatatype.NS)]
+                del self.explicit_delegations[(n, dns.rdatatype.NS)]
             n = n.parent()
         if explicit_delegation is not None:
-            self.explicit_delegations[self.local_ceiling] = explicit_delegation
+            self.explicit_delegations[(self.local_ceiling, dns.rdatatype.NS)] = explicit_delegation
+
+    def _get_servers_from_hints(self, name, hints):
+        servers = set()
+        for rdata in hints[(name, dns.rdatatype.NS)]:
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in hints:
+                    servers.update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
+        return servers
 
     def _root_servers(self, proto=None):
         key = None
-        if dns.name.root in self.explicit_delegations:
+        if (dns.name.root, dns.rdatatype.NS) in self.explicit_delegations:
             key = dns.name.root
-        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+        elif (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) in self.explicit_delegations:
             key = WILDCARD_EXPLICIT_DELEGATION
         if key is not None:
-            servers = set([s for (n,s) in self.explicit_delegations[key]])
+            servers = self._get_servers_from_hints(key, self.explicit_delegations)
         else:
-            servers = ROOT_NS_IPS
+            servers = self._get_servers_from_hints(dns.name.root, util.get_root_hints())
         if proto == 4:
             servers = set(filter(lambda x: x.version == 4, servers))
         elif proto == 6:
@@ -1419,12 +1415,15 @@ class Analyst(object):
 
     def _handle_explicit_delegations(self, name_obj):
         key = None
-        if name_obj.name in self.explicit_delegations:
+        if (name_obj.name, dns.rdatatype.NS) in self.explicit_delegations:
             key = name_obj.name
-        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+        elif (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) in self.explicit_delegations:
             key = WILDCARD_EXPLICIT_DELEGATION
         if key is not None:
-            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[key])
+            for ns_rdata in self.explicit_delegations[(key, dns.rdatatype.NS)]:
+                for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                    if (ns_rdata.target, a_rdtype) in self.explicit_delegations:
+                        name_obj.add_auth_ns_ip_mappings(*[(ns_rdata.target, IPAddr(r.address)) for r in self.explicit_delegations[(ns_rdata.target, a_rdtype)]])
             name_obj.explicit_delegation = True
 
     def _analyze_stub(self, name):
@@ -1474,7 +1473,7 @@ class Analyst(object):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
-        elif name in self.explicit_delegations:
+        elif (name, dns.rdatatype.NS) in self.explicit_delegations:
             parent_obj = None
         elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
@@ -1944,7 +1943,7 @@ class Analyst(object):
         return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
 
     def _check_connectivity(self, name_obj):
-        if self.local_ceiling is not None and self.local_ceiling in self.explicit_delegations:
+        if self.local_ceiling is not None and (self.local_ceiling, dns.rdatatype.NS) in self.explicit_delegations:
             # this check is only useful if not the desdendant of an explicit
             # delegation
             return

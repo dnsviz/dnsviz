@@ -26,6 +26,7 @@ import errno
 import getopt
 import json
 import logging
+import re
 import signal
 import socket
 import sys
@@ -35,7 +36,7 @@ import threading
 import time
 import urlparse
 
-import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
+import dns.exception, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
 from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
 import dnsviz.format as fmt
@@ -53,6 +54,8 @@ resolver = None
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
+
+BRACKETS_RE = re.compile(r'^\[(.*)\]$')
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
@@ -234,28 +237,33 @@ class ParallelAnalyst(ParallelAnalystMixin, BulkAnalyst):
 class RecursiveParallelAnalyst(ParallelAnalystMixin, RecursiveBulkAnalyst):
     analyst_cls = RecursiveMultiProcessAnalyst
 
-def name_addr_mappings_from_string(mappings):
-    mappings_set = set()
+def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
     mappings = mappings.split(',')
     i = 1
     for mapping in mappings:
+        # First determine whether the argument is name=value or simply value
         try:
             name, addr = mapping.rsplit('=', 1)
         except ValueError:
-            # first see if it's a plain IP address
+            # Argument is a single value.  Now determine whether that value is
+            # a name or an address.
+            mapping = BRACKETS_RE.sub(r'\1', mapping.strip())
             try:
-                addr = IPAddr(mapping.strip())
+                IPAddr(mapping)
             except ValueError:
-                # if not, then assign name to mapping
+                # value is not an address
                 name = mapping
                 addr = None
             else:
-                # if it's an IP with no name specified, then create
-                # a name
+                # value is an address
                 name = 'ns%d' % i
+                addr = mapping
                 i += 1
         else:
-            addr = addr.strip()
+            # Argument is name=value
+            addr = BRACKETS_RE.sub(r'\1', addr.strip())
+
+        # Check that the name is valid
         name = name.strip()
         try:
             name = dns.name.from_text(name)
@@ -263,16 +271,19 @@ def name_addr_mappings_from_string(mappings):
             usage('The domain name was invalid: "%s"' % name)
             sys.exit(1)
 
-        # no address is provided, so query A/AAAA records for the name
+        # Add the name to the NS RRset
+        explicit_delegations[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
+
         if addr is None:
+            # If no address is provided, query A/AAAA records for the name
             query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
             answer_map = resolver.query_multiple_for_answer(*query_tuples)
             found_answer = False
-            for a in answer_map.values():
+            for (n, rdtype, rdclass) in answer_map:
+                a = answer_map[(n, rdtype, rdclass)]
                 if isinstance(a, DNSAnswer):
                     found_answer = True
-                    for a_rr in a.rrset:
-                        mappings_set.add((name, IPAddr(a_rr.to_text())))
+                    explicit_delegations[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [r.address for r in a.rrset])
                 # negative responses
                 elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
                     pass
@@ -285,20 +296,26 @@ def name_addr_mappings_from_string(mappings):
                 usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
                 sys.exit(1)
 
-        # otherwise, add the address
         elif not addr:
             usage('No IP address was supplied.')
             sys.exit(1)
+
         else:
-            if addr and addr[0] == '[' and addr[-1] == ']':
-                addr = addr[1:-1]
             try:
-                addr = IPAddr(addr)
+                IPAddr(addr)
             except ValueError:
                 usage('The IP address was invalid: "%s"' % addr)
                 sys.exit(1)
-            mappings_set.add((name, addr))
-    return mappings_set
+
+            if IPAddr(addr).version == 6:
+                a_rdtype = dns.rdatatype.AAAA
+                rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
+            else:
+                a_rdtype = dns.rdatatype.A
+                rdtype_cls = dns.rdtypes.IN.A.A
+            if (name, a_rdtype) not in explicit_delegations:
+                explicit_delegations[(name, a_rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, a_rdtype)
+            explicit_delegations[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
 
 def usage(err=None):
     if err is not None:
@@ -365,9 +382,9 @@ def main(argv):
                 if not mappings:
                     usage('Incorrect usage of -x option: "%s"' % arg)
                     sys.exit(1)
-                if domain not in explicit_delegations:
-                    explicit_delegations[domain] = set()
-                explicit_delegations[domain].update(name_addr_mappings_from_string(mappings))
+                if (domain, dns.rdatatype.NS) not in explicit_delegations:
+                    explicit_delegations[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
+                name_addr_mappings_from_string(domain, mappings, explicit_delegations)
 
             elif opt == '-b':
                 try:
@@ -461,11 +478,20 @@ def main(argv):
                 cls = RecursiveParallelAnalyst
             else:
                 cls = RecursiveBulkAnalyst
+            explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
             if '-s' in opts:
-                explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = name_addr_mappings_from_string(opts['-s'])
+                name_addr_mappings_from_string(WILDCARD_EXPLICIT_DELEGATION, opts['-s'], explicit_delegations)
             else:
-                servers = resolver._servers
-                explicit_delegations[WILDCARD_EXPLICIT_DELEGATION] = set([(dns.name.from_text('ns%d' % i), s) for i, s in enumerate(servers)])
+                for i, server in enumerate(resolver._servers):
+                    if IPAddr(server).version == 6:
+                        rdtype = dns.rdatatype.AAAA
+                    else:
+                        rdtype = dns.rdatatype.A
+                    name = dns.name.from_text('ns%d' % i)
+                    explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
+                    if (name, rdtype) not in explicit_delegations:
+                        explicit_delegations[(name, rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, rdtype)
+                    explicit_delegations[(name, rdtype)].add(dns.rdata.from_text(dns.rdataclass.IN, rdtype, server))
         else:
             if '-t' in opts:
                 cls = ParallelAnalyst
