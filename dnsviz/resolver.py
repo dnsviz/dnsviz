@@ -385,7 +385,8 @@ class FullResolver:
             msg.set_rcode(l[-1])
             for rrset in l[:-1]:
                 if rrset is not None:
-                    msg.find_rrset(msg.answer, qname, rdclass, rdtype, create=True)
+                    new_rrset = msg.find_rrset(msg.answer, rrset.name, rrset.rdclass, rrset.rdtype, create=True)
+                    new_rrset.update(rrset)
         return msg, None
 
     def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
