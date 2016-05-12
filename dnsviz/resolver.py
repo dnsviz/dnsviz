@@ -398,6 +398,22 @@ class FullResolver:
             answer_cls = DNSAnswer
         return answer_cls(qname, rdtype, response, server)
 
+    def query_multiple_for_answer(self, *query_tuples, **kwargs):
+        allow_noanswer = kwargs.pop('allow_noanswer', False)
+        answers = {}
+        for query_tuple in query_tuples:
+            try:
+                answers[query_tuple] = self.query_for_answer(query_tuple[0], query_tuple[1], query_tuple[2], allow_noanswer=allow_noanswer)
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers), e:
+                answers[query_tuple] = e
+        return answers
+
+    def query_multiple(self, *query_tuples, **kwargs):
+        responses = {}
+        for query_tuple in query_tuples:
+            responses[query_tuple] = self.query(query_tuple[0], query_tuple[1], query_tuple[2])
+        return responses
+
     def _query(self, qname, rdtype, rdclass, level, require_auth):
         self.expire_cache()
 
