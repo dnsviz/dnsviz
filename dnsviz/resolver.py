@@ -28,8 +28,9 @@ import query
 from ipaddr import IPAddr
 import response as Response
 import transport
+import util
 
-import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
+import dns.rdataclass, dns.exception, dns.message, dns.rcode, dns.resolver
 
 MAX_CNAME_REDIRECTION = 20
 
@@ -287,7 +288,7 @@ class FullResolver:
     MIN_TTL = 60
     MAX_CHAIN = 20
 
-    def __init__(self, hints, query_cls, client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
 
         self._hints = hints
         self._query_cls = query_cls
@@ -375,7 +376,27 @@ class FullResolver:
             entry = self._cache[key]
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN):
-        return self._query(qname, rdtype, rdclass, 0, True)
+        msg = dns.message.make_response(dns.message.make_query(qname, rdtype), True)
+        try:
+            l = self._query(qname, rdtype, rdclass, 0, True)
+        except ServFail:
+            msg.set_rcode(dns.rcode.SERVFAIL)
+        else:
+            msg.set_rcode(l[-1])
+            for rrset in l[:-1]:
+                if rrset is not None:
+                    msg.find_rrset(msg.answer, qname, rdclass, rdtype, create=True)
+        return msg, None
+
+    def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
+        response, server = self.query(qname, rdtype, rdclass)
+        if response.rcode() == dns.rcode.SERVFAIL:
+            raise dns.resolver.NoNameservers()
+        if allow_noanswer:
+            answer_cls = DNSAnswerNoAnswerAllowed
+        else:
+            answer_cls = DNSAnswer
+        return answer_cls(qname, rdtype, response, server)
 
     def _query(self, qname, rdtype, rdclass, level, require_auth):
         self.expire_cache()
