@@ -960,16 +960,15 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
     def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
         else:
             self.transport_manager = transport_manager
-        self.resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
         if th_factories is None:
             self.th_factories = (self.default_th_factory,)
@@ -986,7 +985,12 @@ class Analyst(object):
         else:
             self.explicit_delegations = explicit_delegations
 
-        resolver = self.resolver
+        if resolver is None:
+            hints = util.get_root_hints()
+            for key in self.explicit_delegations:
+                hints[key] = self.explicit_delegations[key]
+            resolver = Resolver.FullResolver(hints, transport_manager=self.transport_manager)
+        self.resolver = resolver
 
         self.ceiling = ceiling
 
@@ -1011,9 +1015,8 @@ class Analyst(object):
             # delegated.
             if ceiling is None or not self.name.is_subdomain(ceiling) or c.is_subdomain(ceiling):
                 ceiling = c
-                resolver = Resolver.Resolver(list(self._get_servers_from_hints(c, self.explicit_delegations)), self.simple_query, transport_manager=self.transport_manager)
 
-        self.local_ceiling = self._detect_ceiling(ceiling, resolver)[0]
+        self.local_ceiling = self._detect_ceiling(ceiling)[0]
         self._fix_explicit_delegation()
 
         self.try_ipv4 = try_ipv4
@@ -1075,12 +1078,12 @@ class Analyst(object):
             except KeyError:
                 return
 
-    def _detect_ceiling(self, ceiling, resolver):
+    def _detect_ceiling(self, ceiling):
         if ceiling == dns.name.root or ceiling is None:
 
             # make sure we can communicate with a resolver; we must be able to
             # resolve the root
-            server, response = resolver.query(dns.name.root, dns.rdatatype.NS)
+            server, response = self.resolver.query(dns.name.root, dns.rdatatype.NS)
             if server is None:
                 raise NetworkConnectivityException('No network connectivity available!')
 
@@ -1092,7 +1095,7 @@ class Analyst(object):
             ceiling = self.name
 
         try:
-            ans = resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            ans = self.resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
             try:
                 ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 return ceiling, False
@@ -1100,13 +1103,13 @@ class Analyst(object):
                 pass
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             pass
-        except dns.exception.DNSException:
-            parent_ceiling, fail = self._detect_ceiling(ceiling.parent(), resolver)
+        except dns.exception.DNSException, e:
+            parent_ceiling, fail = self._detect_ceiling(ceiling.parent())
             if fail:
                 return parent_ceiling, True
             else:
                 return ceiling, True
-        return self._detect_ceiling(ceiling.parent(), resolver)
+        return self._detect_ceiling(ceiling.parent())
 
     def _fix_explicit_delegation(self):
         if self.local_ceiling is None:
@@ -2015,7 +2018,7 @@ class RecursiveAnalyst(Analyst):
 
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
-    def _detect_ceiling(self, ceiling, resolver):
+    def _detect_ceiling(self, ceiling):
         # if there is a ceiling, but the name is not a subdomain
         # of the ceiling, then use the name itself as a base
         if ceiling is not None and not self.name.is_subdomain(ceiling):
