@@ -1537,8 +1537,8 @@ class RecursiveDNSSECQuery(DNSSECQuery, RecursiveDNSQuery):
 
     pass
 
-class QuickDNSQuery(DNSSECQuery):
-    '''A simple DNSSEC query, designed for quick turnaround.'''
+class QuickDNSSECQuery(DNSSECQuery):
+    '''A standard DNSSEC query, designed for quick turnaround.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
             [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]

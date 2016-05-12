@@ -288,7 +288,7 @@ class FullResolver:
     MIN_TTL = 60
     MAX_CHAIN = 20
 
-    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
 
         self._hints = hints
         self._query_cls = query_cls
