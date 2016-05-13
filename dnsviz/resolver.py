@@ -610,6 +610,8 @@ class FullResolver:
 
                             elif response.is_authoritative():
                                 terminal = True
+                                a_rrsets = {}
+                                min_ttl = None
 
                                 # if response is authoritative (and not a referral), then we return it
                                 try:
@@ -617,6 +619,31 @@ class FullResolver:
                                 except IndexError:
                                     pass
                                 else:
+
+                                    ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
+                                    for ns_name in ns_names:
+                                        if not ns_names[ns_name]:
+                                            ns_names[ns_name] = None
+                                        else: # name is in bailiwick
+                                            for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                                try:
+                                                    a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
+                                                except KeyError:
+                                                    pass
+                                                else:
+                                                    if min_ttl is None or a_rrsets[a_rdtype].ttl < min_ttl:
+                                                        min_ttl = a_rrsets[a_rdtype].ttl
+
+                                            for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                                if a_rdtype in a_rrsets:
+                                                    a_rrsets[a_rdtype].update_ttl(min_ttl)
+                                                    self.cache_put(ns_name, a_rdtype, a_rrsets[a_rdtype], self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, None)
+                                                else:
+                                                    self.cache_put(ns_name, a_rdtype, None, self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, min_ttl)
+
+                                    if min_ttl is not None:
+                                        ns_rrset.update_ttl(min_ttl)
+
                                     self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_AUTH_AUTH, rcode, None, None)
 
                                 if ret[-1] == None:
