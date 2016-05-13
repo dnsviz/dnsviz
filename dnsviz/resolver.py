@@ -615,7 +615,7 @@ class FullResolver:
 
                                 # if response is authoritative (and not a referral), then we return it
                                 try:
-                                    ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.authority)[0]
+                                    ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.answer + response.message.authority)[0]
                                 except IndexError:
                                     pass
                                 else:
