@@ -378,7 +378,7 @@ class FullResolver:
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN):
         msg = dns.message.make_response(dns.message.make_query(qname, rdtype), True)
         try:
-            l = self._query(qname, rdtype, rdclass, 0, True)
+            l = self._query(qname, rdtype, rdclass, 0, self.SRC_NONAUTH_ANS)
         except ServFail:
             msg.set_rcode(dns.rcode.SERVFAIL)
         else:
@@ -415,7 +415,7 @@ class FullResolver:
             responses[query_tuple] = self.query(query_tuple[0], query_tuple[1], query_tuple[2])
         return responses
 
-    def _query(self, qname, rdtype, rdclass, level, require_auth):
+    def _query(self, qname, rdtype, rdclass, level, max_source, starting_domain=None):
         self.expire_cache()
 
         # check for max chain length
@@ -424,13 +424,17 @@ class FullResolver:
 
         # first check cache for answer
         entry = self.cache_get(qname, rdtype)
-        if entry is not None and (not require_auth or entry.source <= self.SRC_NONAUTH_ANS):
+        if entry is not None and entry.source <= max_source:
             return [entry.rrset, entry.rcode]
+
+        # check hints, if allowed
+        if self.SRC_ADDITIONAL <= max_source and (qname, rdtype) in self._hints:
+            return [self._hints[(qname, rdtype)], dns.rcode.NOERROR]
 
         # next check cache for alias
         entry = self.cache_get(qname, dns.rdatatype.CNAME)
         if entry is not None and entry.rrset is not None:
-            return [entry.rrset] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, require_auth)
+            return [entry.rrset] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, max_source)
 
         # now check for closest enclosing NS, DNAME, or hint
         closest_zone = qname
@@ -438,6 +442,9 @@ class FullResolver:
         # when rdtype is DS, start at the parent
         if rdtype == dns.rdatatype.DS and qname != dns.name.root:
             closest_zone = qname.parent()
+        elif starting_domain is not None:
+            assert qname.is_subdomain(starting_domain), 'qname must be a subdomain of starting_domain'
+            closest_zone = starting_domain
 
         ns_names = {}
 
@@ -448,7 +455,7 @@ class FullResolver:
                 entry = self.cache_get(closest_zone, dns.rdatatype.DNAME)
                 if entry is not None and entry.rrset is not None:
                     cname_rrset = Response.cname_from_dname(qname, entry.rrset)
-                    return [entry.rrset, cname_rrset] + self._query(cname_rrset[0].target, rdtype, rdclass, level + 1, require_auth)
+                    return [entry.rrset, cname_rrset] + self._query(cname_rrset[0].target, rdtype, rdclass, level + 1, max_source)
 
             # look for NS records in cache
             entry = self.cache_get(closest_zone, dns.rdatatype.NS)
@@ -503,31 +510,20 @@ class FullResolver:
                         # first get the addresses associated with each name
                         ns_names[ns_name] = set()
                         for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
-                            a_rrset = None
                             if ns_name.is_subdomain(bailiwick):
-                                # if in bailiwick, only check cache and hints
-                                entry = self.cache_get(ns_name, a_rdtype)
-                                if entry is not None:
-                                    if entry.rrset is not None:
-                                        a_rrset = entry.rrset
+                                if bailiwick == dns.name.root:
+                                    starting_domain = bailiwick
                                 else:
-                                    try:
-                                        a_rrset = self._hints[(ns_name, a_rdtype)]
-                                    except KeyError:
-                                        pass
+                                    starting_domain = bailiwick.parent()
                             else:
-                                # otherwise, try cache lookup, and everything
-
-                                l = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, False)
-                                a_rrset = l[-2]
-                                #a_rrset = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, False)[-2]
-
+                                starting_domain = None
+                            try:
+                                a_rrset = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, self.SRC_ADDITIONAL, starting_domain=starting_domain)[-2]
+                            except ServFail:
+                                a_rrset = None
                             if a_rrset is not None:
                                 for rdata in a_rrset:
                                     ns_names[ns_name].add(IPAddr(rdata.address))
-                            else:
-                                # NXDOMAIN or NDATA
-                                pass
 
                     for server in ns_names[ns_name]:
                         query = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6)
@@ -654,7 +650,7 @@ class FullResolver:
                                         self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_AUTH_ANS, rcode, None, None)
 
                                     if ret[-1].rdtype == dns.rdatatype.CNAME:
-                                        ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, require_auth)
+                                        ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, self.SRC_NONAUTH_ANS)
                                         terminal = False
 
                                 if terminal:
@@ -673,6 +669,10 @@ class FullResolver:
             if not is_referral:
                 break
 
+            # if we were only to ask the parent, then we're done
+            if starting_domain is not None:
+                break
+
             # otherwise continue onward, looking for an authoritative answer
 
         # return non-authoritative answer
@@ -687,7 +687,7 @@ class FullResolver:
                     self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_NONAUTH_ANS, rcode, None, None)
 
                 if ret[-1].rdtype == dns.rdatatype.CNAME:
-                    ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, require_auth)
+                    ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, self.SRC_NONAUTH_ANS)
                     terminal = False
 
             if terminal:
