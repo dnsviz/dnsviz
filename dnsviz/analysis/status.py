@@ -1251,7 +1251,7 @@ class NSEC3StatusNODATA(NSEC3Status):
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
                 self.errors.append(Errors.StypeInBitmapWildcardNODATANSEC3(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
-        elif self.rdtype == dns.rdatatype.DS and self.nsec_names_covering_qname:
+        elif self.nsec_names_covering_qname:
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
