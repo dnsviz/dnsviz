@@ -474,6 +474,26 @@ class NoClosestEncloserWildcardAnswer(NoClosestEncloser):
     _abstract = False
     references = ['RFC 5155, Sec. 8.8']
 
+class OptOutFlagNotSet(NSECError):
+    code = 'OPT_OUT_FLAG_NOT_SET'
+    description_template = "The opt-out flag was not set in the %(nsec_type)s RR covering the next closest encloser (%(next_closest_encloser)s) but was required for the NODATA response."
+    required_params = ['next_closest_encloser']
+    nsec_type = 'NSEC3'
+
+class OptOutFlagNotSetNODATA(OptOutFlagNotSet):
+    '''
+    >>> e = OptOutFlagNotSetNODATA(next_closest_encloser='foo.baz.')
+    >>> e.description
+    'The opt-out flag was not set in the NSEC3 RR covering the next closest encloser (foo.baz.) but was required for the NODATA response.'
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.5', 'RFC Errata 3441']
+
+class OptOutFlagNotSetNODATADS(OptOutFlagNotSet):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
+
 class ReferralWithSOABit(NSECError):
     code = 'REFERRAL_WITH_SOA'
     description_template = "The SOA bit was set in the bitmap of the %(nsec_type)s RR corresponding to the delegated name (%(sname)s)."
