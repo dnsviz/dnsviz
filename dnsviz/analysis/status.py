@@ -1255,7 +1255,12 @@ class NSEC3StatusNODATA(NSEC3Status):
             if not self.opt_out:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
-                    self.errors.append(Errors.NoNSEC3MatchingSnameDSNODATA(sname=fmt.humanize_name(self.qname)))
+                    if self.rdtype == dns.rdatatype.DS:
+                        cls = Errors.OptOutFlagNotSetNODATADS
+                    else:
+                        cls = Errors.OptOutFlagNotSetNODATA
+                    next_closest_encloser = self.get_next_closest_encloser()
+                    self.errors.append(cls(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
         else:
