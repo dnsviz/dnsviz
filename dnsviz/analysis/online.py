@@ -1474,10 +1474,10 @@ class Analyst(object):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
-        elif name in self.explicit_delegations:
-            parent_obj = None
         elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
+        elif name in self.explicit_delegations:
+            parent_obj = None
         else:
             parent_obj = self._analyze(name.parent())
 
