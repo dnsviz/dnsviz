@@ -512,13 +512,13 @@ class FullResolver:
                         for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
                             if ns_name.is_subdomain(bailiwick):
                                 if bailiwick == dns.name.root:
-                                    starting_domain = bailiwick
+                                    sd = bailiwick
                                 else:
-                                    starting_domain = bailiwick.parent()
+                                    sd = bailiwick.parent()
                             else:
-                                starting_domain = None
+                                sd = None
                             try:
-                                a_rrset = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, self.SRC_ADDITIONAL, starting_domain=starting_domain)[-2]
+                                a_rrset = self._query(ns_name, a_rdtype, dns.rdataclass.IN, level + 1, self.SRC_ADDITIONAL, starting_domain=sd)[-2]
                             except ServFail:
                                 a_rrset = None
                             if a_rrset is not None:
