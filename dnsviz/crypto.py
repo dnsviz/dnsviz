@@ -327,7 +327,7 @@ def _validate_rrsig_ec(alg, sig, msg, key):
     offset = 0
 
     # get R
-    new_offset = offset+sigsize/2
+    new_offset = offset+sigsize//2
     r = ''
     for c in sig[offset:new_offset]:
         r += '%02x' % struct.unpack('B',c)[0]
@@ -335,7 +335,7 @@ def _validate_rrsig_ec(alg, sig, msg, key):
     offset = new_offset
 
     # get S
-    new_offset = offset+sigsize/2
+    new_offset = offset+sigsize//2
     s = ''
     for c in sig[offset:new_offset]:
         s += '%02x' % struct.unpack('B',c)[0]

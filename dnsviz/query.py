@@ -560,7 +560,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
                 self._upper_bound = self._request.payload - 1
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 self._state = self.PICKLE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
@@ -594,7 +594,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
             elif is_timeout:
                 self._upper_bound = self._request.payload - 1
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
@@ -610,7 +610,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             elif is_valid:
                 self._lower_bound = self._request.payload
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
