@@ -20,10 +20,10 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import codecs
 import collections
 import errno
 import getopt
+import io
 import json
 import logging
 import signal
@@ -552,10 +552,10 @@ def main(argv):
 
         if '-r' in opts:
             if opts['-r'] == '-':
-                analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
+                analysis_str = io.open(sys.stdin.fileno(), 'r', encoding='utf-8').read()
             else:
                 try:
-                    analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
+                    analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
                 except IOError, e:
                     logger.error('%s: "%s"' % (e.strerror, opts['-r']))
                     sys.exit(3)
@@ -584,7 +584,7 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
@@ -619,17 +619,17 @@ def main(argv):
                     names.append(name)
 
         if '-p' in opts:
-            kwargs = { 'indent': 4, 'separators': (',', ': ') }
+            kwargs = { 'indent': 4, 'separators': (u',', u': ') }
         else:
             kwargs = {}
 
         meta_only = '-m' in opts
 
         if '-o' not in opts or opts['-o'] == '-':
-            fh = sys.stdout
+            fh = io.open(sys.stdout.fileno(), 'w', encoding='utf-8')
         else:
             try:
-                fh = open(opts['-o'], 'w')
+                fh = io.open(opts['-o'], 'w', encoding='utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-o']))
                 sys.exit(3)
@@ -642,7 +642,7 @@ def main(argv):
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
-        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in names] }
+        dnsviz_meta = { u'version': DNS_RAW_VERSION, u'names': [n.to_text() for n in names] }
 
         flush = '-F' in opts
 
@@ -678,7 +678,7 @@ def main(argv):
         d['_meta._dnsviz.'] = dnsviz_meta
 
         try:
-            fh.write(json.dumps(d, **kwargs))
+            fh.write(json.dumps(d, ensure_ascii=False, encoding='utf-8', **kwargs))
         except IOError, e:
             logger.error('Error writing analysis: %s' % e)
             sys.exit(3)
