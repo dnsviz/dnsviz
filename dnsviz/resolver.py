@@ -19,6 +19,7 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import io
 import random
 import time
 
@@ -110,7 +111,7 @@ class Resolver:
     def from_file(cls, resolv_conf, query_cls, **kwargs):
         servers = []
         try:
-            with open(resolv_conf, 'r') as f:
+            with io.open(resolv_conf, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     words = line.split()
