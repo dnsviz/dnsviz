@@ -282,6 +282,13 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
             # Argument is name=value
             addr, num_replacements = BRACKETS_RE.subn(r'\1', addr)
 
+        if not name:
+            usage('The domain name was empty.')
+            sys.exit(1)
+
+        # At this point, name is defined, and addr may or may not be defined.
+        # Both are of type str.
+
         # Check that the name is valid
         try:
             name = dns.name.from_text(name)
