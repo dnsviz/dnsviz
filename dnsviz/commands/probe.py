@@ -58,6 +58,8 @@ A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
 
 BRACKETS_RE = re.compile(r'^\[(.*)\]$')
+PORT_RE = re.compile(r'^(.*):(\d+)$')
+NAME_VAL_DELIM_RE = re.compile(r'\s*=\s*')
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
@@ -253,15 +255,20 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
     mappings = mappings.split(',')
     i = 1
     for mapping in mappings:
+
+        # get rid of whitespace
+        mapping = mapping.strip()
+
+        num_replacements = None
+
         # First determine whether the argument is name=value or simply value
         try:
-            name, addr = mapping.rsplit('=', 1)
+            name, addr = NAME_VAL_DELIM_RE.split(mapping, 1)
         except ValueError:
             # Argument is a single value.  Now determine whether that value is
             # a name or an address.
-            mapping = BRACKETS_RE.sub(r'\1', mapping.strip())
             try:
-                IPAddr(mapping)
+                IPAddr(BRACKETS_RE.sub(r'\1', mapping))
             except ValueError:
                 # value is not an address
                 name = mapping
@@ -269,14 +276,13 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
             else:
                 # value is an address
                 name = 'ns%d' % i
-                addr = mapping
+                addr, num_replacements = BRACKETS_RE.subn(r'\1', mapping)
                 i += 1
         else:
             # Argument is name=value
-            addr = BRACKETS_RE.sub(r'\1', addr.strip())
+            addr, num_replacements = BRACKETS_RE.subn(r'\1', addr)
 
         # Check that the name is valid
-        name = name.strip()
         try:
             name = dns.name.from_text(name)
         except dns.exception.DNSException:
@@ -309,7 +315,7 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
                 sys.exit(1)
 
         elif not addr:
-            usage('No IP address was supplied.')
+            usage('The IP address was empty.')
             sys.exit(1)
 
         else:
@@ -320,6 +326,10 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
                 sys.exit(1)
 
             if IPAddr(addr).version == 6:
+                if num_replacements < 1:
+                    usage('Brackets are required around IPv6 addresses.')
+                    sys.exit(1)
+
                 a_rdtype = dns.rdatatype.AAAA
                 rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
             else:
