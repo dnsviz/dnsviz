@@ -259,6 +259,16 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
         # get rid of whitespace
         mapping = mapping.strip()
 
+        # Determine whether there is a port stuck on there
+        match = PORT_RE.search(mapping)
+        if match is not None:
+            mapping = match.group(1)
+            port = int(match.group(2))
+            port_str = ':%d' % port
+        else:
+            port = 53
+            port_str = ''
+
         num_replacements = None
 
         # First determine whether the argument is name=value or simply value
@@ -270,6 +280,15 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
             try:
                 IPAddr(BRACKETS_RE.sub(r'\1', mapping))
             except ValueError:
+                # see if this was an IPv6 address without a port
+                try:
+                    IPAddr(mapping + port_str)
+                except ValueError:
+                    pass
+                else:
+                    usage('Brackets are required around IPv6 addresses.')
+                    sys.exit(1)
+
                 # value is not an address
                 name = mapping
                 addr = None
@@ -329,8 +348,15 @@ def name_addr_mappings_from_string(domain, mappings, explicit_delegations):
             try:
                 IPAddr(addr)
             except ValueError:
-                usage('The IP address was invalid: "%s"' % addr)
-                sys.exit(1)
+                # see if this was an IPv6 address without a port
+                try:
+                    IPAddr(addr + port_str)
+                except ValueError:
+                    usage('The IP address was invalid: "%s"' % addr)
+                    sys.exit(1)
+                else:
+                    usage('Brackets are required around IPv6 addresses.')
+                    sys.exit(1)
 
             if IPAddr(addr).version == 6:
                 if num_replacements < 1:
