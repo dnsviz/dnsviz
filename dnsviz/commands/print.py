@@ -20,8 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import codecs
 import getopt
+import io
 import json
 import logging
 import os
@@ -64,19 +64,18 @@ Options:
     -h             - display the usage and exit
 ''' % (err))
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, filename, fh=None):
-    assert filename is not None or fh is not None, 'Either filename or fh must be passed'
-
+def finish_graph(G, name_objs, rdtypes, trusted_keys, filename):
     G.add_trust(trusted_keys)
 
     if filename is None:
-        show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
-    else:
-        show_colors = False
-        try:
-            fh = codecs.open(filename, 'w', 'utf-8')
-        except IOError, e:
-            logger.error('%s: "%s"' % (e.strerror, filename))
+        filename = sys.stdout.fileno()
+    try:
+        fh = io.open(filename, 'w', encoding='utf-8')
+    except IOError, e:
+        logger.error('%s: "%s"' % (e.strerror, filename))
+        sys.exit(3)
+
+    show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
 
     tuples = []
     processed = set()
@@ -265,7 +264,7 @@ def _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors
     return s
 
 def textualize_status_output(names, show_color):
-    s = ''
+    s = u''
     for name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses in names:
         s += _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses, show_color)
 
@@ -310,7 +309,7 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = open(arg).read()
+                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
                 except IOError, e:
                     sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
@@ -353,13 +352,12 @@ def main(argv):
         logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
-            analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
-        else:
-            try:
-                analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                sys.exit(3)
+            opts['-r'] = sys.stdin.fileno()
+        try:
+            analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+            sys.exit(3)
         try:
             analysis_structured = json.loads(analysis_str)
         except ValueError:
@@ -385,7 +383,7 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
@@ -421,7 +419,7 @@ def main(argv):
 
         if '-t' not in opts:
             try:
-                tk_str = open(TRUSTED_KEYS_ROOT).read()
+                tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
             except IOError, e:
                 logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
                 sys.exit(3)
@@ -474,7 +472,7 @@ def main(argv):
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, rdtypes, trusted_keys, None, sys.stdout)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, None)
             else:
                 finish_graph(G, name_objs, rdtypes, trusted_keys, opts['-o'])
 
