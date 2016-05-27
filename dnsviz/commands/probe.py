@@ -552,13 +552,12 @@ def main(argv):
 
         if '-r' in opts:
             if opts['-r'] == '-':
-                analysis_str = io.open(sys.stdin.fileno(), 'r', encoding='utf-8').read()
-            else:
-                try:
-                    analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
-                except IOError, e:
-                    logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                    sys.exit(3)
+                opts['-r'] = sys.stdin.fileno()
+            try:
+                analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+            except IOError, e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                sys.exit(3)
             try:
                 analysis_structured = json.loads(analysis_str)
             except ValueError:
