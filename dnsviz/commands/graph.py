@@ -20,8 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import codecs
 import getopt
+import io
 import json
 import logging
 import os
@@ -69,9 +69,7 @@ Options:
     -h             - display the usage and exit
 ''' % (err))
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
-    assert filename is not None or fh is not None, 'Either filename or fh must be passed'
-
+def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
     G.add_trust(trusted_keys)
     G.remove_extra_edges()
 
@@ -83,7 +81,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
             sys.exit(3)
 
         try:
-            template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
+            template_str = io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8').read()
         except IOError, e:
             logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
             sys.exit(3)
@@ -94,17 +92,17 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
         template_str = template_str.replace('JQUERY_UI_CSS_PATH', JQUERY_UI_CSS_PATH)
         template_str = template_str.replace('RAPHAEL_PATH', RAPHAEL_PATH)
         template_str = template_str.replace('JS_CODE', js_img)
+
         if filename is None:
-            fh.write(template_str)
-        else:
-            try:
-                codecs.open(filename, 'w', 'utf-8').write(template_str)
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, filename))
-                sys.exit(3)
+            filename = sys.stdout.fileno()
+        try:
+            io.open(filename, 'wt', encoding='utf-8').write(template_str)
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, filename))
+            sys.exit(3)
     else:
         if filename is None:
-            fh.write(G.draw(fmt))
+            io.open(sys.stdout.fileno(), 'wb').write(G.draw(fmt))
         else:
             try:
                 G.draw(fmt, path=filename)
@@ -154,7 +152,7 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = open(arg).read()
+                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
                 except IOError, e:
                     sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
@@ -207,10 +205,10 @@ def main(argv):
         logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
-            analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
+            analysis_str = io.open(sys.stdin.fileno(), 'r', encoding='utf-8').read()
         else:
             try:
-                analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
+                analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-r']))
                 sys.exit(3)
@@ -239,7 +237,7 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
@@ -275,7 +273,7 @@ def main(argv):
 
         if '-t' not in opts:
             try:
-                tk_str = open(TRUSTED_KEYS_ROOT).read()
+                tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
             except IOError, e:
                 logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
                 sys.exit(3)
@@ -328,7 +326,7 @@ def main(argv):
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None, sys.stdout)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None)
             else:
                 finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'])
 
