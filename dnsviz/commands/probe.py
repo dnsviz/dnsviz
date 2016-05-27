@@ -618,20 +618,19 @@ def main(argv):
                     names.append(name)
 
         if '-p' in opts:
-            kwargs = { 'indent': 4, 'separators': (u',', u': ') }
+            kwargs = { 'indent': 4, 'separators': (',', ': ') }
         else:
             kwargs = {}
 
         meta_only = '-m' in opts
 
         if '-o' not in opts or opts['-o'] == '-':
-            fh = io.open(sys.stdout.fileno(), 'w', encoding='utf-8')
-        else:
-            try:
-                fh = io.open(opts['-o'], 'w', encoding='utf-8')
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-o']))
-                sys.exit(3)
+            opts['-o'] = sys.stdout.fileno()
+        try:
+            fh = io.open(opts['-o'], 'wb')
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            sys.exit(3)
 
         def _flush(name_obj):
             d = collections.OrderedDict()
@@ -641,7 +640,7 @@ def main(argv):
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
-        dnsviz_meta = { u'version': DNS_RAW_VERSION, u'names': [n.to_text() for n in names] }
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in names] }
 
         flush = '-F' in opts
 
