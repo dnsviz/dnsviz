@@ -1099,7 +1099,11 @@ class NSECSet(DNSResponseComponent):
         bitmap_index, bitmap_offset = divmod(rdtype_bitmap, 8)
         for (window, bitmap) in self.rrsets[nsec_name].rrset[0].windows:
             try:
-                if window == rdtype_window and ord(bitmap[bitmap_index]) & (0x80 >> bitmap_offset):
+                # dnspython <= 1.12.x uses strings, but dnspython 1.13 uses bytearray (for python3)
+                byte = bitmap[bitmap_index]
+                if isinstance(bitmap, str):
+                    byte = ord(byte)
+                if window == rdtype_window and byte & (0x80 >> bitmap_offset):
                     return True
             except IndexError:
                 pass
