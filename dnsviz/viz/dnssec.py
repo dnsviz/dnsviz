@@ -28,6 +28,7 @@
 import cgi
 import collections
 import errno
+import io
 import json
 import os
 import re
@@ -272,7 +273,7 @@ class DNSAuthGraph:
             if path is None:
                 return img
             else:
-                open(path, 'w').write(img)
+                io.open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
                 return self.G.draw(format=format, prog='dot')
