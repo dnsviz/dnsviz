@@ -25,6 +25,7 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+import io
 import os
 import re
 import socket
@@ -110,7 +111,7 @@ def get_trusted_keys(s):
 
 def get_default_trusted_keys():
     try:
-        tk_str = open(TRUSTED_KEYS_ROOT).read()
+        tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
     except IOError, e:
         return []
     return get_trusted_keys(tk_str)
@@ -132,7 +133,7 @@ def get_hints(s):
 
 def get_root_hints():
     try:
-        return get_hints(open(ROOT_HINTS).read())
+        return get_hints(io.open(ROOT_HINTS, 'r', encoding='utf-8').read())
     except IOError:
         return get_hints(ROOT_HINTS_STR_DEFAULT)
 
