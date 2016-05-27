@@ -20,9 +20,9 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import codecs
 import collections
 import getopt
+import io
 import json
 import logging
 import re
@@ -101,7 +101,7 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = open(arg).read()
+                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
                 except IOError, e:
                     sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
@@ -140,13 +140,12 @@ def main(argv):
         logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
-            analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
-        else:
-            try:
-                analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                sys.exit(3)
+            opts['-r'] = sys.stdin.fileno()
+        try:
+            analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+            sys.exit(3)
         try:
             analysis_structured = json.loads(analysis_str)
         except ValueError:
@@ -172,7 +171,7 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
             except IOError, e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
@@ -212,13 +211,12 @@ def main(argv):
             kwargs = {}
 
         if '-o' not in opts or opts['-o'] == '-':
-            fh = sys.stdout
-        else:
-            try:
-                fh = open(opts['-o'], 'w')
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-o']))
-                sys.exit(3)
+            opts['-o'] = sys.stdout.fileno()
+        try:
+            fh = io.open(opts['-o'], 'wb')
+        except IOError, e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            sys.exit(3)
 
         # if trusted keys were supplied, check that pygraphviz is installed
         if trusted_keys:
@@ -260,7 +258,7 @@ def main(argv):
             name_obj.serialize_status(d, loglevel=loglevel)
 
         if d:
-            fh.write(json.dumps(d, **kwargs))
+            fh.write(json.dumps(d, ensure_ascii=False, encoding='utf-8', **kwargs))
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
