@@ -1475,15 +1475,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if ns_names_not_in_child:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_child), parent=fmt.humanize_name(self.parent_name())))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=[fmt.humanize_name(x) for x in ns_names_not_in_child], parent=fmt.humanize_name(self.parent_name())))
 
         if ns_names_not_in_parent:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_parent), parent=fmt.humanize_name(self.parent_name())))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=[fmt.humanize_name(x) for x in ns_names_not_in_parent], parent=fmt.humanize_name(self.parent_name())))
 
         if names_error_resolving:
             names_error_resolving.sort()
-            self.zone_errors.append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
+            self.zone_errors.append(Errors.ErrorResolvingNSName(names=[fmt.humanize_name(x) for x in names_error_resolving]))
 
         if names_with_glue_mismatch:
             names_with_glue_mismatch.sort()
@@ -1496,11 +1496,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_missing_glue:
             names_missing_glue.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_glue)))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=[fmt.humanize_name(x) for x in names_missing_glue]))
 
         if names_missing_auth:
             names_missing_auth.sort()
-            self.zone_errors.append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
+            self.zone_errors.append(Errors.NoAddressForNSName(names=[fmt.humanize_name(x) for x in names_missing_auth]))
 
         ips_from_parent = self.get_servers_in_parent()
         ips_from_parent_ipv4 = [x for x in ips_from_parent if x.version == 4]

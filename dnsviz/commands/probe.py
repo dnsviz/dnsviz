@@ -434,7 +434,7 @@ def main(argv):
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
             try:
-                rdtypes = map(dns.rdatatype.from_text, rdtypes)
+                rdtypes = [dns.rdatatype.from_text(x) for x in rdtypes]
             except dns.rdatatype.UnknownRdatatype:
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
@@ -569,13 +569,13 @@ def main(argv):
                 logger.error('No version information in JSON input.')
                 sys.exit(3)
             try:
-                major_vers, minor_vers = map(int, str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1))
+                major_vers, minor_vers = [int(x) for x in str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
             except ValueError:
                 logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
                 sys.exit(3)
             # ensure major version is a match and minor version is no greater
             # than the current minor version
-            curr_major_vers, curr_minor_vers = map(int, str(DNS_RAW_VERSION).split('.', 1))
+            curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
             if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
                 logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
                 sys.exit(3)
@@ -600,7 +600,7 @@ def main(argv):
             f.close()
         else:
             if args:
-                args = map(lambda x: x.decode(sys.getfilesystemencoding()), args)
+                args = [x.decode(sys.getfilesystemencoding()) for x in args]
             else:
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']

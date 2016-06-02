@@ -171,13 +171,13 @@ def main():
             if 'version' not in content:
                 raise RemoteQueryError('No version information in HTTP request.')
             try:
-                major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+                major_vers, minor_vers = [int(x) for x in str(content['version']).split('.', 1)]
             except ValueError:
                 raise RemoteQueryError('Version of JSON input in HTTP request is invalid: %s' % content['version'])
 
             # ensure major version is a match and minor version is no greater
             # than the current minor version
-            curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
+            curr_major_vers, curr_minor_vers = [int(x) for x in str(transport.DNS_TRANSPORT_VERSION).split('.', 1)]
             if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
                 raise RemoteQueryError('Version %d.%d of JSON input in HTTP request is incompatible with this software.' % (major_vers, minor_vers))
 
