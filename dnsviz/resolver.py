@@ -125,10 +125,10 @@ class Resolver:
         return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
-        return self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values()[0]
+        return list(self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values())[0]
 
     def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
-        answer = self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
+        answer = list(self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values())[0]
         if isinstance(answer, DNSAnswer):
             return answer
         else:
@@ -216,7 +216,7 @@ class Resolver:
 
                     attempts[query_tuple] += 1
 
-            query.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self._transport_manager, th_factories=self._th_factories)
+            query.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self._transport_manager, th_factories=self._th_factories)
 
             for query_tuple, q in queries.items():
                 # no response means we didn't even try because we don't have
@@ -228,8 +228,8 @@ class Resolver:
                         last_responses[query_tuple] = server, None
                     continue
 
-                server, client_response = q.responses.items()[0]
-                client, response = client_response.items()[0]
+                server, client_response = list(q.responses.items())[0]
+                client, response = list(client_response.items())[0]
                 responses[query_tuple] = (server, response)
                 # if we received a complete message with an acceptable rcode,
                 # then accept it as the last response

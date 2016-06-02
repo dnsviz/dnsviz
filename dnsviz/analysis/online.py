@@ -772,7 +772,7 @@ class OnlineDomainNameAnalysis(object):
     def _serialize_related(self, d, meta_only):
         if self._auth_ns_ip_mapping:
             d['auth_ns_ip_mapping'] = collections.OrderedDict()
-            ns_names = self._auth_ns_ip_mapping.keys()
+            ns_names = list(self._auth_ns_ip_mapping.keys())
             ns_names.sort()
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
@@ -783,7 +783,7 @@ class OnlineDomainNameAnalysis(object):
             return
 
         d['queries'] = []
-        query_keys = self.queries.keys()
+        query_keys = list(self.queries.keys())
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             for query in self.queries[(qname, rdtype)].queries.values():
@@ -1696,7 +1696,7 @@ class Analyst(object):
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
-        Q.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self.transport_manager, th_factories=self.th_factories)
+        Q.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self.transport_manager, th_factories=self.th_factories)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
                 self._add_query(name_obj, query)
@@ -2125,7 +2125,7 @@ class RecursiveAnalyst(Analyst):
         if parent_obj is not None:
             nxdomain_ancestor = parent_obj.nxdomain_ancestor
             if nxdomain_ancestor is None and not parent_obj.stub:
-                rdtype = filter(lambda x: x[0] == parent_obj.name, parent_obj.queries.keys())[0][1]
+                rdtype = [x for x in parent_obj.queries.keys() if x[0] == parent_obj.name][0][1]
                 if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
                     nxdomain_ancestor = parent_obj
 

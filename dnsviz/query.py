@@ -1064,11 +1064,11 @@ class DNSQuery(object):
             d['options']['tcp'] = self.tcp
 
         d['responses'] = collections.OrderedDict()
-        servers = self.responses.keys()
+        servers = list(self.responses.keys())
         servers.sort()
         for server in servers:
             d['responses'][server] = collections.OrderedDict()
-            clients = self.responses[server].keys()
+            clients = list(self.responses[server].keys())
             clients.sort()
             for client in clients:
                 if meta_only:

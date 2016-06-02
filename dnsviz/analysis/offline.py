@@ -201,7 +201,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def get_dnskeys(self):
         if not hasattr(self, '_dnskeys') or self._dnskeys is None:
             self._index_dnskeys()
-        return self._dnskeys.values()
+        return list(self._dnskeys.values())
 
     def potential_trusted_keys(self):
         active_ksks = self.ksks.difference(self.zsks).difference(self.revoked_keys)
@@ -325,10 +325,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_rrsig_simple(self, name_obj, rrset_info):
         rrsig_tup = []
         if name_obj.rrsig_status[rrset_info]:
-            rrsigs = name_obj.rrsig_status[rrset_info].keys()
+            rrsigs = list(name_obj.rrsig_status[rrset_info].keys())
             rrsigs.sort()
             for rrsig in rrsigs:
-                dnskeys = name_obj.rrsig_status[rrset_info][rrsig].keys()
+                dnskeys = list(name_obj.rrsig_status[rrset_info][rrsig].keys())
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
@@ -384,13 +384,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     errors = [e.terse_description for e in dnskey_meta.errors]
                     rdata_tup.append(('VALID', warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
             elif rdtype == dns.rdatatype.DS:
-                dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
+                dss = list(response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys())
                 dss.sort()
                 for ds in dss:
                     # only show the DS if in the RRset in question
                     if ds not in info.rrset:
                         continue
-                    dnskeys = response_info.name_obj.ds_status_by_ds[rdtype][ds].keys()
+                    dnskeys = list(response_info.name_obj.ds_status_by_ds[rdtype][ds].keys())
                     dnskeys.sort()
                     for dnskey in dnskeys:
                         ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
@@ -584,10 +584,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             response_info_map[qname][rdtype] = self.get_response_info(qname, rdtype)
 
         tuples = []
-        qnames = response_info_map.keys()
+        qnames = list(response_info_map.keys())
         qnames.sort()
         for qname in qnames:
-            rdtypes = response_info_map[qname].keys()
+            rdtypes = list(response_info_map[qname].keys())
             rdtypes.sort()
             response_info_list = [response_info_map[qname][r] for r in rdtypes]
             tuples.extend(self._serialize_status_simple(response_info_list, processed))
@@ -611,7 +611,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for query1 in query.queries.values():
                 try:
                     if client is None:
-                        clients = query1.responses[server].keys()
+                        clients = list(query1.responses[server].keys())
                     else:
                         clients = (client,)
                 except KeyError:
@@ -2183,10 +2183,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         rrsig_list = []
         if self.rrsig_status[rrset_info]:
-            rrsigs = self.rrsig_status[rrset_info].keys()
+            rrsigs = list(self.rrsig_status[rrset_info].keys())
             rrsigs.sort()
             for rrsig in rrsigs:
-                dnskeys = self.rrsig_status[rrset_info][rrsig].keys()
+                dnskeys = list(self.rrsig_status[rrset_info][rrsig].keys())
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
@@ -2203,7 +2203,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         wildcard_proof_list = collections.OrderedDict()
         if rrset_info.wildcard_info:
-            wildcard_names = rrset_info.wildcard_info.keys()
+            wildcard_names = list(rrset_info.wildcard_info.keys())
             wildcard_names.sort()
             for wildcard_name in wildcard_names:
                 wildcard_name_str = wildcard_name.canonicalize().to_text()
@@ -2384,11 +2384,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        dss = self.ds_status_by_ds[rdtype].keys()
+        dss = list(self.ds_status_by_ds[rdtype].keys())
         d['ds'] = []
         dss.sort()
         for ds in dss:
-            dnskeys = self.ds_status_by_ds[rdtype][ds].keys()
+            dnskeys = list(self.ds_status_by_ds[rdtype][ds].keys())
             dnskeys.sort()
             for dnskey in dnskeys:
                 ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
@@ -2552,7 +2552,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d[name_str]['status'] = Status.name_status_mapping[self.status]
 
         d[name_str]['queries'] = collections.OrderedDict()
-        query_keys = self.queries.keys()
+        query_keys = list(self.queries.keys())
         query_keys.sort()
         required_rdtypes = self._rdtypes_for_analysis_level(level)
 

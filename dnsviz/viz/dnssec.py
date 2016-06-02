@@ -1322,7 +1322,7 @@ class DNSAuthGraph:
             P, parent_graph_name, parent_bottom, parent_top = self.add_zone(parent_obj)
 
             for dnskey in name_obj.ds_status_by_dnskey[rdtype]:
-                ds_statuses = name_obj.ds_status_by_dnskey[rdtype][dnskey].values()
+                ds_statuses = list(name_obj.ds_status_by_dnskey[rdtype][dnskey].values())
 
                 # identify all validation_status/RRset/algorithm/key_tag
                 # combinations, so we can cluster like DSs
