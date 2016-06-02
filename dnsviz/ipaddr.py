@@ -45,40 +45,17 @@ class IPAddr(str):
 
     def __lt__(self, other):
         self._check_class_for_cmp(other)
-        return cmp(self, other) < 0
-
-    def __le__(self, other):
-        self._check_class_for_cmp(other)
-        return cmp(self, other) <= 0
+        if len(self._ipaddr_bytes) < len(other._ipaddr_bytes):
+            return True
+        elif len(self._ipaddr_bytes) > len(other._ipaddr_bytes):
+            return False
+        else:
+            return self._ipaddr_bytes < other._ipaddr_bytes
 
     def __eq__(self, other):
         if other is None:
             return False
-        self._check_class_for_cmp(other)
-        return cmp(self, other) == 0
-
-    def __ne__(self, other):
-        if other is None:
-            return True
-        self._check_class_for_cmp(other)
-        return cmp(self, other) == 0
-
-    def __gt__(self, other):
-        self._check_class_for_cmp(other)
-        return cmp(self, other) > 0
-
-    def __ge__(self, other):
-        self._check_class_for_cmp(other)
-        return cmp(self, other) >= 0
-
-    def __cmp__(self, other):
-        self._check_class_for_cmp(other)
-        if len(self._ipaddr_bytes) < len(other._ipaddr_bytes):
-            return -1
-        elif len(self._ipaddr_bytes) > len(other._ipaddr_bytes):
-            return 1
-        else:
-            return cmp(self._ipaddr_bytes, other._ipaddr_bytes)
+        return self._ipaddr_bytes == other._ipaddr_bytes
 
     def __hash__(self):
         return hash(self._ipaddr_bytes)
