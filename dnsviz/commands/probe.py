@@ -665,7 +665,7 @@ def main(argv):
 
             name_objs = a.analyze(names)
 
-        name_objs = filter(lambda x: x is not None, name_objs)
+        name_objs = [x for x in name_objs if x is not None]
 
         if not name_objs:
             sys.exit(4)

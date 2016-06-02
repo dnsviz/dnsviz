@@ -382,7 +382,7 @@ class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        filtered_options = filter(lambda x: self._otype == x.otype, self._request.options)
+        filtered_options = [x for x in self._request.options if self._otype == x.otype]
         if not self._params['tcp'] and timeouts >= self._timeouts and filtered_options:
             self._request.options.remove(filtered_options[0])
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, self._otype)
@@ -788,7 +788,7 @@ class AggregateDNSResponse(object):
         msg = response.message
 
         # sort with the most specific DNAME infos first
-        dname_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.DNAME, msg.answer)
+        dname_rrsets = [x for x in msg.answer if x.rdtype == dns.rdatatype.DNAME]
         dname_rrsets.sort(reverse=True)
 
         qname_sought = qname

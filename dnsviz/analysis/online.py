@@ -588,7 +588,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -598,7 +598,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -608,7 +608,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -618,7 +618,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -634,7 +634,7 @@ class OnlineDomainNameAnalysis(object):
             servers = self._auth_or_designated_servers
 
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, servers))
+            return set([x for x in servers if x.version == proto])
         else:
             return servers
 
@@ -987,8 +987,8 @@ class Analyst(object):
             self.th_factories = (self.default_th_factory,)
         else:
             self.th_factories = th_factories
-        self.allow_loopback_query = bool(filter(lambda x: x.cls.allow_loopback_query, self.th_factories))
-        self.allow_private_query = bool(filter(lambda x: x.cls.allow_private_query, self.th_factories))
+        self.allow_loopback_query = bool([x for x in self.th_factories if x.cls.allow_loopback_query])
+        self.allow_private_query = bool([x for x in self.th_factories if x.cls.allow_private_query])
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1149,9 +1149,9 @@ class Analyst(object):
         else:
             servers = ROOT_NS_IPS
         if proto == 4:
-            servers = set(filter(lambda x: x.version == 4, servers))
+            servers = set([x for x in servers if x.version == 4])
         elif proto == 6:
-            servers = set(filter(lambda x: x.version == 6, servers))
+            servers = set([x for x in servers if x.version == 6])
         return servers
 
     def _is_referral_of_type(self, rdtype):
@@ -1308,16 +1308,16 @@ class Analyst(object):
 
     def _filter_servers_network(self, servers):
         if not self.try_ipv6:
-            servers = filter(lambda x: x.version != 6, servers)
+            servers = [x for x in servers if x.version != 6]
         if not self.try_ipv4:
-            servers = filter(lambda x: x.version != 4, servers)
+            servers = [x for x in servers if x.version != 4]
         return servers
 
     def _filter_servers_locality(self, servers):
         if not self.allow_loopback_query:
-            servers = filter(lambda x: not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6, servers)
+            servers = [x for x in servers if not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6]
         if not self.allow_private_query:
-            servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
+            servers = [x for x in servers if not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x)]
         return servers
 
     def _filter_servers(self, servers):
@@ -1938,10 +1938,10 @@ class Analyst(object):
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
     def _require_connectivity_ipv4(self, name_obj):
-        return bool(filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4))
+        return bool([x for x in name_obj.clients_ipv4 if LOOPBACK_IPV4_RE.match(x) is None])
 
     def _require_connectivity_ipv6(self, name_obj):
-        return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
+        return bool([x for x in name_obj.clients_ipv6 if x != LOOPBACK_IPV6])
 
     def _check_connectivity(self, name_obj):
         if self.local_ceiling is not None and self.local_ceiling in self.explicit_delegations:
@@ -1972,8 +1972,8 @@ class Analyst(object):
         if self.try_ipv4 and self.try_ipv6:
             # if we are configured to try both IPv4 and IPv6, then use servers
             # to determine which one is missing
-            has_v4 = bool(filter(lambda x: x.version == 4, servers))
-            has_v6 = bool(filter(lambda x: x.version == 6, servers))
+            has_v4 = bool([x for x in servers if x.version == 4])
+            has_v6 = bool([x for x in servers if x.version == 6])
             if has_v4 and has_v6:
                 # if both IPv4 and IPv6 servers were attempted, then there was
                 # no network connectivity for either protocol

@@ -377,9 +377,9 @@ class DVCommandLine:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not use_ipv4:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not use_ipv6:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
 

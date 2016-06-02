@@ -1107,7 +1107,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
             covering_names = set()
             for names in self.closest_encloser.values() + self.nsec_names_covering_qname.values():
                 covering_names.update(names)
-            self.nsec_set_info = nsec_set_info.project(*filter(lambda x: x is not None, covering_names))
+            self.nsec_set_info = nsec_set_info.project(*[x for x in covering_names if x is not None])
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
@@ -1128,7 +1128,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         except KeyError:
             pass
         if loglevel <= logging.DEBUG:
-            if filter(lambda x: x is not None, self.closest_encloser.values()[0]):
+            if [x for x in self.closest_encloser.values()[0] if x is not None]:
                 d['superfluous_closest_encloser'] = True
         return d
 

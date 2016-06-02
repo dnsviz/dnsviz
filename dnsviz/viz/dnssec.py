@@ -333,8 +333,8 @@ class DNSAuthGraph:
         node_str = self.dnskey_node_str(self.id_for_dnskey(name_obj.name, dnskey.rdata), name_obj.name, dnskey.rdata.algorithm, dnskey.key_tag)
 
         if not self.G.has_node(node_str):
-            rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], dnskey.rrset_info)
-            rrset_info_with_warnings = filter(lambda x: name_obj.rrset_warnings[x], dnskey.rrset_info)
+            rrset_info_with_errors = [x for x in dnskey.rrset_info if name_obj.rrset_errors[x]]
+            rrset_info_with_warnings = [x for x in dnskey.rrset_info if name_obj.rrset_warnings[x]]
 
             img_str = ''
             if dnskey.errors or rrset_info_with_errors:
@@ -441,9 +441,9 @@ class DNSAuthGraph:
                 plural = ''
 
             img_str = ''
-            if filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.errors), ds_statuses) or zone_obj.rrset_errors[ds_info]:
+            if [x for x in ds_statuses if [y for y in x.errors if isinstance(y, Errors.DSError)]] or zone_obj.rrset_errors[ds_info]:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
-            elif filter(lambda x: filter(lambda y: isinstance(y, Errors.DSError), x.warnings), ds_statuses) or zone_obj.rrset_warnings[ds_info]:
+            elif [x for x in ds_statuses if [y for y in x.warnings if isinstance(y, Errors.DSError)]] or zone_obj.rrset_warnings[ds_info]:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
@@ -890,8 +890,8 @@ class DNSAuthGraph:
         edge_id = '%sC-%s|%s' % (dns.rdatatype.to_text(nsec_rdtype), covered_node.replace('*', '_'), node_str)
 
         if not self.G.has_node(node_str):
-            rrset_info_with_errors = filter(lambda x: name_obj.rrset_errors[x], nsec_status.nsec_set_info.rrsets.values())
-            rrset_info_with_warnings = filter(lambda x: name_obj.rrset_warnings[x], nsec_status.nsec_set_info.rrsets.values())
+            rrset_info_with_errors = [x for x in nsec_status.nsec_set_info.rrsets.values() if name_obj.rrset_errors[x]]
+            rrset_info_with_warnings = [x for x in nsec_status.nsec_set_info.rrsets.values() if name_obj.rrset_warnings[x]]
 
             img_str = ''
             if rrset_info_with_errors:
@@ -1015,7 +1015,7 @@ class DNSAuthGraph:
         #return rrset_node
 
     def add_alias(self, alias, target):
-        if not filter(lambda x: x[1] == alias and x.attr['color'] == 'black', self.G.out_edges(target)):
+        if not [x for x in self.G.out_edges(target) if x[1] == alias and x.attr['color'] == 'black']:
             alias_zone = self.node_subgraph_name[alias][8:-4]
             target_zone = self.node_subgraph_name[target][8:-4]
             if alias_zone.endswith(target_zone) and alias_zone != target_zone:
@@ -1329,7 +1329,7 @@ class DNSAuthGraph:
                 validation_statuses = set([(d.validation_status, d.ds_meta, d.ds.algorithm, d.ds.key_tag) for d in ds_statuses])
 
                 for validation_status, rrset_info, algorithm, key_tag in validation_statuses:
-                    ds_status_subset = filter(lambda x: x.validation_status == validation_status and x.ds_meta is rrset_info and x.ds.algorithm == algorithm and x.ds.key_tag == key_tag, ds_statuses)
+                    ds_status_subset = [x for x in ds_statuses if x.validation_status == validation_status and x.ds_meta is rrset_info and x.ds.algorithm == algorithm and x.ds.key_tag == key_tag]
 
                     # create the DS node and edge
                     ds_node = self.add_ds(ds_name, ds_status_subset, name_obj, parent_obj)
@@ -1560,15 +1560,13 @@ class DNSAuthGraph:
         return status
 
     def secure_nsec3_optout_nodes_covering_node(self, n):
-        return filter(lambda x: x.startswith('NSEC') and \
+        return [x for x in self.G.out_neighbors(n) if x.startswith('NSEC') and \
                 OPTOUT_STYLE_RE.search(x.attr['label']) is not None and \
-                x.attr['color'] == COLORS['secure'],
-                self.G.out_neighbors(n))
+                x.attr['color'] == COLORS['secure']]
 
     def secure_nsec_nodes_covering_node(self, n):
-        return filter(lambda x: x.startswith('NSEC') and \
-                x.attr['color'] == COLORS['secure'],
-                self.G.out_neighbors(n))
+        return [x for x in self.G.out_neighbors(n) if x.startswith('NSEC') and \
+                x.attr['color'] == COLORS['secure']]
 
     def is_invis(self, n):
         return INVIS_STYLE_RE.search(self.G.get_node(n).attr['style']) is not None
@@ -1843,10 +1841,10 @@ class DNSAuthGraph:
 
                 in_edges = self.G.in_edges(n)
                 out_edges = self.G.out_edges(n)
-                ds_edges = filter(lambda x: x[1].startswith('DS-') or x[1].startswith('DLV-'), out_edges)
+                ds_edges = [x for x in out_edges if x[1].startswith('DS-') or x[1].startswith('DLV-')]
 
-                is_ksk = bool(filter(lambda x: x[0].startswith('DNSKEY-'), in_edges))
-                is_zsk = bool(filter(lambda x: not x[0].startswith('DNSKEY-'), in_edges))
+                is_ksk = bool([x for x in in_edges if x[0].startswith('DNSKEY-')])
+                is_zsk = bool([x for x in in_edges if not x[0].startswith('DNSKEY-')])
                 non_existent = DASHED_STYLE_RE.search(n.attr['style']) is not None
                 has_sep_bit = n.attr['fillcolor'] == 'lightgray'
 
@@ -1951,7 +1949,7 @@ class DNSAuthGraph:
 
                         # If not linked to any other DNSKEYs, then link to
                         # top-level keys.
-                        elif not filter(lambda x: x.startswith('DNSKEY'), self.G.out_neighbors(n)):
+                        elif not [x for x in self.G.out_neighbors(n) if x.startswith('DNSKEY')]:
                             for m in top_level_keys:
                                 if not self.G.has_edge(n, m):
                                     self.G.add_edge(n, m, style='invis')
@@ -1970,7 +1968,7 @@ class DNSAuthGraph:
 
                 # Link non-keys to intermediate DNSKEYs
                 for n in non_dnskey:
-                    if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
+                    if [x for x in self.G.out_neighbors(n) if x.startswith('DNSKEY') or x.startswith('NSEC')]:
                         continue
                     for m in intermediate_keys:
                         # we only link to non-existent DNSKEYs corresponding to
@@ -1983,7 +1981,7 @@ class DNSAuthGraph:
             else:
                 # For all non-existent non-DNSKEYs, add an edge to the top
                 for n in non_dnskey:
-                    if filter(lambda x: x.startswith('DNSKEY') or x.startswith('NSEC'), self.G.out_neighbors(n)):
+                    if [x for x in self.G.out_neighbors(n) if x.startswith('DNSKEY') or x.startswith('NSEC')]:
                         continue
                     self.G.add_edge(n, self.node_subgraph_name[n], style='invis')
 

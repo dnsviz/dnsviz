@@ -245,7 +245,7 @@ class DNSResponse:
                 #TODO option data
                 edns_options.append(dns.edns.GenericOption(retry.action_arg, ''))
             elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
-                filtered_options = filter(lambda x: retry.action_arg == x.otype, edns_options)
+                filtered_options = [x for x in edns_options if retry.action_arg == x.otype]
                 if filtered_options:
                     edns_options.remove(filtered_options[0])
             elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
@@ -341,7 +341,7 @@ class DNSResponse:
             return False
         # if the name exists in the answer section with the requested rdtype or
         # CNAME, then it can't be a referral
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME)]:
             return False
         # if an SOA record with the given qname exists, then the server
         # is authoritative for the name, so it is a referral
@@ -353,13 +353,13 @@ class DNSResponse:
         # if proper referral is requested and qname is equal to of an NS RRset
         # in the authority, then it is a referral
         if proper:
-            if filter(lambda x: qname == x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
+            if [x for x in self.message.authority if qname == x.name and x.rdtype == dns.rdatatype.NS]:
                 return True
         # if proper referral is NOT requested, qname is a subdomain of
         # (including equal to) an NS RRset in the authority, and qname is not
         # equal to bailiwick, then it is a referral
         else:
-            if filter(lambda x: qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
+            if [x for x in self.message.authority if qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS]:
                 return True
         return False
 
@@ -370,7 +370,7 @@ class DNSResponse:
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
         return bool(not self.is_authoritative() and \
-                filter(lambda x: x.name != qname and qname.is_subdomain(x.name), self.message.authority))
+                [x for x in self.message.authority if x.name != qname and qname.is_subdomain(x.name)])
 
     def is_answer(self, qname, rdtype, include_cname=True):
         '''Return True if this response yields an answer for the queried name
@@ -379,12 +379,12 @@ class DNSResponse:
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
-        if rdtype == dns.rdatatype.ANY and filter(lambda x: x.name == qname, self.message.answer):
+        if rdtype == dns.rdatatype.ANY and [x for x in self.message.answer if x.name == qname]:
             return True
         rdtypes = [rdtype]
         if include_cname:
             rdtypes.append(dns.rdatatype.CNAME)
-        if filter(lambda x: x.name == qname and x.rdtype in rdtypes, self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in rdtypes]:
             return True
         return False
 
@@ -395,7 +395,7 @@ class DNSResponse:
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
 
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME)]:
             return False
 
         if self.message.rcode() == dns.rcode.NXDOMAIN:
@@ -966,9 +966,9 @@ class NegativeResponseInfo(DNSResponseComponent):
         return self.qname == other.qname and self.rdtype == other.rdtype
 
     def create_or_update_soa_info(self, server, client, response, is_referral):
-        soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name), response.message.authority)
+        soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name)]
         if not soa_rrsets:
-            soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)
+            soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA]
         soa_rrsets.sort(reverse=True)
         try:
             soa_rrset = soa_rrsets[0]
@@ -986,7 +986,7 @@ class NegativeResponseInfo(DNSResponseComponent):
 
     def create_or_update_nsec_info(self, server, client, response, is_referral):
         for rdtype in dns.rdatatype.NSEC, dns.rdatatype.NSEC3:
-            nsec_rrsets = filter(lambda x: x.rdtype == rdtype, response.message.authority)
+            nsec_rrsets = [x for x in response.message.authority if x.rdtype == rdtype]
             if not nsec_rrsets:
                 continue
 
@@ -1068,7 +1068,7 @@ class NSECSet(DNSResponseComponent):
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if filter(lambda x: x.upper() not in base32.b32alphabet, nsec_name[0]):
+        if [x for x in nsec_name[0] if x.upper() not in base32.b32alphabet]:
             return False
         return True
 
