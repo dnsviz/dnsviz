@@ -1924,7 +1924,7 @@ class Analyst(object):
             # raise only the first exception, but log all the ones beyond
             for name, exc_info in errors[1:]:
                 self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
-            raise errors[0][1][0], None, errors[0][1][2]
+            raise errors[0][1][0].with_traceback(errors[0][1][2])
 
     def _set_negative_queries(self, name_obj):
         random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
