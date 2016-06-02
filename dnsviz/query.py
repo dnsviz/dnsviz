@@ -1881,19 +1881,19 @@ def main():
     d.execute()
 
     if '-j' in opts:
-        print json.dumps(d.serialize(), indent=4, separators=(',', ': '))
+        print(json.dumps(d.serialize(), indent=4, separators=(',', ': ')))
     else:
-        print 'Responses for %s/%s:' % (args[0], args[1])
+        print('Responses for %s/%s:' % (args[0], args[1]))
         for server in d.responses:
             for client, response in d.responses[server].items():
                 if response.message is not None:
-                    print '   from %s: %s (%d bytes in %dms)' % (server, repr(response.message), len(response.message.to_wire()), int(response.response_time*1000))
+                    print('   from %s: %s (%d bytes in %dms)' % (server, repr(response.message), len(response.message.to_wire()), int(response.response_time*1000)))
                 else:
-                    print '   from %s: (ERR: %s) (%dms)' % (server, repr(response.error), int(response.response_time*1000))
+                    print('   from %s: (ERR: %s) (%dms)' % (server, repr(response.error), int(response.response_time*1000)))
 
-                print '   (src: %s)' % (client)
+                print('   (src: %s)' % (client))
                 if response.history:
-                    print '       (history: %s)' % (response.history)
+                    print('       (history: %s)' % (response.history))
 
 if __name__ == '__main__':
     main()

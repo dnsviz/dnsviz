@@ -281,9 +281,9 @@ def main():
         r = Resolver([IPAddr(x) for x in sys.argv[3:]], query.StandardRecursiveQuery)
     a = r.query_for_answer(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]))
 
-    print 'Response for %s/%s:' % (args[0], args[1])
-    print '   from %s: %s (%d bytes)' % (a.server, repr(a.response), len(a.response.to_wire()))
-    print '   answer:\n      %s' % (a.rrset)
+    print('Response for %s/%s:' % (args[0], args[1]))
+    print('   from %s: %s (%d bytes)' % (a.server, repr(a.response), len(a.response.to_wire())))
+    print('   answer:\n      %s' % (a.rrset))
 
 if __name__ == '__main__':
     main()
