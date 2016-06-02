@@ -80,7 +80,7 @@ class DomainNameAnalysisError(object):
         description_template_escaped = cgi.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
-            if isinstance(v, (int, long)):
+            if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
                 if isinstance(v, (str, unicode)):
