@@ -38,7 +38,7 @@ from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz.util import tuple_to_dict
 
-import errors as Errors
+from . import errors as Errors
 
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1

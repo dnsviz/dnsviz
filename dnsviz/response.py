@@ -39,11 +39,11 @@ import time
 
 import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
-import base32
-import crypto
-import format as fmt
-from ipaddr import IPAddr
-from util import tuple_to_dict
+from . import base32
+from . import crypto
+from . import format as fmt
+from .ipaddr import IPAddr
+from .util import tuple_to_dict
 
 class DNSResponse:
     '''A DNS response, including meta information'''
@@ -75,7 +75,7 @@ class DNSResponse:
             self._review_history()
 
     def __unicode__(self):
-        import query as Q
+        from . import query as Q
         if self.message is not None:
             return repr(self.message)
         else:
@@ -166,7 +166,7 @@ class DNSResponse:
         self.responsive_cause_index_tcp = responsive_cause_index_tcp
 
     def _review_history(self):
-        import query as Q
+        from . import query as Q
 
         flags = self.query.flags
         edns = self.query.edns
@@ -448,7 +448,7 @@ class DNSResponse:
         return ip_mapping
 
     def serialize_meta(self):
-        import query as Q
+        from . import query as Q
 
         d = collections.OrderedDict()
 
@@ -513,7 +513,7 @@ class DNSResponse:
         return d
 
     def serialize(self):
-        import query as Q
+        from . import query as Q
 
         d = collections.OrderedDict()
         if self.message is None:
@@ -535,7 +535,7 @@ class DNSResponse:
 
     @classmethod
     def deserialize(cls, d, query):
-        import query as Q
+        from . import query as Q
 
         if 'msg_size' in d:
             msg_size = int(d['msg_size'])
@@ -718,7 +718,7 @@ class DNSKEYMeta(DNSResponseComponent):
         return s.getvalue()
 
     def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
-        from analysis import status as Status
+        from .analysis import status as Status
 
         show_id = loglevel <= logging.INFO or \
                 (self.warnings and loglevel <= logging.WARNING) or \

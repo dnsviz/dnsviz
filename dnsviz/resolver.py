@@ -23,9 +23,9 @@ import io
 import random
 import time
 
-import query
-from ipaddr import IPAddr
-import transport
+from . import query
+from .ipaddr import IPAddr
+from . import transport
 
 import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
 

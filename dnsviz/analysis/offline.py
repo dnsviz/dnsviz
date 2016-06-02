@@ -37,10 +37,10 @@ import dnsviz.query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
 
-import errors as Errors
-from online import OnlineDomainNameAnalysis, \
+from . import errors as Errors
+from .online import OnlineDomainNameAnalysis, \
         ANALYSIS_TYPE_AUTHORITATIVE, ANALYSIS_TYPE_RECURSIVE, ANALYSIS_TYPE_CACHE
-import status as Status
+from . import status as Status
 
 DNS_PROCESSED_VERSION = '1.0'
 

@@ -38,9 +38,9 @@ import time
 import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype
 
-from ipaddr import *
-from response import *
-import transport
+from .ipaddr import *
+from .response import *
+from . import transport
 
 RETRY_CAUSE_NETWORK_ERROR = RESPONSE_ERROR_NETWORK_ERROR = 1
 RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2

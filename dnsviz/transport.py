@@ -40,7 +40,7 @@ import urlparse
 
 import dns.exception
 
-from ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
 
 DNS_TRANSPORT_VERSION = 1.0
 

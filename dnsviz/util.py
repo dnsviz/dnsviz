@@ -32,9 +32,9 @@ import socket
 
 import dns.message, dns.rdatatype
 
-from config import DNSVIZ_SHARE_PATH
-import format as fmt
-from ipaddr import IPAddr
+from .config import DNSVIZ_SHARE_PATH
+from . import format as fmt
+from .ipaddr import IPAddr
 
 TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 ROOT_HINTS = os.path.join(DNSVIZ_SHARE_PATH, 'hints', 'named.root')
