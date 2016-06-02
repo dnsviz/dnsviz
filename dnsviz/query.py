@@ -1331,7 +1331,7 @@ class ExecutableDNSQuery(DNSQuery):
                     else:
                         try:
                             response = dns.message.from_wire(qtm.res)
-                        except Exception, e:
+                        except Exception as e:
                             response = e
                         if ignore_queryid:
                             response_wire_map[wire_zero_queryid] = response

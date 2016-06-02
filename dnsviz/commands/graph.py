@@ -76,13 +76,13 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
     if fmt == 'html':
         try:
             js_img = G.draw('js')
-        except IOError, e:
+        except IOError as e:
             logger.error(str(e))
             sys.exit(3)
 
         try:
             template_str = io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8').read()
-        except IOError, e:
+        except IOError as e:
             logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
             sys.exit(3)
 
@@ -97,7 +97,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
             filename = sys.stdout.fileno()
         try:
             io.open(filename, 'wt', encoding='utf-8').write(template_str)
-        except IOError, e:
+        except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, filename))
             sys.exit(3)
     else:
@@ -106,7 +106,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
         else:
             try:
                 G.draw(fmt, path=filename)
-            except IOError, e:
+            except IOError as e:
                 if e.strerror:
                     logger.error('%s: "%s"' % (e.strerror, filename))
                 else:
@@ -143,7 +143,7 @@ def main(argv):
 
         try:
             opts, args = getopt.getopt(argv[1:], 'f:r:R:t:Oo:T:h')
-        except getopt.GetoptError, e:
+        except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
 
@@ -153,7 +153,7 @@ def main(argv):
             if opt == '-t':
                 try:
                     tk_str = io.open(arg, 'r', encoding='utf-8').read()
-                except IOError, e:
+                except IOError as e:
                     sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
                 try:
@@ -208,7 +208,7 @@ def main(argv):
             opts['-r'] = sys.stdin.fileno()
         try:
             analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
-        except IOError, e:
+        except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, opts['-r']))
             sys.exit(3)
         try:
@@ -237,14 +237,14 @@ def main(argv):
         if '-f' in opts:
             try:
                 f = io.open(opts['-f'], 'r', encoding='utf-8')
-            except IOError, e:
+            except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
             for line in f:
                 name = line.strip()
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -263,7 +263,7 @@ def main(argv):
             for name in args:
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -273,7 +273,7 @@ def main(argv):
         if '-t' not in opts:
             try:
                 tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
-            except IOError, e:
+            except IOError as e:
                 logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
                 sys.exit(3)
             try:

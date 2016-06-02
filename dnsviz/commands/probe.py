@@ -89,7 +89,7 @@ def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv
     except KeyboardInterrupt:
         raise
     # report exceptions related to network connectivity
-    except (NetworkConnectivityException, transport.RemoteQueryTransportError), e:
+    except (NetworkConnectivityException, transport.RemoteQueryTransportError) as e:
         logger.error('Error analyzing %s: %s' % (fmt.humanize_name(name), e))
     # don't report EOFError, as that is what is raised if there is a
     # KeyboardInterrupt in ParallelAnalyst
@@ -337,7 +337,7 @@ def main(argv):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:EAs:Fh')
-        except getopt.GetoptError, e:
+        except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
 
@@ -386,7 +386,7 @@ def main(argv):
                     s = socket.socket(fam)
                     s.bind((addr, 0))
                     del s
-                except socket.error, e:
+                except socket.error as e:
                     if e.errno == errno.EADDRNOTAVAIL:
                         usage('Cannot bind to specified IP address: "%s"' % addr)
                         sys.exit(1)
@@ -555,7 +555,7 @@ def main(argv):
                 opts['-r'] = sys.stdin.fileno()
             try:
                 analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
-            except IOError, e:
+            except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-r']))
                 sys.exit(3)
             try:
@@ -584,14 +584,14 @@ def main(argv):
         if '-f' in opts:
             try:
                 f = io.open(opts['-f'], 'r', encoding='utf-8')
-            except IOError, e:
+            except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
             for line in f:
                 name = line.strip()
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -610,7 +610,7 @@ def main(argv):
             for name in args:
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -628,7 +628,7 @@ def main(argv):
             opts['-o'] = sys.stdout.fileno()
         try:
             fh = io.open(opts['-o'], 'wb')
-        except IOError, e:
+        except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, opts['-o']))
             sys.exit(3)
 
@@ -677,7 +677,7 @@ def main(argv):
 
         try:
             fh.write(json.dumps(d, ensure_ascii=False, encoding='utf-8', **kwargs))
-        except IOError, e:
+        except IOError as e:
             logger.error('Error writing analysis: %s' % e)
             sys.exit(3)
 

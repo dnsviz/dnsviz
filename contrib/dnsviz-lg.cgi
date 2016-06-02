@@ -190,7 +190,7 @@ def main():
 
                 try:
                     qtm = transport.DNSQueryTransportMeta.deserialize_request(qtm_serialized)
-                except transport.TransportMetaDeserializationError, e:
+                except transport.TransportMetaDeserializationError as e:
                     raise RemoteQueryError('Error deserializing request information: %s' % e)
 
                 check_dst(qtm.dst)
@@ -215,7 +215,7 @@ def main():
             'version': transport.DNS_TRANSPORT_VERSION,
             'responses': [qtm.serialize_response() for qtm in qtms],
         }
-    except RemoteQueryError, e:
+    except RemoteQueryError as e:
         ret = {
             'version': transport.DNS_TRANSPORT_VERSION,
             'error': str(e),

@@ -302,7 +302,7 @@ class DNSQueryTransportHandler(object):
             self._bind_socket()
             self._set_start_time()
             self._connect_socket()
-        except socket.error, e:
+        except socket.error as e:
             self.err = e
             self.cleanup()
 
@@ -338,7 +338,7 @@ class DNSQueryTransportHandler(object):
                 try:
                     self.sock.bind((src, sport))
                     break
-                except socket.error, e:
+                except socket.error as e:
                     i += 1
                     if i > MAX_PORT_BIND_ATTEMPTS or e.errno != socket.errno.EADDRINUSE:
                         raise
@@ -354,7 +354,7 @@ class DNSQueryTransportHandler(object):
     def _connect_socket(self):
         try:
             self.sock.connect(self._get_connect_arg())
-        except socket.error, e:
+        except socket.error as e:
             if e.errno != socket.errno.EINPROGRESS:
                 raise
 
@@ -386,7 +386,7 @@ class DNSQueryTransportHandler(object):
             self.req_index += self.sock.send(self.req[self.req_index:])
             if self.req_index >= self.req_len:
                 return True
-        except socket.error, e:
+        except socket.error as e:
             self.err = e
             self.cleanup()
             return True
@@ -462,7 +462,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                     return True
                 else:
                     self.res = ''
-            except socket.error, e:
+            except socket.error as e:
                 self.err = e
                 self.cleanup()
                 return True
@@ -494,7 +494,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                         self.cleanup()
                         return True
 
-            except (socket.error, EOFError), e:
+            except (socket.error, EOFError) as e:
                 if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                     pass
                 else:
@@ -557,7 +557,7 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
                 self.qtms[i].deserialize_response(content['responses'][i])
             except IndexError:
                 raise RemoteQueryTransportError('DNS response information missing from response')
-            except TransportMetaDeserializationError, e:
+            except TransportMetaDeserializationError as e:
                 raise RemoteQueryTransportError(str(e))
 
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
@@ -746,7 +746,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     self.res += self.res_buf
                     self.res_buf = ''
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:
@@ -921,7 +921,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                         self.cleanup()
                         return True
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:

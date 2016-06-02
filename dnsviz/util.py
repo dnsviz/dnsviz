@@ -112,7 +112,7 @@ def get_trusted_keys(s):
 def get_default_trusted_keys():
     try:
         tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
-    except IOError, e:
+    except IOError as e:
         return []
     return get_trusted_keys(tk_str)
 

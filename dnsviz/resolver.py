@@ -151,7 +151,7 @@ class Resolver:
             elif response.is_complete_response() and response.is_valid_response():
                 try:
                     answers[query_tuple] = answer_cls(query_tuple[0], query_tuple[1], response.message, server)
-                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as e:
                     answers[query_tuple] = e
             # response was timeout or network error
             elif response.error in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):

@@ -144,7 +144,7 @@ class DVCommandLineQuery:
         try:
             dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
             dnsviz_p = subprocess.Popen(dnsviz_args, stdin=dnsget_p.stdout)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write('error: %s\n' % e)
             return False
         else:
@@ -280,7 +280,7 @@ class DVCommandLine:
             try:
                 s = socket.socket(family)
                 s.bind((addr, 0))
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EADDRNOTAVAIL:
                     sys.stderr.write('Cannot bind to specified IP address: "%s"\n' % addr)
                     sys.exit(1)

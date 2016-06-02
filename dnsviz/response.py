@@ -563,7 +563,7 @@ class DNSResponse:
             wire = base64.b64decode(d['message'])
             try:
                 message = dns.message.from_wire(wire)
-            except Exception, e:
+            except Exception as e:
                 message = None
                 if isinstance(e, (struct.error, dns.exception.FormError)):
                     error = Q.RESPONSE_ERROR_FORMERR
