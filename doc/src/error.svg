@@ -1,47 +1,24 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-<svg id="svg2" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://www.w3.org/2000/svg" height="326.05" width="378.3" version="1.0" xmlns:cc="http://creativecommons.org/ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/">
- <defs id="defs4">
-  <linearGradient id="linearGradient3134">
-   <stop id="stop3136" stop-color="#f54c4c" offset="0"/>
-   <stop id="stop3165" stop-color="#ba1313" offset=".5"/>
-   <stop id="stop3138" stop-color="#9a1919" offset="1"/>
-  </linearGradient>
-  <linearGradient id="linearGradient3140" y2="237.7" xlink:href="#linearGradient3134" gradientUnits="userSpaceOnUse" y1="4.3178" x2="244.97" x1="91.3"/>
-  <filter id="filter3172">
-   <feGaussianBlur id="feGaussianBlur3174" stdDeviation="5.0924795"/>
-  </filter>
-  <linearGradient id="linearGradient2184" y2="183.59" xlink:href="#linearGradient3134" gradientUnits="userSpaceOnUse" x2="202.58" gradientTransform="matrix(1.2084 0 0 1.2084 89.67 106.94)" y1="-13.27" x1="29.754"/>
- </defs>
- <metadata id="metadata7">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title>3D effect warning triangle</dc:title>
-    <dc:date>18/9/07</dc:date>
-    <dc:creator>
-     <cc:Agent>
-      <dc:title>Tim O&apos;Ryan</dc:title>
-     </cc:Agent>
-    </dc:creator>
-    <cc:license rdf:resource="http://creativecommons.org/licenses/by-sa/2.5/"/>
-   </cc:Work>
-   <cc:License rdf:about="http://creativecommons.org/licenses/by-sa/2.5/">
-    <cc:permits rdf:resource="http://web.resource.org/cc/Reproduction"/>
-    <cc:permits rdf:resource="http://web.resource.org/cc/Distribution"/>
-    <cc:requires rdf:resource="http://web.resource.org/cc/Notice"/>
-    <cc:requires rdf:resource="http://web.resource.org/cc/Attribution"/>
-    <cc:permits rdf:resource="http://web.resource.org/cc/DerivativeWorks"/>
-    <cc:requires rdf:resource="http://web.resource.org/cc/ShareAlike"/>
-   </cc:License>
-  </rdf:RDF>
- </metadata>
- <g id="layer1" transform="translate(-15.903 -38.352)">
-  <path id="path3152" d="m213.05 47.378c-4.21 0.218-8.03 2.547-10.15 6.193l-168.96 291.54c-2.239 3.86-2.246 8.63-0.018 12.5 2.227 3.87 6.352 6.26 10.819 6.27l336.93 0.53c4.47 0.01 8.6-2.36 10.85-6.23 2.24-3.86 2.25-8.63 0.03-12.51l-168.02-292.06c-2.35-4.071-6.78-6.478-11.48-6.232zm0.61 37.462l146.41 254.53-293.65-0.46 147.24-254.07z" fill-opacity=".79730" filter="url(#filter3172)" fill="#777"/>
-  <path id="path2178" stroke-linejoin="round" d="m199.83 41.494c-4.22 0.218-8.04 2.547-10.16 6.194l-168.96 291.53c-2.237 3.87-2.244 8.64-0.016 12.51s6.352 6.26 10.819 6.26l336.93 0.53c4.47 0.02 8.61-2.36 10.85-6.22 2.24-3.87 2.25-8.63 0.03-12.51l-168.01-292.06c-2.35-4.075-6.79-6.482-11.48-6.236v0zm0.6 37.462l146.41 254.52-293.65-0.45 147.24-254.07z" stroke="#870000" stroke-linecap="round" stroke-width="6.25" fill="url(#linearGradient2184)"/>
-  <path id="path2160" stroke-linejoin="round" stroke="url(#linearGradient3140)" stroke-linecap="round" stroke-width="20.688" fill="url(#linearGradient3140)" d="m230.71 197.86l-278.82-0.45 139.8-241.25 139.02 241.7z" transform="matrix(1.2084 0 0 1.2084 89.67 106.94)"/>
-  <path id="path19491" d="m199.89 117.76c-2.6 0.14-4.96 1.6-6.27 3.89l-104.42 183.11c-1.379 2.42-1.383 5.42-0.007 7.85 1.377 2.43 3.926 3.93 6.687 3.93l208.22 0.34c2.76 0 5.31-1.49 6.7-3.91 1.39-2.43 1.39-5.42 0.02-7.86l-103.83-183.43c-1.45-2.56-4.19-4.07-7.1-3.92z" fill="#fff"/>
-  <path id="text2171" d="m203.69 256.44h-5.34c-0.55-9.45-2.39-20.78-5.51-33.96l-6.35-26.88c-3.8-16.11-5.7-27.65-5.7-34.61 0-14.06 6.71-21.09 20.14-21.09 5.88 0 10.74 1.94 14.57 5.83s5.75 8.85 5.75 14.88c0 6.41-2.02 18.07-6.07 34.99l-6.44 26.88c-2.26 9.45-3.95 20.77-5.05 33.96zm-2.49 17.64c6.26 0 11.1 2.13 14.53 6.39 3.44 4.26 5.15 8.81 5.15 13.67 0 6.4-2.08 11.33-6.25 14.79-4.17 3.45-8.64 5.17-13.43 5.17-6.31 0-11.17-2.11-14.57-6.34s-5.1-8.77-5.1-13.62c0-5.66 1.88-10.42 5.65-14.28s8.45-5.78 14.02-5.78z"/>
- </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 380 330">
+<defs>
+<linearGradient id="linearGradient3134">
+<stop stop-color="#f54c4c" offset="0"/>
+<stop stop-color="#ba1313" offset="0.5"/>
+<stop stop-color="#9a1919" offset="1"/>
+</linearGradient>
+<linearGradient id="linearGradient3140" y2="237.7" xlink:href="#linearGradient3134" gradientUnits="userSpaceOnUse" y1="4.32" x2="245" x1="91.3"/>
+<filter id="filter3172">
+<feGaussianBlur stdDeviation="5.092"/>
+</filter>
+<linearGradient id="linearGradient2184" y2="328.8" xlink:href="#linearGradient3134" gradientUnits="userSpaceOnUse" x2="334.5" y1="90.9" x1="125.6"/>
+</defs>
+<g transform="translate(-15 -37)">
+<path d="m213.05 47.378c-4.21 0.218-8.03 2.547-10.15 6.193l-168.96 291.54c-2.239 3.86-2.246 8.63-0.018 12.5 2.227 3.87 6.352 6.26 10.819 6.27l336.93 0.53c4.47 0.01 8.6-2.36 10.85-6.23 2.24-3.86 2.25-8.63 0.03-12.51l-168.02-292.06c-2.35-4.071-6.78-6.478-11.48-6.232zm0.61 37.462l146.41 254.53-293.65-0.46 147.24-254.07z" fill-opacity="0.8" filter="url(#filter3172)" fill="#777"/>
+<g stroke-linejoin="round" stroke-linecap="round">
+<path d="m199.83 41.494c-4.22 0.218-8.04 2.547-10.16 6.194l-168.96 291.53c-2.237 3.87-2.244 8.64-0.016 12.51s6.352 6.26 10.819 6.26l336.93 0.53c4.47 0.02 8.61-2.36 10.85-6.22 2.24-3.87 2.25-8.63 0.03-12.51l-168.01-292.06c-2.35-4.075-6.79-6.482-11.48-6.236v0zm0.6 37.462l146.41 254.52-293.65-0.45 147.24-254.07z" stroke="#870000" stroke-width="6.25" fill="url(#linearGradient2184)"/>
+<path stroke="url(#linearGradient3140)" stroke-width="20.69" fill="url(#linearGradient3140)" d="m 230.7 197.9 l -278.8 -0.45 139.8 -241.2 139 241.7 z" transform="matrix(1.208 0 0 1.208 89.7 106.9)"/>
+</g>
+<path d="m199.89 117.76c-2.6 0.14-4.96 1.6-6.27 3.89l-104.42 183.11c-1.379 2.42-1.383 5.42-0.007 7.85 1.377 2.43 3.926 3.93 6.687 3.93l208.22 0.34c2.76 0 5.31-1.49 6.7-3.91 1.39-2.43 1.39-5.42 0.02-7.86l-103.83-183.43c-1.45-2.56-4.19-4.07-7.1-3.92z" fill="#fff"/>
+<path d="m203.69 256.44h-5.34c-0.55-9.45-2.39-20.78-5.51-33.96l-6.35-26.88c-3.8-16.11-5.7-27.65-5.7-34.61 0-14.06 6.71-21.09 20.14-21.09 5.88 0 10.74 1.94 14.57 5.83s5.75 8.85 5.75 14.88c0 6.41-2.02 18.07-6.07 34.99l-6.44 26.88c-2.26 9.45-3.95 20.77-5.05 33.96zm-2.49 17.64c6.26 0 11.1 2.13 14.53 6.39 3.44 4.26 5.15 8.81 5.15 13.67 0 6.4-2.08 11.33-6.25 14.79-4.17 3.45-8.64 5.17-13.43 5.17-6.31 0-11.17-2.11-14.57-6.34s-5.1-8.77-5.1-13.62c0-5.66 1.88-10.42 5.65-14.28s8.45-5.78 14.02-5.78z"/>
+</g>
 </svg>
