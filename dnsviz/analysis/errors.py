@@ -58,7 +58,7 @@ class DomainNameAnalysisError(object):
         return self.__class__ == other.__class__ and self.args == other.args
 
     def copy(self):
-        return self.__class__(**dict(zip(self.required_params, self.args)))
+        return self.__class__(**dict(list(zip(self.required_params, self.args))))
 
     @property
     def args(self):
