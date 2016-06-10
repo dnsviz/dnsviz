@@ -22,6 +22,7 @@
 
 from __future__ import unicode_literals
 
+import codecs
 import getopt
 import io
 import json
@@ -402,7 +403,9 @@ def main(argv):
             f.close()
         else:
             if args:
-                args = [x.decode(sys.getfilesystemencoding()) for x in args]
+                # python3/python2 dual compatibility
+                if isinstance(args[0], bytes):
+                    args = [codecs.decode(x, sys.getfilesystemencoding()) for x in args]
             else:
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']
