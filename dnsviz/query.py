@@ -246,8 +246,9 @@ class DNSResponseHandler(object):
         '''Redirect the instantiation of a DNSResponseHandler to create instead a Factory,
         from which a DNSResponseHandler in turn is built.'''
 
+
         if kwargs.pop('__instantiate', None):
-            return super(DNSResponseHandler, cls).__new__(cls, *args, **kwargs)
+            return super(DNSResponseHandler, cls).__new__(cls)
         return DNSResponseHandlerFactory(cls, *args, **kwargs)
 
     def set_context(self, params, history, request):
