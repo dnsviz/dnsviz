@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import calendar
 import datetime
 import re
@@ -58,7 +60,7 @@ class UTC(datetime.tzinfo):
         return ZERO
 
     def tzname(self, dt):
-        return "UTC"
+        return b"UTC"
 
     def dst(self, dt):
         return ZERO

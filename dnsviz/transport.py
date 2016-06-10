@@ -19,6 +19,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import bisect
 import collections
@@ -285,8 +287,8 @@ class DNSQueryTransportHandler(object):
         raise NotImplemented
 
     def _init_res_buffer(self):
-        self.res = ''
-        self.res_buf = ''
+        self.res = b''
+        self.res_buf = b''
         self.res_index = 0
 
     def prepare(self):
@@ -461,7 +463,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                     self.cleanup()
                     return True
                 else:
-                    self.res = ''
+                    self.res = b''
             except socket.error as e:
                 self.err = e
                 self.cleanup()
@@ -475,7 +477,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                         buf = self.sock.recv(1)
                     else:
                         buf = self.sock.recv(2)
-                    if buf == '':
+                    if buf == b'':
                         raise EOFError()
 
                     self.res_buf += buf
@@ -484,7 +486,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
 
                 if self.res_len is not None:
                     buf = self.sock.recv(self.res_len - self.res_index)
-                    if buf == '':
+                    if buf == b'':
                         raise EOFError()
 
                     self.res += buf
@@ -631,7 +633,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def init_req(self):
         data = self._post_data()
-        self.req = 'POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.4\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
+        self.req = bytes('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.4\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data))
         self.req_len = len(self.req)
         self.req_index = 0
 
@@ -649,7 +651,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
             self.res_buf += buf
 
@@ -726,7 +728,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                         else:
                             self.res += self.res_buf
                             self.res_index += len(self.res_buf)
-                            self.res_buf = ''
+                            self.res_buf = b''
 
             elif self.chunked_encoding == False:
                 # output is not chunked, so we're either reading until we've
@@ -744,7 +746,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                         return True
                 else:
                     self.res += self.res_buf
-                    self.res_buf = ''
+                    self.res_buf = b''
 
         except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
@@ -813,7 +815,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return val
 
     def finalize(self):
-        new_res = ''
+        new_res = b''
         for i, mask_index in enumerate(self.mask_mapping):
             mask_octets = struct.unpack('!BBBB', self.res[mask_index:mask_index + 4])
             if i >= len(self.mask_mapping) - 1:
@@ -830,7 +832,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
     def init_req(self):
         data = json.dumps(self.serialize_requests())
 
-        header = '\x81'
+        header = b'\x81'
         l = len(data)
         if l <= 125:
             header += struct.pack('!B', l)
@@ -843,14 +845,14 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.req_index = 0
 
     def init_empty_req(self):
-        self.req = '\x81\x00'
+        self.req = b'\x81\x00'
         self.req_len = len(self.req)
         self.req_index = 0
 
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
             self.res_buf += buf
 
@@ -915,7 +917,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                     else:
                         self.res += self.res_buf
                         self.res_index += len(self.res_buf)
-                        self.res_buf = ''
+                        self.res_buf = b''
 
                     if self.res_index >= self.res_len and not self.has_more:
                         self.cleanup()

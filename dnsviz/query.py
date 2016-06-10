@@ -25,13 +25,15 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import bisect
 import collections
 import errno
+import io
 import Queue
 import socket
-import StringIO
 import struct
 import time
 
@@ -1058,7 +1060,7 @@ class DNSQuery(object):
             d['options']['edns_flags'] = self.edns_flags
             d['options']['edns_options'] = []
             for o in self.edns_options:
-                s = StringIO.StringIO()
+                s = io.BytesIO()
                 o.to_wire(s)
                 d['options']['edns_options'].append((o.otype, base64.b64encode(s.getvalue())))
             d['options']['tcp'] = self.tcp
@@ -1136,9 +1138,9 @@ class MultiQuery(object):
         if not (self.qname == query.qname and self.rdtype == query.rdtype and self.rdclass == query.rdclass):
             raise ValueError('DNS query information must be the same as that to which query is being joined.')
 
-        edns_options_str = ''
+        edns_options_str = b''
         for o in query.edns_options:
-            s = StringIO.StringIO()
+            s = io.BytesIO()
             o.to_wire(s)
             edns_options_str += struct.pack('!H', o.otype) + s.getvalue()
         params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp)
@@ -1325,7 +1327,7 @@ class ExecutableDNSQuery(DNSQuery):
                 if qtm.err is not None:
                     response = qtm.err
                 else:
-                    wire_zero_queryid = '\x00\x00' + qtm.res[2:]
+                    wire_zero_queryid = b'\x00\x00' + qtm.res[2:]
                     if wire_zero_queryid in response_wire_map:
                         response = response_wire_map[wire_zero_queryid]
                     else:

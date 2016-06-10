@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
 import collections
 import errno
@@ -343,10 +345,10 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
-                label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT></TD></TR></TABLE>>' % \
+                label_str = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT></TD></TR></TABLE>>' % \
                         (12, 'Helvetica', img_str, 10, dnskey.rdata.algorithm, dnskey.key_tag)
             else:
-                label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
+                label_str = '<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
                         (12, 'Helvetica', 10, dnskey.rdata.algorithm, dnskey.key_tag)
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
@@ -397,7 +399,7 @@ class DNSAuthGraph:
         node_str = self.dnskey_node_str(0, name, algorithm, key_tag)
 
         if not self.G.has_node(node_str):
-            label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
+            label_str = '<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
                     (12, 'Helvetica', 10, algorithm, key_tag)
 
             attr = {'style': 'filled,dashed', 'color': COLORS['insecure_non_existent'], 'fillcolor': '#ffffff' }
@@ -448,10 +450,10 @@ class DNSAuthGraph:
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
             if img_str:
-                label_str = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">digest alg%s=%s</FONT></TD></TR></TABLE>>' % \
+                label_str = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">digest alg%s=%s</FONT></TD></TR></TABLE>>' % \
                         (12, 'Helvetica', dns.rdatatype.to_text(rdtype), img_str, 10, plural, digest_str)
             else:
-                label_str = u'<<FONT POINT-SIZE="%d" FACE="%s">%s</FONT><BR/><FONT POINT-SIZE="%d">digest alg%s=%s</FONT>>' % \
+                label_str = '<<FONT POINT-SIZE="%d" FACE="%s">%s</FONT><BR/><FONT POINT-SIZE="%d">digest alg%s=%s</FONT>>' % \
                         (12, 'Helvetica', dns.rdatatype.to_text(rdtype), 10, plural, digest_str)
 
             S, parent_node_str, parent_bottom_name, parent_top_name = self.get_zone(parent_obj.name)
@@ -560,10 +562,10 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if zone_obj.analysis_end is not None:
-                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR><TR><TD ALIGN="LEFT" COLSPAN="2"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
+                label_str = '<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR><TR><TD ALIGN="LEFT" COLSPAN="2"><FONT POINT-SIZE="%d">(%s)</FONT></TD></TR></TABLE>>' % \
                         (12, zone_obj, img_str, 10, fmt.datetime_to_str(zone_obj.analysis_end))
             else:
-                label_str = u'<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR></TABLE>>' % \
+                label_str = '<<TABLE BORDER="0"><TR><TD ALIGN="LEFT"><FONT POINT-SIZE="%d">%s</FONT></TD><TD ALIGN="RIGHT">%s</TD></TR></TABLE>>' % \
                         (12, zone_obj, img_str)
             S = self.G.add_subgraph(name=node_str, label=label_str, labeljust='l', penwidth='0.5', id=top_name)
             S.add_node(top_name, shape='point', style='invis')
@@ -598,9 +600,9 @@ class DNSAuthGraph:
         #XXX consider not adding icons if errors are apparent from color of line
         edge_label = ''
         if rrsig_status.errors:
-            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+            edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
         elif rrsig_status.warnings:
-            edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+            edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
         if rrsig_status.validation_status == Status.RRSIG_STATUS_VALID:
             line_color = COLORS['secure']
@@ -676,10 +678,10 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
-                node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
+                node_label = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
                         (12, 'Helvetica', fmt.humanize_name(name, True), dns.rdatatype.to_text(rrset_info.rrset.rdtype), img_str)
             else:
-                node_label = u'<<FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT>>' % \
+                node_label = '<<FONT POINT-SIZE="%d" FACE="%s">%s/%s</FONT>>' % \
                         (12, 'Helvetica', fmt.humanize_name(name, True), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
 
             attr = {}
@@ -744,10 +746,10 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
-                node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
+                node_label = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT></TD></TR><TR><TD>%s</TD></TR></TABLE>>' % \
                         (12, 'Helvetica', fmt.humanize_name(neg_response_info.qname, True), rdtype_str, img_str)
             else:
-                node_label = u'<<FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT>>' % \
+                node_label = '<<FONT POINT-SIZE="%d" FACE="%s">%s%s</FONT>>' % \
                         (12, 'Helvetica', fmt.humanize_name(neg_response_info.qname, True), rdtype_str)
 
             attr = {}
@@ -795,7 +797,7 @@ class DNSAuthGraph:
 
         img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % icon
 
-        node_label = u'<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR><TR><TD><FONT POINT-SIZE="%d" FACE="%s" COLOR="%s"><I>%s/%s</I></FONT></TD></TR></TABLE>>' % \
+        node_label = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD>%s</TD></TR><TR><TD><FONT POINT-SIZE="%d" FACE="%s" COLOR="%s"><I>%s/%s</I></FONT></TD></TR></TABLE>>' % \
                 (img_str, 10, 'Helvetica', '#b0b0b0', fmt.humanize_name(name, True), dns.rdatatype.to_text(rdtype), )
 
         attr = {}
@@ -855,9 +857,9 @@ class DNSAuthGraph:
         except KeyError:
             edge_label = ''
             if dname_status.errors:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+                edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
             elif dname_status.warnings:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+                edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
             self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
@@ -914,19 +916,19 @@ class DNSAuthGraph:
                 cellspacing = -2
 
             self.nsec_rr_status[node_str] = {}
-            label_str = u'<<TABLE BORDER="0" CELLSPACING="%d" CELLPADDING="0" BGCOLOR="%s"><TR>' % (cellspacing, bgcolor)
+            label_str = '<<TABLE BORDER="0" CELLSPACING="%d" CELLPADDING="0" BGCOLOR="%s"><TR>' % (cellspacing, bgcolor)
             for nsec_name in nsec_status.nsec_set_info.rrsets:
                 nsec_name = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
                 self.nsec_rr_status[node_str][nsec_name] = ''
-                label_str += u'<TD PORT="%s" BORDER="2"><FONT POINT-SIZE="%d"> </FONT></TD>' % (nsec_name, 6)
-            label_str += u'</TR><TR><TD COLSPAN="%d" BORDER="2" CELLPADDING="3">' % len(nsec_status.nsec_set_info.rrsets)
+                label_str += '<TD PORT="%s" BORDER="2"><FONT POINT-SIZE="%d"> </FONT></TD>' % (nsec_name, 6)
+            label_str += '</TR><TR><TD COLSPAN="%d" BORDER="2" CELLPADDING="3">' % len(nsec_status.nsec_set_info.rrsets)
             if img_str:
-                label_str += u'<TABLE BORDER="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD><TD>%s</TD></TR></TABLE>' % \
+                label_str += '<TABLE BORDER="0"><TR><TD><FONT POINT-SIZE="%d" FACE="%s">%s</FONT></TD><TD>%s</TD></TR></TABLE>' % \
                         (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype), img_str)
             else:
-                label_str += u'<FONT POINT-SIZE="%d" FACE="%s">%s</FONT>' % \
+                label_str += '<FONT POINT-SIZE="%d" FACE="%s">%s</FONT>' % \
                         (12, 'Helvetica', dns.rdatatype.to_text(nsec_rdtype))
-            label_str += u'</TD></TR></TABLE>>'
+            label_str += '</TD></TR></TABLE>>'
 
             S, zone_node_str, zone_bottom_name, zone_top_name = self.get_zone(zone_obj.name)
             S.add_node(node_str, id=node_id, label=label_str, shape='none')
@@ -1386,9 +1388,9 @@ class DNSAuthGraph:
 
             edge_label = ''
             if has_errors:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
+                edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
             elif has_warnings:
-                edge_label = u'<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
+                edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             if name_obj.delegation_status[rdtype] == Status.DELEGATION_STATUS_SECURE:
                 line_color = COLORS['secure']

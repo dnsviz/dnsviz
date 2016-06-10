@@ -20,6 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import getopt
 import io
 import json
@@ -264,7 +266,7 @@ def _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors
     return s
 
 def textualize_status_output(names, show_color):
-    s = u''
+    s = ''
     for name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses in names:
         s += _textualize_status_output_name(name, zone_status, zone_warnings, zone_errors, delegation_status, delegation_warnings, delegation_errors, responses, show_color)
 

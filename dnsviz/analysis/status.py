@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import cgi
 import collections
@@ -214,8 +216,8 @@ class RRSIGStatus(object):
                     self.validation_status = RRSIG_STATUS_INVALID_SIG
                 self.errors.append(Errors.SignatureInvalid())
 
-    def __unicode__(self):
-        return u'RRSIG covering %s/%s' % (fmt.humanize_name(self.rrset.rrset.name), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
+    def __str__(self):
+        return 'RRSIG covering %s/%s' % (fmt.humanize_name(self.rrset.rrset.name), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -237,7 +239,7 @@ class RRSIGStatus(object):
 
         if loglevel <= logging.DEBUG:
             d.update((
-                ('description', formatter(unicode(self))),
+                ('description', formatter(str(self))),
                 ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
                 ('algorithm', self.rrsig.algorithm),
                 ('key_tag', self.rrsig.key_tag),
@@ -353,8 +355,8 @@ class DSStatus(object):
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_ALGORITHM_IGNORED
 
-    def __unicode__(self):
-        return u'%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
+    def __str__(self):
+        return '%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -376,7 +378,7 @@ class DSStatus(object):
 
         if loglevel <= logging.DEBUG:
             d.update((
-                ('description', formatter(unicode(self))),
+                ('description', formatter(str(self))),
                 ('algorithm', self.ds.algorithm),
                 ('key_tag', self.ds.key_tag),
                 ('digest_type', self.ds.digest_type),
@@ -494,8 +496,8 @@ class NSECStatusNXDOMAIN(NSECStatus):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def __unicode__(self):
-        return u'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
+    def __str__(self):
+        return 'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -525,7 +527,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
             d['id'] = 'NSEC'
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
 
         if nsec_list:
             d['nsec'] = nsec_list
@@ -686,8 +688,8 @@ class NSECStatusNODATA(NSECStatus):
 
         self._set_validation_status(nsec_set_info)
 
-    def __unicode__(self):
-        return u'NSEC record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
+    def __str__(self):
+        return 'NSEC record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -770,7 +772,7 @@ class NSECStatusNODATA(NSECStatus):
             d['id'] = 'NSEC'
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
 
         if nsec_list:
             d['nsec'] = nsec_list
@@ -897,8 +899,8 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
         self._set_validation_status(nsec_set_info)
 
-    def __unicode__(self):
-        return u'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
+    def __str__(self):
+        return 'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -980,7 +982,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             d['id'] = 'NSEC3'
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
 
         if nsec3_list:
             d['nsec3'] = nsec3_list
@@ -1207,8 +1209,8 @@ class NSEC3StatusNODATA(NSEC3Status):
 
         self._set_validation_status(nsec_set_info)
 
-    def __unicode__(self):
-        return u'NSEC3 record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
+    def __str__(self):
+        return 'NSEC3 record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -1325,7 +1327,7 @@ class NSEC3StatusNODATA(NSEC3Status):
             d['id'] = 'NSEC3'
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
 
         if nsec3_list:
             d['nsec3'] = nsec3_list
@@ -1430,8 +1432,8 @@ class CNAMEFromDNAMEStatus(object):
                 else:
                     self.warnings.append(Errors.DNAMETTLMismatch(cname_ttl=self.included_cname.rrset.ttl, dname_ttl=self.synthesized_cname.rrset.ttl))
 
-    def __unicode__(self):
-        return u'CNAME synthesis for %s from %s/%s' % (fmt.humanize_name(self.synthesized_cname.rrset.name), fmt.humanize_name(self.synthesized_cname.dname_info.rrset.name), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
+    def __str__(self):
+        return 'CNAME synthesis for %s from %s/%s' % (fmt.humanize_name(self.synthesized_cname.rrset.name), fmt.humanize_name(self.synthesized_cname.dname_info.rrset.name), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         values = []
@@ -1459,7 +1461,7 @@ class CNAMEFromDNAMEStatus(object):
             d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
 
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
 
         if dname_serialized:
             d['dname'] = dname_serialized

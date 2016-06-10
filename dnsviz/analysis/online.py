@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import collections
 import datetime
 import logging
@@ -188,13 +190,10 @@ class OnlineDomainNameAnalysis(object):
         self._valid_servers_clients_tcp = set()
 
     def __repr__(self):
-        return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
-
-    def __unicode__(self):
-        return fmt.humanize_name(self.name, True)
+        return '<%s %s>' % (self.__class__.__name__, self.__str__())
 
     def __str__(self):
-        return fmt.humanize_name(self.name)
+        return fmt.humanize_name(self.name, True)
 
     def __eq__(self, other):
         return self.name == other.name

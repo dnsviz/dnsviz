@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import collections
 import errno
 import logging
@@ -2227,7 +2229,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
 
         if loglevel <= logging.DEBUG:
-            d['description'] = unicode(rrset_info)
+            d['description'] = str(rrset_info)
             d.update(rrset_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
         if rrsig_list:

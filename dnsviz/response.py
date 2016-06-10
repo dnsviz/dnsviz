@@ -25,14 +25,16 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import errno
 import cgi
 import collections
 import datetime
 import hashlib
+import io
 import logging
-import StringIO
 import socket
 import struct
 import time
@@ -74,7 +76,7 @@ class DNSResponse:
         if review_history:
             self._review_history()
 
-    def __unicode__(self):
+    def __str__(self):
         from . import query as Q
         if self.message is not None:
             return repr(self.message)
@@ -82,7 +84,7 @@ class DNSResponse:
             return Q.response_errors.get(self.error)
 
     def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
+        return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
     def initial_query_tag(self):
         s = ''
@@ -243,7 +245,7 @@ class DNSResponse:
                 edns_flags &= ~retry.action_arg
             elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
                 #TODO option data
-                edns_options.append(dns.edns.GenericOption(retry.action_arg, ''))
+                edns_options.append(dns.edns.GenericOption(retry.action_arg, b''))
             elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
                 filtered_options = [x for x in edns_options if retry.action_arg == x.otype]
                 if filtered_options:
@@ -499,7 +501,7 @@ class DNSResponse:
                 ('edns_options', []),
             ))
             for o in self.effective_edns_options:
-                s = StringIO.StringIO()
+                s = io.BytesIO()
                 o.to_wire(s)
                 d['effective_query_options']['edns_options'].append(base64.b64encode(s.getvalue()))
             d['effective_query_options']['tcp'] = self.effective_tcp
@@ -625,7 +627,7 @@ class DNSKEYMeta(DNSResponseComponent):
         self.key_tag_no_revoke = self.calc_key_tag(rdata, True)
         self.key_len = self.calc_key_len(rdata)
 
-    def __unicode__(self):
+    def __str__(self):
         return 'DNSKEY for %s (algorithm %d (%s), key tag %d)' % (fmt.humanize_name(self.name), self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm), self.key_tag)
 
     @classmethod
@@ -706,16 +708,12 @@ class DNSKEYMeta(DNSResponseComponent):
         else:
             flags = self.rdata.flags
 
-        s = StringIO.StringIO()
-
-        self.name.canonicalize().to_wire(s)
+        name_wire = self.name.canonicalize().to_wire()
 
         # write DNSKEY rdata in wire format
         rdata_wire = struct.pack('!HBB', flags, self.rdata.protocol, self.rdata.algorithm)
-        s.write(rdata_wire)
-        s.write(self.rdata.key)
 
-        return s.getvalue()
+        return name_wire + rdata_wire + self.rdata.key
 
     def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
         from .analysis import status as Status
@@ -734,7 +732,7 @@ class DNSKEYMeta(DNSResponseComponent):
         if show_id:
             d['id'] = '%d/%d' % (self.rdata.algorithm, self.key_tag)
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm
@@ -794,14 +792,14 @@ class RRsetInfo(DNSResponseComponent):
 
         self.cname_info_from_dname = []
 
-    def __unicode__(self):
+    def __str__(self):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
             return 'RRset for %s/%s' % (fmt.format_nsec3_name(self.rrset.name).rstrip('.'), dns.rdatatype.to_text(self.rrset.rdtype))
         else:
             return 'RRset for %s/%s' % (fmt.humanize_name(self.rrset.name), dns.rdatatype.to_text(self.rrset.rdtype))
 
     def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
+        return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
     def __eq__(self, other):
         if not (self.rrset == other.rrset and self.dname_info == other.dname_info):
@@ -827,7 +825,8 @@ class RRsetInfo(DNSResponseComponent):
 
     @classmethod
     def rrset_canonicalized_to_wire(cls, rrset, name, ttl):
-        s = StringIO.StringIO()
+        s = b''
+        name_wire = name.to_wire()
 
         rdata_list = list(rrset)
         rdata_list.sort(cmp=cls.rdata_cmp)
@@ -836,13 +835,11 @@ class RRsetInfo(DNSResponseComponent):
             rdata_wire = rdata.to_digestable()
             rdata_len = len(rdata_wire)
 
-            name.to_wire(s)
             stuff = struct.pack("!HHIH", rrset.rdtype, rrset.rdclass,
                                 ttl, rdata_len)
-            s.write(stuff)
-            s.write(rdata_wire)
+            s += name_wire + stuff + rdata_wire
 
-        return s.getvalue()
+        return s
 
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
@@ -888,16 +885,14 @@ class RRsetInfo(DNSResponseComponent):
             self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, is_referral)
 
     def message_for_rrsig(self, rrsig):
-        s = StringIO.StringIO()
 
         # write RRSIG in wire format
         rdata_wire = struct.pack('!HBBIIIH', rrsig.type_covered,
                              rrsig.algorithm, rrsig.labels,
                              rrsig.original_ttl, rrsig.expiration,
                              rrsig.inception, rrsig.key_tag)
-        s.write(rdata_wire)
-        rrsig.signer.canonicalize().to_wire(s)
-        rrsig_canonicalized_wire = s.getvalue()
+        signer_wire = rrsig.signer.canonicalize().to_wire()
+        rrsig_canonicalized_wire = rdata_wire + signer_wire
 
         rrset_name = self.reduce_wildcard(rrsig).canonicalize()
         rrset_canonicalized_wire = self.rrset_canonicalized_to_wire(self.rrset, rrset_name, rrsig.original_ttl)

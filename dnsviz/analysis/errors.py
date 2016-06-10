@@ -19,6 +19,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
 import collections
 import datetime
@@ -52,9 +54,6 @@ class DomainNameAnalysisError(object):
     def __str__(self):
         return self.code
 
-    def __unicode__(self):
-        return self.code
-
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.args == other.args
 
@@ -83,7 +82,7 @@ class DomainNameAnalysisError(object):
             if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
-                if isinstance(v, (str, unicode)):
+                if isinstance(v, str):
                     template_kwargs_escaped[n] = cgi.escape(v)
                 else:
                     template_kwargs_escaped[n] = cgi.escape(str(v))
