@@ -36,14 +36,21 @@ import ssl
 import struct
 import threading
 import time
-import urllib
-import urlparse
 
 # python3/python2 dual compatibility
 try:
     import queue
 except ImportError:
     import Queue as queue
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+    import urllib
+    urlquote = urllib
+else:
+    urlparse = urllib.parse
+    urlquote = urllib.parse
 
 import dns.exception
 
@@ -624,7 +631,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
 
     def _post_data(self):
-        return 'content=' + urllib.quote(json.dumps(self.serialize_requests()))
+        return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
 
     def _authentication_header(self):
         if not self.username:

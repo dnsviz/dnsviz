@@ -35,7 +35,14 @@ import multiprocessing
 import multiprocessing.managers
 import threading
 import time
-import urlparse
+
+# python3/python2 dual compatibility
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+else:
+    urlparse = urllib.parse
 
 import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
