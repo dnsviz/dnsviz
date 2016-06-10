@@ -79,7 +79,9 @@ def _init_subprocess():
     _init_tm()
     _init_interrupt_handler()
 
-def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories)):
+def _analyze(args):
+    (cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, \
+            explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
