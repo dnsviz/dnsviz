@@ -32,7 +32,7 @@ import bisect
 import collections
 import errno
 import io
-import Queue
+import queue
 import socket
 import struct
 import time
@@ -1256,7 +1256,7 @@ class ExecutableDNSQuery(DNSQuery):
             th_factories = (cls.default_th_factory,)
 
         request_list = []
-        response_queue = Queue.Queue()
+        response_queue = queue.Queue()
 
         ignore_queryid = kwargs.get('ignore_queryid', True)
         response_wire_map = {}
@@ -1311,7 +1311,7 @@ class ExecutableDNSQuery(DNSQuery):
             try:
                 # pull a response from the queue
                 th = response_queue.get(timeout=timeout)
-            except Queue.Empty:
+            except queue.Empty:
                 continue
             th.finalize()
 

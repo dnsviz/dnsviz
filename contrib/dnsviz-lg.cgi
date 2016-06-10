@@ -25,7 +25,7 @@ from __future__ import unicode_literals
 import cgi
 import json
 import os
-import Queue
+import queue
 import re
 import struct
 import sys
@@ -155,7 +155,7 @@ def main():
             raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
         form = cgi.FieldStorage()
 
-        response_queue = Queue.Queue()
+        response_queue = queue.Queue()
         queries_in_waiting = set()
         th_factory = transport.DNSQueryTransportHandlerDNSFactory()
         tm = transport.DNSQueryTransportManager()

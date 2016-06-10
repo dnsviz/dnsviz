@@ -28,7 +28,7 @@ import errno
 import fcntl
 import json
 import os
-import Queue
+import queue
 import random
 import re
 import select
@@ -1018,7 +1018,7 @@ class _DNSQueryTransportManager:
     def __init__(self):
         self._notify_read_fd, self._notify_write_fd = os.pipe()
         fcntl.fcntl(self._notify_read_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-        self._query_queue = Queue.Queue()
+        self._query_queue = queue.Queue()
         self._event_map = {}
 
         self._close = threading.Event()
@@ -1131,7 +1131,7 @@ class _DNSQueryTransportManager:
                             query_meta[fd] = qh
                             bisect.insort(expirations, (qh.expiration, qh))
                             wlist_in.append(fd)
-                    except Queue.Empty:
+                    except queue.Empty:
                         break
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
