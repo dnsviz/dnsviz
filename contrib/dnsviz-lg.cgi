@@ -25,10 +25,15 @@ from __future__ import unicode_literals
 import cgi
 import json
 import os
-import queue
 import re
 import struct
 import sys
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 from dnsviz.ipaddr import *
 from dnsviz import transport

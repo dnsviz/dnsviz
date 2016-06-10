@@ -32,10 +32,15 @@ import bisect
 import collections
 import errno
 import io
-import queue
 import socket
 import struct
 import time
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype

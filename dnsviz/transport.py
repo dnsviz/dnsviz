@@ -28,7 +28,6 @@ import errno
 import fcntl
 import json
 import os
-import queue
 import random
 import re
 import select
@@ -39,6 +38,12 @@ import threading
 import time
 import urllib
 import urlparse
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 import dns.exception
 
