@@ -46,6 +46,7 @@ import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
 from dnsviz import util
+lb2s = fmt.latin1_binary_to_string
 
 _logger = logging.getLogger(__name__)
 
@@ -721,7 +722,7 @@ class OnlineDomainNameAnalysis(object):
         if self in trace:
             return
 
-        name_str = self.name.canonicalize().to_text()
+        name_str = lb2s(self.name.canonicalize().to_text())
         if name_str in d:
             return
 
@@ -751,19 +752,19 @@ class OnlineDomainNameAnalysis(object):
             d[name_str]['clients_ipv6'] = clients_ipv6
 
             if self.parent is not None:
-                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
+                d[name_str]['parent'] = lb2s(self.parent_name().canonicalize().to_text())
             if self.dlv_parent is not None:
-                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+                d[name_str]['dlv_parent'] = lb2s(self.dlv_parent_name().canonicalize().to_text())
             if self.nxdomain_ancestor is not None:
-                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
+                d[name_str]['nxdomain_ancestor'] = lb2s(self.nxdomain_ancestor_name().canonicalize().to_text())
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
             if self.nxdomain_name is not None:
-                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
+                d[name_str]['nxdomain_name'] = lb2s(self.nxdomain_name.to_text())
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
             if self.nxrrset_name is not None:
-                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
+                d[name_str]['nxrrset_name'] = lb2s(self.nxrrset_name.to_text())
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
 
         self._serialize_related(d[name_str], meta_only)
@@ -776,7 +777,7 @@ class OnlineDomainNameAnalysis(object):
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
-                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+                d['auth_ns_ip_mapping'][lb2s(name.canonicalize().to_text())] = addrs
 
         if self.stub:
             return
@@ -814,7 +815,7 @@ class OnlineDomainNameAnalysis(object):
         if name in cache:
             return cache[name]
 
-        name_str = name.canonicalize().to_text()
+        name_str = lb2s(name.canonicalize().to_text())
         d = d1[name_str]
 
         analysis_type = analysis_type_codes[d['type']]
@@ -944,10 +945,10 @@ class OnlineDomainNameAnalysis(object):
 
         # these two are optional
         for target in self.ns_dependencies:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
         for target in self.mx_targets:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
@@ -1220,7 +1221,7 @@ class Analyst(object):
             rdtypes.append(dns.rdatatype.TXT)
         elif name.is_subdomain(ARPA_NAME):
             pass
-        elif PROTO_LABEL_RE.search(name[0]):
+        elif PROTO_LABEL_RE.search(lb2s(name[0])):
             pass
         elif self._is_sld_or_lower(name):
             rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
@@ -1258,7 +1259,7 @@ class Analyst(object):
         determined by examining the structure of the name for _<port>._<proto>
         format.'''
 
-        if len(name) > 2 and DANE_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and DANE_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False
@@ -1268,7 +1269,7 @@ class Analyst(object):
         determined by examining the structure of the name for common
         service-related names.'''
 
-        if len(name) > 2 and SRV_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and SRV_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False

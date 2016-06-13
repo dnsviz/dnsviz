@@ -34,6 +34,7 @@ import sys
 import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
+from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
@@ -230,9 +231,9 @@ def main(argv):
         name_objs = []
         cache = {}
         for name in names:
-            name_str = name.canonicalize().to_text()
+            name_str = lb2s(name.canonicalize().to_text())
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
-                logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
+                logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
             name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
 
@@ -263,7 +264,7 @@ def main(argv):
             name_obj.serialize_status(d, loglevel=loglevel)
 
         if d:
-            fh.write(json.dumps(d, ensure_ascii=False, encoding='utf-8', **kwargs))
+            fh.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')

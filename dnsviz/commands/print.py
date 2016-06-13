@@ -34,6 +34,7 @@ import sys
 import dns.exception, dns.name
 
 from dnsviz.analysis import TTLAgnosticOfflineDomainNameAnalysis, DNS_RAW_VERSION
+from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
@@ -437,9 +438,9 @@ def main(argv):
         name_objs = []
         cache = {}
         for name in names:
-            name_str = name.canonicalize().to_text()
+            name_str = lb2s(name.canonicalize().to_text())
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
-                logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
+                logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
             name_objs.append(TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
 
@@ -465,13 +466,13 @@ def main(argv):
             if rdtypes is not None:
                 for rdtype in rdtypes:
                     if (name_obj.name, rdtype) not in name_obj.queries:
-                        logger.error('No query for "%s/%s" was included in the analysis.' % (name_obj.name.to_text(), dns.rdatatype.to_text(rdtype)))
+                        logger.error('No query for "%s/%s" was included in the analysis.' % (lb2s(name_obj.name.to_text()), dns.rdatatype.to_text(rdtype)))
 
             if '-O' in opts:
                 if name_obj.name == dns.name.root:
                     name = 'root'
                 else:
-                    name = name_obj.name.canonicalize().to_text().rstrip('.')
+                    name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
                 finish_graph(G, [name_obj], rdtypes, trusted_keys, '%s.txt' % name)
                 G = DNSAuthGraph()
 

@@ -55,6 +55,7 @@ else:
 import dns.exception
 
 from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .format import latin1_binary_to_string as lb2s
 
 DNS_TRANSPORT_VERSION = 1.0
 
@@ -91,7 +92,7 @@ class DNSQueryTransportMeta(object):
 
     def serialize_request(self):
         d = collections.OrderedDict()
-        d['req'] = base64.b64encode(self.req)
+        d['req'] = lb2s(base64.b64encode(self.req))
         d['dst'] = self.dst
         d['dport'] = self.dport
         if self.src is not None:
@@ -163,7 +164,7 @@ class DNSQueryTransportMeta(object):
     def serialize_response(self):
         d = collections.OrderedDict()
         if self.res is not None:
-            d['res'] = base64.b64encode(self.res)
+            d['res'] = lb2s(base64.b64encode(self.res))
         else:
             d['res'] = None
         if self.err is not None:
@@ -201,7 +202,7 @@ class DNSQueryTransportMeta(object):
 
         else:
             try:
-                self.res = base64.b64decode(d['res'])
+                self.res = lb2s(base64.b64decode(d['res']))
             except TypeError:
                 raise TransportMetaDeserializationError('Base64 decoding of DNS response failed: %s' % d['res'])
 

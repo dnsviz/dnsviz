@@ -54,6 +54,7 @@ from dnsviz.query import StandardRecursiveQueryCD
 from dnsviz.resolver import DNSAnswer, Resolver
 from dnsviz import transport
 from dnsviz.util import get_client_address
+lb2s = fmt.latin1_binary_to_string
 
 logger = logging.getLogger('dnsviz.analysis.online')
 
@@ -654,7 +655,7 @@ def main(argv):
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
-        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in names] }
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [lb2s(n.to_text()) for n in names] }
 
         flush = '-F' in opts
 
@@ -690,7 +691,7 @@ def main(argv):
         d['_meta._dnsviz.'] = dnsviz_meta
 
         try:
-            fh.write(json.dumps(d, ensure_ascii=False, encoding='utf-8', **kwargs))
+            fh.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
         except IOError as e:
             logger.error('Error writing analysis: %s' % e)
             sys.exit(3)

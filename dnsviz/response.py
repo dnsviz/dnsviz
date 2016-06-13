@@ -46,6 +46,7 @@ from . import crypto
 from . import format as fmt
 from .ipaddr import IPAddr
 from .util import tuple_to_dict
+lb2s = fmt.latin1_binary_to_string
 
 class DNSResponse:
     '''A DNS response, including meta information'''
@@ -526,7 +527,7 @@ class DNSResponse:
                 if errno_name is not None:
                     d['errno'] = errno_name
         else:
-            d['message'] = base64.b64encode(self.message.to_wire())
+            d['message'] = lb2s(base64.b64encode(self.message.to_wire()))
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['time_elapsed'] = int(self.response_time * 1000)
@@ -910,7 +911,7 @@ class RRsetInfo(DNSResponseComponent):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
             d['name'] = formatter(fmt.format_nsec3_name(self.rrset.name))
         else:
-            d['name'] = formatter(self.rrset.name.canonicalize().to_text())
+            d['name'] = formatter(lb2s(self.rrset.name.canonicalize().to_text()))
         d['ttl'] = self.rrset.ttl
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []

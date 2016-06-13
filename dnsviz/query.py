@@ -48,6 +48,7 @@ import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
 from .ipaddr import *
 from .response import *
 from . import transport
+from .format import latin1_binary_to_string as lb2s
 
 RETRY_CAUSE_NETWORK_ERROR = RESPONSE_ERROR_NETWORK_ERROR = 1
 RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2
@@ -1065,7 +1066,7 @@ class DNSQuery(object):
 
     def serialize(self, meta_only=False):
         d = collections.OrderedDict((
-            ('qname', self.qname.to_text()),
+            ('qname', lb2s(self.qname.to_text())),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
             ('qtype', dns.rdatatype.to_text(self.rdtype)),
         ))
@@ -1080,7 +1081,7 @@ class DNSQuery(object):
             for o in self.edns_options:
                 s = io.BytesIO()
                 o.to_wire(s)
-                d['options']['edns_options'].append((o.otype, base64.b64encode(s.getvalue())))
+                d['options']['edns_options'].append((o.otype, lb2s(base64.b64encode(s.getvalue()))))
             d['options']['tcp'] = self.tcp
 
         d['responses'] = collections.OrderedDict()
@@ -1113,7 +1114,7 @@ class DNSQuery(object):
             edns_flags = d1['edns_flags']
             edns_options = []
             for otype, data in d1['edns_options']:
-                edns_options.append(dns.edns.GenericOption(otype, base64.b64decode(data)))
+                edns_options.append(dns.edns.GenericOption(otype, lb2s(base64.b64decode(data))))
         else:
             edns = None
             edns_max_udp_payload = None

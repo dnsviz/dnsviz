@@ -50,6 +50,7 @@ from dnsviz import format as fmt
 from dnsviz import query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
+from lb2s = fmt.latin1_binary_to_string
 
 COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'bogus': '#be1515', 'bogus_non_existent': '#e5a1a1',
@@ -102,7 +103,7 @@ class RRsetNonExistent(object):
         if self.rdtype == dns.rdatatype.NSEC3:
             d['name'] = fmt.format_nsec3_name(self.name)
         else:
-            d['name'] = formatter(self.name.canonicalize().to_text())
+            d['name'] = formatter(lb2s(self.name.canonicalize().to_text()))
         d['ttl'] = None
         d['type'] = dns.rdatatype.to_text(self.rdtype)
         if self.nxdomain:
@@ -918,7 +919,7 @@ class DNSAuthGraph:
             self.nsec_rr_status[node_str] = {}
             label_str = '<<TABLE BORDER="0" CELLSPACING="%d" CELLPADDING="0" BGCOLOR="%s"><TR>' % (cellspacing, bgcolor)
             for nsec_name in nsec_status.nsec_set_info.rrsets:
-                nsec_name = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
+                nsec_name = lb2s(nsec_name.canonicalize().to_text()).replace(r'"', r'\"')
                 self.nsec_rr_status[node_str][nsec_name] = ''
                 label_str += '<TD PORT="%s" BORDER="2"><FONT POINT-SIZE="%d"> </FONT></TD>' % (nsec_name, 6)
             label_str += '</TR><TR><TD COLSPAN="%d" BORDER="2" CELLPADDING="3">' % len(nsec_status.nsec_set_info.rrsets)
@@ -1005,7 +1006,7 @@ class DNSAuthGraph:
         if nsec_status is not None:
             nsec_node = self.add_nsec(nsec_status, rrset_info.rrset.name, rrset_info.rrset.rdtype, name_obj, zone_obj, nxdomain_node)
             for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
-                nsec_cell = nsec_name.canonicalize().to_text()
+                nsec_cell = lb2s(nsec_name.canonicalize().to_text())
                 self.add_rrsigs(name_obj, zone_obj, rrset_info, nsec_node, port=nsec_cell)
 
         return wildcard_node
@@ -1147,7 +1148,7 @@ class DNSAuthGraph:
             for nsec_status in name_obj.nxdomain_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nxdomain_node)
                 for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
-                    nsec_cell = nsec_name.canonicalize().to_text()
+                    nsec_cell = lb2s(nsec_name.canonicalize().to_text())
                     self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, port=nsec_cell)
 
                 id += 1
@@ -1182,7 +1183,7 @@ class DNSAuthGraph:
             for nsec_status in name_obj.nodata_status[neg_response_info]:
                 nsec_node = self.add_nsec(nsec_status, name, rdtype, name_obj, my_zone_obj, nodata_node)
                 for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
-                    nsec_cell = nsec_name.canonicalize().to_text()
+                    nsec_cell = lb2s(nsec_name.canonicalize().to_text())
                     self.add_rrsigs(name_obj, my_zone_obj, rrset_info, nsec_node, port=nsec_cell)
 
                 id += 1
@@ -1364,7 +1365,7 @@ class DNSAuthGraph:
                 self.G.add_edge(parent_bottom, nsec_node, style='invis')
 
                 for nsec_name, rrset_info in nsec_status.nsec_set_info.rrsets.items():
-                    nsec_cell = nsec_name.canonicalize().to_text()
+                    nsec_cell = lb2s(nsec_name.canonicalize().to_text())
                     self.add_rrsigs(name_obj, parent_obj, rrset_info, nsec_node, port=nsec_cell)
 
                 edge_id += 1
@@ -1407,7 +1408,7 @@ class DNSAuthGraph:
 
             consolidate_clients = name_obj.single_client()
             del_serialized = collections.OrderedDict()
-            del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
+            del_serialized['description'] = 'Delegation from %s to %s' % (lb2s(name_obj.parent.name.to_text()), lb2s(name_obj.name.to_text()))
             del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status[rdtype]]
 
             if has_warnings:
@@ -1696,7 +1697,7 @@ class DNSAuthGraph:
             # authenticated.
             elif p.startswith('NSEC'):
                 rrsig_status = list(self.node_mapping[e.attr['id']])[0]
-                nsec_name = rrsig_status.rrset.rrset.name.canonicalize().to_text().replace(r'"', r'\"')
+                nsec_name = lb2s(rrsig_status.rrset.rrset.name.canonicalize().to_text()).replace(r'"', r'\"')
                 if prev_node_trusted:
                     self.nsec_rr_status[p][nsec_name] = COLORS['secure']
                     for nsec_name in self.nsec_rr_status[p]:

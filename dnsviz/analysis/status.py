@@ -39,6 +39,7 @@ from dnsviz import base32
 from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz.util import tuple_to_dict
+lb2s = fmt.latin1_binary_to_string
 
 from . import errors as Errors
 
@@ -235,12 +236,12 @@ class RRSIGStatus(object):
             formatter = lambda x: x
 
         if show_id:
-            d['id'] = '%s/%d/%d' % (self.rrsig.signer.canonicalize().to_text(), self.rrsig.algorithm, self.rrsig.key_tag)
+            d['id'] = '%s/%d/%d' % (lb2s(self.rrsig.signer.canonicalize().to_text()), self.rrsig.algorithm, self.rrsig.key_tag)
 
         if loglevel <= logging.DEBUG:
             d.update((
                 ('description', formatter(str(self))),
-                ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
+                ('signer', formatter(lb2s(self.rrsig.signer.canonicalize().to_text()))),
                 ('algorithm', self.rrsig.algorithm),
                 ('key_tag', self.rrsig.key_tag),
                 ('original_ttl', self.rrsig.original_ttl),
@@ -538,18 +539,18 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['sname_covering'] = collections.OrderedDict((
-                    ('covered_name', formatter(qname.canonicalize().to_text())),
-                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
-                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
+                    ('covered_name', formatter(lb2s(qname.canonicalize().to_text()))),
+                    ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
+                    ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
                 ))
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = list(self.nsec_names_covering_wildcard.items())[0]
                     nsec_name = list(nsec_names)[0]
                     nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                     d['wildcard_covering'] = collections.OrderedDict((
-                        ('covered_name', formatter(wildcard.canonicalize().to_text())),
-                        ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
-                        ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
+                        ('covered_name', formatter(lb2s(wildcard.canonicalize().to_text()))),
+                        ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
+                        ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
                     ))
 
         if loglevel <= logging.INFO or erroneous_status:
@@ -779,20 +780,20 @@ class NSECStatusNODATA(NSECStatus):
 
         if loglevel <= logging.DEBUG:
             if self.nsec_for_qname is not None:
-                d['sname_nsec_match'] = formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())
+                d['sname_nsec_match'] = formatter(lb2s(self.nsec_for_qname.rrset.name.canonicalize().to_text()))
 
             if self.nsec_names_covering_qname:
                 qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['sname_covering'] = collections.OrderedDict((
-                    ('covered_name', formatter(qname.canonicalize().to_text())),
-                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
-                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
+                    ('covered_name', formatter(lb2s(qname.canonicalize().to_text()))),
+                    ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
+                    ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
                 ))
 
                 if self.nsec_for_wildcard_name is not None:
-                    d['wildcard_nsec_match'] = formatter(self.wildcard_name.canonicalize().to_text())
+                    d['wildcard_nsec_match'] = formatter(lb2s(self.wildcard_name.canonicalize().to_text()))
 
         if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -994,13 +995,13 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             if self.closest_encloser:
                 encloser_name, nsec_names = list(self.closest_encloser.items())[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
+                d['closest_encloser'] = formatter(lb2s(encloser_name.canonicalize().to_text()))
                 # could be inferred from wildcard
                 if nsec_name is not None:
                     d['closest_encloser_hash'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
+                d['next_closest_encloser'] = formatter(lb2s(next_closest_encloser.canonicalize().to_text()))
                 digest_name = list(self.name_digest_map[next_closest_encloser].items())[0][1]
                 if digest_name is not None:
                     d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1019,7 +1020,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = list(self.name_digest_map[wildcard_name].items())[0][1]
-                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
+                d['wildcard'] = formatter(lb2s(wildcard_name.canonicalize().to_text()))
                 if wildcard_digest is not None:
                     d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
@@ -1347,11 +1348,11 @@ class NSEC3StatusNODATA(NSEC3Status):
             if self.closest_encloser:
                 encloser_name, nsec_names = list(self.closest_encloser.items())[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
+                d['closest_encloser'] = formatter(lb2s(encloser_name.canonicalize().to_text()))
                 d['closest_encloser_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
+                d['next_closest_encloser'] = formatter(lb2s(next_closest_encloser.canonicalize().to_text()))
                 digest_name = list(self.name_digest_map[next_closest_encloser].items())[0][1]
                 if digest_name is not None:
                     d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1370,7 +1371,7 @@ class NSEC3StatusNODATA(NSEC3Status):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = list(self.name_digest_map[wildcard_name].items())[0][1]
-                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
+                d['wildcard'] = formatter(lb2s(wildcard_name.canonicalize().to_text()))
                 if wildcard_digest is not None:
                     d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
@@ -1458,7 +1459,7 @@ class CNAMEFromDNAMEStatus(object):
             formatter = lambda x: x
 
         if show_id:
-            d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
+            d['id'] = lb2s(self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text())
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(str(self))
@@ -1468,8 +1469,8 @@ class CNAMEFromDNAMEStatus(object):
 
         if loglevel <= logging.DEBUG:
             if self.included_cname is not None:
-                d['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
-                d['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
+                d['cname_owner'] = formatter(lb2s(self.included_cname.rrset.name.canonicalize().to_text()))
+                d['cname_target'] = formatter(lb2s(self.included_cname.rrset[0].target.canonicalize().to_text()))
 
         if loglevel <= logging.INFO or erroneous_status:
             d['status'] = dname_status_mapping[self.validation_status]
