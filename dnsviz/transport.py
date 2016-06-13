@@ -1109,11 +1109,17 @@ class _DNSQueryTransportManager:
                     finished_fds.append(fd)
 
             # handle the expired queries
-            future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandler())))
+            future_index = bisect.bisect_right(expirations, ((time.time(), 0)))
             for i in range(future_index):
-                qh = expirations[i][1]
+                try:
+                    qh = query_meta[expirations[i][1]]
+                except KeyError:
+                    # this query was already finished and removed from
+                    # query_meta, so don't indicate that it timed out
+                    continue
 
-                # perhaps this query actually finished earlier in the loop
+                # this query actually finished earlier in this iteration of the
+                # loop, so don't indicate that it timed out
                 if qh.end_time is not None:
                     continue
 
@@ -1148,7 +1154,7 @@ class _DNSQueryTransportManager:
                             # socket, then put this socket in the write fd list
                             fd = qh.sock.fileno()
                             query_meta[fd] = qh
-                            bisect.insort(expirations, (qh.expiration, qh))
+                            bisect.insort(expirations, (qh.expiration, fd))
                             wlist_in.append(fd)
                     except queue.Empty:
                         break
