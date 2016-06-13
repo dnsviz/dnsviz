@@ -60,7 +60,11 @@ class UTC(datetime.tzinfo):
         return ZERO
 
     def tzname(self, dt):
-        return b"UTC"
+        # python3/python2 dual compatibility
+        if type(b'') is str:
+            return b'UTC'
+        else:
+            return 'UTC'
 
     def dst(self, dt):
         return ZERO
