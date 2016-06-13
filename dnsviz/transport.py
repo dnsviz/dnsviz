@@ -1108,7 +1108,7 @@ class _DNSQueryTransportManager:
                     finished_fds.append(fd)
 
             # handle the expired queries
-            future_index = bisect.bisect_right(expirations, ((time.time(), None)))
+            future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandler())))
             for i in range(future_index):
                 qh = expirations[i][1]
 
