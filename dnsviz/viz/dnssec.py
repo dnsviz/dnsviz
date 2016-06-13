@@ -50,7 +50,7 @@ from dnsviz import format as fmt
 from dnsviz import query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
-from lb2s = fmt.latin1_binary_to_string
+lb2s = fmt.latin1_binary_to_string
 
 COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'bogus': '#be1515', 'bogus_non_existent': '#e5a1a1',
