@@ -415,7 +415,7 @@ class OnlineDomainNameAnalysis(object):
 
         # look for SOA in authority section, in the case of negative responses
         try:
-            soa_rrset = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)[0]
+            soa_rrset = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA][0]
             if soa_rrset.name == self.name:
                 self.has_soa = True
         except IndexError:
