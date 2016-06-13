@@ -447,10 +447,16 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         self.req_len = len(qtm.req)
         self.req_index = 0
 
+        # python3/python2 dual compatibility
+        if isinstance(self.req, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
         self._queryid_wire = self.req[:2]
         index = 12
-        while ord(self.req[index]) != 0:
-            index += ord(self.req[index]) + 1
+        while map_func(self.req[index]) != 0:
+            index += map_func(self.req[index]) + 1
         index += 4
         self._question_wire = self.req[12:index]
 

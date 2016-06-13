@@ -328,7 +328,13 @@ class UseTCPOnTCFlagHandler(DNSResponseHandler):
     '''Retry with TCP if the TC flag is set in the response.'''
 
     def handle(self, response_wire, response, response_time):
-        if response_wire is not None and ord(response_wire[2]) & 0x02:
+        # python3/python2 dual compatibility
+        if isinstance(response_wire, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
+        if response_wire is not None and map_func(response_wire[2]) & 0x02:
             self._params['tcp'] = True
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
@@ -528,6 +534,12 @@ class PMTUBoundingHandler(DNSResponseHandler):
         is_timeout = isinstance(response, dns.exception.Timeout)
         is_valid = isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN)
 
+        # python3/python2 dual compatibility
+        if isinstance(response_wire, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
         if self._request.edns < 0 or not (self._request.ednsflags & dns.flags.DO):
             self._state = self.INVALID
 
@@ -546,12 +558,12 @@ class PMTUBoundingHandler(DNSResponseHandler):
         elif self._state == self.REDUCED_PAYLOAD:
             self.handle_sub(response_wire, response, response_time)
             if not is_timeout:
-                if (response_wire is not None and ord(response_wire[2]) & 0x02) or is_valid:
+                if (response_wire is not None and map_func(response_wire[2]) & 0x02) or is_valid:
                     self._lower_bound = self._water_mark = len(response_wire)
                     self._params['timeout'] = self._bounding_timeout
                     self._params['tcp'] = True
                     self._state = self.USE_TCP
-                    if response_wire is not None and ord(response_wire[2]) & 0x02:
+                    if response_wire is not None and map_func(response_wire[2]) & 0x02:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                     else:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None)
@@ -585,7 +597,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             # if the response was truncated, then the size of the payload
             # received via TCP is the largest we can receive
-            elif response_wire is not None and ord(response_wire[2]) & 0x02:
+            elif response_wire is not None and map_func(response_wire[2]) & 0x02:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
@@ -594,7 +606,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
             if self._upper_bound - self._lower_bound <= 1:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                if response_wire is not None and ord(response_wire[2]) & 0x02:
+                if response_wire is not None and map_func(response_wire[2]) & 0x02:
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                 elif is_timeout:
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None)
