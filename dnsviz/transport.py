@@ -1035,6 +1035,12 @@ class DNSQueryTransportHandlerWrapper(object):
     def __init__(self, qh):
         self.qh = qh
 
+    def __eq__(self, other):
+        return False
+
+    def __lt__(self, other):
+        return False
+
 class _DNSQueryTransportManager:
     '''A class that handles'''
 
