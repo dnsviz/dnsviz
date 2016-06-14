@@ -202,7 +202,7 @@ class DNSQueryTransportMeta(object):
 
         else:
             try:
-                self.res = lb2s(base64.b64decode(d['res']))
+                self.res = base64.b64decode(d['res'])
             except TypeError:
                 raise TransportMetaDeserializationError('Base64 decoding of DNS response failed: %s' % d['res'])
 
