@@ -1059,12 +1059,18 @@ class NSECSet(DNSResponseComponent):
         self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
 
     def is_valid_nsec3_name(self, nsec_name, algorithm):
+        # python3/python2 dual compatibility
+        if isinstance(nsec_name[0], str):
+            map_func = lambda x: x
+        else:
+            map_func = lambda x: chr(x)
+
         # check that NSEC3 name is valid
         if algorithm == 1:
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if [x for x in nsec_name[0] if x.upper() not in base32.b32alphabet]:
+        if [x for x in nsec_name[0] if map_func(x).upper() not in base32.b32alphabet]:
             return False
         return True
 
