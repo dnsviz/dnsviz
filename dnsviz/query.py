@@ -848,7 +848,7 @@ class AggregateDNSResponse(object):
             if referral and rdtype != dns.rdatatype.DS:
                 # add referrals
                 try:
-                    rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, msg.authority)[0]
+                    rrset = [x for x in msg.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
                 except IndexError:
                     pass
                 else:
