@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 
 import base64
 import bisect
+import codecs
 import collections
 import errno
 import fcntl
@@ -550,7 +551,7 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # load the json content
         try:
-            content = json.loads(self.res)
+            content = json.loads(lb2s(self.res))
         except ValueError:
             raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
 
@@ -648,11 +649,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         username = self.username
         if self.password:
             username += ':' + self.password
-        return 'Authorization: Basic %s\r\n' % (base64.b64encode(username))
+        return 'Authorization: Basic %s\r\n' % (lb2s(base64.b64encode(codecs.encode(username, 'utf-8'))))
 
     def init_req(self):
         data = self._post_data()
-        self.req = bytes('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.4\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data))
+        self.req = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.4\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
         self.req_len = len(self.req)
         self.req_index = 0
 
@@ -676,13 +677,13 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
             # still reading status and headers
             if self.chunked_encoding is None and self.res_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(self.res_buf)
+                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.res_buf))
                 if headers_end_match is not None:
                     headers = self.res_buf[:headers_end_match.start()]
                     self.res_buf = self.res_buf[headers_end_match.end():]
 
                     # check HTTP status
-                    status_match = HTTP_STATUS_RE.search(headers)
+                    status_match = HTTP_STATUS_RE.search(lb2s(headers))
                     if status_match is None:
                         self.err = RemoteQueryTransportError('Malformed HTTP status line')
                         self.cleanup()
@@ -695,12 +696,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                     # get content length or determine whether "chunked"
                     # transfer encoding is used
-                    content_length_match = CONTENT_LENGTH_RE.search(headers)
+                    content_length_match = CONTENT_LENGTH_RE.search(lb2s(headers))
                     if content_length_match is not None:
                         self.chunked_encoding = False
                         self.res_len = int(content_length_match.group('length'))
                     else:
-                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(headers) is not None
+                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(lb2s(headers)) is not None
 
             # handle chunked encoding first
             if self.chunked_encoding:
@@ -712,12 +713,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(self.res_buf)
+                        crlf_start_match = CRLF_START_RE.search(lb2s(self.res_buf))
                         if crlf_start_match is not None:
                             self.res_buf = self.res_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_buf)
+                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.res_buf))
                         if chunk_len_match is not None:
                             self.res_len = int(chunk_len_match.group('length'), 16)
                             self.res_buf = self.res_buf[chunk_len_match.end():]
@@ -1033,12 +1034,6 @@ class DNSQueryTransportHandlerWebSocketPrivateFactory:
 class DNSQueryTransportHandlerWrapper(object):
     def __init__(self, qh):
         self.qh = qh
-
-    def __eq__(self, other):
-        return False
-
-    def __lt__(self, other):
-        return False
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
