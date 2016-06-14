@@ -1030,6 +1030,16 @@ class DNSQueryTransportHandlerWebSocketPrivateFactory:
     def build(self, **kwargs):
         return self._f.build(**kwargs)
 
+class DNSQueryTransportHandlerWrapper(object):
+    def __init__(self, qh):
+        self.qh = qh
+
+    def __eq__(self, other):
+        return False
+
+    def __lt__(self, other):
+        return False
+
 class _DNSQueryTransportManager:
     '''A class that handles'''
 
@@ -1109,14 +1119,9 @@ class _DNSQueryTransportManager:
                     finished_fds.append(fd)
 
             # handle the expired queries
-            future_index = bisect.bisect_right(expirations, ((time.time(), 0)))
+            future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandlerWrapper(None))))
             for i in range(future_index):
-                try:
-                    qh = query_meta[expirations[i][1]]
-                except KeyError:
-                    # this query was already finished and removed from
-                    # query_meta, so don't indicate that it timed out
-                    continue
+                qh = expirations[i][1].qh
 
                 # this query actually finished earlier in this iteration of the
                 # loop, so don't indicate that it timed out
@@ -1154,7 +1159,7 @@ class _DNSQueryTransportManager:
                             # socket, then put this socket in the write fd list
                             fd = qh.sock.fileno()
                             query_meta[fd] = qh
-                            bisect.insort(expirations, (qh.expiration, fd))
+                            bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
                             wlist_in.append(fd)
                     except queue.Empty:
                         break
