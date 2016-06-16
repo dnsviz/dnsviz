@@ -1320,9 +1320,9 @@ class Analyst(object):
             servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
         return servers
 
-    def _filter_servers(self, servers):
+    def _filter_servers(self, servers, no_raise=False):
         filtered_servers = self._filter_servers_network(servers)
-        if servers and not filtered_servers:
+        if servers and not filtered_servers and not no_raise:
             self._raise_connectivity_error_remote()
         return self._filter_servers_locality(filtered_servers)
 
@@ -1853,7 +1853,7 @@ class Analyst(object):
             # NS query
             servers = auth_servers.difference(servers_queried[dns.rdatatype.NS])
             servers_queried[dns.rdatatype.NS].update(servers)
-            servers = self._filter_servers(servers)
+            servers = self._filter_servers(servers, no_raise=True)
             if servers:
                 self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
                 queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
@@ -1862,7 +1862,7 @@ class Analyst(object):
             if secondary_rdtype is not None and self._ask_non_delegation_queries(name_obj.name):
                 servers = auth_servers.difference(servers_queried[secondary_rdtype])
                 servers_queried[secondary_rdtype].update(servers)
-                servers = self._filter_servers(servers)
+                servers = self._filter_servers(servers, no_raise=True)
                 if servers:
                     self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(secondary_rdtype)))
                     queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
