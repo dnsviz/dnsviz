@@ -20,10 +20,13 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import codecs
+from __future__ import unicode_literals
+
 import collections
+import codecs
 import errno
 import getopt
+import io
 import json
 import logging
 import signal
@@ -33,7 +36,14 @@ import multiprocessing
 import multiprocessing.managers
 import threading
 import time
-import urlparse
+
+# python3/python2 dual compatibility
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+else:
+    urlparse = urllib.parse
 
 import dns.exception, dns.name, dns.rdataclass, dns.rdatatype
 
@@ -44,6 +54,7 @@ from dnsviz.query import StandardRecursiveQueryCD
 from dnsviz.resolver import DNSAnswer, Resolver
 from dnsviz import transport
 from dnsviz.util import get_client_address
+lb2s = fmt.latin1_binary_to_string
 
 logger = logging.getLogger('dnsviz.analysis.online')
 
@@ -77,7 +88,9 @@ def _init_subprocess():
     _init_tm()
     _init_interrupt_handler()
 
-def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories)):
+def _analyze(args):
+    (cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, \
+            explicit_delegations, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
@@ -89,7 +102,7 @@ def _analyze((cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv
     except KeyboardInterrupt:
         raise
     # report exceptions related to network connectivity
-    except (NetworkConnectivityException, transport.RemoteQueryTransportError), e:
+    except (NetworkConnectivityException, transport.RemoteQueryTransportError) as e:
         logger.error('Error analyzing %s: %s' % (fmt.humanize_name(name), e))
     # don't report EOFError, as that is what is raised if there is a
     # KeyboardInterrupt in ParallelAnalyst
@@ -337,7 +350,7 @@ def main(argv):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:EAs:Fh')
-        except getopt.GetoptError, e:
+        except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
 
@@ -386,7 +399,7 @@ def main(argv):
                     s = socket.socket(fam)
                     s.bind((addr, 0))
                     del s
-                except socket.error, e:
+                except socket.error as e:
                     if e.errno == errno.EADDRNOTAVAIL:
                         usage('Cannot bind to specified IP address: "%s"' % addr)
                         sys.exit(1)
@@ -434,7 +447,7 @@ def main(argv):
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
             try:
-                rdtypes = map(dns.rdatatype.from_text, rdtypes)
+                rdtypes = [dns.rdatatype.from_text(x) for x in rdtypes]
             except dns.rdatatype.UnknownRdatatype:
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
@@ -552,13 +565,12 @@ def main(argv):
 
         if '-r' in opts:
             if opts['-r'] == '-':
-                analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
-            else:
-                try:
-                    analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
-                except IOError, e:
-                    logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                    sys.exit(3)
+                opts['-r'] = sys.stdin.fileno()
+            try:
+                analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+            except IOError as e:
+                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+                sys.exit(3)
             try:
                 analysis_structured = json.loads(analysis_str)
             except ValueError:
@@ -570,13 +582,13 @@ def main(argv):
                 logger.error('No version information in JSON input.')
                 sys.exit(3)
             try:
-                major_vers, minor_vers = map(int, str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1))
+                major_vers, minor_vers = [int(x) for x in str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
             except ValueError:
                 logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
                 sys.exit(3)
             # ensure major version is a match and minor version is no greater
             # than the current minor version
-            curr_major_vers, curr_minor_vers = map(int, str(DNS_RAW_VERSION).split('.', 1))
+            curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
             if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
                 logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
                 sys.exit(3)
@@ -584,15 +596,15 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
-            except IOError, e:
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
+            except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
             for line in f:
                 name = line.strip()
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -601,7 +613,9 @@ def main(argv):
             f.close()
         else:
             if args:
-                args = map(lambda x: x.decode(sys.getfilesystemencoding()), args)
+                # python3/python2 dual compatibility
+                if isinstance(args[0], bytes):
+                    args = [codecs.decode(x, sys.getfilesystemencoding()) for x in args]
             else:
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']
@@ -611,7 +625,7 @@ def main(argv):
             for name in args:
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -626,13 +640,12 @@ def main(argv):
         meta_only = '-m' in opts
 
         if '-o' not in opts or opts['-o'] == '-':
-            fh = sys.stdout
-        else:
-            try:
-                fh = open(opts['-o'], 'w')
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-o']))
-                sys.exit(3)
+            opts['-o'] = sys.stdout.fileno()
+        try:
+            fh = io.open(opts['-o'], 'wb')
+        except IOError as e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            sys.exit(3)
 
         def _flush(name_obj):
             d = collections.OrderedDict()
@@ -642,7 +655,7 @@ def main(argv):
             rindex = s.rindex('}')
             fh.write(s[lindex+1:rindex]+',')
 
-        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in names] }
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [lb2s(n.to_text()) for n in names] }
 
         flush = '-F' in opts
 
@@ -667,7 +680,7 @@ def main(argv):
 
             name_objs = a.analyze(names)
 
-        name_objs = filter(lambda x: x is not None, name_objs)
+        name_objs = [x for x in name_objs if x is not None]
 
         if not name_objs:
             sys.exit(4)
@@ -678,8 +691,8 @@ def main(argv):
         d['_meta._dnsviz.'] = dnsviz_meta
 
         try:
-            fh.write(json.dumps(d, **kwargs))
-        except IOError, e:
+            fh.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
+        except IOError as e:
             logger.error('Error writing analysis: %s' % e)
             sys.exit(3)
 

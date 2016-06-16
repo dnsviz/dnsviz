@@ -19,6 +19,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
 import collections
 import datetime
@@ -52,14 +54,11 @@ class DomainNameAnalysisError(object):
     def __str__(self):
         return self.code
 
-    def __unicode__(self):
-        return self.code
-
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.args == other.args
 
     def copy(self):
-        return self.__class__(**dict(zip(self.required_params, self.args)))
+        return self.__class__(**dict(list(zip(self.required_params, self.args))))
 
     @property
     def args(self):
@@ -80,10 +79,10 @@ class DomainNameAnalysisError(object):
         description_template_escaped = cgi.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
-            if isinstance(v, (int, long)):
+            if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
-                if isinstance(v, (str, unicode)):
+                if isinstance(v, str):
                     template_kwargs_escaped[n] = cgi.escape(v)
                 else:
                     template_kwargs_escaped[n] = cgi.escape(str(v))

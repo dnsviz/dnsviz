@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import collections
 import datetime
 import logging
@@ -44,6 +46,7 @@ import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
 from dnsviz import util
+lb2s = fmt.latin1_binary_to_string
 
 _logger = logging.getLogger(__name__)
 
@@ -188,13 +191,10 @@ class OnlineDomainNameAnalysis(object):
         self._valid_servers_clients_tcp = set()
 
     def __repr__(self):
-        return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
-
-    def __unicode__(self):
-        return fmt.humanize_name(self.name, True)
+        return '<%s %s>' % (self.__class__.__name__, self.__str__())
 
     def __str__(self):
-        return fmt.humanize_name(self.name)
+        return fmt.humanize_name(self.name, True)
 
     def __eq__(self, other):
         return self.name == other.name
@@ -416,7 +416,7 @@ class OnlineDomainNameAnalysis(object):
 
         # look for SOA in authority section, in the case of negative responses
         try:
-            soa_rrset = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)[0]
+            soa_rrset = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA][0]
             if soa_rrset.name == self.name:
                 self.has_soa = True
         except IndexError:
@@ -588,7 +588,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -598,7 +598,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -608,7 +608,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -618,7 +618,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -634,7 +634,7 @@ class OnlineDomainNameAnalysis(object):
             servers = self._auth_or_designated_servers
 
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, servers))
+            return set([x for x in servers if x.version == proto])
         else:
             return servers
 
@@ -722,7 +722,7 @@ class OnlineDomainNameAnalysis(object):
         if self in trace:
             return
 
-        name_str = self.name.canonicalize().to_text()
+        name_str = lb2s(self.name.canonicalize().to_text())
         if name_str in d:
             return
 
@@ -752,19 +752,19 @@ class OnlineDomainNameAnalysis(object):
             d[name_str]['clients_ipv6'] = clients_ipv6
 
             if self.parent is not None:
-                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
+                d[name_str]['parent'] = lb2s(self.parent_name().canonicalize().to_text())
             if self.dlv_parent is not None:
-                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+                d[name_str]['dlv_parent'] = lb2s(self.dlv_parent_name().canonicalize().to_text())
             if self.nxdomain_ancestor is not None:
-                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
+                d[name_str]['nxdomain_ancestor'] = lb2s(self.nxdomain_ancestor_name().canonicalize().to_text())
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
             if self.nxdomain_name is not None:
-                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
+                d[name_str]['nxdomain_name'] = lb2s(self.nxdomain_name.to_text())
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
             if self.nxrrset_name is not None:
-                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
+                d[name_str]['nxrrset_name'] = lb2s(self.nxrrset_name.to_text())
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
 
         self._serialize_related(d[name_str], meta_only)
@@ -772,18 +772,18 @@ class OnlineDomainNameAnalysis(object):
     def _serialize_related(self, d, meta_only):
         if self._auth_ns_ip_mapping:
             d['auth_ns_ip_mapping'] = collections.OrderedDict()
-            ns_names = self._auth_ns_ip_mapping.keys()
+            ns_names = list(self._auth_ns_ip_mapping.keys())
             ns_names.sort()
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
-                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+                d['auth_ns_ip_mapping'][lb2s(name.canonicalize().to_text())] = addrs
 
         if self.stub:
             return
 
         d['queries'] = []
-        query_keys = self.queries.keys()
+        query_keys = list(self.queries.keys())
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             for query in self.queries[(qname, rdtype)].queries.values():
@@ -815,7 +815,7 @@ class OnlineDomainNameAnalysis(object):
         if name in cache:
             return cache[name]
 
-        name_str = name.canonicalize().to_text()
+        name_str = lb2s(name.canonicalize().to_text())
         d = d1[name_str]
 
         analysis_type = analysis_type_codes[d['type']]
@@ -945,10 +945,10 @@ class OnlineDomainNameAnalysis(object):
 
         # these two are optional
         for target in self.ns_dependencies:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
         for target in self.mx_targets:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
@@ -987,8 +987,8 @@ class Analyst(object):
             self.th_factories = (self.default_th_factory,)
         else:
             self.th_factories = th_factories
-        self.allow_loopback_query = bool(filter(lambda x: x.cls.allow_loopback_query, self.th_factories))
-        self.allow_private_query = bool(filter(lambda x: x.cls.allow_private_query, self.th_factories))
+        self.allow_loopback_query = bool([x for x in self.th_factories if x.cls.allow_loopback_query])
+        self.allow_private_query = bool([x for x in self.th_factories if x.cls.allow_private_query])
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1149,9 +1149,9 @@ class Analyst(object):
         else:
             servers = ROOT_NS_IPS
         if proto == 4:
-            servers = set(filter(lambda x: x.version == 4, servers))
+            servers = set([x for x in servers if x.version == 4])
         elif proto == 6:
-            servers = set(filter(lambda x: x.version == 6, servers))
+            servers = set([x for x in servers if x.version == 6])
         return servers
 
     def _is_referral_of_type(self, rdtype):
@@ -1221,7 +1221,7 @@ class Analyst(object):
             rdtypes.append(dns.rdatatype.TXT)
         elif name.is_subdomain(ARPA_NAME):
             pass
-        elif PROTO_LABEL_RE.search(name[0]):
+        elif PROTO_LABEL_RE.search(lb2s(name[0])):
             pass
         elif self._is_sld_or_lower(name):
             rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
@@ -1259,7 +1259,7 @@ class Analyst(object):
         determined by examining the structure of the name for _<port>._<proto>
         format.'''
 
-        if len(name) > 2 and DANE_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and DANE_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False
@@ -1269,7 +1269,7 @@ class Analyst(object):
         determined by examining the structure of the name for common
         service-related names.'''
 
-        if len(name) > 2 and SRV_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and SRV_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False
@@ -1308,16 +1308,16 @@ class Analyst(object):
 
     def _filter_servers_network(self, servers):
         if not self.try_ipv6:
-            servers = filter(lambda x: x.version != 6, servers)
+            servers = [x for x in servers if x.version != 6]
         if not self.try_ipv4:
-            servers = filter(lambda x: x.version != 4, servers)
+            servers = [x for x in servers if x.version != 4]
         return servers
 
     def _filter_servers_locality(self, servers):
         if not self.allow_loopback_query:
-            servers = filter(lambda x: not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6, servers)
+            servers = [x for x in servers if not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6]
         if not self.allow_private_query:
-            servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
+            servers = [x for x in servers if not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x)]
         return servers
 
     def _filter_servers(self, servers, no_raise=False):
@@ -1696,7 +1696,7 @@ class Analyst(object):
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
-        Q.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self.transport_manager, th_factories=self.th_factories)
+        Q.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self.transport_manager, th_factories=self.th_factories)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
                 self._add_query(name_obj, query)
@@ -1924,7 +1924,7 @@ class Analyst(object):
             # raise only the first exception, but log all the ones beyond
             for name, exc_info in errors[1:]:
                 self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
-            raise errors[0][1][0], None, errors[0][1][2]
+            raise errors[0][1][0].with_traceback(errors[0][1][2])
 
     def _set_negative_queries(self, name_obj):
         random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
@@ -1938,10 +1938,10 @@ class Analyst(object):
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
     def _require_connectivity_ipv4(self, name_obj):
-        return bool(filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4))
+        return bool([x for x in name_obj.clients_ipv4 if LOOPBACK_IPV4_RE.match(x) is None])
 
     def _require_connectivity_ipv6(self, name_obj):
-        return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
+        return bool([x for x in name_obj.clients_ipv6 if x != LOOPBACK_IPV6])
 
     def _check_connectivity(self, name_obj):
         if self.local_ceiling is not None and self.local_ceiling in self.explicit_delegations:
@@ -1972,8 +1972,8 @@ class Analyst(object):
         if self.try_ipv4 and self.try_ipv6:
             # if we are configured to try both IPv4 and IPv6, then use servers
             # to determine which one is missing
-            has_v4 = bool(filter(lambda x: x.version == 4, servers))
-            has_v6 = bool(filter(lambda x: x.version == 6, servers))
+            has_v4 = bool([x for x in servers if x.version == 4])
+            has_v6 = bool([x for x in servers if x.version == 6])
             if has_v4 and has_v6:
                 # if both IPv4 and IPv6 servers were attempted, then there was
                 # no network connectivity for either protocol
@@ -2125,7 +2125,7 @@ class RecursiveAnalyst(Analyst):
         if parent_obj is not None:
             nxdomain_ancestor = parent_obj.nxdomain_ancestor
             if nxdomain_ancestor is None and not parent_obj.stub:
-                rdtype = filter(lambda x: x[0] == parent_obj.name, parent_obj.queries.keys())[0][1]
+                rdtype = [x for x in parent_obj.queries.keys() if x[0] == parent_obj.name][0][1]
                 if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
                     nxdomain_ancestor = parent_obj
 

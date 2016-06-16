@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import atexit
 import base64
 import struct
@@ -44,10 +46,10 @@ else:
 
 _supported_nsec3_algs = set([1])
 
-GOST_PREFIX = '\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
-GOST_DIGEST_NAME = 'GOST R 34.11-94'
+GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
+GOST_DIGEST_NAME = b'GOST R 34.11-94'
 
-EC_NOCOMPRESSION = '\x04'
+EC_NOCOMPRESSION = b'\x04'
 
 def _init_dynamic():
     try:
@@ -94,7 +96,7 @@ def nsec3_alg_is_supported(alg):
 
 def _gost_init():
     try:
-        gost = Engine.Engine('gost')
+        gost = Engine.Engine(b'gost')
         gost.init()
         gost.set_default()
     except ValueError:
@@ -103,7 +105,7 @@ def _gost_init():
 def _gost_cleanup():
     from M2Crypto import Engine
     try:
-        gost = Engine.Engine('gost')
+        gost = Engine.Engine(b'gost')
     except ValueError:
         pass
     else:
@@ -163,33 +165,33 @@ def _dnskey_to_dsa(key):
 
     # get Q
     new_offset = offset+20
-    q = ''
+    q = b''
     for c in key[offset:new_offset]:
-        q += '%02x' % struct.unpack('B',c)[0]
+        q += b'%02x' % struct.unpack('B',c)[0]
     q = bn_to_mpi(hex_to_bn(q))
     offset = new_offset
 
     # get P
     new_offset = offset+64+(t<<3)
-    p = ''
+    p = b''
     for c in key[offset:new_offset]:
-        p += '%02x' % struct.unpack('B',c)[0]
+        p += b'%02x' % struct.unpack('B',c)[0]
     p = bn_to_mpi(hex_to_bn(p))
     offset = new_offset
 
     # get G
     new_offset = offset+64+(t<<3)
-    g = ''
+    g = b''
     for c in key[offset:new_offset]:
-        g += '%02x' % struct.unpack('B',c)[0]
+        g += b'%02x' % struct.unpack('B',c)[0]
     g = bn_to_mpi(hex_to_bn(g))
     offset = new_offset
 
     # get Y
     new_offset = offset+64+(t<<3)
-    y = ''
+    y = b''
     for c in key[offset:new_offset]:
-        y += '%02x' % struct.unpack('B',c)[0]
+        y += b'%02x' % struct.unpack('B',c)[0]
     y = bn_to_mpi(hex_to_bn(y))
     offset = new_offset
 
@@ -209,16 +211,16 @@ def _dnskey_to_rsa(key):
         offset = 3
 
     # get the exponent
-    e = ''
+    e = b''
     for c in key[offset:offset+e_len]:
-        e += '%02x' % struct.unpack('B',c)[0]
+        e += b'%02x' % struct.unpack('B',c)[0]
     e = bn_to_mpi(hex_to_bn(e))
     offset += e_len
 
     # get the modulus
-    n = ''
+    n = b''
     for c in key[offset:]:
-        n += '%02x' % struct.unpack('B',c)[0]
+        n += b'%02x' % struct.unpack('B',c)[0]
     n = bn_to_mpi(hex_to_bn(n))
 
     # create the RSA public key
@@ -230,7 +232,7 @@ def _dnskey_to_rsa(key):
 
 def _dnskey_to_gost(key):
     der = GOST_PREFIX + key
-    pem = '-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+'-----END PUBLIC KEY-----'
+    pem = bytes('-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+'-----END PUBLIC KEY-----')
 
     return EVP.load_key_string_pubkey(pem)
 
@@ -274,17 +276,17 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
 
     # get R
     new_offset = offset+20
-    r = ''
+    r = b''
     for c in sig[offset:new_offset]:
-        r += '%02x' % struct.unpack('B',c)[0]
+        r += b'%02x' % struct.unpack('B',c)[0]
     r = bn_to_mpi(hex_to_bn(r))
     offset = new_offset
 
     # get S
     new_offset = offset+20
-    s = ''
+    s = b''
     for c in sig[offset:new_offset]:
-        s += '%02x' % struct.unpack('B',c)[0]
+        s += b'%02x' % struct.unpack('B',c)[0]
     s = bn_to_mpi(hex_to_bn(s))
     offset = new_offset
 
@@ -327,18 +329,18 @@ def _validate_rrsig_ec(alg, sig, msg, key):
     offset = 0
 
     # get R
-    new_offset = offset+sigsize/2
-    r = ''
+    new_offset = offset+sigsize//2
+    r = b''
     for c in sig[offset:new_offset]:
-        r += '%02x' % struct.unpack('B',c)[0]
+        r += b'%02x' % struct.unpack('B',c)[0]
     r = bn_to_mpi(hex_to_bn(r))
     offset = new_offset
 
     # get S
-    new_offset = offset+sigsize/2
-    s = ''
+    new_offset = offset+sigsize//2
+    s = b''
     for c in sig[offset:new_offset]:
-        s += '%02x' % struct.unpack('B',c)[0]
+        s += b'%02x' % struct.unpack('B',c)[0]
     s = bn_to_mpi(hex_to_bn(s))
     offset = new_offset
 

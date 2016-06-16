@@ -19,12 +19,15 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
+import io
 import random
 import time
 
-import query
-from ipaddr import IPAddr
-import transport
+from . import query
+from .ipaddr import IPAddr
+from . import transport
 
 import dns.rdataclass, dns.exception, dns.rcode, dns.resolver
 
@@ -110,7 +113,7 @@ class Resolver:
     def from_file(cls, resolv_conf, query_cls, **kwargs):
         servers = []
         try:
-            with open(resolv_conf, 'r') as f:
+            with io.open(resolv_conf, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     words = line.split()
@@ -124,10 +127,10 @@ class Resolver:
         return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
-        return self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values()[0]
+        return list(self.query_multiple((qname, rdtype, rdclass), accept_first_response=accept_first_response, continue_on_servfail=continue_on_servfail).values())[0]
 
     def query_for_answer(self, qname, rdtype, rdclass=dns.rdataclass.IN, allow_noanswer=False):
-        answer = self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values()[0]
+        answer = list(self.query_multiple_for_answer((qname, rdtype, rdclass), allow_noanswer=allow_noanswer).values())[0]
         if isinstance(answer, DNSAnswer):
             return answer
         else:
@@ -150,7 +153,7 @@ class Resolver:
             elif response.is_complete_response() and response.is_valid_response():
                 try:
                     answers[query_tuple] = answer_cls(query_tuple[0], query_tuple[1], response.message, server)
-                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN), e:
+                except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as e:
                     answers[query_tuple] = e
             # response was timeout or network error
             elif response.error in (query.RESPONSE_ERROR_TIMEOUT, query.RESPONSE_ERROR_NETWORK_ERROR):
@@ -215,7 +218,7 @@ class Resolver:
 
                     attempts[query_tuple] += 1
 
-            query.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self._transport_manager, th_factories=self._th_factories)
+            query.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self._transport_manager, th_factories=self._th_factories)
 
             for query_tuple, q in queries.items():
                 # no response means we didn't even try because we don't have
@@ -227,8 +230,8 @@ class Resolver:
                         last_responses[query_tuple] = server, None
                     continue
 
-                server, client_response = q.responses.items()[0]
-                client, response = client_response.items()[0]
+                server, client_response = list(q.responses.items())[0]
+                client, response = list(client_response.items())[0]
                 responses[query_tuple] = (server, response)
                 # if we received a complete message with an acceptable rcode,
                 # then accept it as the last response
@@ -277,12 +280,12 @@ def main():
     if len(args) < 3:
         r = get_standard_resolver()
     else:
-        r = Resolver(map(IPAddr, sys.argv[3:]), query.StandardRecursiveQuery)
+        r = Resolver([IPAddr(x) for x in sys.argv[3:]], query.StandardRecursiveQuery)
     a = r.query_for_answer(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]))
 
-    print 'Response for %s/%s:' % (args[0], args[1])
-    print '   from %s: %s (%d bytes)' % (a.server, repr(a.response), len(a.response.to_wire()))
-    print '   answer:\n      %s' % (a.rrset)
+    print('Response for %s/%s:' % (args[0], args[1]))
+    print('   from %s: %s (%d bytes)' % (a.server, repr(a.response), len(a.response.to_wire())))
+    print('   answer:\n      %s' % (a.rrset))
 
 if __name__ == '__main__':
     main()

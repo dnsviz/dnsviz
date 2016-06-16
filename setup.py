@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import unicode_literals
+
 import glob
 import os
 import stat
@@ -99,7 +101,7 @@ setup(name='dnsviz',
         description='DNS analysis and visualization tool suite',
         long_description=open('README.md', 'r').read(),
         license='LICENSE',
-        packages=['dnsviz','dnsviz.viz','dnsviz.analysis','dnsviz.commands'],
+        packages=[b'dnsviz',b'dnsviz.viz',b'dnsviz.analysis',b'dnsviz.commands'],
         scripts=['bin/dnsviz'],
         data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
@@ -107,6 +109,22 @@ setup(name='dnsviz',
                 'pygraphviz (>=1.1)',
                 'm2crypto (>=0.24.0)',
                 'dnspython (>=1.11)',
+        ],
+        classifiers=[
+                'Development Status :: 5 - Production/Stable',
+                'Environment :: Console',
+                'Environment :: Web Environment',
+                'Intended Audience :: Developers',
+                'Intended Audience :: System Administrators',
+                'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+                'Natural Language :: English',
+                'Operating System :: MacOS :: MacOS X',
+                'Operating System :: POSIX',
+                'Programming Language :: Python :: 2.7',
+                'Programming Language :: Python :: 3',
+                'Topic :: Internet :: Name Service (DNS)',
+                'Topic :: Scientific/Engineering :: Visualization',
+                'Topic :: System :: Networking :: Monitoring',
         ],
         cmdclass={ 'build': MyBuild, 'install': MyInstall },
 )
