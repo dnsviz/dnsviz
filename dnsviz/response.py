@@ -637,10 +637,20 @@ class DNSKEYMeta(DNSResponseComponent):
         clear_revoke is True, then clear the revoke flag of the DNSKEY RR
         first.'''
 
+        # python3/python2 dual compatibility
+        if isinstance(rdata.key, bytes):
+            if isinstance(rdata.key, str):
+                map_func = lambda x, y: ord(x[y])
+            else:
+                map_func = lambda x, y: x[y]
+        else:
+            map_func = lambda x, y: struct.unpack('B',x[y])[0]
+
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
-            key_tag, = struct.unpack('!H', rdata.key[-3:-1])
-            return key_tag
+            b1 = map_func(rdata.key[-3])
+            b2 = map_func(rdata.key[-2])
+            return (b1 << 8) | b2
 
         if clear_revoke:
             flags = rdata.flags & (~fmt.DNSKEY_FLAGS['revoke'])
@@ -651,7 +661,7 @@ class DNSKEYMeta(DNSResponseComponent):
 
         ac = 0
         for i in range(len(key_str)):
-            b, = struct.unpack('B',key_str[i])
+            b = map_func(key_str, i)
             if i & 1:
                 ac += b
             else:
@@ -666,17 +676,28 @@ class DNSKEYMeta(DNSResponseComponent):
 
         key_str = rdata.key
 
+        # python3/python2 dual compatibility
+        if isinstance(rdata.key, bytes):
+            if isinstance(rdata.key, str):
+                map_func = lambda x, y: ord(x[y])
+            else:
+                map_func = lambda x, y: x[y]
+        else:
+            map_func = lambda x, y: struct.unpack('B',x[y])[0]
+
         # RSA keys
         if rdata.algorithm in (1,5,7,8,10):
             try:
                 # get the exponent length
-                e_len, = struct.unpack('B',key_str[0])
+                e_len = map_func(key_str, 0)
             except IndexError:
                 return 0
 
             offset = 1
             if e_len == 0:
-                e_len, = struct.unpack('!H',key_str[1:3])
+                b1 = map_func(rdata.key[1])
+                b2 = map_func(rdata.key[2])
+                e_len = (b1 << 8) | b2
                 offset = 3
 
             # get the exponent
@@ -687,7 +708,7 @@ class DNSKEYMeta(DNSResponseComponent):
 
         # DSA keys
         elif rdata.algorithm in (3,6):
-            t, = struct.unpack('B',key_str[0])
+            t = map_func(key_str, 0)
             return (64 + t*8)<<3
 
         # GOST keys
