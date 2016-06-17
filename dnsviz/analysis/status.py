@@ -248,7 +248,7 @@ class RRSIGStatus(object):
                 ('labels', self.rrsig.labels),
                 ('inception', fmt.timestamp_to_str(self.rrsig.inception)),
                 ('expiration', fmt.timestamp_to_str(self.rrsig.expiration)),
-                ('signature', base64.b64encode(self.rrsig.signature)),
+                ('signature', lb2s(base64.b64encode(self.rrsig.signature))),
                 ('ttl', self.rrset.rrsig_info[self.rrsig].ttl),
             ))
 
@@ -383,7 +383,7 @@ class DSStatus(object):
                 ('algorithm', self.ds.algorithm),
                 ('key_tag', self.ds.key_tag),
                 ('digest_type', self.ds.digest_type),
-                ('digest', base64.b64encode(self.ds.digest)),
+                ('digest', lb2s(base64.b64encode(self.ds.digest))),
             ))
 
             if html_format:

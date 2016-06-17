@@ -737,7 +737,7 @@ class DNSKEYMeta(DNSResponseComponent):
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm
-            d['key'] = base64.b64encode(self.rdata.key)
+            d['key'] = lb2s(base64.b64encode(self.rdata.key))
             d['ttl'] = self.ttl
             d['key_length'] = self.key_len
             d['key_tag'] = self.key_tag
