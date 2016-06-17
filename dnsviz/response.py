@@ -809,6 +809,9 @@ class RRsetInfo(DNSResponseComponent):
             return False
         return True
 
+    def __hash__(self):
+        return hash(id(self))
+
     @classmethod
     def rdata_cmp(cls, a, b):
         '''Compare the wire value of rdata a and rdata b.'''
@@ -961,6 +964,9 @@ class NegativeResponseInfo(DNSResponseComponent):
     def __eq__(self, other):
         return self.qname == other.qname and self.rdtype == other.rdtype
 
+    def __hash__(self):
+        return hash(id(self))
+
     def create_or_update_soa_info(self, server, client, response, is_referral):
         soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name)]
         if not soa_rrsets:
@@ -1022,11 +1028,14 @@ class NSECSet(DNSResponseComponent):
 
         self.servers_clients = {}
 
+    def __repr__(self):
+        return '<%s>' % (self.__class__.__name__)
+
     def __eq__(self, other):
         return self.rrsets == other.rrsets
 
-    def __repr__(self):
-        return '<%s>' % (self.__class__.__name__)
+    def __hash__(self):
+        return hash(id(self))
 
     def project(self, *names):
         if set(names).difference(self.rrsets):
@@ -1252,6 +1261,9 @@ class DNSResponseError(DNSResponseComponent):
     def __eq__(self, other):
         return self.code == other.code and self.arg == other.arg
 
+    def __hash__(self):
+        return hash(id(self))
+
 class ReferralResponse(DNSResponseComponent):
     def __init__(self, name):
         super(ReferralResponse, self).__init__()
@@ -1260,6 +1272,9 @@ class ReferralResponse(DNSResponseComponent):
     def __eq__(self, other):
         return self.name == other.name
 
+    def __hash__(self):
+        return hash(id(self))
+
 class TruncatedResponse(DNSResponseComponent):
     def __init__(self, wire):
         super(TruncatedResponse, self).__init__()
@@ -1267,3 +1282,6 @@ class TruncatedResponse(DNSResponseComponent):
 
     def __eq__(self, other):
         return self.wire == other.wire
+
+    def __hash__(self):
+        return hash(id(self))
