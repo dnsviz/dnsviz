@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+import codecs
 import glob
 import os
 import stat
@@ -93,6 +94,11 @@ if os.path.exists(os.path.join('external', 'raphael')):
 else:
     RAPHAEL_FILES = []
 
+if isinstance(b'', str):
+    map_func = lambda x: x
+else:
+    map_func = lambda x: codecs.decode(x, 'latin1')
+
 setup(name='dnsviz',
         version='0.5.4',
         author='Casey Deccio',
@@ -101,7 +107,7 @@ setup(name='dnsviz',
         description='DNS analysis and visualization tool suite',
         long_description=open('README.md', 'r').read(),
         license='LICENSE',
-        packages=[b'dnsviz',b'dnsviz.viz',b'dnsviz.analysis',b'dnsviz.commands'],
+        packages=[map_func(b'dnsviz'), map_func(b'dnsviz.viz'), map_func(b'dnsviz.analysis'), map_func(b'dnsviz.commands')],
         scripts=['bin/dnsviz'],
         data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
