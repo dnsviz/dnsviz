@@ -800,6 +800,19 @@ class DNSKEYMeta(DNSResponseComponent):
 
         return d
 
+#XXX This class is necessary because of a bug in dnspython, in which
+# comparisons are not properly made for the purposes of sorting rdata for RRSIG
+# validation
+class RdataWrapper(object):
+    def __init__(self, rdata):
+        self._rdata = rdata
+
+    def __eq__(self, other):
+        return self._rdata.to_digestable() == other._rdata.to_digestable()
+
+    def __lt__(self, other):
+        return self._rdata.to_digestable() < other._rdata.to_digestable()
+
 class RRsetInfo(DNSResponseComponent):
     def __init__(self, rrset, ttl_cmp, dname_info=None):
         super(RRsetInfo, self).__init__()
@@ -834,29 +847,15 @@ class RRsetInfo(DNSResponseComponent):
         return hash(id(self))
 
     @classmethod
-    def rdata_cmp(cls, a, b):
-        '''Compare the wire value of rdata a and rdata b.'''
-
-        #XXX This is necessary because of a bug in dnspython
-        a_val = a.to_digestable()
-        b_val = b.to_digestable()
-
-        if a_val < b_val:
-            return -1
-        elif a_val > b_val:
-            return 1
-        else:
-            return 0
-
-    @classmethod
     def rrset_canonicalized_to_wire(cls, rrset, name, ttl):
         s = b''
         name_wire = name.to_wire()
 
-        rdata_list = list(rrset)
-        rdata_list.sort(cmp=cls.rdata_cmp)
+        rdata_list = [RdataWrapper(x) for x in rrset]
+        rdata_list.sort()
 
-        for rdata in rdata_list:
+        for rdataw in rdata_list:
+            rdata = rdataw._rdata
             rdata_wire = rdata.to_digestable()
             rdata_len = len(rdata_wire)
 
@@ -939,9 +938,10 @@ class RRsetInfo(DNSResponseComponent):
         d['ttl'] = self.rrset.ttl
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
-        rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=self.rdata_cmp)
-        for rdata in rdata_list:
+        rdata_list = [RdataWrapper(x) for x in self.rrset]
+        rdata_list.sort()
+        for rdataw in rdata_list:
+            rdata = rdataw._rdata
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
