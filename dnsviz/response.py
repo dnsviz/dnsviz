@@ -945,7 +945,11 @@ class RRsetInfo(DNSResponseComponent):
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
-                d['rdata'].append(formatter(rdata.to_text()))
+                s = rdata.to_text()
+                # python3/python2 dual compatibility
+                if not isinstance(s, str):
+                    s = lb2s(s)
+                d['rdata'].append(formatter(s))
 
         if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.servers_clients)
