@@ -1750,7 +1750,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if rdtype == dns.rdatatype.DS:
             try:
-                ds_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == dns.rdatatype.DS, self.queries[(name, rdtype)].nxdomain_info)[0]
+                ds_nxdomain_info = [x for x in self.queries[(name, rdtype)].nxdomain_info if x.qname == name and x.rdtype == dns.rdatatype.DS][0]
             except IndexError:
                 pass
             else:
@@ -1759,7 +1759,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # NXDOMAIN for the referral.  If so, this is due to the
                     # delegation not being found on all servers.
                     try:
-                        delegation_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == self.referral_rdtype, self.queries[(name, self.referral_rdtype)].nxdomain_info)[0]
+                        delegation_nxdomain_info = [x for x in self.queries[(name, self.referral_rdtype)].nxdomain_info if x.qname == name and x.rdtype == self.referral_rdtype][0]
                     except IndexError:
                         # if there were not NXDOMAINs received in response to the
                         # referral query, then use all the servers/clients
@@ -2402,11 +2402,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             del d['ds']
 
         try:
-            neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nodata_status)[0]
+            neg_response_info = [x for x in self.nodata_status if x.qname == self.name and x.rdtype == rdtype][0]
             status = self.nodata_status
         except IndexError:
             try:
-                neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nxdomain_status)[0]
+                neg_response_info = [x for x in self.nxdomain_status if x.qname == self.name and x.rdtype == rdtype][0]
                 status = self.nxdomain_status
             except IndexError:
                 neg_response_info = None

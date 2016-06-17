@@ -550,7 +550,6 @@ class DNSAuthGraph:
 
     def add_zone(self, zone_obj):
         node_str = self.zone_node_str(zone_obj.name)
-
         top_name = node_str + '_top'
         bottom_name = node_str + '_bottom'
 
@@ -1262,13 +1261,13 @@ class DNSAuthGraph:
 
         # map negative responses for DNSKEY queries to top name of the zone
         try:
-            dnskey_nodata_info = filter(lambda x: x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY, name_obj.nodata_status)[0]
+            dnskey_nodata_info = [x for x in name_obj.nodata_status if x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY][0]
         except IndexError:
             pass
         else:
             self.node_reverse_mapping[dnskey_nodata_info] = zone_top
         try:
-            dnskey_nxdomain_info = filter(lambda x: x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY, name_obj.nxdomain_status)[0]
+            dnskey_nxdomain_info = [x for x in name_obj.nxdomain_status if x.qname == name_obj.name and x.rdtype == dns.rdatatype.DNSKEY][0]
         except IndexError:
             pass
         else:
@@ -1344,13 +1343,13 @@ class DNSAuthGraph:
             nsec_statuses = []
             soa_rrsets = []
             try:
-                ds_nodata_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nodata_status)[0]
+                ds_nodata_info = [x for x in name_obj.nodata_status if x.qname == ds_name and x.rdtype == rdtype][0]
                 nsec_statuses.extend(name_obj.nodata_status[ds_nodata_info])
                 soa_rrsets.extend(ds_nodata_info.soa_rrset_info)
             except IndexError:
                 ds_nodata_info = None
             try:
-                ds_nxdomain_info = filter(lambda x: x.qname == ds_name and x.rdtype == rdtype, name_obj.nxdomain_status)[0]
+                ds_nxdomain_info = [x for x in name_obj.nxdomain_status if x.qname == ds_name and x.rdtype == rdtype][0]
                 nsec_statuses.extend(name_obj.nxdomain_status[ds_nxdomain_info])
                 soa_rrsets.extend(ds_nxdomain_info.soa_rrset_info)
             except IndexError:
