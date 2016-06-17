@@ -105,7 +105,9 @@ setup(name='dnsviz',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
         description='DNS analysis and visualization tool suite',
-        long_description=open('README.md', 'r').read(),
+        long_description='''DNSViz is a tool suite for analysis and visualization of Domain Name System
+(DNS) behavior, including its security extensions (DNSSEC).  This tool suite
+powers the Web-based analysis available at http://dnsviz.net/ .''',
         license='LICENSE',
         packages=[map_func(b'dnsviz'), map_func(b'dnsviz.viz'), map_func(b'dnsviz.analysis'), map_func(b'dnsviz.commands')],
         scripts=['bin/dnsviz'],
