@@ -538,10 +538,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             name_tup = (fmt.humanize_name(nxdomain_ancestor.name), None, [], [], None, [], [], [])
             tup.append(name_tup)
 
-            for qname, rdtype in nxdomain_ancestor.queries:
-                if qname != nxdomain_ancestor.name:
-                    continue
-                name_tup[7].extend(nxdomain_ancestor._serialize_response_component_list_simple(rdtype, nxdomain_ancestor.get_response_info(qname, rdtype), True))
+            name_tup[7].extend(nxdomain_ancestor._serialize_response_component_list_simple(nxdomain_ancestor.referral_rdtype, nxdomain_ancestor.get_response_info(nxdomain_ancestor.name, nxdomain_ancestor.referral_rdtype), True))
 
         # in recursive analysis, if we don't contact any servers that are
         # valid and responsive, then we get a zone_obj (and thus
