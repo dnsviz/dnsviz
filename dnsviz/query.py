@@ -746,7 +746,7 @@ class DNSQueryHandler:
                 # given destination (e.g., because it is of the wrong address
                 # scope) will result in a regular network failure with
                 # EHOSTUNREACH, as there is no scope comparison in this code.)
-                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EHOSTUNREACH and client is None:
+                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg in (errno.EHOSTUNREACH, errno.ENETUNREACH) and client is None:
                     raise AcceptResponse
 
                 # if this error was our fault, don't add it to the history
