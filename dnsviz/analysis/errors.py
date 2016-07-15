@@ -1325,6 +1325,19 @@ class InconsistentNXDOMAIN(ResponseError):
     required_params = ['qname', 'rdtype_nxdomain', 'rdtype_noerror']
     references = ['RFC 1034, Sec. 4.3.2']
 
+class InconsistentNXDOMAINAncestry(ResponseError):
+    '''
+    >>> e = InconsistentNXDOMAINAncestry(qname='foo.baz.', ancestor_qname='baz.')
+    >>> e.description
+    "A query for foo.baz. results in a NOERROR response, while a query for its ancestor, baz., returns a name error (NXDOMAIN), which indicates that subdomains of baz., including foo.baz., don't exist."
+    '''
+
+    _abstract = False
+    code = 'INCONSISTENT_NXDOMAIN_ANCESTOR'
+    description_template = "A query for %(qname)s results in a NOERROR response, while a query for its ancestor, %(ancestor_qname)s, returns a name error (NXDOMAIN), which indicates that subdomains of %(ancestor_qname)s, including %(qname)s, don't exist."
+    required_params = ['qname', 'ancestor_qname']
+    references = []
+
 class PMTUExceeded(ResponseError):
     '''
     >>> e = PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None)
