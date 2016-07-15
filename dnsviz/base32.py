@@ -59,6 +59,8 @@
 # Alphabet, as specified in RFC 4648.
 #
 
+from __future__ import unicode_literals
+
 import struct
 
 _b32tab = { 0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',

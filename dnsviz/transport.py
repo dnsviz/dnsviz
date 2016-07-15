@@ -19,14 +19,16 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import bisect
+import codecs
 import collections
 import errno
 import fcntl
 import json
 import os
-import Queue
 import random
 import re
 import select
@@ -35,12 +37,26 @@ import ssl
 import struct
 import threading
 import time
-import urllib
-import urlparse
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+    import urllib
+    urlquote = urllib
+else:
+    urlparse = urllib.parse
+    urlquote = urllib.parse
 
 import dns.exception
 
-from ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .format import latin1_binary_to_string as lb2s
 
 DNS_TRANSPORT_VERSION = 1.0
 
@@ -77,7 +93,7 @@ class DNSQueryTransportMeta(object):
 
     def serialize_request(self):
         d = collections.OrderedDict()
-        d['req'] = base64.b64encode(self.req)
+        d['req'] = lb2s(base64.b64encode(self.req))
         d['dst'] = self.dst
         d['dport'] = self.dport
         if self.src is not None:
@@ -149,7 +165,7 @@ class DNSQueryTransportMeta(object):
     def serialize_response(self):
         d = collections.OrderedDict()
         if self.res is not None:
-            d['res'] = base64.b64encode(self.res)
+            d['res'] = lb2s(base64.b64encode(self.res))
         else:
             d['res'] = None
         if self.err is not None:
@@ -285,8 +301,8 @@ class DNSQueryTransportHandler(object):
         raise NotImplemented
 
     def _init_res_buffer(self):
-        self.res = ''
-        self.res_buf = ''
+        self.res = b''
+        self.res_buf = b''
         self.res_index = 0
 
     def prepare(self):
@@ -302,7 +318,7 @@ class DNSQueryTransportHandler(object):
             self._bind_socket()
             self._set_start_time()
             self._connect_socket()
-        except socket.error, e:
+        except socket.error as e:
             self.err = e
             self.cleanup()
 
@@ -338,7 +354,7 @@ class DNSQueryTransportHandler(object):
                 try:
                     self.sock.bind((src, sport))
                     break
-                except socket.error, e:
+                except socket.error as e:
                     i += 1
                     if i > MAX_PORT_BIND_ATTEMPTS or e.errno != socket.errno.EADDRINUSE:
                         raise
@@ -354,7 +370,7 @@ class DNSQueryTransportHandler(object):
     def _connect_socket(self):
         try:
             self.sock.connect(self._get_connect_arg())
-        except socket.error, e:
+        except socket.error as e:
             if e.errno != socket.errno.EINPROGRESS:
                 raise
 
@@ -386,7 +402,7 @@ class DNSQueryTransportHandler(object):
             self.req_index += self.sock.send(self.req[self.req_index:])
             if self.req_index >= self.req_len:
                 return True
-        except socket.error, e:
+        except socket.error as e:
             self.err = e
             self.cleanup()
             return True
@@ -433,10 +449,16 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         self.req_len = len(qtm.req)
         self.req_index = 0
 
+        # python3/python2 dual compatibility
+        if isinstance(self.req, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
         self._queryid_wire = self.req[:2]
         index = 12
-        while ord(self.req[index]) != 0:
-            index += ord(self.req[index]) + 1
+        while map_func(self.req[index]) != 0:
+            index += map_func(self.req[index]) + 1
         index += 4
         self._question_wire = self.req[12:index]
 
@@ -461,8 +483,8 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                     self.cleanup()
                     return True
                 else:
-                    self.res = ''
-            except socket.error, e:
+                    self.res = b''
+            except socket.error as e:
                 self.err = e
                 self.cleanup()
                 return True
@@ -475,7 +497,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                         buf = self.sock.recv(1)
                     else:
                         buf = self.sock.recv(2)
-                    if buf == '':
+                    if buf == b'':
                         raise EOFError()
 
                     self.res_buf += buf
@@ -484,7 +506,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
 
                 if self.res_len is not None:
                     buf = self.sock.recv(self.res_len - self.res_index)
-                    if buf == '':
+                    if buf == b'':
                         raise EOFError()
 
                     self.res += buf
@@ -494,7 +516,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                         self.cleanup()
                         return True
 
-            except (socket.error, EOFError), e:
+            except (socket.error, EOFError) as e:
                 if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                     pass
                 else:
@@ -529,20 +551,20 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # load the json content
         try:
-            content = json.loads(self.res)
+            content = json.loads(lb2s(self.res))
         except ValueError:
             raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
 
         if 'version' not in content:
             raise RemoteQueryTransportError('No version information in response.')
         try:
-            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+            major_vers, minor_vers = [int(x) for x in str(content['version']).split('.', 1)]
         except ValueError:
             raise RemoteQueryTransportError('Version of JSON input in response is invalid: %s' % content['version'])
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
+        curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_TRANSPORT_VERSION).split('.', 1)]
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             raise RemoteQueryTransportError('Version %d.%d of JSON input in response is incompatible with this software.' % (major_vers, minor_vers))
 
@@ -557,7 +579,7 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
                 self.qtms[i].deserialize_response(content['responses'][i])
             except IndexError:
                 raise RemoteQueryTransportError('DNS response information missing from response')
-            except TransportMetaDeserializationError, e:
+            except TransportMetaDeserializationError as e:
                 raise RemoteQueryTransportError(str(e))
 
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
@@ -617,7 +639,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
 
     def _post_data(self):
-        return 'content=' + urllib.quote(json.dumps(self.serialize_requests()))
+        return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
 
     def _authentication_header(self):
         if not self.username:
@@ -627,11 +649,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         username = self.username
         if self.password:
             username += ':' + self.password
-        return 'Authorization: Basic %s\r\n' % (base64.b64encode(username))
+        return 'Authorization: Basic %s\r\n' % (lb2s(base64.b64encode(codecs.encode(username, 'utf-8'))))
 
     def init_req(self):
         data = self._post_data()
-        self.req = 'POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.2\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
+        self.req = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.4\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
         self.req_len = len(self.req)
         self.req_index = 0
 
@@ -649,19 +671,19 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
             self.res_buf += buf
 
             # still reading status and headers
             if self.chunked_encoding is None and self.res_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(self.res_buf)
+                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.res_buf))
                 if headers_end_match is not None:
                     headers = self.res_buf[:headers_end_match.start()]
                     self.res_buf = self.res_buf[headers_end_match.end():]
 
                     # check HTTP status
-                    status_match = HTTP_STATUS_RE.search(headers)
+                    status_match = HTTP_STATUS_RE.search(lb2s(headers))
                     if status_match is None:
                         self.err = RemoteQueryTransportError('Malformed HTTP status line')
                         self.cleanup()
@@ -674,12 +696,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                     # get content length or determine whether "chunked"
                     # transfer encoding is used
-                    content_length_match = CONTENT_LENGTH_RE.search(headers)
+                    content_length_match = CONTENT_LENGTH_RE.search(lb2s(headers))
                     if content_length_match is not None:
                         self.chunked_encoding = False
                         self.res_len = int(content_length_match.group('length'))
                     else:
-                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(headers) is not None
+                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(lb2s(headers)) is not None
 
             # handle chunked encoding first
             if self.chunked_encoding:
@@ -691,12 +713,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(self.res_buf)
+                        crlf_start_match = CRLF_START_RE.search(lb2s(self.res_buf))
                         if crlf_start_match is not None:
                             self.res_buf = self.res_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_buf)
+                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.res_buf))
                         if chunk_len_match is not None:
                             self.res_len = int(chunk_len_match.group('length'), 16)
                             self.res_buf = self.res_buf[chunk_len_match.end():]
@@ -726,7 +748,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                         else:
                             self.res += self.res_buf
                             self.res_index += len(self.res_buf)
-                            self.res_buf = ''
+                            self.res_buf = b''
 
             elif self.chunked_encoding == False:
                 # output is not chunked, so we're either reading until we've
@@ -744,9 +766,9 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                         return True
                 else:
                     self.res += self.res_buf
-                    self.res_buf = ''
+                    self.res_buf = b''
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:
@@ -813,7 +835,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return val
 
     def finalize(self):
-        new_res = ''
+        new_res = b''
         for i, mask_index in enumerate(self.mask_mapping):
             mask_octets = struct.unpack('!BBBB', self.res[mask_index:mask_index + 4])
             if i >= len(self.mask_mapping) - 1:
@@ -830,7 +852,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
     def init_req(self):
         data = json.dumps(self.serialize_requests())
 
-        header = '\x81'
+        header = b'\x81'
         l = len(data)
         if l <= 125:
             header += struct.pack('!B', l)
@@ -843,14 +865,14 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.req_index = 0
 
     def init_empty_req(self):
-        self.req = '\x81\x00'
+        self.req = b'\x81\x00'
         self.req_len = len(self.req)
         self.req_index = 0
 
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
             self.res_buf += buf
 
@@ -915,13 +937,13 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                     else:
                         self.res += self.res_buf
                         self.res_index += len(self.res_buf)
-                        self.res_buf = ''
+                        self.res_buf = b''
 
                     if self.res_index >= self.res_len and not self.has_more:
                         self.cleanup()
                         return True
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:
@@ -1009,6 +1031,16 @@ class DNSQueryTransportHandlerWebSocketPrivateFactory:
     def build(self, **kwargs):
         return self._f.build(**kwargs)
 
+class DNSQueryTransportHandlerWrapper(object):
+    def __init__(self, qh):
+        self.qh = qh
+
+    def __eq__(self, other):
+        return False
+
+    def __lt__(self, other):
+        return False
+
 class _DNSQueryTransportManager:
     '''A class that handles'''
 
@@ -1016,7 +1048,7 @@ class _DNSQueryTransportManager:
     def __init__(self):
         self._notify_read_fd, self._notify_write_fd = os.pipe()
         fcntl.fcntl(self._notify_read_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-        self._query_queue = Queue.Queue()
+        self._query_queue = queue.Queue()
         self._event_map = {}
 
         self._close = threading.Event()
@@ -1088,11 +1120,12 @@ class _DNSQueryTransportManager:
                     finished_fds.append(fd)
 
             # handle the expired queries
-            future_index = bisect.bisect_right(expirations, ((time.time(), None)))
+            future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandlerWrapper(None))))
             for i in range(future_index):
-                qh = expirations[i][1]
+                qh = expirations[i][1].qh
 
-                # perhaps this query actually finished earlier in the loop
+                # this query actually finished earlier in this iteration of the
+                # loop, so don't indicate that it timed out
                 if qh.end_time is not None:
                     continue
 
@@ -1127,9 +1160,9 @@ class _DNSQueryTransportManager:
                             # socket, then put this socket in the write fd list
                             fd = qh.sock.fileno()
                             query_meta[fd] = qh
-                            bisect.insort(expirations, (qh.expiration, qh))
+                            bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
                             wlist_in.append(fd)
-                    except Queue.Empty:
+                    except queue.Empty:
                         break
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):

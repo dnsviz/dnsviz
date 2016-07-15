@@ -20,13 +20,20 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
 import json
 import os
-import Queue
 import re
 import struct
 import sys
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 from dnsviz.ipaddr import *
 from dnsviz import transport
@@ -153,7 +160,7 @@ def main():
             raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
         form = cgi.FieldStorage()
 
-        response_queue = Queue.Queue()
+        response_queue = queue.Queue()
         queries_in_waiting = set()
         th_factory = transport.DNSQueryTransportHandlerDNSFactory()
         tm = transport.DNSQueryTransportManager()
@@ -171,13 +178,13 @@ def main():
             if 'version' not in content:
                 raise RemoteQueryError('No version information in HTTP request.')
             try:
-                major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+                major_vers, minor_vers = [int(x) for x in str(content['version']).split('.', 1)]
             except ValueError:
                 raise RemoteQueryError('Version of JSON input in HTTP request is invalid: %s' % content['version'])
 
             # ensure major version is a match and minor version is no greater
             # than the current minor version
-            curr_major_vers, curr_minor_vers = map(int, str(transport.DNS_TRANSPORT_VERSION).split('.', 1))
+            curr_major_vers, curr_minor_vers = [int(x) for x in str(transport.DNS_TRANSPORT_VERSION).split('.', 1)]
             if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
                 raise RemoteQueryError('Version %d.%d of JSON input in HTTP request is incompatible with this software.' % (major_vers, minor_vers))
 
@@ -190,7 +197,7 @@ def main():
 
                 try:
                     qtm = transport.DNSQueryTransportMeta.deserialize_request(qtm_serialized)
-                except transport.TransportMetaDeserializationError, e:
+                except transport.TransportMetaDeserializationError as e:
                     raise RemoteQueryError('Error deserializing request information: %s' % e)
 
                 check_dst(qtm.dst)
@@ -215,7 +222,7 @@ def main():
             'version': transport.DNS_TRANSPORT_VERSION,
             'responses': [qtm.serialize_response() for qtm in qtms],
         }
-    except RemoteQueryError, e:
+    except RemoteQueryError as e:
         ret = {
             'version': transport.DNS_TRANSPORT_VERSION,
             'error': str(e),

@@ -20,6 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import datetime
 import errno
 import socket
@@ -264,7 +266,7 @@ class DigCommandLineQuery:
                 else:
                     try:
                         tk_str = open(arg).read()
-                    except IOError, e:
+                    except IOError as e:
                         raise CommandLineException('%s: "%s"' % (e.strerror, arg))
                     try:
                         self.trusted_keys = get_trusted_keys(tk_str)
@@ -293,9 +295,9 @@ class DigCommandLineQuery:
             processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not use_ipv4:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not use_ipv6:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = nameservers + processed_nameservers
 
@@ -430,7 +432,7 @@ class DigCommandLineQuery:
     def query_and_display(self, options, filehandle):
         try:
             server, response = self.query(options)
-        except transport.RemoteQueryTransportError, e:
+        except transport.RemoteQueryTransportError as e:
             sys.stderr.write('%s\n' % e)
         else:
             output = self.display(response, server, options)
@@ -582,7 +584,7 @@ class DigCommandLine:
             try:
                 s = socket.socket(family)
                 s.bind((addr, 0))
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EADDRNOTAVAIL:
                     raise SemanticException('Cannot bind to specified IP address: "%s"' % addr)
             else:
@@ -684,9 +686,9 @@ class DigCommandLine:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not self.options['use_ipv4']:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not self.options['use_ipv6']:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
 
@@ -694,7 +696,7 @@ def main():
     try:
         q = DigCommandLine(sys.argv[1:])
         q.query_and_display()
-    except (CommandLineException, SemanticException), e:
+    except (CommandLineException, SemanticException) as e:
         sys.stderr.write('%s\n' % e)
         sys.exit(1)
     except KeyboardInterrupt:

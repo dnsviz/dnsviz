@@ -20,8 +20,11 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import codecs
 import getopt
+import io
 import json
 import logging
 import os
@@ -32,6 +35,7 @@ import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
+from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
@@ -69,22 +73,20 @@ Options:
     -h             - display the usage and exit
 ''' % (err))
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
-    assert filename is not None or fh is not None, 'Either filename or fh must be passed'
-
+def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
     G.add_trust(trusted_keys)
     G.remove_extra_edges()
 
     if fmt == 'html':
         try:
             js_img = G.draw('js')
-        except IOError, e:
+        except IOError as e:
             logger.error(str(e))
             sys.exit(3)
 
         try:
-            template_str = codecs.open(DNSSEC_TEMPLATE_FILE, 'r', 'utf-8').read()
-        except IOError, e:
+            template_str = io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8').read()
+        except IOError as e:
             logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
             sys.exit(3)
 
@@ -94,21 +96,21 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, fh=None):
         template_str = template_str.replace('JQUERY_UI_CSS_PATH', JQUERY_UI_CSS_PATH)
         template_str = template_str.replace('RAPHAEL_PATH', RAPHAEL_PATH)
         template_str = template_str.replace('JS_CODE', js_img)
+
         if filename is None:
-            fh.write(template_str)
-        else:
-            try:
-                codecs.open(filename, 'w', 'utf-8').write(template_str)
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, filename))
-                sys.exit(3)
+            filename = sys.stdout.fileno()
+        try:
+            io.open(filename, 'wt', encoding='utf-8').write(template_str)
+        except IOError as e:
+            logger.error('%s: "%s"' % (e.strerror, filename))
+            sys.exit(3)
     else:
         if filename is None:
-            fh.write(G.draw(fmt))
+            io.open(sys.stdout.fileno(), 'wb').write(G.draw(fmt))
         else:
             try:
                 G.draw(fmt, path=filename)
-            except IOError, e:
+            except IOError as e:
                 if e.strerror:
                     logger.error('%s: "%s"' % (e.strerror, filename))
                 else:
@@ -145,7 +147,7 @@ def main(argv):
 
         try:
             opts, args = getopt.getopt(argv[1:], 'f:r:R:t:Oo:T:h')
-        except getopt.GetoptError, e:
+        except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
 
@@ -154,8 +156,8 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = open(arg).read()
-                except IOError, e:
+                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
+                except IOError as e:
                     sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
                     sys.exit(3)
                 try:
@@ -180,7 +182,7 @@ def main(argv):
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
             try:
-                rdtypes = map(dns.rdatatype.from_text, rdtypes)
+                rdtypes = [dns.rdatatype.from_text(x) for x in rdtypes]
             except dns.rdatatype.UnknownRdatatype:
                 usage('The list of types was invalid: "%s"' % opts['-R'])
                 sys.exit(1)
@@ -207,13 +209,12 @@ def main(argv):
         logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
-            analysis_str = codecs.getreader('utf-8')(sys.stdin).read()
-        else:
-            try:
-                analysis_str = codecs.open(opts['-r'], 'r', 'utf-8').read()
-            except IOError, e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-r']))
-                sys.exit(3)
+            opts['-r'] = sys.stdin.fileno()
+        try:
+            analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+        except IOError as e:
+            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+            sys.exit(3)
         try:
             analysis_structured = json.loads(analysis_str)
         except ValueError:
@@ -225,13 +226,13 @@ def main(argv):
             logger.error('No version information in JSON input.')
             sys.exit(3)
         try:
-            major_vers, minor_vers = map(int, str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1))
+            major_vers, minor_vers = [int(x) for x in str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
         except ValueError:
             logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
             sys.exit(3)
         # ensure major version is a match and minor version is no greater
         # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(DNS_RAW_VERSION).split('.', 1))
+        curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
             sys.exit(3)
@@ -239,15 +240,15 @@ def main(argv):
         names = []
         if '-f' in opts:
             try:
-                f = codecs.open(opts['-f'], 'r', 'utf-8')
-            except IOError, e:
+                f = io.open(opts['-f'], 'r', encoding='utf-8')
+            except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts['-f']))
                 sys.exit(3)
             for line in f:
                 name = line.strip()
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -256,7 +257,9 @@ def main(argv):
             f.close()
         else:
             if args:
-                args = map(lambda x: x.decode(sys.getfilesystemencoding()), args)
+                # python3/python2 dual compatibility
+                if isinstance(args[0], bytes):
+                    args = [codecs.decode(x, sys.getfilesystemencoding()) for x in args]
             else:
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']
@@ -266,7 +269,7 @@ def main(argv):
             for name in args:
                 try:
                     name = dns.name.from_text(name)
-                except UnicodeDecodeError, e:
+                except UnicodeDecodeError as e:
                     logger.error('%s: "%s"' % (e, name))
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
@@ -275,8 +278,8 @@ def main(argv):
 
         if '-t' not in opts:
             try:
-                tk_str = open(TRUSTED_KEYS_ROOT).read()
-            except IOError, e:
+                tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
+            except IOError as e:
                 logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
                 sys.exit(3)
             try:
@@ -288,9 +291,9 @@ def main(argv):
         name_objs = []
         cache = {}
         for name in names:
-            name_str = name.canonicalize().to_text()
+            name_str = lb2s(name.canonicalize().to_text())
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
-                logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
+                logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
             name_objs.append(OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
 
@@ -316,19 +319,19 @@ def main(argv):
             if rdtypes is not None:
                 for rdtype in rdtypes:
                     if (name_obj.name, rdtype) not in name_obj.queries:
-                        logger.error('No query for "%s/%s" was included in the analysis.' % (name_obj.name.to_text(), dns.rdatatype.to_text(rdtype)))
+                        logger.error('No query for "%s/%s" was included in the analysis.' % (lb2s(name_obj.name.to_text()), dns.rdatatype.to_text(rdtype)))
 
             if '-O' in opts:
                 if name_obj.name == dns.name.root:
                     name = 'root'
                 else:
-                    name = name_obj.name.canonicalize().to_text().rstrip('.')
+                    name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
                 finish_graph(G, [name_obj], rdtypes, trusted_keys, fmt, '%s.%s' % (name, fmt))
                 G = DNSAuthGraph()
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None, sys.stdout)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None)
             else:
                 finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'])
 

@@ -25,15 +25,18 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
+import io
 import os
 import re
 import socket
 
 import dns.message, dns.rdatatype
 
-from config import DNSVIZ_SHARE_PATH
-import format as fmt
-from ipaddr import IPAddr
+from .config import DNSVIZ_SHARE_PATH
+from . import format as fmt
+from .ipaddr import IPAddr
 
 TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 ROOT_HINTS = os.path.join(DNSVIZ_SHARE_PATH, 'hints', 'named.root')
@@ -110,8 +113,8 @@ def get_trusted_keys(s):
 
 def get_default_trusted_keys():
     try:
-        tk_str = open(TRUSTED_KEYS_ROOT).read()
-    except IOError, e:
+        tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
+    except IOError as e:
         return []
     return get_trusted_keys(tk_str)
 
@@ -132,7 +135,7 @@ def get_hints(s):
 
 def get_root_hints():
     try:
-        return get_hints(open(ROOT_HINTS).read())
+        return get_hints(io.open(ROOT_HINTS, 'r', encoding='utf-8').read())
     except IOError:
         return get_hints(ROOT_HINTS_STR_DEFAULT)
 
