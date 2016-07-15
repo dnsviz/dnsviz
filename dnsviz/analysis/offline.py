@@ -1139,6 +1139,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if response.recursion_desired() and not response.recursion_available():
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), group, server, client, response)
 
+            # check for NOERROR, inconsistent with NXDOMAIN in ancestor
+            if response.is_complete_response() and response.message.rcode() == dns.rcode.NOERROR and qname_obj.nxdomain_ancestor is not None:
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAINAncestry(qname=fmt.humanize_name(response.query.qname), ancestor_qname=fmt.humanize_name(qname_obj.nxdomain_ancestor.name)), errors, server, client, response)
+
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
