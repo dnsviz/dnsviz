@@ -529,6 +529,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             parent_is_signed = parent_obj.signed
 
+        # handle nxdomain_ancestor
+        nxdomain_ancestor = response_info.name_obj.nxdomain_ancestor
+        if nxdomain_ancestor is not None and \
+                (nxdomain_ancestor.name, -1) not in processed:
+            processed.add((nxdomain_ancestor.name, -1))
+
+            name_tup = (fmt.humanize_name(nxdomain_ancestor.name), None, [], [], None, [], [], [])
+            tup.append(name_tup)
+
+            for qname, rdtype in nxdomain_ancestor.queries:
+                if qname != nxdomain_ancestor.name:
+                    continue
+                name_tup[7].extend(nxdomain_ancestor._serialize_response_component_list_simple(rdtype, nxdomain_ancestor.get_response_info(qname, rdtype), True))
+
         # in recursive analysis, if we don't contact any servers that are
         # valid and responsive, then we get a zone_obj (and thus
         # parent_obj, in this case) that is None (because we couldn't
@@ -782,6 +796,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ns_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
 
         # populate status of ancestry
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.parent is not None:
             self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.dlv_parent is not None:
@@ -2174,6 +2190,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ns_obj._set_response_component_status(response_component_status, trace=trace + [self])
 
         # populate status of ancestry
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor._set_response_component_status(response_component_status, trace=trace + [self])
         if self.parent is not None:
             self.parent._set_response_component_status(response_component_status, trace=trace + [self])
         if self.dlv_parent is not None:
@@ -2528,6 +2546,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # serialize status of ancestry
         if level <= self.RDTYPES_SECURE_DELEGATION:
+            if self.nxdomain_ancestor is not None:
+                self.nxdomain_ancestor.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_ALL_SAME_NAME, trace=trace + [self], html_format=html_format)
             if self.parent is not None:
                 self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
             if self.dlv_parent is not None:

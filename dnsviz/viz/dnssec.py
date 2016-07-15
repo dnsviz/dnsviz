@@ -1056,6 +1056,10 @@ class DNSAuthGraph:
             zone_obj = name_obj
             self.add_zone(zone_obj)
 
+        if name_obj.nxdomain_ancestor is not None:
+            for qname1, rdtype1 in name_obj.nxdomain_ancestor.queries:
+                self.graph_rrset_auth(name_obj.nxdomain_ancestor, qname1, rdtype1)
+
         # if this is for DNSKEY or DS of a zone, then return, as we have
         # already take care of these types in graph_zone_auth()
         if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
