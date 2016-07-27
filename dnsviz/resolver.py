@@ -30,7 +30,7 @@ import time
 from . import query
 from .ipaddr import IPAddr
 from . import transport
-from . util
+from . import util
 
 import dns.rdataclass, dns.exception, dns.message, dns.rcode, dns.resolver
 
