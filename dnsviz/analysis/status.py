@@ -1133,7 +1133,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         for name in self.nsec_set_info.invalid_nsec3_owner:
             self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
@@ -1316,7 +1316,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         for name in self.nsec_set_info.invalid_nsec3_owner:
             self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
