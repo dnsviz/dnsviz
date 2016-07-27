@@ -19,6 +19,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
 import collections
 import datetime
@@ -52,14 +54,11 @@ class DomainNameAnalysisError(object):
     def __str__(self):
         return self.code
 
-    def __unicode__(self):
-        return self.code
-
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.args == other.args
 
     def copy(self):
-        return self.__class__(**dict(zip(self.required_params, self.args)))
+        return self.__class__(**dict(list(zip(self.required_params, self.args))))
 
     @property
     def args(self):
@@ -80,10 +79,10 @@ class DomainNameAnalysisError(object):
         description_template_escaped = cgi.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
-            if isinstance(v, (int, long)):
+            if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
-                if isinstance(v, (str, unicode)):
+                if isinstance(v, str):
                     template_kwargs_escaped[n] = cgi.escape(v)
                 else:
                     template_kwargs_escaped[n] = cgi.escape(str(v))
@@ -1325,6 +1324,19 @@ class InconsistentNXDOMAIN(ResponseError):
     description_template = 'The server returned a no error (NOERROR) response when queried for %(qname)s having record data of type %(rdtype_noerror)s, but returned a name error (NXDOMAIN) when queried for %(qname)s having record data of type %(rdtype_nxdomain)s.'
     required_params = ['qname', 'rdtype_nxdomain', 'rdtype_noerror']
     references = ['RFC 1034, Sec. 4.3.2']
+
+class InconsistentNXDOMAINAncestry(ResponseError):
+    '''
+    >>> e = InconsistentNXDOMAINAncestry(qname='foo.baz.', ancestor_qname='baz.')
+    >>> e.description
+    "A query for foo.baz. results in a NOERROR response, while a query for its ancestor, baz., returns a name error (NXDOMAIN), which indicates that subdomains of baz., including foo.baz., don't exist."
+    '''
+
+    _abstract = False
+    code = 'INCONSISTENT_NXDOMAIN_ANCESTOR'
+    description_template = "A query for %(qname)s results in a NOERROR response, while a query for its ancestor, %(ancestor_qname)s, returns a name error (NXDOMAIN), which indicates that subdomains of %(ancestor_qname)s, including %(qname)s, don't exist."
+    required_params = ['qname', 'ancestor_qname']
+    references = []
 
 class PMTUExceeded(ResponseError):
     '''

@@ -25,6 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import collections
 import errno
 import logging
@@ -36,11 +38,12 @@ import dnsviz.format as fmt
 import dnsviz.query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
+lb2s = fmt.latin1_binary_to_string
 
-import errors as Errors
-from online import OnlineDomainNameAnalysis, \
+from . import errors as Errors
+from .online import OnlineDomainNameAnalysis, \
         ANALYSIS_TYPE_AUTHORITATIVE, ANALYSIS_TYPE_RECURSIVE, ANALYSIS_TYPE_CACHE
-import status as Status
+from . import status as Status
 
 DNS_PROCESSED_VERSION = '1.0'
 
@@ -201,7 +204,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def get_dnskeys(self):
         if not hasattr(self, '_dnskeys') or self._dnskeys is None:
             self._index_dnskeys()
-        return self._dnskeys.values()
+        return list(self._dnskeys.values())
 
     def potential_trusted_keys(self):
         active_ksks = self.ksks.difference(self.zsks).difference(self.revoked_keys)
@@ -325,10 +328,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_rrsig_simple(self, name_obj, rrset_info):
         rrsig_tup = []
         if name_obj.rrsig_status[rrset_info]:
-            rrsigs = name_obj.rrsig_status[rrset_info].keys()
+            rrsigs = list(name_obj.rrsig_status[rrset_info].keys())
             rrsigs.sort()
             for rrsig in rrsigs:
-                dnskeys = name_obj.rrsig_status[rrset_info][rrsig].keys()
+                dnskeys = list(name_obj.rrsig_status[rrset_info][rrsig].keys())
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
@@ -376,7 +379,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         children = []
         if isinstance(info, Response.RRsetInfo):
             if info.rrset.rdtype == dns.rdatatype.CNAME:
-                rdata_tup.append((None, [], [], 'CNAME %s' % (info.rrset[0].target.to_text())))
+                rdata_tup.append((None, [], [], 'CNAME %s' % (lb2s(info.rrset[0].target.to_text()))))
             elif rdtype == dns.rdatatype.DNSKEY:
                 for d in info.rrset:
                     dnskey_meta = response_info.name_obj._dnskeys[d]
@@ -384,13 +387,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     errors = [e.terse_description for e in dnskey_meta.errors]
                     rdata_tup.append(('VALID', warnings, errors, '%d/%d/%d' % (d.algorithm, dnskey_meta.key_tag, d.flags)))
             elif rdtype == dns.rdatatype.DS:
-                dss = response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys()
+                dss = list(response_info.name_obj.ds_status_by_ds[dns.rdatatype.DS].keys())
                 dss.sort()
                 for ds in dss:
                     # only show the DS if in the RRset in question
                     if ds not in info.rrset:
                         continue
-                    dnskeys = response_info.name_obj.ds_status_by_ds[rdtype][ds].keys()
+                    dnskeys = list(response_info.name_obj.ds_status_by_ds[rdtype][ds].keys())
                     dnskeys.sort()
                     for dnskey in dnskeys:
                         ds_status = response_info.name_obj.ds_status_by_ds[rdtype][ds][dnskey]
@@ -398,9 +401,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         errors = [e.terse_description for e in ds_status.errors]
                         rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], warnings, errors, '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
             elif rdtype == dns.rdatatype.NSEC3:
-                rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
+                rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(lb2s(info.rrset[0].to_text())))))
             elif rdtype == dns.rdatatype.NSEC:
-                rdata_tup.append((None, [], [], '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
+                rdata_tup.append((None, [], [], '%s %s' % (lb2s(info.rrset.name.to_text()), info.rrset[0].to_text())))
             elif rdtype == dns.rdatatype.DNAME:
                 warnings = [w.terse_description for w in dname_status.warnings]
                 errors = [e.terse_description for e in dname_status.errors]
@@ -526,6 +529,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             parent_is_signed = parent_obj.signed
 
+        # handle nxdomain_ancestor
+        nxdomain_ancestor = response_info.name_obj.nxdomain_ancestor
+        if nxdomain_ancestor is not None and \
+                (nxdomain_ancestor.name, -1) not in processed:
+            processed.add((nxdomain_ancestor.name, -1))
+
+            name_tup = (fmt.humanize_name(nxdomain_ancestor.name), None, [], [], None, [], [], [])
+            tup.append(name_tup)
+
+            name_tup[7].extend(nxdomain_ancestor._serialize_response_component_list_simple(nxdomain_ancestor.referral_rdtype, nxdomain_ancestor.get_response_info(nxdomain_ancestor.name, nxdomain_ancestor.referral_rdtype), True))
+
         # in recursive analysis, if we don't contact any servers that are
         # valid and responsive, then we get a zone_obj (and thus
         # parent_obj, in this case) that is None (because we couldn't
@@ -584,10 +598,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             response_info_map[qname][rdtype] = self.get_response_info(qname, rdtype)
 
         tuples = []
-        qnames = response_info_map.keys()
+        qnames = list(response_info_map.keys())
         qnames.sort()
         for qname in qnames:
-            rdtypes = response_info_map[qname].keys()
+            rdtypes = list(response_info_map[qname].keys())
             rdtypes.sort()
             response_info_list = [response_info_map[qname][r] for r in rdtypes]
             tuples.extend(self._serialize_status_simple(response_info_list, processed))
@@ -611,7 +625,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for query1 in query.queries.values():
                 try:
                     if client is None:
-                        clients = query1.responses[server].keys()
+                        clients = list(query1.responses[server].keys())
                     else:
                         clients = (client,)
                 except KeyError:
@@ -699,7 +713,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
             return self._server_responsive_with_condition(server, client, tcp,
                     lambda x: x.effective_edns >= 0 and \
-                            not filter(lambda x: action_arg == x.otype, x.effective_edns_options) and \
+                            not [x for x in x.effective_edns_options if action_arg == x.otype] and \
 
                             ((x.effective_tcp and x.tcp_responsive) or \
                             (not x.effective_tcp and x.udp_responsive)) and \
@@ -708,7 +722,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
             return self._server_responsive_with_condition(server, client, tcp,
                     lambda x: x.effective_edns >= 0 and \
-                            filter(lambda x: action_arg == x.otype, x.effective_edns_options) and \
+                            [x for x in x.effective_edns_options if action_arg == x.otype] and \
 
                             ((x.effective_tcp and x.tcp_responsive) or \
                             (not x.effective_tcp and x.udp_responsive)) and \
@@ -779,6 +793,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ns_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
 
         # populate status of ancestry
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.parent is not None:
             self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.dlv_parent is not None:
@@ -879,7 +895,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for (qname, rdtype), query in self.queries.items():
                 if rdtype == dns.rdatatype.DS:
                     continue
-                if filter(lambda x: x.qname == qname, query.nxdomain_info):
+                if [x for x in query.nxdomain_info if x.qname == qname]:
                     self.status = Status.NAME_STATUS_NXDOMAIN
                     break
 
@@ -1072,7 +1088,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if response.message.edns < 0:
                     # if there were indicators that the server supported EDNS
                     # (e.g., by RRSIGs in the answer), then report it as such
-                    if filter(lambda x: x.rdtype == dns.rdatatype.RRSIG, response.message.answer):
+                    if [x for x in response.message.answer if x.rdtype == dns.rdatatype.RRSIG]:
                         edns_errs.append(Errors.EDNSSupportNoOpt())
                     # otherwise, simply report it as a server not responding
                     # properly to EDNS requests
@@ -1122,6 +1138,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 if response.recursion_desired() and not response.recursion_available():
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), group, server, client, response)
+
+            # check for NOERROR, inconsistent with NXDOMAIN in ancestor
+            if response.is_complete_response() and response.message.rcode() == dns.rcode.NOERROR and qname_obj.nxdomain_ancestor is not None:
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAINAncestry(qname=fmt.humanize_name(response.query.qname), ancestor_qname=fmt.humanize_name(qname_obj.nxdomain_ancestor.name)), errors, server, client, response)
 
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
@@ -1411,7 +1431,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _finalize_key_roles(self):
         if self.is_zone():
             self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
-            self.revoked_keys = set(filter(lambda x: x.rdata.flags & fmt.DNSKEY_FLAGS['revoke'], self.get_dnskeys()))
+            self.revoked_keys = set([x for x in self.get_dnskeys() if x.rdata.flags & fmt.DNSKEY_FLAGS['revoke']])
 
     def _populate_ns_status(self, warn_no_ipv4=True, warn_no_ipv6=False):
         if not self.is_zone():
@@ -1475,15 +1495,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if ns_names_not_in_child:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_child), parent=fmt.humanize_name(self.parent_name())))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInChild(names=[fmt.humanize_name(x) for x in ns_names_not_in_child], parent=fmt.humanize_name(self.parent_name())))
 
         if ns_names_not_in_parent:
             ns_names_not_in_child.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=map(lambda x: fmt.humanize_name(x), ns_names_not_in_parent), parent=fmt.humanize_name(self.parent_name())))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.NSNameNotInParent(names=[fmt.humanize_name(x) for x in ns_names_not_in_parent], parent=fmt.humanize_name(self.parent_name())))
 
         if names_error_resolving:
             names_error_resolving.sort()
-            self.zone_errors.append(Errors.ErrorResolvingNSName(names=map(lambda x: fmt.humanize_name(x), names_error_resolving)))
+            self.zone_errors.append(Errors.ErrorResolvingNSName(names=[fmt.humanize_name(x) for x in names_error_resolving]))
 
         if names_with_glue_mismatch:
             names_with_glue_mismatch.sort()
@@ -1496,19 +1516,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if names_missing_glue:
             names_missing_glue.sort()
-            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_glue)))
+            self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueForNSName(names=[fmt.humanize_name(x) for x in names_missing_glue]))
 
         if names_missing_auth:
             names_missing_auth.sort()
-            self.zone_errors.append(Errors.NoAddressForNSName(names=map(lambda x: fmt.humanize_name(x), names_missing_auth)))
+            self.zone_errors.append(Errors.NoAddressForNSName(names=[fmt.humanize_name(x) for x in names_missing_auth]))
 
         ips_from_parent = self.get_servers_in_parent()
-        ips_from_parent_ipv4 = filter(lambda x: x.version == 4, ips_from_parent)
-        ips_from_parent_ipv6 = filter(lambda x: x.version == 6, ips_from_parent)
+        ips_from_parent_ipv4 = [x for x in ips_from_parent if x.version == 4]
+        ips_from_parent_ipv6 = [x for x in ips_from_parent if x.version == 6]
 
         ips_from_child = self.get_servers_in_child()
-        ips_from_child_ipv4 = filter(lambda x: x.version == 4, ips_from_child)
-        ips_from_child_ipv6 = filter(lambda x: x.version == 6, ips_from_child)
+        ips_from_child_ipv4 = [x for x in ips_from_child if x.version == 4]
+        ips_from_child_ipv6 = [x for x in ips_from_child if x.version == 6]
 
         if not (ips_from_parent_ipv4 or ips_from_child_ipv4) and warn_no_ipv4:
             if ips_from_parent_ipv4:
@@ -1747,7 +1767,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if rdtype == dns.rdatatype.DS:
             try:
-                ds_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == dns.rdatatype.DS, self.queries[(name, rdtype)].nxdomain_info)[0]
+                ds_nxdomain_info = [x for x in self.queries[(name, rdtype)].nxdomain_info if x.qname == name and x.rdtype == dns.rdatatype.DS][0]
             except IndexError:
                 pass
             else:
@@ -1756,7 +1776,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # NXDOMAIN for the referral.  If so, this is due to the
                     # delegation not being found on all servers.
                     try:
-                        delegation_nxdomain_info = filter(lambda x: x.qname == name and x.rdtype == self.referral_rdtype, self.queries[(name, self.referral_rdtype)].nxdomain_info)[0]
+                        delegation_nxdomain_info = [x for x in self.queries[(name, self.referral_rdtype)].nxdomain_info if x.qname == name and x.rdtype == self.referral_rdtype][0]
                     except IndexError:
                         # if there were not NXDOMAINs received in response to the
                         # referral query, then use all the servers/clients
@@ -1789,8 +1809,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return
 
         designated_servers = self.get_designated_servers()
-        servers_queried_udp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried))
-        servers_queried_tcp = set(filter(lambda x: x[0] in designated_servers, self._all_servers_clients_queried_tcp))
+        servers_queried_udp = set([x for x in self._all_servers_clients_queried if x[0] in designated_servers])
+        servers_queried_tcp = set([x for x in self._all_servers_clients_queried_tcp if x[0] in designated_servers])
         servers_queried = servers_queried_udp.union(servers_queried_tcp)
 
         unresponsive_udp = servers_queried_udp.difference(self._responsive_servers_clients_udp)
@@ -1901,7 +1921,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             else:
                 upward_referral_error = errors[index]
                 for notices in errors, warnings:
-                    not_auth_notices = filter(lambda x: isinstance(x, Errors.NotAuthoritative), notices)
+                    not_auth_notices = [x for x in notices if isinstance(x, Errors.NotAuthoritative)]
                     for notice in not_auth_notices:
                         for server, client in upward_referral_error.servers_clients:
                             for response in upward_referral_error.servers_clients[(server, client)]:
@@ -1986,7 +2006,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if rdtype2 in (dns.rdatatype.DS, dns.rdatatype.DLV):
                             continue
 
-                        for rrset_info in filter(lambda x: x.rrset.name == neg_response_info.qname, query2.answer_info):
+                        for rrset_info in [x for x in query2.answer_info if x.rrset.name == neg_response_info.qname]:
                             shared_servers_clients = set(rrset_info.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
                                 err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=fmt.humanize_name(neg_response_info.qname), rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None)
@@ -1996,7 +2016,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         err1.add_server_client(server, client, response)
                                         err2.add_server_client(server, client, response)
 
-                        for neg_response_info2 in filter(lambda x: x.qname == neg_response_info.qname, query2.nodata_info):
+                        for neg_response_info2 in [x for x in query2.nodata_info if x.qname == neg_response_info.qname]:
                             shared_servers_clients = set(neg_response_info2.servers_clients).intersection(neg_response_info.servers_clients)
                             if shared_servers_clients:
                                 err1 = Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAIN(qname=fmt.humanize_name(neg_response_info.qname), rdtype_nxdomain=dns.rdatatype.to_text(rdtype), rdtype_noerror=dns.rdatatype.to_text(query2.rdtype)), self.nxdomain_warnings[neg_response_info], None, None, None)
@@ -2097,7 +2117,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # Mark each individual NSEC in the set
                 elif isinstance(obj, Response.NSECSet):
                     for nsec_name in obj.rrsets:
-                        nsec_name_str = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
+                        nsec_name_str = lb2s(nsec_name.canonicalize().to_text()).replace(r'"', r'\"')
                         response_component_status[obj.rrsets[nsec_name]] = G.status_for_node(node_str, nsec_name_str)
 
                 elif isinstance(obj, Response.NegativeResponseInfo):
@@ -2171,6 +2191,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 ns_obj._set_response_component_status(response_component_status, trace=trace + [self])
 
         # populate status of ancestry
+        if self.nxdomain_ancestor is not None:
+            self.nxdomain_ancestor._set_response_component_status(response_component_status, trace=trace + [self])
         if self.parent is not None:
             self.parent._set_response_component_status(response_component_status, trace=trace + [self])
         if self.dlv_parent is not None:
@@ -2183,10 +2205,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         rrsig_list = []
         if self.rrsig_status[rrset_info]:
-            rrsigs = self.rrsig_status[rrset_info].keys()
+            rrsigs = list(self.rrsig_status[rrset_info].keys())
             rrsigs.sort()
             for rrsig in rrsigs:
-                dnskeys = self.rrsig_status[rrset_info][rrsig].keys()
+                dnskeys = list(self.rrsig_status[rrset_info][rrsig].keys())
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
@@ -2203,10 +2225,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         wildcard_proof_list = collections.OrderedDict()
         if rrset_info.wildcard_info:
-            wildcard_names = rrset_info.wildcard_info.keys()
+            wildcard_names = list(rrset_info.wildcard_info.keys())
             wildcard_names.sort()
             for wildcard_name in wildcard_names:
-                wildcard_name_str = wildcard_name.canonicalize().to_text()
+                wildcard_name_str = lb2s(wildcard_name.canonicalize().to_text())
                 wildcard_proof_list[wildcard_name_str] = []
                 for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                     nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
@@ -2224,10 +2246,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
             else:
-                d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
+                d['id'] = '%s/%s/%s' % (lb2s(rrset_info.rrset.name.canonicalize().to_text()), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
 
         if loglevel <= logging.DEBUG:
-            d['description'] = unicode(rrset_info)
+            d['description'] = str(rrset_info)
             d.update(rrset_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
 
         if rrsig_list:
@@ -2285,7 +2307,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 (proof_list or soa_list)
 
         if show_id:
-            d['id'] = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
+            d['id'] = '%s/%s/%s' % (lb2s(neg_response_info.qname.canonicalize().to_text()), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
 
         if proof_list:
             d['proof'] = proof_list
@@ -2384,11 +2406,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
 
-        dss = self.ds_status_by_ds[rdtype].keys()
+        dss = list(self.ds_status_by_ds[rdtype].keys())
         d['ds'] = []
         dss.sort()
         for ds in dss:
-            dnskeys = self.ds_status_by_ds[rdtype][ds].keys()
+            dnskeys = list(self.ds_status_by_ds[rdtype][ds].keys())
             dnskeys.sort()
             for dnskey in dnskeys:
                 ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
@@ -2399,11 +2421,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             del d['ds']
 
         try:
-            neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nodata_status)[0]
+            neg_response_info = [x for x in self.nodata_status if x.qname == self.name and x.rdtype == rdtype][0]
             status = self.nodata_status
         except IndexError:
             try:
-                neg_response_info = filter(lambda x: x.qname == self.name and x.rdtype == rdtype, self.nxdomain_status)[0]
+                neg_response_info = [x for x in self.nxdomain_status if x.qname == self.name and x.rdtype == rdtype][0]
                 status = self.nxdomain_status
             except IndexError:
                 neg_response_info = None
@@ -2440,7 +2462,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             names = list(self.get_ns_names())
             names.sort()
             for name in names:
-                name_str = name.canonicalize().to_text()
+                name_str = lb2s(name.canonicalize().to_text())
                 d['servers'][name_str] = collections.OrderedDict()
                 if name in glue_ip_mapping and glue_ip_mapping[name]:
                     servers = list(glue_ip_mapping[name])
@@ -2466,7 +2488,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 names = list(stealth_mapping)
                 names.sort()
                 for name in names:
-                    name_str = name.canonicalize().to_text()
+                    name_str = lb2s(name.canonicalize().to_text())
                     servers = stealth_mapping[name]
                     servers.sort()
                     d['servers'][name_str] = collections.OrderedDict((
@@ -2499,7 +2521,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.stub:
             return d
 
-        name_str = self.name.canonicalize().to_text()
+        name_str = lb2s(self.name.canonicalize().to_text())
         if name_str in d:
             return d
 
@@ -2525,6 +2547,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # serialize status of ancestry
         if level <= self.RDTYPES_SECURE_DELEGATION:
+            if self.nxdomain_ancestor is not None:
+                self.nxdomain_ancestor.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_ALL_SAME_NAME, trace=trace + [self], html_format=html_format)
             if self.parent is not None:
                 self.parent.serialize_status(d, loglevel=loglevel, level=self.RDTYPES_SECURE_DELEGATION, trace=trace + [self], html_format=html_format)
             if self.dlv_parent is not None:
@@ -2552,7 +2576,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d[name_str]['status'] = Status.name_status_mapping[self.status]
 
         d[name_str]['queries'] = collections.OrderedDict()
-        query_keys = self.queries.keys()
+        query_keys = list(self.queries.keys())
         query_keys.sort()
         required_rdtypes = self._rdtypes_for_analysis_level(level)
 
@@ -2571,7 +2595,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if query_serialized:
-                qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+                qname_type_str = '%s/%s/%s' % (lb2s(qname.canonicalize().to_text()), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
                 d[name_str]['queries'][qname_type_str] = query_serialized
 
         if not d[name_str]['queries']:

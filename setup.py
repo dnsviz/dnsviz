@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+from __future__ import unicode_literals
+
+import codecs
 import glob
 import os
 import stat
@@ -91,15 +94,22 @@ if os.path.exists(os.path.join('external', 'raphael')):
 else:
     RAPHAEL_FILES = []
 
+if isinstance(b'', str):
+    map_func = lambda x: x
+else:
+    map_func = lambda x: codecs.decode(x, 'latin1')
+
 setup(name='dnsviz',
         version='0.5.4',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
         description='DNS analysis and visualization tool suite',
-        long_description=open('README.md', 'r').read(),
+        long_description='''DNSViz is a tool suite for analysis and visualization of Domain Name System
+(DNS) behavior, including its security extensions (DNSSEC).  This tool suite
+powers the Web-based analysis available at http://dnsviz.net/ .''',
         license='LICENSE',
-        packages=['dnsviz','dnsviz.viz','dnsviz.analysis','dnsviz.commands'],
+        packages=[map_func(b'dnsviz'), map_func(b'dnsviz.viz'), map_func(b'dnsviz.analysis'), map_func(b'dnsviz.commands')],
         scripts=['bin/dnsviz'],
         data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
@@ -107,6 +117,22 @@ setup(name='dnsviz',
                 'pygraphviz (>=1.1)',
                 'm2crypto (>=0.24.0)',
                 'dnspython (>=1.11)',
+        ],
+        classifiers=[
+                'Development Status :: 5 - Production/Stable',
+                'Environment :: Console',
+                'Environment :: Web Environment',
+                'Intended Audience :: Developers',
+                'Intended Audience :: System Administrators',
+                'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
+                'Natural Language :: English',
+                'Operating System :: MacOS :: MacOS X',
+                'Operating System :: POSIX',
+                'Programming Language :: Python :: 2.7',
+                'Programming Language :: Python :: 3',
+                'Topic :: Internet :: Name Service (DNS)',
+                'Topic :: Scientific/Engineering :: Visualization',
+                'Topic :: System :: Networking :: Monitoring',
         ],
         cmdclass={ 'build': MyBuild, 'install': MyInstall },
 )

@@ -25,7 +25,10 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import calendar
+import codecs
 import datetime
 import re
 import time
@@ -58,7 +61,11 @@ class UTC(datetime.tzinfo):
         return ZERO
 
     def tzname(self, dt):
-        return "UTC"
+        # python3/python2 dual compatibility
+        if type(b'') is str:
+            return b'UTC'
+        else:
+            return 'UTC'
 
     def dst(self, dt):
         return ZERO
@@ -143,7 +150,7 @@ def format_diff(date_now, date_relative):
 #################
 # Human representation of DNS names
 def format_nsec3_name(name):
-    return dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text()
+    return lb2s(dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text())
 
 def format_nsec3_rrset_text(nsec3_rrset_text):
     return re.sub(r'((^| )[0-9a-zA-Z]{32,})', lambda x: x.group(1).upper(), nsec3_rrset_text).rstrip('.')
@@ -153,9 +160,13 @@ def humanize_name(name, idn=False):
         try:
             name = name.canonicalize().to_unicode()
         except UnicodeError:
-            name = name.canonicalize().to_text()
+            name = lb2s(name.canonicalize().to_text())
     else:
-        name = name.canonicalize().to_text()
+        name = lb2s(name.canonicalize().to_text())
     if name == '.':
         return name
     return name.rstrip('.')
+
+def latin1_binary_to_string(s):
+    return codecs.decode(s, 'latin1')
+lb2s = latin1_binary_to_string

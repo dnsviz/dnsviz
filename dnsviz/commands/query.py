@@ -20,6 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import getopt
 import socket
 import subprocess
@@ -144,7 +146,7 @@ class DVCommandLineQuery:
         try:
             dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
             dnsviz_p = subprocess.Popen(dnsviz_args, stdin=dnsget_p.stdout)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write('error: %s\n' % e)
             return False
         else:
@@ -280,7 +282,7 @@ class DVCommandLine:
             try:
                 s = socket.socket(family)
                 s.bind((addr, 0))
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EADDRNOTAVAIL:
                     sys.stderr.write('Cannot bind to specified IP address: "%s"\n' % addr)
                     sys.exit(1)
@@ -377,9 +379,9 @@ class DVCommandLine:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not use_ipv4:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not use_ipv6:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
 
