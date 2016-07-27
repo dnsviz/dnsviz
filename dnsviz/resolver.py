@@ -407,7 +407,7 @@ class FullResolver:
         for query_tuple in query_tuples:
             try:
                 answers[query_tuple] = self.query_for_answer(query_tuple[0], query_tuple[1], query_tuple[2], allow_noanswer=allow_noanswer)
-            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers), e:
+            except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers) as e:
                 answers[query_tuple] = e
         return answers
 

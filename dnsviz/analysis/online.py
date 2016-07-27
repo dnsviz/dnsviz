@@ -1103,7 +1103,7 @@ class Analyst(object):
                 pass
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             pass
-        except dns.exception.DNSException, e:
+        except dns.exception.DNSException as e:
             parent_ceiling, fail = self._detect_ceiling(ceiling.parent())
             if fail:
                 return parent_ceiling, True
