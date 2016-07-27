@@ -473,6 +473,9 @@ class NSECStatusNXDOMAIN(NSECStatus):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
@@ -588,6 +591,9 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return isinstance(other, self.__class__) and \
                 super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name_from_rrsig == other.wildcard_name_from_rrsig
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _next_closest_encloser(self):
         return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
 
@@ -695,6 +701,9 @@ class NSECStatusNODATA(NSECStatus):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
+
+    def __hash__(self):
+        return hash(id(self))
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
@@ -907,6 +916,9 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
 
@@ -1085,6 +1097,9 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         return isinstance(other, self.__class__) and \
                 super(NSEC3StatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
@@ -1216,6 +1231,9 @@ class NSEC3StatusNODATA(NSEC3Status):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
+
+    def __hash__(self):
+        return hash(id(self))
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
