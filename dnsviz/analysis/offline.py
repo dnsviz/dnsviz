@@ -401,7 +401,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         errors = [e.terse_description for e in ds_status.errors]
                         rdata_tup.append((Status.ds_status_mapping[ds_status.validation_status], warnings, errors, '%d/%d/%d' % (ds.algorithm, ds.key_tag, ds.digest_type)))
             elif rdtype == dns.rdatatype.NSEC3:
-                rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(lb2s(info.rrset[0].to_text())))))
+                rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
             elif rdtype == dns.rdatatype.NSEC:
                 rdata_tup.append((None, [], [], '%s %s' % (lb2s(info.rrset.name.to_text()), info.rrset[0].to_text())))
             elif rdtype == dns.rdatatype.DNAME:
