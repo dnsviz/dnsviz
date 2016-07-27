@@ -536,8 +536,8 @@ class FullResolver:
                             # No network connectivity
                             continue
 
-                        server1, client_response = query.responses.items()[0]
-                        client, response = client_response.items()[0]
+                        server1, client_response = list(query.responses.items())[0]
+                        client, response = list(client_response.items())[0]
 
                         if response.is_valid_response() and response.is_complete_response():
                             soa_rrset = None
@@ -546,25 +546,25 @@ class FullResolver:
                             # response is acceptable
                             try:
                                 # first check for exact match
-                                ret = [filter(lambda x: x.name == qname and x.rdtype == rdtype and x.rdclass == rdclass, response.message.answer)[0]]
+                                ret = [[x for x in response.message.answer if x.name == qname and x.rdtype == rdtype and x.rdclass == rdclass][0]]
                             except IndexError:
                                 try:
                                     # now look for DNAME
-                                    dname_rrset = filter(lambda x: qname.is_subdomain(x.name) and qname != x.name and x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                    dname_rrset = [x for x in response.message.answer if qname.is_subdomain(x.name) and qname != x.name and x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass][0]
                                 except IndexError:
                                     try:
                                         # now look for CNAME
-                                        cname_rrset = filter(lambda x: x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                        cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
                                     except IndexError:
                                         ret = [None]
                                         # no answer
                                         try:
-                                            soa_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.SOA, response.message.authority)[0]
+                                            soa_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.SOA][0]
                                         except IndexError:
                                             pass
                                     # cache the NS RRset
                                     else:
-                                        cname_rrset = filter(lambda x: x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass, response.message.answer)[0]
+                                        cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
                                         ret = [cname_rrset]
                                 else:
                                     # handle DNAME: return the DNAME, CNAME and (recursively) its chain
@@ -577,7 +577,7 @@ class FullResolver:
                                 min_ttl = None
 
                                 # if response is referral, then we follow it
-                                ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.authority)[0]
+                                ns_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
                                 ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
                                 for ns_name in ns_names:
                                     if not ns_names[ns_name]:
@@ -613,7 +613,7 @@ class FullResolver:
 
                                 # if response is authoritative (and not a referral), then we return it
                                 try:
-                                    ns_rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, response.message.answer + response.message.authority)[0]
+                                    ns_rrset = [x for x in  response.message.answer + response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
                                 except IndexError:
                                     pass
                                 else:
