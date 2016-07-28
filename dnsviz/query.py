@@ -1114,7 +1114,7 @@ class DNSQuery(object):
             edns_flags = d1['edns_flags']
             edns_options = []
             for otype, data in d1['edns_options']:
-                edns_options.append(dns.edns.GenericOption(otype, lb2s(base64.b64decode(data))))
+                edns_options.append(dns.edns.GenericOption(otype, base64.b64decode(data)))
         else:
             edns = None
             edns_max_udp_payload = None
@@ -1778,7 +1778,7 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
 
     edns = 0
     edns_max_udp_payload = 512
-    edns_options = [dns.edns.GenericOption(100, '')]
+    edns_options = [dns.edns.GenericOption(100, b'')]
 
     response_handlers = SimpleDNSQuery.response_handlers + \
             [RemoveEDNSOptionOnTimeoutHandler(100, 4),
@@ -1855,7 +1855,7 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
     flags = dns.flags.RD
     edns = 0
     edns_max_udp_payload = 512
-    edns_options = [dns.edns.GenericOption(100, '')]
+    edns_options = [dns.edns.GenericOption(100, b'')]
 
     response_handlers = SimpleDNSQuery.response_handlers + \
             [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),

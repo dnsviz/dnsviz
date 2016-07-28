@@ -30,6 +30,7 @@ from __future__ import unicode_literals
 import base64
 import errno
 import cgi
+import codecs
 import collections
 import datetime
 import hashlib
@@ -1095,16 +1096,16 @@ class NSECSet(DNSResponseComponent):
     def is_valid_nsec3_name(self, nsec_name, algorithm):
         # python3/python2 dual compatibility
         if isinstance(nsec_name[0], str):
-            map_func = lambda x: x
+            map_func = lambda x: codecs.encode(x.upper(), 'latin1')
         else:
-            map_func = lambda x: chr(x)
+            map_func = lambda x: codecs.encode(chr(x).upper(), 'latin1')
 
         # check that NSEC3 name is valid
         if algorithm == 1:
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if [x for x in nsec_name[0] if map_func(x).upper() not in base32.b32alphabet]:
+        if [x for x in nsec_name[0] if map_func(x) not in base32.b32alphabet]:
             return False
         return True
 

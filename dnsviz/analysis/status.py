@@ -473,6 +473,9 @@ class NSECStatusNXDOMAIN(NSECStatus):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
@@ -588,6 +591,9 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return isinstance(other, self.__class__) and \
                 super(NSECStatusWildcard, self).__eq__(other) and self.wildcard_name_from_rrsig == other.wildcard_name_from_rrsig
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _next_closest_encloser(self):
         return dns.name.Name(self.qname.labels[-len(self.wildcard_name):])
 
@@ -695,6 +701,9 @@ class NSECStatusNODATA(NSECStatus):
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
+
+    def __hash__(self):
+        return hash(id(self))
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
@@ -907,6 +916,9 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.origin == other.origin and self.nsec_set_info == other.nsec_set_info
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
 
@@ -951,9 +963,9 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()
@@ -1085,6 +1097,9 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         return isinstance(other, self.__class__) and \
                 super(NSEC3StatusWildcard, self).__eq__(other) and self.wildcard_name == other.wildcard_name
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if not self.nsec_names_covering_qname:
@@ -1116,9 +1131,9 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
@@ -1217,6 +1232,9 @@ class NSEC3StatusNODATA(NSEC3Status):
         return isinstance(other, self.__class__) and \
                 self.qname == other.qname and self.rdtype == other.rdtype and self.origin == other.origin and self.referral == other.referral and self.nsec_set_info == other.nsec_set_info
 
+    def __hash__(self):
+        return hash(id(self))
+
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
@@ -1296,9 +1314,9 @@ class NSEC3StatusNODATA(NSEC3Status):
 
         # Report errors with NSEC3 owner names
         for name in self.nsec_set_info.invalid_nsec3_owner:
-            self.errors.append(Errors.InvalidNSEC3OwnerName(name=name))
+            self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=name, nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next)))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
         d = collections.OrderedDict()

@@ -187,6 +187,9 @@ class OnlineDomainNameAnalysis(object):
     def __eq__(self, other):
         return self.name == other.name
 
+    def __hash__(self):
+        return hash(self.name)
+
     def parent_name(self):
         if self.parent is not None:
             return self.parent.name
