@@ -153,7 +153,7 @@ def format_nsec3_name(name):
     return lb2s(dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text())
 
 def format_nsec3_rrset_text(nsec3_rrset_text):
-    return re.sub(r'((^| )[0-9a-zA-Z]{32,})', lambda x: x.group(1).upper(), nsec3_rrset_text).rstrip('.')
+    return re.sub(r'^(\d+\s+\d+\s+\d+\s+\S+\s+)([0-9a-zA-Z]+)', lambda x: '%s%s' % (x.group(1), x.group(2).upper()), nsec3_rrset_text).rstrip('.')
 
 def humanize_name(name, idn=False):
     if idn:
