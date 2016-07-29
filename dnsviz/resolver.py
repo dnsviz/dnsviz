@@ -290,12 +290,15 @@ class FullResolver:
     MIN_TTL = 60
     MAX_CHAIN = 20
 
-    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, transport_manager=None, th_factories=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None):
 
         self._hints = hints
         self._query_cls = query_cls
         self._client_ipv4 = client_ipv4
         self._client_ipv6 = client_ipv6
+        if odd_ports is None:
+            odd_ports = {}
+        self._odd_ports = odd_ports
         self._transport_manager = transport_manager
         self._th_factories = th_factories
 
@@ -528,7 +531,7 @@ class FullResolver:
                                     ns_names[ns_name].add(IPAddr(rdata.address))
 
                     for server in ns_names[ns_name]:
-                        query = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6)
+                        query = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53))
                         query.execute(tm=self._transport_manager, th_factories=self._th_factories)
                         is_referral = False
 

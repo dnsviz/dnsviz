@@ -723,7 +723,7 @@ class DNSQueryHandler:
 
     def get_query_transport_meta(self):
         return transport.DNSQueryTransportMeta(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
-                self.query.port, src=self._client, sport=self.params['sport'])
+                self.query.odd_ports.get(self._server, self.query.port), src=self._client, sport=self.params['sport'])
 
     def get_remaining_lifetime(self):
         if self._expiration is None:
@@ -1208,7 +1208,7 @@ class ExecutableDNSQuery(DNSQuery):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
-            client_ipv4, client_ipv6, port,
+            client_ipv4, client_ipv6, port, odd_ports,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
@@ -1222,11 +1222,15 @@ class ExecutableDNSQuery(DNSQuery):
                 servers = set([servers])
         if not servers:
             raise ValueError("At least one server must be specified for an ExecutableDNSQuery")
+
         self.servers = servers
         self.bailiwick = bailiwick
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
         self.port = port
+        if odd_ports is None:
+            odd_ports = {}
+        self.odd_ports = odd_ports
         self.response_handlers = response_handlers
 
         self.query_timeout = query_timeout
@@ -1487,7 +1491,7 @@ class DNSQueryFactory(object):
     response_handlers = []
 
     def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
-            client_ipv4=None, client_ipv6=None, port=53,
+            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
 
@@ -1500,7 +1504,7 @@ class DNSQueryFactory(object):
 
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
-                client_ipv4, client_ipv6, port,
+                client_ipv4, client_ipv6, port, odd_ports,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 

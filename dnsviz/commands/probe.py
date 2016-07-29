@@ -64,6 +64,7 @@ tm = None
 full_resolver = None
 stub_resolver = None
 explicit_delegations = None
+odd_ports = None
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
@@ -95,7 +96,7 @@ def _init_resolver():
     hints = get_root_hints()
     for key in explicit_delegations:
         hints[key] = explicit_delegations[key]
-    full_resolver = FullResolver(hints, transport_manager=tm)
+    full_resolver = FullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
 
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
@@ -113,7 +114,7 @@ def _analyze(args):
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=full_resolver)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=full_resolver)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -340,6 +341,9 @@ def name_addr_mappings_from_string(domain, mappings):
                 if isinstance(a, DNSAnswer):
                     found_answer = True
                     explicit_delegations[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [r.address for r in a.rrset])
+                    if port != 53:
+                        for r in a.rrset:
+                            odd_ports[(domain, IPAddr(r.address))] = port
                 # negative responses
                 elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
                     pass
@@ -383,6 +387,8 @@ def name_addr_mappings_from_string(domain, mappings):
             if (name, a_rdtype) not in explicit_delegations:
                 explicit_delegations[(name, a_rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, a_rdtype)
             explicit_delegations[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
+            if port != 53:
+                odd_ports[(domain, IPAddr(addr))] = port
 
 def usage(err=None):
     if err is not None:
@@ -419,6 +425,7 @@ def main(argv):
     global full_resolver
     global stub_resolver
     global explicit_delegations
+    global odd_ports
 
     try:
         try:
@@ -432,6 +439,7 @@ def main(argv):
 
         # get all the -x options
         explicit_delegations = {}
+        odd_ports = {}
         client_ipv4 = None
         client_ipv6 = None
         for opt, arg in opts:
