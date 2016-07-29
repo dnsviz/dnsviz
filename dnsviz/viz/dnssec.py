@@ -27,6 +27,7 @@
 
 from __future__ import unicode_literals
 
+import codecs
 import cgi
 import collections
 import errno
@@ -268,7 +269,7 @@ class DNSAuthGraph:
         s += self._write_raphael_node(dom.documentElement, None, 's\'+this.imageScale+\',\'+this.imageScale+\',0,0')
         s += '\tpaper.setViewBox(0, 0, imageWidth, imageHeight);\n'
         s += '}\n'
-        return s
+        return codecs.encode(s, 'utf-8')
 
     def draw(self, format, path=None):
         if format == 'js':
