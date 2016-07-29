@@ -79,7 +79,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
 
     if fmt == 'html':
         try:
-            js_img = G.draw('js')
+            js_img = codecs.decode(G.draw('js'), 'utf-8')
         except IOError as e:
             logger.error(str(e))
             sys.exit(3)
