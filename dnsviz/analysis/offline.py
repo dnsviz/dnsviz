@@ -1447,7 +1447,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         names_from_child = self.get_ns_names_in_child()
         names_from_parent = self.get_ns_names_in_parent()
 
-        auth_ns_response = self.queries[(self.name, dns.rdatatype.NS)].is_valid_complete_authoritative_response_any()
+        # With explicit delegations we won't have queried for authoritative NS
+        # records, but we also don't need to check delegation consistency in
+        # that case.
+        if (self.name, dns.rdatatype.NS) in self.queries:
+            auth_ns_response = self.queries[(self.name, dns.rdatatype.NS)].is_valid_complete_authoritative_response_any()
+        else:
+            auth_ns_response = False
 
         glue_mapping = self.get_glue_ip_mapping()
         auth_mapping = self.get_auth_ns_ip_mapping()
