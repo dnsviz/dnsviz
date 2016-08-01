@@ -22,6 +22,7 @@
 
 from __future__ import unicode_literals
 
+import atexit
 import collections
 import codecs
 import errno
@@ -29,12 +30,17 @@ import getopt
 import io
 import json
 import logging
+import os
 import re
 import signal
 import socket
 import sys
 import multiprocessing
 import multiprocessing.managers
+import signal
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
 
@@ -65,6 +71,7 @@ full_resolver = None
 stub_resolver = None
 explicit_delegations = None
 odd_ports = None
+next_port = 50053
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
@@ -265,6 +272,8 @@ class RecursiveParallelAnalyst(ParallelAnalystMixin, RecursiveBulkAnalyst):
     analyst_cls = RecursiveMultiProcessAnalyst
 
 def name_addr_mappings_from_string(domain, mappings):
+    global next_port
+
     mappings = mappings.split(',')
     i = 1
     for mapping in mappings:
@@ -284,39 +293,50 @@ def name_addr_mappings_from_string(domain, mappings):
 
         num_replacements = None
 
-        # First determine whether the argument is name=value or simply value
-        try:
-            name, addr = NAME_VAL_DELIM_RE.split(mapping, 1)
-        except ValueError:
-            # Argument is a single value.  Now determine whether that value is
-            # a name or an address.
-            try:
-                IPAddr(BRACKETS_RE.sub(r'\1', mapping))
-            except ValueError:
-                # see if this was an IPv6 address without a port
-                try:
-                    IPAddr(mapping + port_str)
-                except ValueError:
-                    pass
-                else:
-                    usage('Brackets are required around IPv6 addresses.')
-                    sys.exit(1)
+        # if the value is actually a path, then check it as a zone file
+        if os.path.isfile(mapping):
+            if port_str == '':
+                #TODO assign random port here
+                port = next_port
+                next_port += 1
+            _serve_zone(domain, mapping, port)
+            name = 'localhost'
+            addr = None
 
-                # value is not an address
-                name = mapping
-                addr = None
-            else:
-                # value is an address
-                name = 'ns%d' % i
-                addr, num_replacements = BRACKETS_RE.subn(r'\1', mapping)
-                i += 1
         else:
-            # Argument is name=value
-            addr, num_replacements = BRACKETS_RE.subn(r'\1', addr)
+            # First determine whether the argument is name=value or simply value
+            try:
+                name, addr = NAME_VAL_DELIM_RE.split(mapping, 1)
+            except ValueError:
+                # Argument is a single value.  Now determine whether that value is
+                # a name or an address.
+                try:
+                    IPAddr(BRACKETS_RE.sub(r'\1', mapping))
+                except ValueError:
+                    # see if this was an IPv6 address without a port
+                    try:
+                        IPAddr(mapping + port_str)
+                    except ValueError:
+                        pass
+                    else:
+                        usage('Brackets are required around IPv6 addresses.')
+                        sys.exit(1)
 
-        if not name:
-            usage('The domain name was empty.')
-            sys.exit(1)
+                    # value is not an address
+                    name = mapping
+                    addr = None
+                else:
+                    # value is an address
+                    name = 'ns%d' % i
+                    addr, num_replacements = BRACKETS_RE.subn(r'\1', mapping)
+                    i += 1
+            else:
+                # Argument is name=value
+                addr, num_replacements = BRACKETS_RE.subn(r'\1', addr)
+
+            if not name:
+                usage('The domain name was empty.')
+                sys.exit(1)
 
         # At this point, name is defined, and addr may or may not be defined.
         # Both are of type str.
@@ -389,6 +409,52 @@ def name_addr_mappings_from_string(domain, mappings):
             explicit_delegations[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
             if port != 53:
                 odd_ports[(domain, IPAddr(addr))] = port
+
+def _serve_zone(zone, zone_file, port):
+    tmpdir = tempfile.mkdtemp(prefix='dnsviz')
+    atexit.register(shutil.rmtree, tmpdir)
+    io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
+options {
+	pid-file "%s/named.pid";
+	listen-on port %s { localhost; };
+	listen-on-v6 port %s { localhost; };
+	recursion no;
+	notify no;
+};
+controls {};
+zone "%s" {
+	type master;
+	file "%s";
+};
+logging {
+	channel info_file { file "%s/named.log"; severity info; };
+	category default { info_file; };
+	category unmatched { null; };
+};
+''' % (tmpdir, port, port, lb2s(zone.to_text()), zone_file, tmpdir))
+    try:
+        p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError as e:
+        usage('There was an error executing named-checkconf (is it in PATH?): %s' % e)
+        sys.exit(1)
+
+    (stdout, stderr) = p.communicate()
+    if p.returncode != 0:
+        usage('There was an problem with the zone file for "%s":\n%s' % (lb2s(zone.to_text()), stdout))
+        sys.exit(1)
+
+    try:
+        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError as e:
+        usage('There was an error executing named (is it in PATH?): %s' % e)
+        sys.exit(1)
+    (stdout, stderr) = p.communicate()
+    if p.returncode != 0:
+        usage('There was an problem executing named to serve the "%s" zone\n%s' % (lb2s(zone.to_text()), stdout))
+        sys.exit(1)
+
+    pid = int(io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8').read())
+    atexit.register(os.kill, pid, signal.SIGINT)
 
 def usage(err=None):
     if err is not None:
