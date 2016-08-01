@@ -415,7 +415,8 @@ def _serve_zone(zone, zone_file, port):
     atexit.register(shutil.rmtree, tmpdir)
     io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
 options {
-	pid-file "%s/named.pid";
+    directory "%s";
+	pid-file "named.pid";
 	listen-on port %s { localhost; };
 	listen-on-v6 port %s { localhost; };
 	recursion no;
@@ -431,7 +432,7 @@ logging {
 	category default { info_file; };
 	category unmatched { null; };
 };
-''' % (tmpdir, port, port, lb2s(zone.to_text()), zone_file, tmpdir))
+''' % (tmpdir, port, port, lb2s(zone.to_text()), os.path.abspath(zone_file), tmpdir))
     try:
         p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
