@@ -362,7 +362,7 @@ def name_addr_mappings_from_string(domain, mappings):
                 a = answer_map[(n, rdtype, rdclass)]
                 if isinstance(a, DNSAnswer):
                     found_answer = True
-                    explicit_delegations[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [r.address for r in a.rrset])
+                    explicit_delegations[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [IPAddr(r.address) for r in a.rrset])
                     if port != 53:
                         for r in a.rrset:
                             odd_ports[(domain, IPAddr(r.address))] = port
