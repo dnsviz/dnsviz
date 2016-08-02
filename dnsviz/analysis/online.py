@@ -963,10 +963,11 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'odd_ports', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
     def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, odd_ports=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
+             analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
@@ -988,6 +989,11 @@ class Analyst(object):
         else:
             self.explicit_delegations = explicit_delegations
 
+        if stop_at_explicit is None:
+            self.stop_at_explicit = {}
+        else:
+            self.stop_at_explicit = stop_at_explicit
+
         if odd_ports is None:
             self.odd_ports = {}
         else:
@@ -1008,7 +1014,7 @@ class Analyst(object):
         c = self.name
         try:
             while True:
-                if (c, dns.rdatatype.NS) in self.explicit_delegations:
+                if (c, dns.rdatatype.NS) in self.explicit_delegations and self.stop_at_explicit[c]:
                     break
                 c = c.parent()
         except dns.name.NoParent:
@@ -1025,7 +1031,6 @@ class Analyst(object):
                 ceiling = c
 
         self.local_ceiling = self._detect_ceiling(ceiling)[0]
-        self._fix_explicit_delegation()
 
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
@@ -1118,24 +1123,6 @@ class Analyst(object):
             else:
                 return ceiling, True
         return self._detect_ceiling(ceiling.parent())
-
-    def _fix_explicit_delegation(self):
-        if self.local_ceiling is None:
-            return
-
-        # at this point, if self.name or any ancestor below self.local_ceiling has an
-        # explicit delegation, then it is obsolete and needs to be applied to
-        # self.local_ceiling instead.
-        n = self.name
-        explicit_delegation = None
-        while n != self.local_ceiling:
-            if (n, dns.rdatatype.NS) in self.explicit_delegations:
-                if explicit_delegation is None:
-                    explicit_delegation = self.explicit_delegations[(n, dns.rdatatype.NS)]
-                del self.explicit_delegations[(n, dns.rdatatype.NS)]
-            n = n.parent()
-        if explicit_delegation is not None:
-            self.explicit_delegations[(self.local_ceiling, dns.rdatatype.NS)] = explicit_delegation
 
     def _get_servers_from_hints(self, name, hints):
         servers = set()
@@ -1484,10 +1471,10 @@ class Analyst(object):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
+        elif (name, dns.rdatatype.NS) in self.explicit_delegations and self.stop_at_explicit[name]:
+            parent_obj = None
         elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
-        elif (name, dns.rdatatype.NS) in self.explicit_delegations:
-            parent_obj = None
         else:
             parent_obj = self._analyze(name.parent())
 
