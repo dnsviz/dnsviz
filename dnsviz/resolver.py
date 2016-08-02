@@ -315,7 +315,7 @@ class FullResolver:
         t = time.time()
 
         with self._cache_lock:
-            if self._expirations and self._expirations[0] > t:
+            if self._expirations and self._expirations[0][0] > t:
                 return
 
             future_index = bisect.bisect_right(self._expirations, (t, None))
