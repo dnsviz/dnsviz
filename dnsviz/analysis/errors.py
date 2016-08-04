@@ -1520,12 +1520,12 @@ class GlueMismatchError(DelegationError):
     '''
     >>> e = GlueMismatchError(name='ns1.foo.baz.', glue_addresses=('192.0.2.1',), auth_addresses=('192.0.2.2',))
     >>> e.description
-    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from their respective authoritative address(es) (192.0.2.2).'
+    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from its authoritative address(es) (192.0.2.2).'
     '''
 
     _abstract = False
     code = 'GLUE_MISMATCH'
-    description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from their respective authoritative address(es) (%(auth_addresses_text)s).'
+    description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from its authoritative address(es) (%(auth_addresses_text)s).'
     required_params = ['name', 'glue_addresses', 'auth_addresses']
 
     def __init__(self, **kwargs):
