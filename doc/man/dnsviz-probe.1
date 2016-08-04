@@ -157,7 +157,27 @@ Query authoritative servers, rather than (the default) recursive servers.
 .IP "-x <domain>:<server>[,<server>...]"
 Set explicit delegation for the specified domain to one or more servers.
 
-See \fI-s\fP for the syntax used for designating servers.
+The default behavior is to identify and query servers authoritative for
+ancestors of the specified domain to obtain if the options so dictate.
+However, if the domain ends in "+", then queries aren't issued for servers
+authoritative for ancestor domains of the domain.  For example, with the
+following command:
+
+dnsviz probe -a . -x example.com:ns1.example.com example.com
+
+at the very least the com servers will be queried for DS records for
+example.com.  However, if the following is used:
+
+dnsviz probe -a . -x example.com+:ns1.example.com example.com
+
+no queries are performed at com servers or above, includg DS records for
+example.com.
+
+See \fI-s\fP for the syntax used for designating servers.  However, unlike the
+\fI-s\fP option, a zone file may be specified in lieu of a server name and/or
+address, in which case an instance of \fInamed(8)\fP is started, the zone is
+served from that instance, and queries for the domain are directed to the local
+instance of \fInamed(8)\fP serving that zone.
 
 This option may be used multiple times on the command line.
 
