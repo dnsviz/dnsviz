@@ -303,7 +303,7 @@ def name_addr_mappings_from_string(domain, mappings):
                 next_port += 1
             _serve_zone(domain, mapping, port)
             name = 'localhost'
-            addr = None
+            addr = '127.0.0.1'
 
         else:
             # First determine whether the argument is name=value or simply value
