@@ -239,6 +239,8 @@ def main(argv):
 
         names = []
         if '-f' in opts:
+            if opts['-f'] == '-':
+                opts['-f'] = sys.stdin.fileno()
             try:
                 f = io.open(opts['-f'], 'r', encoding='utf-8')
             except IOError as e:
