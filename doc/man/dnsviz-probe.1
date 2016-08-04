@@ -116,8 +116,40 @@ Each server specified may either be an address (IPv4 or IPv6), a domain name
 or both, using the syntax "name=address".  Note that when both a name and an
 address are specified ("name=address"), the name is only used for
 identification purposes, and it doesn't matter whether the name resolves to the
-corresponding address (or at all, for that matter).
+corresponding address (or at all, for that matter).  IPv6 addresses must be
+wrapped in square brackets, e.g., "[2001:db8::1]".
 
+Each server value may optionally be suffixed with a numeric port on which the
+server should be contacted.  If not specified, the standard DNS port, 53, is
+used.
+
+The following are example server values:
+.RS
+.P
+ns1.example.com
+.RE
+.RS
+.P
+ns1.example.com:5333
+.RE
+.RS
+.P
+ns1.example.com=192.0.2.1
+.RE
+.RS
+.P
+ns1.example.com=[2001:db8::1]
+.RE
+.RS
+.P
+ns1.example.com=[2001:db8::1]:5333
+.RE
+.RS
+.P
+192.0.2.1
+.RE
+
+.P
 This option cannot be used in conjunction with \fI-A\fP.
 
 .IP -A
