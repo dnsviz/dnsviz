@@ -1533,6 +1533,30 @@ class GlueMismatchError(DelegationError):
         self.template_kwargs['glue_addresses_text'] = ', '.join(self.template_kwargs['glue_addresses'])
         self.template_kwargs['auth_addresses_text'] = ', '.join(self.template_kwargs['auth_addresses'])
 
+class MissingGlueIPv4(DelegationError):
+    '''
+    >>> e = MissingGlueIPv4(name='ns1.foo.baz.')
+    >>> e.description
+    'Authoritative A records exist for ns1.foo.baz., but there are no corresponding A glue records.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_IPV4'
+    description_template = "Authoritative A records exist for %(name)s, but there are no corresponding A glue records."
+    required_params = ['name']
+
+class MissingGlueIPv6(DelegationError):
+    '''
+    >>> e = MissingGlueIPv6(name='ns1.foo.baz.')
+    >>> e.description
+    'Authoritative AAAA records exist for ns1.foo.baz., but there are no corresponding AAAA glue records.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_IPV6'
+    description_template = "Authoritative AAAA records exist for %(name)s, but there are no corresponding AAAA glue records."
+    required_params = ['name']
+
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
     proto = None
