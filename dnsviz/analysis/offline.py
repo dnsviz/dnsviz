@@ -1489,21 +1489,33 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if name.is_subdomain(self.name) and not glue_mapping[name]:
                     names_missing_glue.append(name)
 
-                # if glue is supplied, check that it matches the authoritative response
-                if glue_mapping[name] and auth_addrs and glue_mapping[name] != auth_addrs:
+                # if there are both glue and authoritative addresses supplied, check that it matches the authoritative response
+                if glue_mapping[name] and auth_addrs:
+                    # there are authoritative address records either of type A
+                    # or AAAA and also glue records of either type A or AAAA
+
                     glue_addrs_ipv4 = set([x for x in glue_mapping[name] if x.version == 4])
                     glue_addrs_ipv6 = set([x for x in glue_mapping[name] if x.version == 6])
                     auth_addrs_ipv4 = set([x for x in auth_addrs if x.version == 4])
                     auth_addrs_ipv6 = set([x for x in auth_addrs if x.version == 6])
 
-                    if not glue_addrs_ipv4:
-                        names_with_no_glue_ipv4.append(name)
-                    elif glue_addrs_ipv4 != auth_addrs_ipv4:
-                        names_with_glue_mismatch_ipv4.append((name, glue_addrs_ipv4, auth_addrs_ipv4))
-                    if not glue_addrs_ipv6:
-                        names_with_no_glue_ipv6.append(name)
-                    elif glue_addrs_ipv6 != auth_addrs_ipv6:
-                        names_with_glue_mismatch_ipv6.append((name, glue_addrs_ipv6, auth_addrs_ipv6))
+                    if auth_addrs_ipv4:
+                        # there are authoritative A records for the name...
+                        if not glue_addrs_ipv4:
+                            # ...but no A glue
+                            names_with_no_glue_ipv4.append(name)
+                        elif glue_addrs_ipv4 != auth_addrs_ipv4:
+                            # ...but the A glue does not match
+                            names_with_glue_mismatch_ipv4.append((name, glue_addrs_ipv4, auth_addrs_ipv4))
+
+                    if auth_addrs_ipv6:
+                        # there are authoritative AAAA records for the name
+                        if not glue_addrs_ipv6:
+                            # ...but no AAAA glue
+                            names_with_no_glue_ipv6.append(name)
+                        elif glue_addrs_ipv6 != auth_addrs_ipv6:
+                            # ...but the AAAA glue does not match
+                            names_with_glue_mismatch_ipv6.append((name, glue_addrs_ipv6, auth_addrs_ipv6))
 
             elif name_in_parent is False:
                 ns_names_not_in_parent.append(name)
