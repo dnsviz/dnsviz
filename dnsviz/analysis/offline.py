@@ -1548,11 +1548,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if names_with_glue_mismatch_ipv4:
             names_with_glue_mismatch_ipv4.sort()
             for name, glue_addrs, auth_addrs in names_with_glue_mismatch_ipv4:
+                glue_addrs = list(glue_addrs)
+                glue_addrs.sort()
+                auth_addrs = list(auth_addrs)
+                auth_addrs.sort()
                 self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchError(name=fmt.humanize_name(name), glue_addresses=glue_addrs, auth_addresses=auth_addrs))
 
         if names_with_glue_mismatch_ipv6:
             names_with_glue_mismatch_ipv6.sort()
             for name, glue_addrs, auth_addrs in names_with_glue_mismatch_ipv6:
+                glue_addrs = list(glue_addrs)
+                glue_addrs.sort()
+                auth_addrs = list(auth_addrs)
+                auth_addrs.sort()
                 self.delegation_warnings[dns.rdatatype.DS].append(Errors.GlueMismatchError(name=fmt.humanize_name(name), glue_addresses=glue_addrs, auth_addresses=auth_addrs))
 
         if names_missing_glue:
