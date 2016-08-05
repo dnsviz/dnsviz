@@ -578,6 +578,7 @@ class FullResolver:
                                 is_referral = True
                                 a_rrsets = {}
                                 min_ttl = None
+                                ret = None
 
                                 # if response is referral, then we follow it
                                 ns_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
