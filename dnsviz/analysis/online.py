@@ -861,6 +861,7 @@ class OnlineDomainNameAnalysis(object):
     def _deserialize_related(self, d):
         if 'auth_ns_ip_mapping' in d:
             for target in d['auth_ns_ip_mapping']:
+                self.add_auth_ns_ip_mappings((dns.name.from_text(target), None))
                 for addr in d['auth_ns_ip_mapping'][target]:
                     self.add_auth_ns_ip_mappings((dns.name.from_text(target), IPAddr(addr)))
 
