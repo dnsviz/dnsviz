@@ -234,8 +234,14 @@ class OnlineDomainNameAnalysis(object):
             return self.parent
     zone = property(_get_zone)
 
-    def single_client(self):
-        return len(self.clients_ipv4) <= 1 and len(self.clients_ipv6) <= 1
+    def single_client(self, exclude_loopback=True):
+        if exclude_loopback:
+            clients_ipv4 = [x for x in self.clients_ipv4 if LOOPBACK_IPV4_RE.match(x) is None]
+            clients_ipv6 = [x for x in self.clients_ipv6 if x != LOOPBACK_IPV6]
+        else:
+            clients_ipv4 = self.clients_ipv4
+            clients_ipv6 = self.clients_ipv6
+        return len(clients_ipv4) <= 1 and len(clients_ipv6) <= 1
 
     def get_name(self, name, trace=None):
         #XXX this whole method is a hack
