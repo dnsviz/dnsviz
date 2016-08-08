@@ -76,7 +76,12 @@ def get_qname(msg):
         # no label
         if index >= len(msg):
             raise InvalidName()
-        l = struct.unpack('!B', msg[index])[0]
+
+        # python3/python2 dual compatibility
+        if isinstance(msg, str):
+            l = struct.unpack('!B', msg[index])[0]
+        else:
+            l = msg[index]
 
         # no compression allowed in question
         if l & 0xc0:
