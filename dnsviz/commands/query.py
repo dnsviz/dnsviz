@@ -92,6 +92,8 @@ class DVCommandLineQuery:
                     (len(arg) <= 12 or arg[12] == '='):
                 try:
                     opt, arg = arg.split('=')
+                    if not arg:
+                        raise ValueError()
                 except ValueError:
                     usage('+trusted-key requires a filename argument.')
                     sys.exit(1)
@@ -160,8 +162,8 @@ class DVCommandLine:
         self.arg_index = 0
 
         self.options = {
-            'rdtype': dns.rdatatype.A,
-            'rdclass': dns.rdataclass.IN,
+            'rdtype': None,
+            'rdclass': None,
             'use_ipv4': None,
             'use_ipv6': None,
             'client_ipv4': None,
@@ -186,6 +188,11 @@ class DVCommandLine:
             if not q.nameservers and not q.trace:
                 sys.stderr.write('No nameservers to query\n')
                 sys.exit(1)
+
+        if self.options['rdtype'] is None:
+            self.options['rdtype'] = dns.rdatatype.A
+        if self.options['rdclass'] is None:
+            self.options['rdclass'] = dns.rdataclass.IN
 
     def query_and_display(self):
         ret = True
@@ -237,6 +244,27 @@ class DVCommandLine:
         qname = self._get_arg(True)
         return DVCommandLineQuery(qname, None, None)
 
+    def _add_default_option(self):
+        if self.options['rdclass'] is None:
+            try:
+                self.options['rdclass'] = dns.rdataclass.from_text(self.args[self.arg_index])
+            except dns.rdataclass.UnknownRdataclass:
+                pass
+            else:
+                self.arg_index += 1
+                return True
+
+        if self.options['rdtype'] is None:
+            try:
+                self.options['rdtype'] = dns.rdatatype.from_text(self.args[self.arg_index])
+            except dns.rdatatype.UnknownRdatatype:
+                pass
+            else:
+                self.arg_index += 1
+                return True
+
+        return False
+
     def _add_qname(self):
         qname = self.args[self.arg_index]
         self.arg_index += 1
@@ -251,14 +279,14 @@ class DVCommandLine:
         else:
             self.arg_index += 1
 
-            # now check for optional class
-            try:
-                rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
-            except (IndexError, dns.rdataclass.UnknownRdataclass):
-                # no class detected; use default rdclass
-                rdclass = None
-            else:
-                self.arg_index += 1
+        # now check for optional class
+        try:
+            rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
+        except (IndexError, dns.rdataclass.UnknownRdataclass):
+            # no class detected; use default rdclass
+            rdclass = None
+        else:
+            self.arg_index += 1
 
         return DVCommandLineQuery(qname, rdtype, rdclass)
 
@@ -347,6 +375,10 @@ class DVCommandLine:
             # query options
             elif self.args[self.arg_index][0] == '+':
                 self._add_query_option(query)
+
+            # global query class/type
+            elif query is None and self._add_default_option():
+                pass
 
             # name to be queried
             else:
