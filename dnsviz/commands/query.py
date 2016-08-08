@@ -103,10 +103,15 @@ class DVCommandLineQuery:
                 usage('Option "%s" not recognized.' % arg)
                 sys.exit(1)
 
-    def process_nameservers(self, nameservers):
+    def process_nameservers(self, nameservers, use_ipv4, use_ipv6):
         processed_nameservers = []
         for addr in self.nameservers:
             processed_nameservers.extend(_get_nameservers_for_name(addr))
+
+        if not use_ipv4:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
+        if not use_ipv6:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = nameservers + processed_nameservers
 
@@ -126,9 +131,9 @@ class DVCommandLineQuery:
         dnsget_args = ['dnsviz', 'probe']
         dnsviz_args = ['dnsviz', 'print']
         dnsget_args.extend(['-d', '1', '-a', '.'])
-        if options['use_ipv4']:
+        if options['use_ipv4'] and not options['use_ipv6']:
             dnsget_args.append('-4')
-        if options['use_ipv6']:
+        if options['use_ipv6'] and not options['use_ipv4']:
             dnsget_args.append('-6')
         if options['client_ipv4'] is not None:
             dnsget_args.extend(['-b', options['client_ipv4']])
@@ -176,13 +181,14 @@ class DVCommandLine:
         self.queries = []
 
         self._process_args()
+        self._process_network()
         self._process_nameservers()
 
         if not self.queries:
             self.queries.append(DVCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
         for q in self.queries:
-            q.process_nameservers(self.nameservers)
+            q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
             q.process_query_options(self.global_query_options)
 
             if not q.nameservers and not q.trace:
@@ -387,22 +393,14 @@ class DVCommandLine:
 
     def _process_network(self):
         if self.options['use_ipv4'] is None and self.options['use_ipv6'] is None:
-            use_ipv4 = True
-            use_ipv6 = True
-        else:
-            if self.options['use_ipv4']:
-                use_ipv4 = True
-            else:
-                use_ipv4 = False
-            if self.options['use_ipv6']:
-                use_ipv6 = True
-            else:
-                use_ipv6 = False
-        return use_ipv4, use_ipv6
+            self.options['use_ipv4'] = True
+            self.options['use_ipv6'] = True
+        if not self.options['use_ipv4']:
+            self.options['use_ipv4'] = False
+        if not self.options['use_ipv6']:
+            self.options['use_ipv6'] = False
 
     def _process_nameservers(self):
-        use_ipv4, use_ipv6 = self._process_network()
-
         if not self.nameservers:
             processed_nameservers = Resolver.get_standard_resolver()._servers
         else:
@@ -410,9 +408,9 @@ class DVCommandLine:
             for addr in self.nameservers:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
-        if not use_ipv4:
+        if not self.options['use_ipv4']:
             processed_nameservers = [x for x in processed_nameservers if x.version != 4]
-        if not use_ipv6:
+        if not self.options['use_ipv6']:
             processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
