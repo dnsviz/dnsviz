@@ -1462,6 +1462,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         names_with_glue_mismatch_ipv6 = []
         names_with_no_glue_ipv4 = []
         names_with_no_glue_ipv6 = []
+        names_with_no_auth_ipv4 = []
+        names_with_no_auth_ipv6 = []
         names_missing_glue = []
         names_missing_auth = []
 
@@ -1507,6 +1509,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         elif glue_addrs_ipv4 != auth_addrs_ipv4:
                             # ...but the A glue does not match
                             names_with_glue_mismatch_ipv4.append((name, glue_addrs_ipv4, auth_addrs_ipv4))
+                    elif glue_addrs_ipv4:
+                        # there are A glue records for the name
+                        # but no authoritative A records.
+                        names_with_no_auth_ipv4.append(name)
 
                     if auth_addrs_ipv6:
                         # there are authoritative AAAA records for the name
@@ -1516,6 +1522,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         elif glue_addrs_ipv6 != auth_addrs_ipv6:
                             # ...but the AAAA glue does not match
                             names_with_glue_mismatch_ipv6.append((name, glue_addrs_ipv6, auth_addrs_ipv6))
+                    elif glue_addrs_ipv6:
+                        # there are AAAA glue records for the name
+                        # but no authoritative AAAA records.
+                        names_with_no_auth_ipv6.append(name)
 
             elif name_in_parent is False:
                 ns_names_not_in_parent.append(name)
@@ -1544,6 +1554,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             names_with_no_glue_ipv6.sort()
             for name in names_with_no_glue_ipv6:
                 self.delegation_warnings[dns.rdatatype.DS].append(Errors.MissingGlueIPv6(name=fmt.humanize_name(name)))
+
+        if names_with_no_auth_ipv4:
+            names_with_no_auth_ipv4.sort()
+            for name in names_with_no_auth_ipv4:
+                self.delegation_warnings[dns.rdatatype.DS].append(Errors.ExtraGlueIPv4(name=fmt.humanize_name(name)))
+
+        if names_with_no_auth_ipv6:
+            names_with_no_auth_ipv6.sort()
+            for name in names_with_no_auth_ipv6:
+                self.delegation_warnings[dns.rdatatype.DS].append(Errors.ExtraGlueIPv6(name=fmt.humanize_name(name)))
 
         if names_with_glue_mismatch_ipv4:
             names_with_glue_mismatch_ipv4.sort()

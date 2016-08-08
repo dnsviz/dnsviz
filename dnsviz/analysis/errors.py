@@ -1557,6 +1557,30 @@ class MissingGlueIPv6(DelegationError):
     description_template = "Authoritative AAAA records exist for %(name)s, but there are no corresponding AAAA glue records."
     required_params = ['name']
 
+class ExtraGlueIPv4(DelegationError):
+    '''
+    >>> e = ExtraGlueIPv4(name='ns1.foo.baz.')
+    >>> e.description
+    'A glue records exist for ns1.foo.baz., but there are no corresponding authoritative A records.'
+    '''
+
+    _abstract = False
+    code = 'EXTRA_GLUE_IPV4'
+    description_template = "A glue records exist for %(name)s, but there are no corresponding authoritative A records."
+    required_params = ['name']
+
+class ExtraGlueIPv6(DelegationError):
+    '''
+    >>> e = ExtraGlueIPv6(name='ns1.foo.baz.')
+    >>> e.description
+    'AAAA glue records exist for ns1.foo.baz., but there are no corresponding authoritative AAAA records.'
+    '''
+
+    _abstract = False
+    code = 'EXTRA_GLUE_IPV6'
+    description_template = "AAAA glue records exist for %(name)s, but there are no corresponding authoritative AAAA records."
+    required_params = ['name']
+
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
     proto = None
