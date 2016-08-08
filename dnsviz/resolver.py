@@ -23,6 +23,7 @@ from __future__ import unicode_literals
 
 import bisect
 import io
+import math
 import random
 import threading
 import time
@@ -290,7 +291,7 @@ class FullResolver:
     MIN_TTL = 60
     MAX_CHAIN = 20
 
-    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None, max_ttl=None):
 
         self._hints = hints
         self._query_cls = query_cls
@@ -301,6 +302,7 @@ class FullResolver:
         self._odd_ports = odd_ports
         self._transport_manager = transport_manager
         self._th_factories = th_factories
+        self._max_ttl = max_ttl
 
         self._cache = {}
         self._expirations = []
@@ -328,13 +330,18 @@ class FullResolver:
         t = time.time()
 
         if rrset is not None:
-            expiration = int(t) + max(rrset.ttl, self.MIN_TTL) + 1
+            ttl = max(rrset.ttl, self.MIN_TTL)
         elif soa_rrset is not None:
-            expiration = int(t) + max(min(soa_rrset.ttl, soa_rrset[0].minimum), self.MIN_TTL) + 1
+            ttl = max(min(soa_rrset.ttl, soa_rrset[0].minimum), self.MIN_TTL)
         elif ttl is not None:
-            expiration = int(t) + max(ttl, self.MIN_TTL) + 1
+            ttl = max(ttl, self.MIN_TTL)
         else:
-            expiration = int(t) + self.MIN_TTL + 1
+            ttl = self.MIN_TTL
+
+        if self._max_ttl is not None and ttl > self._max_ttl:
+            ttl = self._max_ttl
+
+        expiration = math.ceil(t) + ttl
 
         key = (name, rdtype)
         new_entry = CacheEntry(rrset, source, expiration, rcode, soa_rrset)
