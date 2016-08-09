@@ -503,7 +503,7 @@ def main(argv):
             usage(str(e))
             sys.exit(1)
 
-        tm = transport.DNSQueryTransportManager()
+        _init_tm()
         stub_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
 
         # get all the -x options
@@ -844,6 +844,7 @@ def main(argv):
             if '-t' in opts:
                 a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories, processes)
             else:
+                _init_resolver()
                 a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories)
                 if flush:
                     fh.write('{')
