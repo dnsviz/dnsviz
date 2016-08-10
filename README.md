@@ -316,7 +316,7 @@ Same, but specify an alternate trust anchor:
 $ dnsviz query +trusted-key=tk.txt example.com
 ```
 
-Analyze example.com through the recurisve resolver at 192.0.2.1:
+Analyze example.com through the recursive resolver at 192.0.2.1:
 ```
 $ dnsviz query @192.0.2.1 +trusted-key=tk.txt example.com
 ```
