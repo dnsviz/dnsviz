@@ -155,7 +155,8 @@ This option cannot be used in conjunction with \fI-A\fP.
 .IP -A
 Query authoritative servers, rather than (the default) recursive servers.
 .IP "-x <domain>:<server>[,<server>...]"
-Set explicit delegation for the specified domain to one or more servers.
+Explicitly designate authoritative servers for a domain, rather than learning
+them by following delegations.
 
 The default behavior is to identify and query servers authoritative for
 ancestors of the specified domain to obtain if the options so dictate.
