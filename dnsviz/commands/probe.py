@@ -491,8 +491,8 @@ Options:
     -s <server>[,<server>...]
                    - designate servers for recursive analysis
     -A             - query analysis against authoritative servers
-    -x <domain>:<server>[,<server>...]
-                   - set explicit delegation for the specified domain
+    -x <domain>[+]:<server>[,<server>...]
+                   - designate authoritative servers explicitly for a domain
     -E             - include EDNS compatibility diagnostics
     -p             - make json output pretty instead of minimal
     -o <filename>    - write the analysis to the specified file
