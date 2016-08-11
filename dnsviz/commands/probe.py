@@ -195,6 +195,8 @@ class MultiProcessAnalystMixin(object):
 
         if name_obj.parent is not None:
             self.refresh_dependency_references(name_obj.parent, trace+[name_obj.name])
+        if name_obj.nxdomain_ancestor is not None:
+            self.refresh_dependency_references(name_obj.nxdomain_ancestor, trace+[name_obj.name])
         if name_obj.dlv_parent is not None:
             self.refresh_dependency_references(name_obj.dlv_parent, trace+[name_obj.name])
 
@@ -222,6 +224,14 @@ class MultiProcessAnalystMixin(object):
                     except KeyError:
                         time.sleep(1)
                 self.refresh_dependency_references(name_obj.ns_dependencies[ns], trace+[name_obj.name])
+        if self.follow_mx:
+            for target in name_obj.mx_targets:
+                while name_obj.mx_targets[target] is None:
+                    try:
+                        name_obj.mx_targets[target] = self.analysis_cache[target]
+                    except KeyError:
+                        time.sleep(1)
+                self.refresh_dependency_references(name_obj.mx_targets[target], trace+[name_obj.name])
 
     def analyze(self):
         name_obj = super(MultiProcessAnalystMixin, self).analyze()
