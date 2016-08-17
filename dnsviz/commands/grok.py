@@ -118,10 +118,10 @@ def color_json(s):
 
         if error is None:
             # not in an error object
-            line = KEY_RE.sub(r'\1%s\3%s\4' % (TERM_COLOR_MAP['BOLD'], TERM_COLOR_MAP['RESET']), line)
             m = STATUS_RE.search(line)
             if m is not None:
                 line = STATUS_RE.sub(r'\1\2%s\3%s\4' % (TERM_COLOR_MAP[m.group('status').upper()], TERM_COLOR_MAP['RESET']), line)
+            line = KEY_RE.sub(r'\1%s\3%s\4' % (TERM_COLOR_MAP['BOLD'], TERM_COLOR_MAP['RESET']), line)
             s1 += line + '\n'
             continue
 
