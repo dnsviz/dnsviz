@@ -28,6 +28,7 @@ import getopt
 import io
 import json
 import logging
+import os
 import re
 import sys
 
@@ -51,6 +52,40 @@ except ImportError:
 
 logger = logging.getLogger('dnsviz.analysis.offline')
 
+TERM_COLOR_MAP = {
+    'BOLD': '\033[1m',
+    'RESET': '\033[0m',
+    'SECURE': '\033[36m',
+    'BOGUS': '\033[31m',
+    'INSECURE': '\033[37m',
+    'NOERROR': '\033[37m',
+    'NXDOMAIN': '\033[37m',
+    'INDETERMINATE': '\033[31m',
+    'NON_EXISTENT': '\033[37m',
+    'VALID': '\033[36m',
+    'INDETERMINATE': '\033[37m',
+    'INDETERMINATE_NO_DNSKEY': '\033[37m',
+    'INDETERMINATE_MATCH_PRE_REVOKE': '\033[37m',
+    'INDETERMINATE_UNKNOWN_ALGORITHM': '\033[33m',
+    'ALGORITHM_IGNORED': '\033[37m',
+    'EXPIRED': '\033[35m',
+    'PREMATURE': '\033[35m',
+    'INVALID_SIG': '\033[31m',
+    'INVALID': '\033[31m',
+    'INVALID_DIGEST': '\033[31m',
+    'INCOMPLETE': '\033[33m',
+    'LAME': '\033[33m',
+    'INVALID_TARGET': '\033[31m',
+    'ERROR': '\033[31m',
+    'WARNING': '\033[33m',
+}
+
+KEY_RE = re.compile(r'^((?P<indent>\s+)")(.+)(": [\[{"])')
+ERRORS_RE = re.compile(r'^((?P<indent>\s+)")((?P<level>warning|error)s?)(": \[)$')
+ERRORS_CLOSE_RE = re.compile(r'^(?P<indent>\s+)]$')
+DESCRIPTION_CODE_RE = re.compile(r'^((?P<indent>\s+)")(?P<name>description|code)(": ")(.+)(",?)$')
+STATUS_RE = re.compile(r'^(?P<indent>\s+)("status": ")(?P<status>.+)(",?)')
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -66,6 +101,42 @@ Options:
     -l <loglevel>  - set log level to one of: error, warning, info, debug
     -h             - display the usage and exit
 ''' % (err))
+
+def color_json(s):
+    error = None
+    s1 = ''
+
+    for line in s.split('\n'):
+        if error is None:
+            # not in an error object; look for a start
+            error = ERRORS_RE.search(line)
+            if error is not None:
+                # found an error start
+                line = ERRORS_RE.sub(r'\1%s%s\3%s\5' % (TERM_COLOR_MAP['BOLD'], TERM_COLOR_MAP[error.group('level').upper()], TERM_COLOR_MAP['RESET']), line)
+                s1 += line + '\n'
+                continue
+
+        if error is None:
+            # not in an error object
+            line = KEY_RE.sub(r'\1%s\3%s\4' % (TERM_COLOR_MAP['BOLD'], TERM_COLOR_MAP['RESET']), line)
+            m = STATUS_RE.search(line)
+            if m is not None:
+                line = STATUS_RE.sub(r'\1\2%s\3%s\4' % (TERM_COLOR_MAP[m.group('status').upper()], TERM_COLOR_MAP['RESET']), line)
+            s1 += line + '\n'
+            continue
+
+        # in an error object
+        m = ERRORS_CLOSE_RE.search(line)
+        if m is not None and len(m.group('indent')) == len(error.group('indent')):
+            error = None
+            s1 += line + '\n'
+            continue
+
+        line = DESCRIPTION_CODE_RE.sub(r'\1\3\4%s\5%s\6' % (TERM_COLOR_MAP[error.group('level').upper()], TERM_COLOR_MAP['RESET']), line)
+        line = KEY_RE.sub(r'\1%s\3%s\4' % (TERM_COLOR_MAP['BOLD'], TERM_COLOR_MAP['RESET']), line)
+        s1 += line + '\n'
+
+    return s1.rstrip()
 
 def test_m2crypto():
     try:
@@ -213,11 +284,6 @@ def main(argv):
                 else:
                     names.append(name)
 
-        if '-p' in opts:
-            kwargs = { 'indent': 4, 'separators': (',', ': ') }
-        else:
-            kwargs = {}
-
         if '-o' not in opts or opts['-o'] == '-':
             opts['-o'] = sys.stdout.fileno()
         try:
@@ -225,6 +291,14 @@ def main(argv):
         except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, opts['-o']))
             sys.exit(3)
+
+        if fh.isatty():
+            opts['-p'] = None
+
+        if '-p' in opts:
+            kwargs = { 'indent': 4, 'separators': (',', ': ') }
+        else:
+            kwargs = {}
 
         # if trusted keys were supplied, check that pygraphviz is installed
         if trusted_keys:
@@ -266,7 +340,10 @@ def main(argv):
             name_obj.serialize_status(d, loglevel=loglevel)
 
         if d:
-            fh.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
+            s = json.dumps(d, ensure_ascii=False, **kwargs)
+            if fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb':
+                s = color_json(s)
+            fh.write(s.encode('utf-8'))
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
