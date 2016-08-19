@@ -52,7 +52,7 @@ except ImportError:
 else:
     urlparse = urllib.parse
 
-import dns.exception, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
+import dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
 from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
 import dnsviz.format as fmt
@@ -283,12 +283,12 @@ class ParallelAnalyst(ParallelAnalystMixin, BulkAnalyst):
 class RecursiveParallelAnalyst(ParallelAnalystMixin, RecursiveBulkAnalyst):
     analyst_cls = RecursiveMultiProcessAnalyst
 
-def name_addr_mappings_from_string(domain, mappings):
+def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, require_name):
     global next_port
 
-    mappings = mappings.split(',')
+    addr_mappings = addr_mappings.split(',')
     i = 1
-    for mapping in mappings:
+    for mapping in addr_mappings:
 
         # get rid of whitespace
         mapping = mapping.strip()
@@ -338,6 +338,10 @@ def name_addr_mappings_from_string(domain, mappings):
                     name = mapping
                     addr = None
                 else:
+                    if require_name:
+                        usage('A name is required to accompany the address for this option.')
+                        sys.exit(1)
+
                     # value is an address
                     name = 'ns%d' % i
                     addr, num_replacements = BRACKETS_RE.subn(r'\1', mapping)
@@ -361,36 +365,38 @@ def name_addr_mappings_from_string(domain, mappings):
             sys.exit(1)
 
         # Add the name to the NS RRset
-        explicit_delegations[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
+        delegation_mapping[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
 
         if addr is None:
-            # If no address is provided, query A/AAAA records for the name
-            query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
-            answer_map = stub_resolver.query_multiple_for_answer(*query_tuples)
-            found_answer = False
-            for (n, rdtype, rdclass) in answer_map:
-                a = answer_map[(n, rdtype, rdclass)]
-                if isinstance(a, DNSAnswer):
-                    found_answer = True
-                    explicit_delegations[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [IPAddr(r.address) for r in a.rrset])
-                    if port != 53:
-                        for r in a.rrset:
-                            odd_ports[(domain, IPAddr(r.address))] = port
-                # negative responses
-                elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
-                    pass
-                # error responses
-                elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
-                    usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+            if not require_name:
+                # If no address is provided, query A/AAAA records for the name
+                query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
+                answer_map = stub_resolver.query_multiple_for_answer(*query_tuples)
+                found_answer = False
+                for (n, rdtype, rdclass) in answer_map:
+                    a = answer_map[(n, rdtype, rdclass)]
+                    if isinstance(a, DNSAnswer):
+                        found_answer = True
+                        delegation_mapping[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [IPAddr(r.address) for r in a.rrset])
+                        if port != 53:
+                            for r in a.rrset:
+                                odd_ports[(domain, IPAddr(r.address))] = port
+                    # negative responses
+                    elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
+                        pass
+                    # error responses
+                    elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
+                        usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+                        sys.exit(1)
+
+                if not found_answer:
+                    usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
                     sys.exit(1)
 
-            if not found_answer:
-                usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
-                sys.exit(1)
-
         elif not addr:
-            usage('The IP address was empty.')
-            sys.exit(1)
+            if not require_name:
+                usage('The IP address was empty.')
+                sys.exit(1)
 
         else:
             try:
@@ -416,11 +422,59 @@ def name_addr_mappings_from_string(domain, mappings):
             else:
                 a_rdtype = dns.rdatatype.A
                 rdtype_cls = dns.rdtypes.IN.A.A
-            if (name, a_rdtype) not in explicit_delegations:
-                explicit_delegations[(name, a_rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, a_rdtype)
-            explicit_delegations[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
+            if (name, a_rdtype) not in delegation_mapping:
+                delegation_mapping[(name, a_rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, a_rdtype)
+            delegation_mapping[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
             if port != 53:
                 odd_ports[(domain, IPAddr(addr))] = port
+
+def ds_from_string(domain, dss, delegation_mapping):
+    dss = dss.split(',')
+
+    if (domain, dns.rdatatype.DS) not in delegation_mapping:
+        delegation_mapping[(domain, dns.rdatatype.DS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.DS)
+
+    for ds in dss:
+        # get rid of whitespace
+        ds = ds.strip()
+
+        # if the value is actually a path, then check it as a zone file
+        if os.path.isfile(ds):
+            try:
+                s = io.open(ds, 'r', encoding='utf-8').read()
+            except IOError as e:
+                usage('%s: "%s"' % (e.strerror, ds))
+                sys.exit(3)
+
+            try:
+                m = dns.message.from_text(str(';ANSWER\n'+s))
+            except dns.exception.DNSException as e:
+                usage('Error reading DS records from %s: "%s"' % (ds, e))
+                sys.exit(3)
+
+            for rrset in m.answer:
+                if not (rrset.name == domain and rrset.rdtype == dns.rdatatype.DS):
+                    continue
+                for rdata in rrset:
+                    delegation_mapping[(domain, dns.rdatatype.DS)].add(rdata)
+
+        else:
+            try:
+                delegation_mapping[(domain, dns.rdatatype.DS)].add(dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.DS, ds))
+            except dns.exception.DNSException as e:
+                usage('Error parsing DS records: %s\n%s' % (e, ds))
+                sys.exit(3)
+
+def _create_and_serve_zone(zone, mappings, port):
+    zonefile = tempfile.NamedTemporaryFile('w', prefix='dnsviz', delete=False)
+    atexit.register(os.remove, zonefile.name)
+    zonefile.write('$ORIGIN %s\n@ IN SOA localhost. root.localhost. 1 1800 900 86400 600\n@ IN NS @\n@ IN A 127.0.0.1\n' % lb2s(zone.canonicalize().to_text()))
+    for name, rdtype in mappings:
+        if not name.is_subdomain(zone):
+            continue
+        zonefile.write(mappings[(name, rdtype)].to_text() + '\n')
+    zonefile.close()
+    _serve_zone(zone, zonefile.name, port)
 
 def _serve_zone(zone, zone_file, port):
     tmpdir = tempfile.mkdtemp(prefix='dnsviz')
@@ -493,6 +547,10 @@ Options:
     -A             - query analysis against authoritative servers
     -x <domain>[+]:<server>[,<server>...]
                    - designate authoritative servers explicitly for a domain
+    -X <domain>:<server>[,<server>...]
+                   - specify delegation information for a domain
+    -D <domain>:"<ds>"[,"<ds>"...]
+                   - specify DS records for a domain
     -E             - include EDNS compatibility diagnostics
     -p             - make json output pretty instead of minimal
     -o <filename>    - write the analysis to the specified file
@@ -505,10 +563,11 @@ def main(argv):
     global stub_resolver
     global explicit_delegations
     global odd_ports
+    global next_port
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:X:D:EAs:Fh')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -522,18 +581,22 @@ def main(argv):
         stop_at_explicit = {}
         client_ipv4 = None
         client_ipv6 = None
+        delegation_info = {}
         for opt, arg in opts:
-            if opt == '-x':
+            if opt in ('-x', '-X'):
                 try:
                     domain, mappings = arg.split(':', 1)
                 except ValueError:
-                    usage('Incorrect usage of -x option: "%s"' % arg)
+                    usage('Incorrect usage of %s option: "%s"' % (opt, arg))
                     sys.exit(1)
                 domain = domain.strip()
                 mappings = mappings.strip()
 
                 match = STOP_RE.search(domain)
                 if match is not None:
+                    if opt == '-X':
+                        usage('Incorrect usage of %s option: "%s"' % (opt, arg))
+                        sys.exit(1)
                     domain = match.group(1)
 
                 try:
@@ -542,17 +605,60 @@ def main(argv):
                     usage('The domain name was invalid: "%s"' % domain)
                     sys.exit(1)
 
+                if opt == '-X' and domain == dns.name.root:
+                    usage('The root zone cannot be used with option -X.')
+                    sys.exit(1)
+
                 if match is not None:
                     stop_at_explicit[domain] = True
                 else:
                     stop_at_explicit[domain] = False
 
+                if opt == '-X':
+                    if domain == dns.name.root:
+                        usage('The root zone cannot be used with option -X.')
+                        sys.exit(1)
+
+                    parent = domain.parent()
+                    if parent not in delegation_info:
+                        delegation_info[parent] = {}
+                    delegation_mapping = delegation_info[parent]
+                else:
+                    delegation_mapping = explicit_delegations
+
                 if not mappings:
-                    usage('Incorrect usage of -x option: "%s"' % arg)
+                    usage('Incorrect usage of %s option: "%s"' % (arg, opt))
                     sys.exit(1)
-                if (domain, dns.rdatatype.NS) not in explicit_delegations:
-                    explicit_delegations[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
-                name_addr_mappings_from_string(domain, mappings)
+                if (domain, dns.rdatatype.NS) not in delegation_mapping:
+                    delegation_mapping[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
+                name_addr_mappings_from_string(domain, mappings, delegation_mapping, opt == '-X')
+
+            elif opt == '-D':
+                try:
+                    domain, ds_str = arg.split(':', 1)
+                except ValueError:
+                    usage('Incorrect usage of %s option: "%s"' % (opt, arg))
+                    sys.exit(1)
+                domain = domain.strip()
+                ds_str = ds_str.strip()
+
+                try:
+                    domain = dns.name.from_text(domain)
+                except dns.exception.DNSException:
+                    usage('The domain name was invalid: "%s"' % domain)
+                    sys.exit(1)
+
+                parent = domain.parent()
+                if parent not in delegation_info:
+                    delegation_info[parent] = {}
+                delegation_mapping = delegation_info[parent]
+
+                if not ds_str:
+                    usage('Incorrect usage of %s option: "%s"' % (arg, opt))
+                    sys.exit(1)
+                if (domain, dns.rdatatype.DS) not in delegation_mapping:
+                    delegation_mapping[(domain, dns.rdatatype.DS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.DS)
+                ds_from_string(domain, ds_str.strip(), delegation_mapping)
 
             elif opt == '-b':
                 try:
@@ -594,6 +700,15 @@ def main(argv):
 
         if '-x' in opts and '-A' not in opts:
             usage('-x may only be used in conjunction with -A.')
+            sys.exit(1)
+
+        if '-X' in opts and '-A' not in opts:
+            usage('-X may only be used in conjunction with -A.')
+            sys.exit(1)
+
+        if '-D' in opts and '-X' not in opts:
+            #TODO retrieve NS/A/AAAA if -D is specified but -X is not
+            usage('-D may only be used in conjunction with -X.')
             sys.exit(1)
 
         if '-4' in opts and '-6' in opts:
@@ -641,6 +756,23 @@ def main(argv):
                 try_ipv4 = False
                 try_ipv6 = True
 
+        for domain in delegation_info:
+            if (domain, dns.rdatatype.NS) in explicit_delegations:
+                usage('Cannot use "%s" with -x if its child is specified with -X' % lb2s(domain.canonicalize().to_text()))
+                sys.exit(1)
+
+            port = next_port
+            next_port += 1
+            _create_and_serve_zone(domain, delegation_info[domain], port)
+            localhost = dns.name.from_text('localhost')
+            loopback = IPAddr('127.0.0.1')
+            explicit_delegations[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
+            explicit_delegations[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, localhost))
+            explicit_delegations[(localhost, dns.rdatatype.A)] = dns.rrset.RRset(localhost, dns.rdataclass.IN, dns.rdatatype.A)
+            explicit_delegations[(localhost, dns.rdatatype.A)].add(dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, loopback))
+            odd_ports[(domain, loopback)] = port
+            stop_at_explicit[domain] = True
+
         if '-A' not in opts:
             if '-t' in opts:
                 cls = RecursiveParallelAnalyst
@@ -648,7 +780,7 @@ def main(argv):
                 cls = RecursiveBulkAnalyst
             explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
             if '-s' in opts:
-                name_addr_mappings_from_string(WILDCARD_EXPLICIT_DELEGATION, opts['-s'])
+                name_addr_mappings_from_string(WILDCARD_EXPLICIT_DELEGATION, opts['-s'], explicit_delegations, False)
             else:
                 for i, server in enumerate(stub_resolver._servers):
                     if IPAddr(server).version == 6:
