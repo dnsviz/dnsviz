@@ -90,7 +90,11 @@ http://username:password@www.example.com/cgi-bin/dnsviz-lg.cgi
 Same, but use HTTP Basic authentication
 .RE
 
-This option is only supported when using python version 2.7.9 or greater.
+.RS
+.P
+Note that a looking glass that uses https is only supported when using python
+version 2.7.9 or greater.
+.RE
 
 .IP -k
 When \fI-u\fP is used to specify the URL of a DNS looking glass, don't verify
@@ -149,8 +153,10 @@ ns1.example.com=[2001:db8::1]:5333
 192.0.2.1
 .RE
 
+.RS
 .P
 This option cannot be used in conjunction with \fI-A\fP.
+.RE
 
 .IP -A
 Query authoritative servers, rather than (the default) recursive servers.
@@ -178,7 +184,11 @@ See \fI-s\fP for the syntax used for designating servers.  However, unlike the
 \fI-s\fP option, a zone file may be specified in lieu of a server name and/or
 address, in which case an instance of \fInamed(8)\fP is started, the zone is
 served from that instance, and queries for the domain are directed to the local
-instance of \fInamed(8)\fP serving that zone.
+instance of \fInamed(8)\fP serving that zone.  For example, if example.com.zone
+is a file containing the contents of the example.com zone, the following may be
+used:
+
+dnsviz probe -x example.com:example.com.zone
 
 This option may be used multiple times on the command line.
 
@@ -195,7 +205,7 @@ Write the output to the specified file instead of to standard output, which
 is the default.
 .IP -p
 Make JSON output "pretty" instead of minimal (i.e., using indentation and
-newlines).
+newlines).  Note that this is the default when the output is a TTY.
 .IP -h
 Display the usage and exit.
 
