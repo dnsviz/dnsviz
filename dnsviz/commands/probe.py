@@ -502,7 +502,7 @@ logging {
     try:
         p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
-        usage('There was an error executing named-checkconf (is it in PATH?): %s' % e)
+        usage('This option requires executing named-checkconf.  Please ensure that it is installed and in PATH (%s).' % e)
         sys.exit(1)
 
     (stdout, stderr) = p.communicate()
@@ -513,7 +513,7 @@ logging {
     try:
         p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
-        usage('There was an error executing named (is it in PATH?): %s' % e)
+        usage('This option requires executing named.  Please ensure that it is installed and in PATH (%s).' % e)
         sys.exit(1)
     (stdout, stderr) = p.communicate()
     if p.returncode != 0:
