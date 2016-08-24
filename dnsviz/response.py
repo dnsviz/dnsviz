@@ -649,8 +649,8 @@ class DNSKEYMeta(DNSResponseComponent):
 
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
-            b1 = map_func(rdata.key[-3])
-            b2 = map_func(rdata.key[-2])
+            b1 = map_func(rdata.key, -3)
+            b2 = map_func(rdata.key, -2)
             return (b1 << 8) | b2
 
         if clear_revoke:
