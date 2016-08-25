@@ -80,7 +80,7 @@ TERM_COLOR_MAP = {
     'WARNING': '\033[33m',
 }
 
-KEY_RE = re.compile(r'^((?P<indent>\s+)")(.+)(": [\[{"\d])')
+KEY_RE = re.compile(r'^((?P<indent>\s+)")(.+)(": )')
 ERRORS_RE = re.compile(r'^((?P<indent>\s+)")((?P<level>warning|error)s?)(": \[)$')
 ERRORS_CLOSE_RE = re.compile(r'^(?P<indent>\s+)],?$')
 DESCRIPTION_CODE_RE = re.compile(r'^((?P<indent>\s+)")(?P<name>description|code)(": ")(.+)(",?)$')
