@@ -161,8 +161,10 @@ def check_qname(msg):
 
 def main():
     try:
-        if os.environ.get('REQUEST_METHOD', '') != 'POST':
-            raise RemoteQueryError('Request method %s not supported' % os.environ.get('REQUEST_METHOD'))
+        if not os.environ.get('REQUEST_METHOD', None):
+            os.environ['REQUEST_METHOD'] = 'POST'
+        if os.environ['REQUEST_METHOD'] != 'POST':
+            raise RemoteQueryError('Request method %s not supported' % os.environ['REQUEST_METHOD'])
         form = cgi.FieldStorage()
 
         response_queue = queue.Queue()
