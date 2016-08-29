@@ -192,13 +192,21 @@ This option can only be used in conjunction with \fI-A\fP.
 
 Specify delegation information for a domain, i.e., the NS and glue records for
 the domain, which would be served by the domain's parent.  This is used for
-testing new delegations or testing to a delegation or for testing a  .
+testing new delegations or testing a potential change to a delegation.
 
 This option has similar usage to that of the \fI-x\fP option.  The major
 difference is that the server names supplied comprise the NS record set, and
 the addresses supplied represent glue records.  Thus if there are discrepancies
 between the authoritative responses for the NS RRset and glue and what is
-supplied on the command line, an error will be reported.
+supplied on the command line, an error will be reported when the output is
+subsequently assessed, e.g., using \fI"dnsviz grok"\fP.
+
+In lieu of specifying the record data itself on the command line, a file may be
+specified, which contains the delegation NS and glue records for the domain.
+
+.RS
+dnsviz probe -D example.com:dsset-example.com.
+.RE
 
 .IP "-D <domain>:<ds>[,<ds>...]"
 
