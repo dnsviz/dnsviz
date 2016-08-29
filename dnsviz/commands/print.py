@@ -359,11 +359,13 @@ def main(argv):
         logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
-            opts['-r'] = sys.stdin.fileno()
+            opt_r = sys.stdin.fileno()
+        else:
+            opt_r = opts['-r']
         try:
-            analysis_str = io.open(opts['-r'], 'r', encoding='utf-8').read()
+            analysis_str = io.open(opt_r, 'r', encoding='utf-8').read()
         except IOError as e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-r']))
+            logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
             sys.exit(3)
         try:
             analysis_structured = json.loads(analysis_str)
