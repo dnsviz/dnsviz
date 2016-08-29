@@ -307,13 +307,49 @@ def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, re
 
         # if the value is actually a path, then check it as a zone file
         if os.path.isfile(mapping):
-            if port_str == '':
-                #TODO assign random port here
-                port = next_port
-                next_port += 1
-            _serve_zone(domain, mapping, port)
-            name = 'localhost'
-            addr = '127.0.0.1'
+            # if this is a file containing delegation records, then read the
+            # file, create a name=value string, and call name_addr_mappings_from_string()
+            if require_name:
+                mappings_from_file = []
+                try:
+                    s = io.open(mapping, 'r', encoding='utf-8').read()
+                except IOError as e:
+                    usage('%s: "%s"' % (e.strerror, mapping))
+                    sys.exit(3)
+
+                try:
+                    m = dns.message.from_text(str(';ANSWER\n'+s))
+                except dns.exception.DNSException as e:
+                    usage('Error reading delegation records from %s: "%s"' % (mapping, e))
+                    sys.exit(3)
+
+                try:
+                    ns_rrset = m.find_rrset(m.answer, domain, dns.rdataclass.IN, dns.rdatatype.NS)
+                except KeyError:
+                    usage('No NS records for %s found in %s' % (lb2s(domain.canonicalize().to_text()), mapping))
+                    sys.exit(3)
+
+                for rdata in ns_rrset:
+                    a_rrsets = [r for r in m.answer if r.name == rdata.target and r.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA)]
+                    if not a_rrsets or not rdata.target.is_subdomain(domain.parent()):
+                        mappings_from_file.append(lb2s(rdata.target.canonicalize().to_text()))
+                    else:
+                        for a_rrset in a_rrsets:
+                            for a_rdata in a_rrset:
+                                mappings_from_file.append('%s=%s' % (lb2s(rdata.target.canonicalize().to_text()), IPAddr(a_rdata.address)))
+
+                name_addr_mappings_from_string(domain, ','.join(mappings_from_file), delegation_mapping, require_name)
+                continue
+
+            # otherwise (it is the zone proper), just serve the file
+            else:
+                if port_str == '':
+                    #TODO assign random port here
+                    port = next_port
+                    next_port += 1
+                _serve_zone(domain, mapping, port)
+                name = 'localhost'
+                addr = '127.0.0.1'
 
         else:
             # First determine whether the argument is name=value or simply value
