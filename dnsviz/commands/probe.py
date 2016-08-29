@@ -488,11 +488,14 @@ def ds_from_string(domain, dss, delegation_mapping):
                 usage('Error reading DS records from %s: "%s"' % (ds, e))
                 sys.exit(3)
 
-            for rrset in m.answer:
-                if not (rrset.name == domain and rrset.rdtype == dns.rdatatype.DS):
-                    continue
-                for rdata in rrset:
-                    delegation_mapping[(domain, dns.rdatatype.DS)].add(rdata)
+            try:
+                rrset = m.find_rrset(m.answer, domain, dns.rdataclass.IN, dns.rdatatype.DS)
+            except KeyError:
+                usage('No DS records for %s found in %s' % (lb2s(domain.canonicalize().to_text()), ds))
+                sys.exit(3)
+
+            for rdata in rrset:
+                delegation_mapping[(domain, dns.rdatatype.DS)].add(rdata)
 
         else:
             try:
