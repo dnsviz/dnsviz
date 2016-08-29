@@ -104,15 +104,15 @@ authoritative servers, rather than learning the servers through referrals from
 the IANA root servers:
 ```
 $ dnsviz probe -A \
-  -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
-  -x example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=2001:500:8d::53 \
+  -n example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
+  -n example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=2001:500:8d::53 \
   -o example.com.json example.com
 ```
 
 Same, but have `dnsviz probe` resolve the names:
 ```
 $ dnsviz probe -A \
-  -x example.com:a.iana-servers.org,b.iana-servers.org \
+  -n example.com:a.iana-servers.org,b.iana-servers.org \
   -o example.com.json example.com
 ```
 
@@ -320,3 +320,8 @@ Analyze example.com through the recursive resolver at 192.0.2.1:
 ```
 $ dnsviz query @192.0.2.1 +trusted-key=tk.txt example.com
 ```
+
+
+## Advanced Usage
+
+There are features for advanced
