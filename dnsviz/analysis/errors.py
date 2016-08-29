@@ -290,6 +290,42 @@ class ExpirationInPast(RRSIGError):
         diff = self.template_kwargs['reference_time'] - self.template_kwargs['expiration']
         self.template_kwargs['expired_time'] = fmt.humanize_time(diff.seconds, diff.days)
 
+class InceptionWithinClockSkew(RRSIGError):
+    '''
+    >>> e = InceptionWithinClockSkew(inception=datetime.datetime(2015,1,10,0,0,0), reference_time=datetime.datetime(2015,1,10,0,0,1))
+    >>> e.description
+    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range of the current time (2015-01-10 00:00:01)'.
+    '''
+
+    _abstract = False
+    code = 'INCEPTION_WITHIN_CLOCK_SKEW'
+    description_template = "The value of the Signature Inception field of the RRSIG RR (%(inception)s) is within possible clock skew range (%(difference)s) of the current time (%(reference_time)s)."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['inception', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(InceptionWithinClockSkew, self).__init__(**kwargs)
+        diff = self.template_kwargs['reference_time'] - self.template_kwargs['inception']
+        self.template_kwargs['difference'] = fmt.humanize_time(diff.seconds, diff.days)
+
+class ExpirationWithinClockSkew(RRSIGError):
+    '''
+    >>> e = ExpirationWithinClockSkew(expiration=datetime.datetime(2015,1,10,0,0,1), reference_time=datetime.datetime(2015,1,10,0,0,0))
+    >>> e.description
+    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range of the current time (2015-01-10 00:00:00)'.
+    '''
+
+    _abstract = False
+    code = 'EXPIRATION_WITHIN_CLOCK_SKEW'
+    description_template = "The value of the Signature Expiration field of the RRSIG RR (%(expiration)s) is within possible clock skew range (%(difference)s) of the current time (%(reference_time)s)."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['expiration', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(ExpirationWithinClockSkew, self).__init__(**kwargs)
+        diff = self.template_kwargs['expiration'] - self.template_kwargs['reference_time']
+        self.template_kwargs['difference'] = fmt.humanize_time(diff.seconds, diff.days)
+
 class SignatureInvalid(RRSIGError):
     '''
     >>> e = SignatureInvalid()

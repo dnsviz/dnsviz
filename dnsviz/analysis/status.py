@@ -43,6 +43,8 @@ lb2s = fmt.latin1_binary_to_string
 
 from . import errors as Errors
 
+CLOCK_SKEW_WARNING = 300
+
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1
 STATUS_INVALID = 2
@@ -203,12 +205,17 @@ class RRSIGStatus(object):
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_PREMATURE
             self.errors.append(Errors.InceptionInFuture(inception=fmt.timestamp_to_datetime(self.rrsig.inception), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
+        elif self.reference_ts - CLOCK_SKEW_WARNING < self.rrsig.inception:
+            self.warnings.append(Errors.InceptionWithinClockSkew(inception=fmt.timestamp_to_datetime(self.rrsig.inception), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
+
         if self.reference_ts >= self.rrsig.expiration:
             if self.validation_status == RRSIG_STATUS_VALID:
                 self.validation_status = RRSIG_STATUS_EXPIRED
             self.errors.append(Errors.ExpirationInPast(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
         elif self.reference_ts + min_ttl >= self.rrsig.expiration:
             self.errors.append(Errors.TTLBeyondExpiration(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), rrsig_ttl=min_ttl, reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
+        elif self.reference_ts + CLOCK_SKEW_WARNING >= self.rrsig.expiration:
+            self.warnings.append(Errors.ExpirationWithinClockSkew(expiration=fmt.timestamp_to_datetime(self.rrsig.expiration), reference_time=fmt.timestamp_to_datetime(self.reference_ts)))
 
         if self.signature_valid == False and self.dnskey.rdata.algorithm in supported_algs:
             # only report this if we're not referring to a key revoked post-sign
