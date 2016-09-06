@@ -30,6 +30,7 @@ import time
 
 from . import query
 from .ipaddr import IPAddr
+from . import response as Response
 from . import transport
 from . import util
 
@@ -538,15 +539,15 @@ class FullResolver:
                                     ns_names[ns_name].add(IPAddr(rdata.address))
 
                     for server in ns_names[ns_name]:
-                        query = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53))
-                        query.execute(tm=self._transport_manager, th_factories=self._th_factories)
+                        q = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53))
+                        q.execute(tm=self._transport_manager, th_factories=self._th_factories)
                         is_referral = False
 
-                        if not query.responses:
+                        if not q.responses:
                             # No network connectivity
                             continue
 
-                        server1, client_response = list(query.responses.items())[0]
+                        server1, client_response = list(q.responses.items())[0]
                         client, response = list(client_response.items())[0]
 
                         if response.is_valid_response() and response.is_complete_response():
