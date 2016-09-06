@@ -584,9 +584,9 @@ Options:
     -s <server>[,<server>...]
                    - designate servers for recursive analysis
     -A             - query analysis against authoritative servers
-    -n <domain>[+]:<server>[,<server>...]
+    -x <domain>[+]:<server>[,<server>...]
                    - designate authoritative servers explicitly for a domain
-    -N <domain>:<server>[,<server>...]
+    -X <domain>:<server>[,<server>...]
                    - specify delegation information for a domain
     -D <domain>:"<ds>"[,"<ds>"...]
                    - specify DS records for a domain
@@ -606,7 +606,7 @@ def main(argv):
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:n:N:D:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:X:D:EAs:Fh')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -614,7 +614,7 @@ def main(argv):
         _init_tm()
         stub_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
 
-        # get all the options for which there might be multiple values
+        # get all the -x options
         explicit_delegations = {}
         odd_ports = {}
         stop_at_explicit = {}
@@ -622,7 +622,7 @@ def main(argv):
         client_ipv6 = None
         delegation_info = {}
         for opt, arg in opts:
-            if opt in ('-n', '-N'):
+            if opt in ('-x', '-X'):
                 try:
                     domain, mappings = arg.split(':', 1)
                 except ValueError:
@@ -633,7 +633,7 @@ def main(argv):
 
                 match = STOP_RE.search(domain)
                 if match is not None:
-                    if opt == '-N':
+                    if opt == '-X':
                         usage('Incorrect usage of %s option: "%s"' % (opt, arg))
                         sys.exit(1)
                     domain = match.group(1)
@@ -644,8 +644,8 @@ def main(argv):
                     usage('The domain name was invalid: "%s"' % domain)
                     sys.exit(1)
 
-                if opt == '-N' and domain == dns.name.root:
-                    usage('The root zone cannot be used with option -N.')
+                if opt == '-X' and domain == dns.name.root:
+                    usage('The root zone cannot be used with option -X.')
                     sys.exit(1)
 
                 if match is not None:
@@ -653,9 +653,9 @@ def main(argv):
                 else:
                     stop_at_explicit[domain] = False
 
-                if opt == '-N':
+                if opt == '-X':
                     if domain == dns.name.root:
-                        usage('The root zone cannot be used with option -N.')
+                        usage('The root zone cannot be used with option -X.')
                         sys.exit(1)
 
                     parent = domain.parent()
@@ -670,7 +670,7 @@ def main(argv):
                     sys.exit(1)
                 if (domain, dns.rdatatype.NS) not in delegation_mapping:
                     delegation_mapping[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
-                name_addr_mappings_from_string(domain, mappings, delegation_mapping, opt == '-N')
+                name_addr_mappings_from_string(domain, mappings, delegation_mapping, opt == '-X')
 
             elif opt == '-D':
                 try:
@@ -737,16 +737,17 @@ def main(argv):
             usage('If -A is used, then -s cannot be used.')
             sys.exit(1)
 
-        if '-n' in opts and '-A' not in opts:
-            usage('-n may only be used in conjunction with -A.')
+        if '-x' in opts and '-A' not in opts:
+            usage('-x may only be used in conjunction with -A.')
             sys.exit(1)
 
-        if '-N' in opts and '-A' not in opts:
-            usage('-N may only be used in conjunction with -A.')
+        if '-X' in opts and '-A' not in opts:
+            usage('-X may only be used in conjunction with -A.')
             sys.exit(1)
 
-        if '-D' in opts and '-N' not in opts:
-            usage('-D may only be used in conjunction with -N.')
+        if '-D' in opts and '-X' not in opts:
+            #TODO retrieve NS/A/AAAA if -D is specified but -X is not
+            usage('-D may only be used in conjunction with -X.')
             sys.exit(1)
 
         if '-4' in opts and '-6' in opts:
@@ -796,7 +797,7 @@ def main(argv):
 
         for domain in delegation_info:
             if (domain, dns.rdatatype.NS) in explicit_delegations:
-                usage('Cannot use "%s" with -n if its child is specified with -N' % lb2s(domain.canonicalize().to_text()))
+                usage('Cannot use "%s" with -x if its child is specified with -X' % lb2s(domain.canonicalize().to_text()))
                 sys.exit(1)
 
             port = next_port

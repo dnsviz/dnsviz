@@ -153,23 +153,23 @@ This option cannot be used in conjunction with \fI-A\fP.
 
 .IP -A
 Query authoritative servers, rather than (the default) recursive servers.
-.IP "-n <domain>[+]:<server>[,<server>...]"
+.IP "-x <domain>[+]:<server>[,<server>...]"
 Explicitly designate authoritative servers for a domain, rather than learning
 them by following delegations.  This option dictates which servers will be
 queried for a domain, but the servers specified will not be used to check NS or
-glue record consistency with the child; for that behavior, see \fI-N\fP.
+glue record consistency with the child; for that behavior, see \fI-X\fP.
 
 The default behavior is to identify and query servers authoritative for
 ancestors of the specified domain, if other options so dictate.  However, if
 the domain ends in "+", then queries aren't issued for servers authoritative
 for ancestor domains of the domain.  For example, with the following command:
 
-dnsviz probe -a . -n example.com:ns1.example.com example.com
+dnsviz probe -a . -x example.com:ns1.example.com example.com
 
 at the very least the com servers will be queried for DS records for
 example.com.  However, if the following is used:
 
-dnsviz probe -a . -n example.com+:ns1.example.com example.com
+dnsviz probe -a . -x example.com+:ns1.example.com example.com
 
 no queries are performed at com servers or above, includig DS records for
 example.com.
@@ -182,19 +182,19 @@ instance of \fInamed(8)\fP serving that zone.  For example, if example.com.zone
 is a file containing the contents of the example.com zone, the following may be
 used:
 
-dnsviz probe -n example.com:example.com.zone
+dnsviz probe -x example.com:example.com.zone
 
 This option may be used multiple times on the command line.
 
 This option can only be used in conjunction with \fI-A\fP.
 
-.IP "-N <domain>:<server>[,<server>...]"
+.IP "-X <domain>:<server>[,<server>...]"
 
 Specify delegation information for a domain, i.e., the NS and glue records for
 the domain, which would be served by the domain's parent.  This is used for
 testing new delegations or testing a potential change to a delegation.
 
-This option has similar usage to that of the \fI-n\fP option.  The major
+This option has similar usage to that of the \fI-x\fP option.  The major
 difference is that the server names supplied comprise the NS record set, and
 the addresses supplied represent glue records.  Thus if there are discrepancies
 between the authoritative responses for the NS RRset and glue and what is
@@ -211,7 +211,7 @@ dnsviz probe -D example.com:dsset-example.com.
 .IP "-D <domain>:<ds>[,<ds>...]"
 
 Specify one or more delegation signer (DS) records for a domain.  This is used
-in conjunction with the \fI-N\fP option for testing the introduction or change
+in conjunction with the \fI-X\fP option for testing the introduction or change
 of DS changes.
 
 The DS records themselves are specified using the the textual representation of their record data.  For example the following DS records for example.com:
@@ -247,7 +247,7 @@ dnsviz probe -D example.com:dsset-example.com.
 .RE
 
 .RS
-This option must be used in conjunction with the \fI-N\fP option.
+This option must be used in conjunction with the \fI-X\fP option.
 .RE
 
 .IP -E
