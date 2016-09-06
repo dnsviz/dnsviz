@@ -157,7 +157,7 @@ Query authoritative servers, rather than (the default) recursive servers.
 Explicitly designate authoritative servers for a domain, rather than learning
 them by following delegations.  This option dictates which servers will be
 queried for a domain, but the servers specified will not be used to check NS or
-glue record consistency with the child; for that behavior, see \fI-X\fP.
+glue record consistency with the child; for that behavior, see \fI-N\fP.
 
 The default behavior is to identify and query servers authoritative for
 ancestors of the specified domain, if other options so dictate.  However, if
@@ -188,7 +188,7 @@ This option may be used multiple times on the command line.
 
 This option can only be used in conjunction with \fI-A\fP.
 
-.IP "-X <domain>:<server>[,<server>...]"
+.IP "-N <domain>:<server>[,<server>...]"
 
 Specify delegation information for a domain, i.e., the NS and glue records for
 the domain, which would be served by the domain's parent.  This is used for
@@ -211,7 +211,7 @@ dnsviz probe -D example.com:dsset-example.com.
 .IP "-D <domain>:<ds>[,<ds>...]"
 
 Specify one or more delegation signer (DS) records for a domain.  This is used
-in conjunction with the \fI-X\fP option for testing the introduction or change
+in conjunction with the \fI-N\fP option for testing the introduction or change
 of DS changes.
 
 The DS records themselves are specified using the the textual representation of their record data.  For example the following DS records for example.com:
@@ -247,7 +247,7 @@ dnsviz probe -D example.com:dsset-example.com.
 .RE
 
 .RS
-This option must be used in conjunction with the \fI-X\fP option.
+This option must be used in conjunction with the \fI-N\fP option.
 .RE
 
 .IP -E
