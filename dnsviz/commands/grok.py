@@ -97,7 +97,7 @@ Options:
     -r <filename>  - read diagnostic queries from a file
     -t <filename>  - specify file containing trusted keys
     -o <filename>  - save the output to the specified file
-    -p             - make json output pretty instead of minimal
+    -c             - make json output minimal instead of pretty
     -l <loglevel>  - set log level to one of: error, warning, info, debug
     -h             - display the usage and exit
 ''' % (err))
@@ -165,8 +165,9 @@ def main(argv):
     try:
         test_m2crypto()
 
+        #TODO remove -p option (it is now the default, and -c is used to change it)
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:pl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:cpl:h')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -294,10 +295,7 @@ def main(argv):
             logger.error('%s: "%s"' % (e.strerror, opts['-o']))
             sys.exit(3)
 
-        if fh.isatty():
-            opts['-p'] = None
-
-        if '-p' in opts:
+        if '-c' not in opts:
             kwargs = { 'indent': 4, 'separators': (',', ': ') }
         else:
             kwargs = {}
@@ -343,7 +341,7 @@ def main(argv):
 
         if d:
             s = json.dumps(d, ensure_ascii=False, **kwargs)
-            if fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb':
+            if '-c' not in opts and fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb':
                 s = color_json(s)
             fh.write(s.encode('utf-8'))
 
