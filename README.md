@@ -152,48 +152,43 @@ Same thing:
 $ dnsviz grok -r example.com.json -o example.com-chk.json example.com
 ```
 
-Same thing, but with "pretty", formatted JSON:
-```
-$ dnsviz grok -p -r example.com.json -o example.com-chk.json
-```
-
 Show only info-level information: descriptions, statuses, warnings, and errors:
 ```
-$ dnsviz grok -p -l info -r example.com.json -o example.com-chk.json
+$ dnsviz grok -l info -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related warnings or errors:
 ```
-$ dnsviz grok -p -l warning -r example.com.json -o example.com-chk.json
+$ dnsviz grok -l warning -r example.com.json -o example.com-chk.json
 ```
 
 Show descriptions only if there are related errors:
 ```
-$ dnsviz grok -p -l error -r example.com.json -o example.com-chk.json
+$ dnsviz grok -l error -r example.com.json -o example.com-chk.json
 ```
 
 Use root key as DNSSEC trust anchor, to additionally indicate
 authentication status of responses:
 ```
 $ dig +noall +answer . dnskey | awk '$5 % 2 { print $0 }' > tk.txt
-$ dnsviz grok -p -l info -t tk.txt -r example.com.json -o example.com-chk.json
+$ dnsviz grok -l info -t tk.txt -r example.com.json -o example.com-chk.json
 ```
 
 Pipe `dnsviz probe` output directly to `dnsviz grok`:
 ```
 $ dnsviz probe example.com | \
-      dnsviz grok -p -l info -o example.com-chk.json
+      dnsviz grok -l info -o example.com-chk.json
 ```
 
 Same thing, but save the raw output (for re-use) along the way:
 ```
 $ dnsviz probe example.com | tee example.com.json | \
-      dnsviz grok -p -l info -o example.com-chk.json
+      dnsviz grok -l info -o example.com-chk.json
 ```
 
 Assess multiple names at once with error level:
 ```
-$ dnsviz grok -p -l error -r multiple.json -o example.com-chk.json
+$ dnsviz grok -l error -r multiple.json -o example.com-chk.json
 ```
 
 
