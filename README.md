@@ -14,7 +14,8 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 * python (2.7.x) - http://www.python.org/
 
-  python 2.7.x is required.
+  python 2.7.x is required.  python 3.4.x has also been successfully tested and
+  should work, as long as the other third-party dependencies support python 3.
 
 * dnspython (1.11.0 or later) - http://www.dnspython.org/
 
@@ -47,6 +48,14 @@ powers the Web-based analysis available at http://dnsviz.net/
   ```
   $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
   ```
+
+* (optional) ISC BIND - https://www.isc.org/downloads/bind/
+
+  When calling `dnsviz probe` if the `-N` option is used or if a zone file is
+  used in conjunction with the `-x` option, `named(8)` is looked for in PATH
+  and invoked to serve the zone file.  ISC BIND is only needed in this specific
+  case, and `named(8)` does not need to be running.
+
 
 ### Build and Install
 
@@ -82,7 +91,7 @@ of which are serialized into JSON format.
 #### Examples
 
 Analyze the domain name example.com using your configured DNS resolvers (i.e.,
-in /etc/resolv.conf) and store the queries and responses in the file named
+in `/etc/resolv.conf`) and store the queries and responses in the file named
 "example.com.json":
 ```
 $ dnsviz probe example.com > example.com.json
@@ -301,7 +310,7 @@ one go.
 #### Examples
 
 Analyze the domain name example.com using the first of your configured DNS
-resolvers (i.e., in /etc/resolv.conf):
+resolvers (i.e., in `/etc/resolv.conf`):
 ```
 $ dnsviz query example.com
 ```
@@ -314,4 +323,104 @@ $ dnsviz query +trusted-key=tk.txt example.com
 Analyze example.com through the recursive resolver at 192.0.2.1:
 ```
 $ dnsviz query @192.0.2.1 +trusted-key=tk.txt example.com
+```
+
+
+## Pre-Deployment DNS Testing
+
+The examples in this section demonstrate usage of DNSViz for pre-deployment
+testing.
+
+
+### Pre-Delegation Testing
+
+The following examples involve issuing diagnostic queries for a zone before it
+is ever delegated.
+
+Issue queries against a zone file on the local system (`example.com.zone`).
+`named(8)` is invoked to serve the file locally:
+```
+$ dnsviz probe -A -x example.com+:example.com.zone example.com
+```
+(Note the use of "+", which designates that the parent servers should not be
+queried for DS records.)
+
+Issue queries to a server that is serving the zone:
+```
+$ dnsviz probe -A -x example.com+:192.0.2.1 example.com
+```
+(Note that this server doesn't need to be a server in the NS RRset for
+example.com.)
+
+Issue queries to the servers in the authoritative NS RRset, specified by name
+and/or address:
+```
+$ dnsviz probe -A \
+      -x example.com+:ns1.example.com=192.0.2.1 \
+      -x example.com+:ns2.example.com=192.0.2.1,ns2.example.com=[2001:db8::1] \
+      example.com
+```
+
+Specify the names and addresses corresponding to the future delegation NS
+records and (as appropriate) A/AAAA glue records in the parent zone (com):
+```
+$ dnsviz probe -A \
+      -N example.com:ns1.example.com=192.0.2.1 \
+      -N example.com:ns2.example.com=192.0.2.1,ns2.example.com=[2001:db8::1] \
+      example.com
+```
+
+Also supply future DS records:
+```
+$ dnsviz probe -A \
+      -N example.com:ns1.example.com=192.0.2.1 \
+      -N example.com:ns2.example.com=192.0.2.1,ns2.example.com=[2001:db8::1] \
+      -D example.com:dsset-example.com. \
+      example.com
+```
+
+
+### Pre-Deployment Testing of Authoritative Zone Changes
+
+The following examples involve issuing diagnostic queries for a delegated zone
+before changes are deployed.
+
+Issue diagnostic queries for a new zone file that has been created but not yet
+been deployed (i.e., with changes to DNSKEY or other records):
+```
+$ dnsviz probe -A -x example.com:example.com.zone example.com
+```
+(Note the absence of "+", which designates that the parent servers will be
+queried for DS records.)
+
+Issue queries to a server that is serving the new version of the zone:
+```
+$ dnsviz probe -A -x example.com:192.0.2.1 example.com
+```
+(Note that this server doesn't need to be a server in the NS RRset for
+example.com.)
+
+
+### Pre-Deployment Testing of Delegation Changes
+
+The following examples involve issuing diagnostic queries for a delegated zone
+before changes are deployed to the delegation, glue, or DS records for that
+zone.
+
+Specify the names and addresses corresponding to the new delegation NS records
+and (as appropriate) A/AAAA glue records in the parent zone (com):
+```
+$ dnsviz probe -A \
+      -N example.com:ns1.example.com=192.0.2.1 \
+      -N example.com:ns2.example.com=192.0.2.1,ns2.example.com=[2001:db8::1] \
+      example.com
+```
+
+Also supply the replacement DS records:
+```
+$ dnsviz probe -A \
+      -N example.com:ns1.example.com=192.0.2.1 \
+      -N example.com:ns2.example.com=192.0.2.1,ns2.example.com=[2001:db8::1] \
+      -D example.com:dsset-example.com. \
+      example.com
 ```
