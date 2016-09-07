@@ -113,8 +113,8 @@ authoritative servers, rather than learning the servers through referrals from
 the IANA root servers:
 ```
 $ dnsviz probe -A \
-  -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=2001:500:8c::53 \
-  -x example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=2001:500:8d::53 \
+  -x example.com:a.iana-servers.org=199.43.132.53,a.iana-servers.org=[2001:500:8c::53] \
+  -x example.com:b.iana-servers.org=199.43.133.53,b.iana-servers.org=[2001:500:8d::53] \
   -o example.com.json example.com
 ```
 
@@ -135,7 +135,7 @@ Analyze multiple names in parallel (four threads) using explicit recursive
 resolvers (replace *192.0.1.2* and *2001:db8::1* with legitimate resolver
 addresses):
 ```
-$ dnsviz probe -s 192.0.2.1,2001:db8::1 -t 4 -o multiple.json \
+$ dnsviz probe -s 192.0.2.1,[2001:db8::1] -t 4 -o multiple.json \
   example.com sandia.gov verisignlabs.com dnsviz.net
 ```
 
