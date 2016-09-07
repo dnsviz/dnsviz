@@ -18,52 +18,62 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz 1 "06 Sep 2016" "0.6.0"
 .SH NAME
 dnsviz \- issue and assess diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsviz <command> [args]
-
-.B dnsviz help [<command>]
+.P
+.B dnsviz
+\fIcommand\fR
+[ \fIoptions\fR ]
+.TP
+.B dnsviz
+\fBhelp\fR [ \fIcommand\fR ]
 .SH DESCRIPTION
+.P
 .B dnsviz
 is a tool for assessing the health of DNS deployments by issuing diagnostic
 queries, assessing the responses, and outputting the results in one of several
 formats.  The assessment may be directed towards recursive or authoritative DNS
 servers, and the output may be textual, graphical, or serialized for
 programmatic review.
-
+.P
 .B dnsviz
 is invoked by specifying one of its commands as the first argument on the
 command line, followed by arguments specific to that command.  If the first
 argument is "help", then the usage of the command specified by the second
 argument is displayed.  If no second argument is provided, then a general usage
 message is given.
-
 .SH COMMANDS
-.IP probe
-Issue diagnostic DNS queries.  See \fIdnsviz-probe(1)\fP.
-
-.IP grok
-Assess diagnostic DNS queries See \fIdnsviz-grok(1)\fP.
-
-.IP graph
-Graph the assessment of diagnostic DNS queries See \fIdnsviz-graph(1)\fP.
-
-.IP print
-Process diagnostic DNS queries to textual output See \fIdnsviz-print(1)\fP.
-
-.IP query
-Assess a DNS query See \fIdnsviz-query(1)\fP.
-
-.IP "help [<command>]"
+.TP
+.B probe
+Issue diagnostic DNS queries.  See \fBdnsviz-probe(1)\fR.
+.TP
+.B grok
+Assess diagnostic DNS queries See \fBdnsviz-grok(1)\fR.
+.TP
+.B graph
+Graph the assessment of diagnostic DNS queries See \fBdnsviz-graph(1)\fR.
+.TP
+.B print
+Process diagnostic DNS queries to textual output See \fBdnsviz-print(1)\fR.
+.TP
+.B query
+Assess a DNS query See \fBdnsviz-query(1)\fR.
+.TP
+.B "\fBhelp\fR [ \fIcommand\fR ]"
 Show usage generally, or for a specific command.
-
 .SH EXIT CODES
 The exit codes are:
-.IP 0
+.TP
+.B 0
 Program terminated normally.
-.IP 1
+.TP
+.B 1
 Incorrect usage.
-.SH SEE ALSO
-.BR dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-print (1), dnsviz-query (1)
+.SH "SEE ALSO"
+.BR dnsviz-probe(1),
+.BR dnsviz-grok(1),
+.BR dnsviz-graph(1),
+.BR dnsviz-print(1),
+.BR dnsviz-query(1)

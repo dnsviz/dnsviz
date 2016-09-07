@@ -18,25 +18,27 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz-probe 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz-probe 1 "06 Sep 2016" "0.6.0"
 .SH NAME
 dnsviz-probe \- issue diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsviz probe [options]
-.I [domain_name...]
+.B dnsviz
+\fBprobe\fR
+[ \fIoptions\fR ]
+[ \fIdomain_name...\fR ]
 .SH DESCRIPTION
 Perform a series of diagnostic queries of specified names to either recursive
 (default) or authoritative DNS servers, the results of which are serialized
 into JSON format.  Its output is used to assess the health of DNS deployments,
-using, e.g., \fI"dnsviz grok"\fP and \fI"dnsviz graph"\fP.
+using, e.g., \fBdnsviz-grok(1)\fR and \fBdnsviz-graph(1)\fR.
 
 Domain names to be processed may be passed either as command-line arguments or
-in a file (using the \fI-f\fP option).  When the \fI-r\fP option is used, then
+in a file (using the \fB-f\fR option).  When the \fB-r\fR option is used, then
 the domain names can simply be implied using the diagnostic query input.
 
 Domain names are extracted from the diagnostic query input in conjunction with
-\fI-r\fP only when \fI-f\fP is not used and no domain names are supplied on the
-command line.  If the \fI-f\fP option is used, then names may not be specified
+\fB-r\fR only when \fB-f\fR is not used and no domain names are supplied on the
+command line.  If the \fB-f\fR option is used, then names may not be specified
 on the command line.
 
 The domain names passed as input are fully-qualified domain names, such as
@@ -45,25 +47,32 @@ example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
 are fully qualified, no trailing dot is necessary.
 
 .SH OPTIONS
-.IP "-f <filename>"
+.TP
+.B -f \fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
-.IP "-d <level>"
+.TP
+.B -d \fIlevel\fR
 Set debug level to a value from 0 to 3, with increasing verbosity.  The default
 is "2" (informational-level output).
-.IP "-r <filename>"
+.TP
+.B -r \fIfilename\fR
 Read diagnostic query input from the specified file, instead of querying
 servers.  Specify "-" to read from standard input.
-.IP "-t <threads>"
+.TP
+.B -t \fIthreads\fR
 Specify the number of threads to use for issuing diagnostic queries for
 different names in parallel.  The default is to execute diagnostic queries of
 names serially.
-.IP -4
+.TP
+.B -4
 Use IPv4 only.
-.IP -6
+.TP
+.B -6
 Use IPv6 only.
-.IP "-b <address>"
+.TP
+.B -b \fIaddress\fR
 Specify a source IPv4 or IPv6 address for queries, rather than detecting it.
 
 This option can be used more than once to supply both an IPv4 and an IPv6
@@ -71,54 +80,60 @@ address.
 
 The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
-.IP "-u <url>"
+.TP
+.B -u \fIurl\fR
 Specify the URL (HTTP/HTTPS only) for a DNS looking glass that will send the
 diagnostic queries, rather than sending them locally.
 
+.RS
+.RS
 Examples:
 .RS
 .P
-http://www.example.com/cgi-bin/dnsviz-lg.cgi
+.PD 0
+Issue DNS queries from www.example.com using the cgi script dnsviz-lg.cgi:
 .P
-Issue DNS queries from www.example.com using the cgi script dnsviz-lg.cgi
-.RE
-
-.RS
+http://www.example.com/cgi-bin/dnsviz-lg.cgi
+.PD
+.P
+.PD 0
+Same, but use HTTP Basic authentication:
 .P
 http://username:password@www.example.com/cgi-bin/dnsviz-lg.cgi
-.P
-Same, but use HTTP Basic authentication
+.PD
 .RE
-
-.RS
 .P
+.RE
 Note that a looking glass that uses https is only supported when using python
 version 2.7.9 or greater.
 .RE
 
-.IP -k
-When \fI-u\fP is used to specify the URL of a DNS looking glass, don't verify
+.TP
+.B -k
+When \fB-u\fR is used to specify the URL of a DNS looking glass, don't verify
 the server-side TLS cert.
-
-.IP "-a <ancestor>"
+.TP
+.B -a \fIancestor\fR
 Issue diagnostic queries of each domain name through the specified ancestor.  The
 default for recursive mode is "." (i.e., issue queries all the way to the
-root).   The default for authoritative mode (i.e., with \fI-A\fP) is the domain
+root).   The default for authoritative mode (i.e., with \fB-A\fR) is the domain
 name itself.
-.IP "-R <type>[,<type>...]"
+.TP
+.B -R \fItype\fR[,\fItype...\fR]
 Issue diagnostic queries for only the specified type(s) (e.g., A, AAAA).  The
 default is to pick query types based on the nature of the name (e.g., the number of
 labels, whether it is a subdomain of .arpa, labels indicating association to
 TLSA or SRV records, etc.) and whether there are NS records detected (i.e., it
 is a zone).
-.IP "-s <server>[,<server>...]"
+.TP
+.B -s \fIserver\fR[,\fIserver...\fR]
 Designate one or more servers for recursive queries, rather than using those
-specified in /etc/resolv.conf.
+specified in \fI/etc/resolv.conf\fR.
 
 Each server specified may either be an address (IPv4 or IPv6), a domain name
 (which will be resolved to an address using the standard resolution process),
-or both, using the syntax "name=address".  Note that when both a name and an
-address are specified ("name=address"), the name is only used for
+or both, using the syntax \fIname\fR\fB=\fR\fIaddress\fR.  Note that when both a name and an
+address are specified (\fIname\fR\fB=\fR\fIaddress\fR), the name is only used for
 identification purposes, and it doesn't matter whether the name resolves to the
 corresponding address (or at all, for that matter).  IPv6 addresses must be
 wrapped in square brackets, e.g., "[2001:db8::1]".
@@ -128,142 +143,148 @@ server should be contacted.  If not specified, the standard DNS port, 53, is
 used.
 
 The following are example server values:
+
 .RS
+.RS
+.P
+.PD 0
 ns1.example.com
-.RE
-.RS
+.P
 ns1.example.com:5333
-.RE
-.RS
+.P
 ns1.example.com=192.0.2.1
-.RE
-.RS
+.P
 ns1.example.com=[2001:db8::1]
-.RE
-.RS
+.P
 ns1.example.com=[2001:db8::1]:5333
-.RE
-.RS
+.P
 192.0.2.1
+.PD
 .RE
 
-.RS
-This option cannot be used in conjunction with \fI-A\fP.
+This option cannot be used in conjunction with \fB-A\fR.
 .RE
 
-.IP -A
+.TP
+.B -A
 Query authoritative servers, rather than (the default) recursive servers.
-.IP "-x <domain>[+]:<server>[,<server>...]"
+.TP
+.B -x \fIdomain\fR[\fB+\fR]\fB:\fR\fIserver\fR[,\fIserver...\fR]
 Explicitly designate authoritative servers for a domain, rather than learning
 them by following delegations.  This option dictates which servers will be
 queried for a domain, but the servers specified will not be used to check NS or
-glue record consistency with the child; for that behavior, see \fI-N\fP.
+glue record consistency with the child; for that behavior, see \fB-N\fR.
 
 The default behavior is to identify and query servers authoritative for
 ancestors of the specified domain, if other options so dictate.  However, if
 the domain ends in "+", then queries aren't issued for servers authoritative
 for ancestor domains of the domain.  For example, with the following command:
 
-dnsviz probe -a . -x example.com:ns1.example.com example.com
+.RS
+.RS
+dnsviz probe -A -x example.com:ns1.example.com example.com
+.RE
 
-at the very least the com servers will be queried for DS records for
-example.com.  However, if the following is used:
+the com servers will be queried for DS records for example.com.  However, if
+the following is used:
 
-dnsviz probe -a . -x example.com+:ns1.example.com example.com
+.RS
+dnsviz probe -A -x example.com+:ns1.example.com example.com
+.RE
 
-no queries are performed at com servers or above, includig DS records for
+no queries are performed at com servers or above, including DS records for
 example.com.
 
-See \fI-s\fP for the syntax used for designating servers.  However, unlike the
-\fI-s\fP option, a zone file may be specified in lieu of a server name and/or
-address, in which case an instance of \fInamed(8)\fP is started, the zone is
+See \fB-s\fR for the syntax used for designating servers.  However, unlike the
+\fB-s\fR option, a zone file may be specified in lieu of a server name and/or
+address, in which case an instance of \fBnamed(8)\fR is started, the zone is
 served from that instance, and queries for the domain are directed to the local
-instance of \fInamed(8)\fP serving that zone.  For example, if example.com.zone
-is a file containing the contents of the example.com zone, the following may be
-used:
+instance of \fBnamed(8)\fR serving that zone.  For example, if example.com.zone
+is a file containing the contents of the example.com zone, the following command
+could be used to specify that the zone file should be used:
 
-dnsviz probe -x example.com:example.com.zone
+.RS
+dnsviz probe -A -x example.com:example.com.zone example.com
+.RE
 
 This option may be used multiple times on the command line.
 
-This option can only be used in conjunction with \fI-A\fP.
-
-.IP "-N <domain>:<server>[,<server>...]"
-
+This option can only be used in conjunction with \fB-A\fR.
+.RE
+.TP
+.B -N \fIdomain\fR\fB:\fR\fIserver\fR[,\fIserver...\fR]
 Specify delegation information for a domain, i.e., the NS and glue records for
 the domain, which would be served by the domain's parent.  This is used for
 testing new delegations or testing a potential change to a delegation.
 
-This option has similar usage to that of the \fI-x\fP option.  The major
+This option has similar usage to that of the \fB-x\fR option.  The major
 difference is that the server names supplied comprise the NS record set, and
 the addresses supplied represent glue records.  Thus if there are discrepancies
 between the authoritative responses for the NS RRset and glue and what is
 supplied on the command line, an error will be reported when the output is
-subsequently assessed, e.g., using \fI"dnsviz grok"\fP.
+subsequently assessed, e.g., using \fBdnsviz-grok(1)\fR.
 
 In lieu of specifying the record data itself on the command line, a file may be
 specified, which contains the delegation NS and glue records for the domain.
-
-.RS
-dnsviz probe -D example.com:dsset-example.com.
-.RE
-
-.IP "-D <domain>:<ds>[,<ds>...]"
-
+.TP
+.B -D \fIdomain\fR\fB:\fR\fIds\fR[,\fIds...\fR]
 Specify one or more delegation signer (DS) records for a domain.  This is used
-in conjunction with the \fI-N\fP option for testing the introduction or change
-of DS changes.
+in conjunction with the \fB-N\fR option for testing the introduction or change
+of DS records.
 
-The DS records themselves are specified using the the textual representation of their record data.  For example the following DS records for example.com:
+The DS records themselves are specified using the the textual representation of
+their record data.  For example the following DS records for
+example.com:
 
 .RS
+.RS
+.P
+.PD 0
 31589 8 1 3490A6806D47F17A34C29E2CE80E8A999FFBE4BE
-.RE
-.RS
+.P
 31589 8 2 CDE0D742D6998AA554A92D890F8184C698CFAC8A26FA59875A990C03 E576343C
+.PD
 .RE
 
-.RS
-would be specified using
-.RE
+would be specified by passing this value to \fB-D\fR:
 
 .RS
-dnsviz probe -D example.com:"31589 8 1
-.RE
-.RS
-3490A6806D47F17A34C29E2CE80E8A999FFBE4BE,31589 8 2
-.RE
-.RS
-CDE0D742D6998AA554A92D890F8184C698CFAC8A26FA59875A990C03 E576343C"
+.PD 0
+"31589 8 1 3490A6806D47F17A34C29E2CE80E8A999FFBE4BE,
+.P
+   31589 8 2 CDE0D742D6998AA554A92D890F8184C698CFAC8A26FA59875A990C03 E576343C"
+.PD
 .RE
 
-.RS
 In lieu of specifying the record data itself on the command line, a file may be
 specified, which contains the DS records.  For example:
-.RE
 
 .RS
 dnsviz probe -D example.com:dsset-example.com.
 .RE
 
-.RS
-This option must be used in conjunction with the \fI-N\fP option.
+This option must be used in conjunction with the \fB-N\fR option.
 .RE
-
-.IP -E
+.TP
+.B -E
 Include diagnostic DNS queries that can assess EDNS compatibility of servers.
-
+.RS
+.P
 If this option is used, each server probed will be queried with "future" EDNS
 settings, the respective responses can later be assessed for proper behavior.
 These settings include future EDNS versions (i.e., > 0), unknown options, and
 unknown flags.
-.IP "-o <filename>"
+.RE
+.TP
+.B -o \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
-.IP -p
+.TP
+.B -p
 Make JSON output "pretty" instead of minimal (i.e., using indentation and
 newlines).  Note that this is the default when the output is a TTY.
-.IP -h
+.TP
+.B -h
 Display the usage and exit.
 
 .SH EXIT CODES
@@ -279,4 +300,8 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-print (1), dnsviz-query (1)
+.BR dnsviz(1),
+.BR dnsviz-grok(1),
+.BR dnsviz-graph(1),
+.BR dnsviz-print(1),
+.BR dnsviz-query(1)

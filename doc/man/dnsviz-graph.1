@@ -18,30 +18,32 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz-graph 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz-probe 1 "06 Sep 2016" "0.6.0"
 .SH NAME
 dnsviz-graph \- graph the assessment of diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsviz graph [options]
-.I [domain_name...]
+.B dnsviz
+\fBgraph\fR
+[ \fIoptions\fR ]
+[ \fIdomain_name...\fR ]
 .SH DESCRIPTION
 Process the results of diagnostic DNS queries previously performed, e.g., using
-\fI"dnsviz probe"\fP, to assess the health of the associated DNS deployments
+\fBdnsviz-probe(1)\fR, to assess the health of the associated DNS deployments
 for one or more domain names specified.  The results of this processing are
 presented in one of several graphical formats for user diagnostics.
 
 The source of the diagnostic query input is either a file specified with
-\fI-r\fP or standard input.
+\fB-r\fR or standard input.
 
 Domain names to be processed may be passed either as command-line arguments, in
-a file (using the \fI-f\fP option), or simply implied using the diagnostic
+a file (using the \fB-f\fR option), or simply implied using the diagnostic
 query input.  The latter is the preferred methodology (and the simplest) and is
 useful, except in cases where the input contains diagnostic queries for
 multiple domain names, only a subset of which are to be processed.
 
-If \fI-f\fP is not used and no domain names are supplied on the command line,
+If \fB-f\fR is not used and no domain names are supplied on the command line,
 then the domain names to be processed are extracted from the diagnostic query
-input.  If the \fI-f\fP option is used, then names may not be specified on the
+input.  If the \fB-f\fR option is used, then names may not be specified on the
 command line.
 
 The domain names passed as input are fully-qualified domain names, such as
@@ -50,47 +52,54 @@ example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
 are fully qualified, no trailing dot is necessary.
 
 The graphical output is the image of a directed graph created using
-\fIdot(1)\fP.  The "html" format makes this image interactive using javascript
+\fBdot(1)\fR.  The "html" format makes this image interactive using javascript
 libraries that are distributed with this software.
 
 .SH OPTIONS
-.IP "-f <filename>"
+.TP
+.B -f \fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
-.IP "-r <filename>"
+.TP
+.B -r \fIfilename\fR
 Read diagnostic query input from the specified file, instead of from standard
 input.
-.IP "-t <filename>"
+.TP
+.B -t \fIfilename\fR
 Specify a file that contains trusted keys for processing diagnostic queries.
-This overrides the default behavior of using the built-in keys for the root
+This overrides the default behavior of using the installed keys for the root
 zone.
 
 The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
-.IP "-R <type>[,<type>...]"
+.TP
+.B -R \fItype\fR[,\fItype...\fI]
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.
-.IP -O
+.TP
+.B -O
 Save the output to a file, whose name is derived from the format (i.e.,
-provided to \fI-T\fP) and the domain name.
+provided to \fB-T\fR) and the domain name.
 
 If this option is used when the diagnostic queries of multiple domain names are
 being processed, a file will be created for each domain name processed.
-.IP "-o <filename>"
+.TP
+.B -o \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
 
 If this option is used when the diagnostic queries of multiple domain name are
 being processed, a single file (the one specified) will be created, which will
 contain the collective output for all domain names processed.
-.IP "-T <format>"
+.TP
+.B -T \fIformat\fR
 Specify the format of the format from among the following: "dot", "png", "jpg",
 "svg", and "html".  The default is "dot".
-
-.IP -h
+.TP
+.B -h
 Display the usage and exit.
 
 .SH OUTPUT
@@ -278,7 +287,7 @@ A solid red edge from the NSEC or NSEC3 node to the negative response indicates
 that the NSEC or NSEC3 RRs included in in the response do not prove the
 validity of the negative response.
 
-.P
+.PP
 A special case of NSEC/NSEC3 RRs is that in which they serve to prove the
 non-existence of Delegation Signer (DS) records.  The proof of absence of DS
 records constitutes an insecure delegation, in which any trust at the parent
@@ -338,7 +347,7 @@ When the algorithm and key tag of an RRSIG RR match those of a DNSKEY RR, but
 the cryptographic algorithm associated with the RRSIG is unknown or
 unsupported, then the line stemming from the DNSKEY is yellow.
 
-.IP "indeterminate - match pre-revoke"
+.IP invalid
 When an RRSIG is invalid, independent of the correctness of its temporal
 validity period and its cryptographic signature, the line stemming from the
 DNSKEY is red and dashed.  Example scenarios might be when the DNSKEY has the
@@ -346,6 +355,7 @@ revoke bit set or when the signer field in the RRSIG RR does not match the name
 of the zone apex.  Such scenarios are disallowed by RFCs 5011 and 4035,
 respectively.
 
+.PP
 Just like other RRsets, a DNSKEY RRset is signed as an RRset, which comprises
 all the collective DNSKEY RRs at the zone apex.  Because each DNSKEY RR is
 represented as a node in DNSViz, a single RRSIG covering the DNSKEY RRset is
@@ -457,4 +467,8 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz (1), dnsviz-probe (1), dnsviz-grok (1), dnsviz-print (1), dnsviz-query (1)
+.BR dnsviz(1),
+.BR dnsviz-probe(1),
+.BR dnsviz-grok(1),
+.BR dnsviz-print(1),
+.BR dnsviz-query(1)
