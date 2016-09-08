@@ -39,6 +39,7 @@ import multiprocessing
 import multiprocessing.managers
 import signal
 import shutil
+import struct
 import subprocess
 import tempfile
 import threading
@@ -52,7 +53,7 @@ except ImportError:
 else:
     urlparse = urllib.parse
 
-import dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
+import dns.edns, dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
 from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
 import dnsviz.format as fmt
@@ -115,14 +116,14 @@ def _init_subprocess():
     _init_interrupt_handler()
 
 def _analyze(args):
-    (cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, \
+    (cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, \
             stop_at_explicit, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=full_resolver)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=full_resolver)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -141,11 +142,12 @@ def _analyze(args):
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
-    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories):
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories):
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
+        self.query_class_mixin = query_class_mixin
         self.ceiling = ceiling
         self.edns_diagnostics = edns_diagnostics
         self.stop_at_explicit = stop_at_explicit
@@ -160,7 +162,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock, self.th_factories)
+            yield (self.analyst_cls, name, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock, self.th_factories)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -248,8 +250,8 @@ class RecursiveMultiProcessAnalyst(MultiProcessAnalystMixin, PrivateRecursiveAna
 class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
 
-    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories, processes):
-        super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories)
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories, processes):
+        super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -562,6 +564,48 @@ logging {
     pid = int(io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8').read())
     atexit.register(os.kill, pid, signal.SIGINT)
 
+def _get_ecs_option(s):
+    try:
+        addr, prefix = s.split('/', 1)
+    except ValueError:
+        addr = s
+        prefix = None
+
+    try:
+        addr = IPAddr(addr)
+    except ValueError:
+        usage('The IP address was invalid: "%s"' % addr)
+        sys.exit(1)
+
+    if addr.version == 4:
+        addrlen = 4
+    else:
+        addrlen = 16
+
+    if prefix is None:
+        prefix = addrlen << 3
+    else:
+        try:
+            prefix = int(prefix)
+        except ValueError:
+            usage('The mask length was invalid: "%s"' % prefix)
+            sys.exit(1)
+
+        if prefix < 0 or prefix > (addrlen << 3):
+            usage('The mask length was invalid: "%d"' % prefix)
+            sys.exit(1)
+
+    bytes_masked, remainder = divmod(prefix, 8)
+    if remainder:
+        bytes_masked += 1
+
+    wire = struct.pack('!H', 4 + bytes_masked)
+    wire += struct.pack('!B', prefix)
+    wire += struct.pack('!B', 0)
+    wire += addr._ipaddr_bytes[:bytes_masked]
+
+    return dns.edns.GenericOption(8, wire)
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -606,7 +650,7 @@ def main(argv):
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:N:D:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:N:D:e:EAs:Fh')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -1015,6 +1059,13 @@ def main(argv):
 
         flush = '-F' in opts
 
+        if '-e' in opts:
+            class Foo(object):
+                edns_options = [_get_ecs_option(opts['-e'])]
+            query_class_mixin = Foo
+        else:
+            query_class_mixin = None
+
         name_objs = []
         if '-r' in opts:
             cache = {}
@@ -1025,10 +1076,10 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories, processes)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories, processes)
             else:
                 _init_resolver()
-                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)

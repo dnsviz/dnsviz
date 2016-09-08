@@ -956,25 +956,35 @@ class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
 
 class Analyst(object):
     analysis_model = ActiveDomainNameAnalysis
-    simple_query = Q.SimpleDNSQuery
-    diagnostic_query = Q.DiagnosticQuery
-    tcp_diagnostic_query = Q.TCPDiagnosticQuery
-    pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
-    truncation_diagnostic_query = Q.TruncationDiagnosticQuery
-    edns_version_diagnostic_query = Q.EDNSVersionDiagnosticQuery
-    edns_flag_diagnostic_query = Q.EDNSFlagDiagnosticQuery
-    edns_opt_diagnostic_query = Q.EDNSOptDiagnosticQuery
+    _simple_query = Q.SimpleDNSQuery
+    _diagnostic_query = Q.DiagnosticQuery
+    _tcp_diagnostic_query = Q.TCPDiagnosticQuery
+    _pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
+    _truncation_diagnostic_query = Q.TruncationDiagnosticQuery
+    _edns_version_diagnostic_query = Q.EDNSVersionDiagnosticQuery
+    _edns_flag_diagnostic_query = Q.EDNSFlagDiagnosticQuery
+    _edns_opt_diagnostic_query = Q.EDNSOptDiagnosticQuery
 
     default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
 
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
-    def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
+    def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, query_class_mixin=None, logger=_logger, ceiling=None, edns_diagnostics=False,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
              analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
+
+        self.query_class_mixin = query_class_mixin
+        self.simple_query = self._get_query_class(self._simple_query, self.query_class_mixin)
+        self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin)
+        self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin)
+        self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin)
+        self.truncation_diagnostic_query = self._get_query_class(self._truncation_diagnostic_query, self.query_class_mixin)
+        self.edns_version_diagnostic_query = self._get_query_class(self._edns_version_diagnostic_query, self.query_class_mixin)
+        self.edns_flag_diagnostic_query = self._get_query_class(self._edns_flag_diagnostic_query, self.query_class_mixin)
+        self.edns_opt_diagnostic_query = self._get_query_class(self._edns_opt_diagnostic_query, self.query_class_mixin)
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
@@ -1070,6 +1080,13 @@ class Analyst(object):
         else:
             self.analysis_cache_lock = analysis_cache_lock
         self._detect_cname_chain()
+
+    def _get_query_class(self, mixin, cls):
+        if mixin is None:
+            return cls
+        class _foo(cls, mixin):
+            pass
+        return _foo
 
     def _detect_cname_chain(self):
         self._cname_chain = []
@@ -2017,14 +2034,14 @@ class PrivateAnalyst(Analyst):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
 class RecursiveAnalyst(Analyst):
-    simple_query = Q.RecursiveDNSQuery
-    diagnostic_query = Q.RecursiveDiagnosticQuery
-    tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
-    pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
-    truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
-    edns_version_diagnostic_query = Q.RecursiveEDNSVersionDiagnosticQuery
-    edns_flag_diagnostic_query = Q.RecursiveEDNSFlagDiagnosticQuery
-    edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
+    _simple_query = Q.RecursiveDNSQuery
+    _diagnostic_query = Q.RecursiveDiagnosticQuery
+    _tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
+    _pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
+    _truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
+    _edns_version_diagnostic_query = Q.RecursiveEDNSVersionDiagnosticQuery
+    _edns_flag_diagnostic_query = Q.RecursiveEDNSFlagDiagnosticQuery
+    _edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
 
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
