@@ -1081,10 +1081,10 @@ class Analyst(object):
             self.analysis_cache_lock = analysis_cache_lock
         self._detect_cname_chain()
 
-    def _get_query_class(self, mixin, cls):
+    def _get_query_class(self, cls, mixin):
         if mixin is None:
             return cls
-        class _foo(cls, mixin):
+        class _foo(mixin, cls):
             pass
         return _foo
 
