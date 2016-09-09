@@ -579,8 +579,10 @@ def _get_ecs_option(s):
 
     if addr.version == 4:
         addrlen = 4
+        family = 1
     else:
         addrlen = 16
+        family = 2
 
     if prefix is None:
         prefix = addrlen << 3
@@ -600,6 +602,7 @@ def _get_ecs_option(s):
         bytes_masked += 1
 
     wire = struct.pack('!H', 4 + bytes_masked)
+    wire = struct.pack('!H', family)
     wire += struct.pack('!B', prefix)
     wire += struct.pack('!B', 0)
     wire += addr._ipaddr_bytes[:bytes_masked]
