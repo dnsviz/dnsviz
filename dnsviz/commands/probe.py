@@ -601,7 +601,6 @@ def _get_ecs_option(s):
     if remainder:
         bytes_masked += 1
 
-    wire = struct.pack('!H', 4 + bytes_masked)
     wire = struct.pack('!H', family)
     wire += struct.pack('!B', prefix)
     wire += struct.pack('!B', 0)
