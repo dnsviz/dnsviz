@@ -637,6 +637,8 @@ Options:
                    - specify delegation information for a domain
     -D <domain>:"<ds>"[,"<ds>"...]
                    - specify DS records for a domain
+    -e <subnet>[:<prefix>]
+                   - use the EDNS client subnet option with subnet/prefix
     -E             - include EDNS compatibility diagnostics
     -p             - make json output pretty instead of minimal
     -o <filename>    - write the analysis to the specified file

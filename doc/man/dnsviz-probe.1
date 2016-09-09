@@ -266,15 +266,18 @@ dnsviz probe -D example.com:dsset-example.com.
 This option must be used in conjunction with the \fB-N\fR option.
 .RE
 .TP
+.B -e \fIsubnet\fR[\fB:\fR\fIprefix\fR]
+Use the EDNS Client Subnet option with every DNS query issued, using the
+specified \fIsubnet\fR and \fIprefix\fR as values.  If \fIprefix\fR is not
+specified, the prefix is the length of the entire address.
+.TP
 .B -E
 Include diagnostic DNS queries that can assess EDNS compatibility of servers.
-.RS
-.P
+
 If this option is used, each server probed will be queried with "future" EDNS
 settings, the respective responses can later be assessed for proper behavior.
 These settings include future EDNS versions (i.e., > 0), unknown options, and
 unknown flags.
-.RE
 .TP
 .B -o \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
