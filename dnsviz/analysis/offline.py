@@ -1196,7 +1196,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
             rdtypes = [r for (n, r) in self.yxrrset if n == rrset_info.rrset.name and r != dns.rdatatype.CNAME]
             if rdtypes:
-                Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMEWithOtherData(name=fmt.humanize_name(rrset_info.rrset.name)), self.rrset_errors[rrset_info], None, None, None)
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMEWithOtherData(name=fmt.humanize_name(rrset_info.rrset.name)), self.rrset_warnings[rrset_info], None, None, None)
 
     def _initialize_rrset_status(self, rrset_info):
         self.rrset_warnings[rrset_info] = []
