@@ -99,6 +99,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.status = None
         self.yxdomain = None
         self.yxrrset = None
+        self.yxrrset_proper = None
         self.nxrrset = None
         self.rrset_warnings = None
         self.rrset_errors = None
@@ -825,6 +826,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         self.status = Status.NAME_STATUS_INDETERMINATE
         self.yxdomain = set()
+        self.yxrrset_proper = set()
         self.yxrrset = set()
         self.nxrrset = set()
 
@@ -842,6 +844,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for rrset_info in query.answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
                 self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
+                self.yxrrset_proper.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
                 if rrset_info.dname_info is not None:
                     self.yxrrset.add((rrset_info.dname_info.rrset.name, rrset_info.dname_info.rrset.rdtype))
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
@@ -1194,7 +1197,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def _populate_cname_status(self, rrset_info):
         if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
-            rdtypes = [r for (n, r) in self.yxrrset if n == rrset_info.rrset.name and r != dns.rdatatype.CNAME]
+            rdtypes = [r for (n, r) in self.yxrrset_proper if n == rrset_info.rrset.name and r != dns.rdatatype.CNAME]
             if rdtypes:
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMEWithOtherData(name=fmt.humanize_name(rrset_info.rrset.name)), self.rrset_warnings[rrset_info], None, None, None)
 
