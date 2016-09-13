@@ -1768,3 +1768,16 @@ class RevokedNotSigning(DNSKEYError):
     _abstract = False
     description_template = "The key was revoked but was not found signing the RRset."
     code = 'REVOKED_NOT_SIGNING'
+class ZoneDataError(DomainNameAnalysisError):
+    pass
+
+class CNAMEWithOtherData(ZoneDataError):
+    '''
+    >>> e = CNAMEWithOtherData(name='foo.')
+    >>> e.description
+    'The server returned CNAME for foo., but records of other types exist at that name.'
+    '''
+    _abstract = False
+    description_template = "The server returned CNAME for %(name)s, but records of other types exist at that name."
+    code = 'CNAME_WITH_OTHER_DATA'
+    required_params = ['name']

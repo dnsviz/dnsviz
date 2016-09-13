@@ -1192,6 +1192,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # check for DO bit in request
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingNSECForWildcard(), self.rrset_errors[rrset_info], server, client, response)
 
+    def _populate_cname_status(self, rrset_info):
+        if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+            rdtypes = [r for (n, r) in self.yxrrset if n == rrset_info.rrset.name and r != dns.rdatatype.CNAME]
+            if rdtypes:
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMEWithOtherData(name=fmt.humanize_name(rrset_info.rrset.name)), self.rrset_errors[rrset_info], None, None, None)
+
     def _initialize_rrset_status(self, rrset_info):
         self.rrset_warnings[rrset_info] = []
         self.rrset_errors[rrset_info] = []
@@ -1337,6 +1343,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDLV(algorithm=alg), errors, server, client, response)
 
         self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs)
+        self._populate_cname_status(rrset_info)
 
         if populate_response_errors:
             for server,client in rrset_info.servers_clients:
