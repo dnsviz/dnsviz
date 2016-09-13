@@ -464,7 +464,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
 
         if qtm.tcp:
             self.transport_type = socket.SOCK_STREAM
-            self.req = struct.pack('!H', self.req_len) + self.req
+            self.req = struct.pack(b'!H', self.req_len) + self.req
             self.req_len += struct.calcsize('H')
         else:
             self.transport_type = socket.SOCK_DGRAM
@@ -502,7 +502,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
 
                     self.res_buf += buf
                     if len(self.res_buf) == 2:
-                        self.res_len = struct.unpack('!H', self.res_buf)[0]
+                        self.res_len = struct.unpack(b'!H', self.res_buf)[0]
 
                 if self.res_len is not None:
                     buf = self.sock.recv(self.res_len - self.res_index)
@@ -837,14 +837,14 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
     def finalize(self):
         new_res = b''
         for i, mask_index in enumerate(self.mask_mapping):
-            mask_octets = struct.unpack('!BBBB', self.res[mask_index:mask_index + 4])
+            mask_octets = struct.unpack(b'!BBBB', self.res[mask_index:mask_index + 4])
             if i >= len(self.mask_mapping) - 1:
                 buf = self.res[mask_index + 4:]
             else:
                 buf = self.res[mask_index + 4:self.mask_mapping[i + 1]]
             for j in range(len(buf)):
-                b = struct.unpack('!B', buf[j])[0]
-                new_res += struct.pack('!B', b ^ mask_octets[j % 4]);
+                b = struct.unpack(b'!B', buf[j])[0]
+                new_res += struct.pack(b'!B', b ^ mask_octets[j % 4]);
         self.res = new_res
 
         super(DNSQueryTransportHandlerWebSocket, self).finalize()
@@ -855,11 +855,11 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         header = b'\x81'
         l = len(data)
         if l <= 125:
-            header += struct.pack('!B', l)
+            header += struct.pack(b'!B', l)
         elif l <= 0xffff:
-            header += struct.pack('!BH', 126, l)
+            header += struct.pack(b'!BH', 126, l)
         else: # 0xffff < len <= 2^63
-            header += struct.pack('!BL', 127, l)
+            header += struct.pack(b'!BL', 127, l)
         self.req = header + data
         self.req_len = len(self.req)
         self.req_index = 0
@@ -882,7 +882,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                 if self.res_len is None:
                     # looking for frame length
                     if len(self.res_buf) >= 2:
-                        byte0, byte1 = struct.unpack('!BB', self.res_buf[0:2])
+                        byte0, byte1 = struct.unpack(b'!BB', self.res_buf[0:2])
                         byte1b = byte1 & 0x7f
 
                         # mask must be set
@@ -907,9 +907,9 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                             if byte1b <= 125:
                                 self.res_len = byte1b
                             elif byte1b == 126:
-                                self.res_len = struct.unpack('!H', self.res_buf[2:4])[0]
+                                self.res_len = struct.unpack(b'!H', self.res_buf[2:4])[0]
                             elif byte1b == 127:
-                                self.res_len = struct.unpack('!Q', self.res_buf[2:10])[0]
+                                self.res_len = struct.unpack(b'!Q', self.res_buf[2:10])[0]
 
                             # handle mask
                             self.mask_mapping.append(len(self.res))
@@ -1057,7 +1057,7 @@ class _DNSQueryTransportManager:
 
     def close(self):
         self._close.set()
-        os.write(self._notify_write_fd, struct.pack('!B', 0))
+        os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
     def query(self, qh):
         self._event_map[qh] = threading.Event()
@@ -1070,7 +1070,7 @@ class _DNSQueryTransportManager:
 
     def _query(self, qh):
         self._query_queue.put(qh)
-        os.write(self._notify_write_fd, struct.pack('!B', 0))
+        os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
     def _loop(self):
         '''Return the data resulting from a UDP transaction.'''

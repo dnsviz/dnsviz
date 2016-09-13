@@ -645,7 +645,7 @@ class DNSKEYMeta(DNSResponseComponent):
             else:
                 map_func = lambda x, y: x[y]
         else:
-            map_func = lambda x, y: struct.unpack('B',x[y])[0]
+            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
 
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
@@ -658,7 +658,7 @@ class DNSKEYMeta(DNSResponseComponent):
         else:
             flags = rdata.flags
 
-        key_str = struct.pack('!HBB', flags, rdata.protocol, rdata.algorithm) + rdata.key
+        key_str = struct.pack(b'!HBB', flags, rdata.protocol, rdata.algorithm) + rdata.key
 
         ac = 0
         for i in range(len(key_str)):
@@ -684,7 +684,7 @@ class DNSKEYMeta(DNSResponseComponent):
             else:
                 map_func = lambda x, y: x[y]
         else:
-            map_func = lambda x, y: struct.unpack('B',x[y])[0]
+            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
 
         # RSA keys
         if rdata.algorithm in (1,5,7,8,10):
@@ -734,7 +734,7 @@ class DNSKEYMeta(DNSResponseComponent):
         name_wire = self.name.canonicalize().to_wire()
 
         # write DNSKEY rdata in wire format
-        rdata_wire = struct.pack('!HBB', flags, self.rdata.protocol, self.rdata.algorithm)
+        rdata_wire = struct.pack(b'!HBB', flags, self.rdata.protocol, self.rdata.algorithm)
 
         return name_wire + rdata_wire + self.rdata.key
 
@@ -912,7 +912,7 @@ class RRsetInfo(DNSResponseComponent):
     def message_for_rrsig(self, rrsig):
 
         # write RRSIG in wire format
-        rdata_wire = struct.pack('!HBBIIIH', rrsig.type_covered,
+        rdata_wire = struct.pack(b'!HBBIIIH', rrsig.type_covered,
                              rrsig.algorithm, rrsig.labels,
                              rrsig.original_ttl, rrsig.expiration,
                              rrsig.inception, rrsig.key_tag)

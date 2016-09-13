@@ -79,7 +79,7 @@ def get_qname(msg):
 
         # python3/python2 dual compatibility
         if isinstance(msg, str):
-            l = struct.unpack('!B', msg[index])[0]
+            l = struct.unpack(b'!B', msg[index])[0]
         else:
             l = msg[index]
 

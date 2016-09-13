@@ -160,14 +160,14 @@ def validate_ds_digest(digest_alg, digest, dnskey_msg):
 
 def _dnskey_to_dsa(key):
     # get T
-    t, = struct.unpack('B',key[0])
+    t, = struct.unpack(b'B',key[0])
     offset = 1
 
     # get Q
     new_offset = offset+20
     q = b''
     for c in key[offset:new_offset]:
-        q += b'%02x' % struct.unpack('B',c)[0]
+        q += b'%02x' % struct.unpack(b'B',c)[0]
     q = bn_to_mpi(hex_to_bn(q))
     offset = new_offset
 
@@ -175,7 +175,7 @@ def _dnskey_to_dsa(key):
     new_offset = offset+64+(t<<3)
     p = b''
     for c in key[offset:new_offset]:
-        p += b'%02x' % struct.unpack('B',c)[0]
+        p += b'%02x' % struct.unpack(b'B',c)[0]
     p = bn_to_mpi(hex_to_bn(p))
     offset = new_offset
 
@@ -183,7 +183,7 @@ def _dnskey_to_dsa(key):
     new_offset = offset+64+(t<<3)
     g = b''
     for c in key[offset:new_offset]:
-        g += b'%02x' % struct.unpack('B',c)[0]
+        g += b'%02x' % struct.unpack(b'B',c)[0]
     g = bn_to_mpi(hex_to_bn(g))
     offset = new_offset
 
@@ -191,7 +191,7 @@ def _dnskey_to_dsa(key):
     new_offset = offset+64+(t<<3)
     y = b''
     for c in key[offset:new_offset]:
-        y += b'%02x' % struct.unpack('B',c)[0]
+        y += b'%02x' % struct.unpack(b'B',c)[0]
     y = bn_to_mpi(hex_to_bn(y))
     offset = new_offset
 
@@ -201,26 +201,26 @@ def _dnskey_to_dsa(key):
 def _dnskey_to_rsa(key):
     try:
         # get the exponent length
-        e_len, = struct.unpack('B',key[0])
+        e_len, = struct.unpack(b'B',key[0])
     except IndexError:
         return None
 
     offset = 1
     if e_len == 0:
-        e_len, = struct.unpack('!H',key[1:3])
+        e_len, = struct.unpack(b'!H',key[1:3])
         offset = 3
 
     # get the exponent
     e = b''
     for c in key[offset:offset+e_len]:
-        e += b'%02x' % struct.unpack('B',c)[0]
+        e += b'%02x' % struct.unpack(b'B',c)[0]
     e = bn_to_mpi(hex_to_bn(e))
     offset += e_len
 
     # get the modulus
     n = b''
     for c in key[offset:]:
-        n += b'%02x' % struct.unpack('B',c)[0]
+        n += b'%02x' % struct.unpack(b'B',c)[0]
     n = bn_to_mpi(hex_to_bn(n))
 
     # create the RSA public key
@@ -271,14 +271,14 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
     pubkey = _dnskey_to_dsa(key)
 
     # get T
-    t, = struct.unpack('B',sig[0])
+    t, = struct.unpack(b'B',sig[0])
     offset = 1
 
     # get R
     new_offset = offset+20
     r = b''
     for c in sig[offset:new_offset]:
-        r += b'%02x' % struct.unpack('B',c)[0]
+        r += b'%02x' % struct.unpack(b'B',c)[0]
     r = bn_to_mpi(hex_to_bn(r))
     offset = new_offset
 
@@ -286,7 +286,7 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
     new_offset = offset+20
     s = b''
     for c in sig[offset:new_offset]:
-        s += b'%02x' % struct.unpack('B',c)[0]
+        s += b'%02x' % struct.unpack(b'B',c)[0]
     s = bn_to_mpi(hex_to_bn(s))
     offset = new_offset
 
@@ -332,7 +332,7 @@ def _validate_rrsig_ec(alg, sig, msg, key):
     new_offset = offset+sigsize//2
     r = b''
     for c in sig[offset:new_offset]:
-        r += b'%02x' % struct.unpack('B',c)[0]
+        r += b'%02x' % struct.unpack(b'B',c)[0]
     r = bn_to_mpi(hex_to_bn(r))
     offset = new_offset
 
@@ -340,7 +340,7 @@ def _validate_rrsig_ec(alg, sig, msg, key):
     new_offset = offset+sigsize//2
     s = b''
     for c in sig[offset:new_offset]:
-        s += b'%02x' % struct.unpack('B',c)[0]
+        s += b'%02x' % struct.unpack(b'B',c)[0]
     s = bn_to_mpi(hex_to_bn(s))
     offset = new_offset
 

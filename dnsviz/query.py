@@ -1161,7 +1161,7 @@ class MultiQuery(object):
         for o in query.edns_options:
             s = io.BytesIO()
             o.to_wire(s)
-            edns_options_str += struct.pack('!H', o.otype) + s.getvalue()
+            edns_options_str += struct.pack(b'!H', o.otype) + s.getvalue()
         params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp)
         if params in self.queries:
             self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
