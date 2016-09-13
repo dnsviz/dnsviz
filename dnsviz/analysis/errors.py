@@ -1768,6 +1768,7 @@ class RevokedNotSigning(DNSKEYError):
     _abstract = False
     description_template = "The key was revoked but was not found signing the RRset."
     code = 'REVOKED_NOT_SIGNING'
+
 class ZoneDataError(DomainNameAnalysisError):
     pass
 
@@ -1781,3 +1782,4 @@ class CNAMEWithOtherData(ZoneDataError):
     description_template = "The server returned CNAME for %(name)s, but records of other types exist at that name."
     code = 'CNAME_WITH_OTHER_DATA'
     required_params = ['name']
+    references = ['RFC 2181, Sec. 10.1']
