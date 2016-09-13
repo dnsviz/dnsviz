@@ -139,6 +139,9 @@ def _analyze(args):
         logger.exception('Error analyzing %s' % fmt.humanize_name(name))
         return None
 
+class CustomQueryMixin(object):
+    pass
+
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
 
@@ -1064,9 +1067,8 @@ def main(argv):
         flush = '-F' in opts
 
         if '-e' in opts:
-            class Foo(object):
-                edns_options = [_get_ecs_option(opts['-e'])]
-            query_class_mixin = Foo
+            CustomQueryMixin.edns_options = [_get_ecs_option(opts['-e'])]
+            query_class_mixin = CustomQueryMixin
         else:
             query_class_mixin = None
 
