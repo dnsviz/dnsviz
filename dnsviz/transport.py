@@ -465,7 +465,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         if qtm.tcp:
             self.transport_type = socket.SOCK_STREAM
             self.req = struct.pack(b'!H', self.req_len) + self.req
-            self.req_len += struct.calcsize('H')
+            self.req_len += struct.calcsize(b'H')
         else:
             self.transport_type = socket.SOCK_DGRAM
 
