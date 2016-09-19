@@ -100,7 +100,7 @@ else:
     map_func = lambda x: codecs.decode(x, 'latin1')
 
 setup(name='dnsviz',
-        version='0.6.1',
+        version='0.6.2',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
