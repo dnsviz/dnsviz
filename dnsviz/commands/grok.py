@@ -23,7 +23,6 @@
 from __future__ import unicode_literals
 
 import codecs
-import collections
 import getopt
 import io
 import json
@@ -31,6 +30,12 @@ import logging
 import os
 import re
 import sys
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 import dns.exception, dns.name
 
@@ -316,7 +321,7 @@ def main(argv):
         if not name_objs:
             sys.exit(4)
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
         for name_obj in name_objs:
             name_obj.populate_status(trusted_keys)
 

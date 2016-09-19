@@ -23,7 +23,6 @@
 from __future__ import unicode_literals
 
 import atexit
-import collections
 import codecs
 import errno
 import getopt
@@ -44,6 +43,12 @@ import subprocess
 import tempfile
 import threading
 import time
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 # python3/python2 dual compatibility
 try:
@@ -1055,7 +1060,7 @@ def main(argv):
             sys.exit(3)
 
         def _flush(name_obj):
-            d = collections.OrderedDict()
+            d = OrderedDict()
             name_obj.serialize(d)
             s = json.dumps(d, **kwargs)
             lindex = s.index('{')
@@ -1099,7 +1104,7 @@ def main(argv):
         if not name_objs:
             sys.exit(4)
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
         for name_obj in name_objs:
             name_obj.serialize(d, meta_only)
         d['_meta._dnsviz.'] = dnsviz_meta

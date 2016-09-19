@@ -22,8 +22,13 @@
 from __future__ import unicode_literals
 
 import cgi
-import collections
 import datetime
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 import dns.dnssec
 
@@ -105,7 +110,7 @@ class DomainNameAnalysisError(object):
                     del self.servers_clients[(server, client)]
 
     def serialize(self, consolidate_clients=False, html_format=False):
-        d = collections.OrderedDict()
+        d = OrderedDict()
 
         if html_format:
             d['description'] = self.html_description

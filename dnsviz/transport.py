@@ -24,7 +24,6 @@ from __future__ import unicode_literals
 import base64
 import bisect
 import codecs
-import collections
 import errno
 import fcntl
 import json
@@ -37,6 +36,12 @@ import ssl
 import struct
 import threading
 import time
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 # python3/python2 dual compatibility
 try:
@@ -92,7 +97,7 @@ class DNSQueryTransportMeta(object):
         self.end_time = None
 
     def serialize_request(self):
-        d = collections.OrderedDict()
+        d = OrderedDict()
         d['req'] = lb2s(base64.b64encode(self.req))
         d['dst'] = self.dst
         d['dport'] = self.dport
@@ -163,7 +168,7 @@ class DNSQueryTransportMeta(object):
         return cls(req, dst, tcp, timeout, dport, src, sport)
 
     def serialize_response(self):
-        d = collections.OrderedDict()
+        d = OrderedDict()
         if self.res is not None:
             d['res'] = lb2s(base64.b64encode(self.res))
         else:

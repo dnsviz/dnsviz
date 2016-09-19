@@ -29,12 +29,17 @@ from __future__ import unicode_literals
 
 import base64
 import bisect
-import collections
 import errno
 import io
 import socket
 import struct
 import time
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 # python3/python2 dual compatibility
 try:
@@ -176,7 +181,7 @@ class DNSQueryRetryAttempt:
     def serialize(self):
         '''Return a serialized version of the query.'''
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
         d['time_elapsed'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
@@ -1065,12 +1070,12 @@ class DNSQuery(object):
         return False
 
     def serialize(self, meta_only=False):
-        d = collections.OrderedDict((
+        d = OrderedDict((
             ('qname', lb2s(self.qname.to_text())),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
             ('qtype', dns.rdatatype.to_text(self.rdtype)),
         ))
-        d['options'] = collections.OrderedDict((
+        d['options'] = OrderedDict((
             ('flags', self.flags),
         ))
         if self.edns >= 0:
@@ -1084,11 +1089,11 @@ class DNSQuery(object):
                 d['options']['edns_options'].append((o.otype, lb2s(base64.b64encode(s.getvalue()))))
             d['options']['tcp'] = self.tcp
 
-        d['responses'] = collections.OrderedDict()
+        d['responses'] = OrderedDict()
         servers = list(self.responses.keys())
         servers.sort()
         for server in servers:
-            d['responses'][server] = collections.OrderedDict()
+            d['responses'][server] = OrderedDict()
             clients = list(self.responses[server].keys())
             clients.sort()
             for client in clients:
