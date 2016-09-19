@@ -14,8 +14,11 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 * python (2.7.x) - http://www.python.org/
 
-  python 2.7.x is required.  python 3.4.x has also been successfully tested and
-  should work, as long as the other third-party dependencies support python 3.
+  python 2.7.x is required.  python 2.6.x and 3.4.x have also been successfully
+  tested and should work, as long as the other third-party dependencies also
+  support them.  Note that for python 2.6.x the importlib
+  (https://pypi.python.org/pypi/importlib) and ordereddict
+  (https://pypi.python.org/pypi/ordereddict) packages are also required.
 
 * dnspython (1.11.0 or later) - http://www.dnspython.org/
 
@@ -35,14 +38,14 @@ powers the Web-based analysis available at http://dnsviz.net/
   desired (and thus is highly recommended).  The current code will display
   warnings if the cryptographic elements cannot be verified.
 
-	Note that M2Crypto version 0.21.1 or later can be used to validate some
+  Note that M2Crypto version 0.21.1 or later can be used to validate some
   DNSSEC algorithms, but support for the following DNSSEC algorithms is not
-	available in releases of M2Crypto prior to 0.24.0 without a patch:
-	3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1), 12 (GOST R 34.10-2001),
+  available in releases of M2Crypto prior to 0.24.0 without a patch:
+  3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1), 12 (GOST R 34.10-2001),
   13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve P-384 with SHA-384).
   There are two patches included in the `contrib` directory that can be
   applied to pre-0.24.0 versions to get this functionality:
-	`contrib/m2crypto-pre0.23.patch` or `contrib/m2crypto-0.23.patch`.  For
+  `contrib/m2crypto-pre0.23.patch` or `contrib/m2crypto-0.23.patch`.  For
   example:
 
   ```
