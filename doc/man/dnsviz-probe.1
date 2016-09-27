@@ -266,6 +266,9 @@ dnsviz probe -D example.com:dsset-example.com.
 This option must be used in conjunction with the \fB-N\fR option.
 .RE
 .TP
+.B -n
+Use the NSID EDNS option with every DNS query issued.
+.TP
 .B -e \fIsubnet\fR[\fB:\fR\fIprefix\fR]
 Use the EDNS Client Subnet option with every DNS query issued, using the
 specified \fIsubnet\fR and \fIprefix\fR as values.  If \fIprefix\fR is not

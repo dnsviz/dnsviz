@@ -616,6 +616,10 @@ def _get_ecs_option(s):
 
     return dns.edns.GenericOption(8, wire)
 
+def _get_nsid_option():
+
+    return dns.edns.GenericOption(dns.edns.NSID, b'')
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -644,6 +648,7 @@ Options:
                    - specify delegation information for a domain
     -D <domain>:"<ds>"[,"<ds>"...]
                    - specify DS records for a domain
+    -n             - use the NSID EDNS option
     -e <subnet>[:<prefix>]
                    - use the EDNS client subnet option with subnet/prefix
     -E             - include EDNS compatibility diagnostics
@@ -662,7 +667,7 @@ def main(argv):
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:N:D:e:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:N:D:ne:EAs:Fh')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -1071,8 +1076,12 @@ def main(argv):
 
         flush = '-F' in opts
 
-        if '-e' in opts:
-            CustomQueryMixin.edns_options = [_get_ecs_option(opts['-e'])]
+        if '-n' in opts or '-e' in opts:
+            CustomQueryMixin.edns_options = []
+            if '-e' in opts:
+                CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
+            if '-n' in opts:
+                CustomQueryMixin.edns_options.append(_get_nsid_option())
             query_class_mixin = CustomQueryMixin
         else:
             query_class_mixin = None
