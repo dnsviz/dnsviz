@@ -12,12 +12,11 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 ### Dependencies
 
-* python (2.7.x) - http://www.python.org/
+* python (2.6/2.7/3.4) - http://www.python.org/
 
-  python 2.7.x is required.  python 2.6.x and 3.4.x have also been successfully
-  tested and should work, as long as the other third-party dependencies also
-  support them.  Note that for python 2.6.x the importlib
-  (https://pypi.python.org/pypi/importlib) and ordereddict
+  python 2.6, 2.7, or 3.4 is required.  For python 3.4 the other third-party
+  dependencies must also support python 3.4.  Note that for python 2.6 the
+  importlib (https://pypi.python.org/pypi/importlib) and ordereddict
   (https://pypi.python.org/pypi/ordereddict) packages are also required.
 
 * dnspython (1.11.0 or later) - http://www.dnspython.org/
