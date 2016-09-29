@@ -74,7 +74,7 @@ logger = logging.getLogger('dnsviz.analysis.online')
 # this needs to be global because of multiprocessing
 tm = None
 full_resolver = None
-stub_resolver = None
+bootstrap_resolver = None
 explicit_delegations = None
 odd_ports = None
 next_port = 50053
@@ -417,7 +417,7 @@ def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, re
             if not require_name:
                 # If no address is provided, query A/AAAA records for the name
                 query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
-                answer_map = stub_resolver.query_multiple_for_answer(*query_tuples)
+                answer_map = bootstrap_resolver.query_multiple_for_answer(*query_tuples)
                 found_answer = False
                 for (n, rdtype, rdclass) in answer_map:
                     a = answer_map[(n, rdtype, rdclass)]
@@ -660,7 +660,7 @@ Options:
 def main(argv):
     global tm
     global full_resolver
-    global stub_resolver
+    global bootstrap_resolver
     global explicit_delegations
     global odd_ports
     global next_port
@@ -673,7 +673,7 @@ def main(argv):
             sys.exit(1)
 
         _init_tm()
-        stub_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
+        bootstrap_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
 
         # get all the options for which there might be multiple values
         explicit_delegations = {}
@@ -882,7 +882,7 @@ def main(argv):
             if '-s' in opts:
                 name_addr_mappings_from_string(WILDCARD_EXPLICIT_DELEGATION, opts['-s'], explicit_delegations, False)
             else:
-                for i, server in enumerate(stub_resolver._servers):
+                for i, server in enumerate(bootstrap_resolver._servers):
                     if IPAddr(server).version == 6:
                         rdtype = dns.rdatatype.AAAA
                     else:
