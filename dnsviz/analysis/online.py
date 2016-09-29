@@ -1022,10 +1022,7 @@ class Analyst(object):
             self.odd_ports = odd_ports
 
         if resolver is None:
-            hints = util.get_root_hints()
-            for key in self.explicit_delegations:
-                hints[key] = self.explicit_delegations[key]
-            resolver = Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
+            resolver = self._get_resolver()
         self.resolver = resolver
 
         self.ceiling = ceiling
@@ -1085,6 +1082,12 @@ class Analyst(object):
         else:
             self.analysis_cache_lock = analysis_cache_lock
         self._detect_cname_chain()
+
+    def _get_resolver(self):
+        hints = util.get_root_hints()
+        for key in self.explicit_delegations:
+            hints[key] = self.explicit_delegations[key]
+        return Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
 
     def _get_query_class(self, cls, mixin):
         if mixin is None:
@@ -2049,6 +2052,9 @@ class RecursiveAnalyst(Analyst):
     _edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
 
     analysis_type = ANALYSIS_TYPE_RECURSIVE
+
+    def _get_resolver(self):
+        return Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
     def _detect_ceiling(self, ceiling):
         # if there is a ceiling, but the name is not a subdomain

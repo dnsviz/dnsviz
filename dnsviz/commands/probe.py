@@ -73,7 +73,7 @@ logger = logging.getLogger('dnsviz.analysis.online')
 
 # this needs to be global because of multiprocessing
 tm = None
-full_resolver = None
+resolver = None
 bootstrap_resolver = None
 explicit_delegations = None
 odd_ports = None
@@ -103,21 +103,34 @@ def _init_tm():
     global tm
     tm = transport.DNSQueryTransportManager()
 
-def _init_resolver():
-    global full_resolver
+def _init_stub_resolver():
+    global resolver
+
+    servers = set()
+    for rdata in explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)]:
+        for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+            if (rdata.target, rdtype) in explicit_delegations:
+                servers.update([IPAddr(r.address) for r in explicit_delegations[(rdata.target, rdtype)]])
+    resolver = Resolver(list(servers), StandardRecursiveQueryCD, transport_manager=tm)
+
+def _init_full_resolver():
+    global resolver
 
     # now that we have the hints, make resolver a full resolver instead of a stub
     hints = get_root_hints()
     for key in explicit_delegations:
         hints[key] = explicit_delegations[key]
-    full_resolver = FullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
+    resolver = FullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
 
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
 
-def _init_subprocess():
+def _init_subprocess(use_full):
     _init_tm()
-    _init_resolver()
+    if use_full:
+        _init_full_resolver()
+    else:
+        _init_stub_resolver()
     _init_interrupt_handler()
 
 def _analyze(args):
@@ -128,7 +141,7 @@ def _analyze(args):
     else:
         c = name
     try:
-        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=full_resolver)
+        a = cls(name, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=resolver)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -149,6 +162,7 @@ class CustomQueryMixin(object):
 
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
+    use_full_resolver = True
 
     def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories):
         self.try_ipv4 = try_ipv4
@@ -184,6 +198,7 @@ class BulkAnalyst(object):
 
 class RecursiveBulkAnalyst(BulkAnalyst):
     analyst_cls = PrivateRecursiveAnalyst
+    use_full_resolver = False
 
 class MultiProcessAnalystMixin(object):
     analysis_model = OnlineDomainNameAnalysis
@@ -257,6 +272,7 @@ class RecursiveMultiProcessAnalyst(MultiProcessAnalystMixin, PrivateRecursiveAna
 
 class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
+    use_full_resolver = None
 
     def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories, processes):
         super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories)
@@ -271,7 +287,7 @@ class ParallelAnalystMixin(object):
     def analyze(self, names, flush_func=None):
         results = []
         name_objs = []
-        pool = multiprocessing.Pool(self.processes, _init_subprocess)
+        pool = multiprocessing.Pool(self.processes, _init_subprocess, (self.use_full_resolver,))
         try:
             for args in self._name_to_args_iter(names):
                 results.append(pool.apply_async(_analyze, (args,)))
@@ -289,9 +305,11 @@ class ParallelAnalystMixin(object):
 
 class ParallelAnalyst(ParallelAnalystMixin, BulkAnalyst):
     analyst_cls = MultiProcessAnalyst
+    use_full_resolver = True
 
 class RecursiveParallelAnalyst(ParallelAnalystMixin, RecursiveBulkAnalyst):
     analyst_cls = RecursiveMultiProcessAnalyst
+    use_full_resolver = False
 
 def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, require_name):
     global next_port
@@ -659,7 +677,7 @@ Options:
 
 def main(argv):
     global tm
-    global full_resolver
+    global resolver
     global bootstrap_resolver
     global explicit_delegations
     global odd_ports
@@ -1098,7 +1116,10 @@ def main(argv):
             if '-t' in opts:
                 a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories, processes)
             else:
-                _init_resolver()
+                if cls.use_full_resolver:
+                    _init_full_resolver()
+                else:
+                    _init_stub_resolver()
                 a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories)
                 if flush:
                     fh.write('{')
