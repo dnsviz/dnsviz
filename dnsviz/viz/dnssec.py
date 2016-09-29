@@ -352,11 +352,11 @@ class DNSAuthGraph:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             if img_str:
-                label_str = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT></TD></TR></TABLE>>' % \
-                        (12, 'Helvetica', img_str, 10, dnskey.rdata.algorithm, dnskey.key_tag)
+                label_str = '<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT></TD><TD VALIGN="bottom">%s</TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="%d">alg=%d, id=%d<BR/>%d bits</FONT></TD></TR></TABLE>>' % \
+                        (12, 'Helvetica', img_str, 10, dnskey.rdata.algorithm, dnskey.key_tag, dnskey.key_len)
             else:
-                label_str = '<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
-                        (12, 'Helvetica', 10, dnskey.rdata.algorithm, dnskey.key_tag)
+                label_str = '<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d<BR/>%d bits</FONT>>' % \
+                        (12, 'Helvetica', 10, dnskey.rdata.algorithm, dnskey.key_tag, dnskey.key_len)
 
             attr = {'style': 'filled', 'fillcolor': '#ffffff' }
             if dnskey.rdata.flags & fmt.DNSKEY_FLAGS['SEP']:
