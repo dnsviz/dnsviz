@@ -710,7 +710,13 @@ class DNSKEYMeta(DNSResponseComponent):
             offset += e_len
 
             # get the modulus
-            return (len(key_str) - offset) << 3
+            key_len = len(key_str) - offset
+
+            # if something went wrong here, use key length of rdata key
+            if key_len <= 0:
+                return len(key_str)<<3
+
+            return key_len << 3
 
         # DSA keys
         elif rdata.algorithm in (3,6):
@@ -725,7 +731,9 @@ class DNSKEYMeta(DNSResponseComponent):
         elif rdata.algorithm in (13,14):
             return len(key_str)<<3
 
-        return None
+        # other keys - just guess, based on the length of the raw key material
+        else:
+            return len(key_str)<<3
 
     def message_for_ds(self, clear_revoke=False):
         '''Return the string value suitable for hashing to create a DS
