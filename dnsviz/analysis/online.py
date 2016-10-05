@@ -239,13 +239,9 @@ class OnlineDomainNameAnalysis(object):
             return self.parent
     zone = property(_get_zone)
 
-    def single_client(self, exclude_loopback=True):
-        if exclude_loopback:
-            clients_ipv4 = [x for x in self.clients_ipv4 if LOOPBACK_IPV4_RE.match(x) is None]
-            clients_ipv6 = [x for x in self.clients_ipv6 if x != LOOPBACK_IPV6]
-        else:
-            clients_ipv4 = self.clients_ipv4
-            clients_ipv6 = self.clients_ipv6
+    def single_client(self, exclude_loopback=True, exclude_ipv4_mapped=True):
+        clients_ipv4 = [x for x in self.clients_ipv4 if not exclude_loopback or LOOPBACK_IPV4_RE.match(x) is None]
+        clients_ipv6 = [x for x in self.clients_ipv6 if (not exclude_loopback or x != LOOPBACK_IPV6) and (not exclude_ipv4_mapped or IPV4_MAPPED_IPV6_RE.match(x) is None)]
         return len(clients_ipv4) <= 1 and len(clients_ipv6) <= 1
 
     def get_name(self, name, trace=None):

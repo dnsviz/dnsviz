@@ -80,6 +80,7 @@ class IPAddr(str):
         return name
 
 LOOPBACK_IPV4_RE = re.compile(r'^127')
+IPV4_MAPPED_IPV6_RE = re.compile(r'^::(ffff:)?\d+.\d+.\d+.\d+$', re.IGNORECASE)
 LOOPBACK_IPV6 = IPAddr('::1')
 RFC_1918_RE = re.compile(r'^(0?10|172\.0?(1[6-9]|2[0-9]|3[0-1])|192\.168)\.')
 LINK_LOCAL_RE = re.compile(r'^fe[89ab][0-9a-f]:', re.IGNORECASE)
