@@ -2054,7 +2054,12 @@ class RecursiveAnalyst(Analyst):
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
     def _get_resolver(self):
-        return Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
+        servers = set()
+        for rdata in self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)]:
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in self.explicit_delegations:
+                    servers.update([IPAddr(r.address) for r in self.explicit_delegations[(rdata.target, rdtype)]])
+        return Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
     def _detect_ceiling(self, ceiling):
         # if there is a ceiling, but the name is not a subdomain
