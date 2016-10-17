@@ -64,7 +64,7 @@ from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, Privat
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.query import StandardRecursiveQueryCD
-from dnsviz.resolver import DNSAnswer, Resolver, FullResolver
+from dnsviz.resolver import DNSAnswer, Resolver, PrivateFullResolver
 from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
 lb2s = fmt.latin1_binary_to_string
@@ -120,7 +120,7 @@ def _init_full_resolver():
     hints = get_root_hints()
     for key in explicit_delegations:
         hints[key] = explicit_delegations[key]
-    resolver = FullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
+    resolver = PrivateFullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
 
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)
