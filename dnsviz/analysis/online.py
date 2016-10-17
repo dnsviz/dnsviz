@@ -996,8 +996,8 @@ class Analyst(object):
             self.th_factories = (self.default_th_factory,)
         else:
             self.th_factories = th_factories
-        self.allow_loopback_query = bool([x for x in self.th_factories if x.cls.allow_loopback_query])
-        self.allow_private_query = bool([x for x in self.th_factories if x.cls.allow_private_query])
+        self.allow_loopback_query = not bool([x for x in self.th_factories if not x.cls.allow_loopback_query])
+        self.allow_private_query = not bool([x for x in self.th_factories if not x.cls.allow_private_query])
 
         self.name = name
         self.dlv_domain = dlv_domain
