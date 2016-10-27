@@ -265,7 +265,7 @@ class DNSAuthGraph:
         return s
 
     def to_raphael(self):
-        svg = self.G.draw(format='svg', prog='dot')
+        svg = self.G.draw(format=codecs.encode('svg', 'utf-8'), prog=codecs.encode('dot', 'utf-8'))
         dom = xml.dom.minidom.parseString(svg)
 
         s = 'AuthGraph.prototype.draw = function () {\n'
@@ -285,9 +285,9 @@ class DNSAuthGraph:
                 io.open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
-                return self.G.draw(format=format, prog='dot')
+                return self.G.draw(format=codecs.encode(format, 'utf-8'), prog=codecs.encode('dot', 'utf-8'))
             else:
-                return self.G.draw(path=path, format=format, prog='dot')
+                return self.G.draw(path=codecs.encode(path, 'utf-8'), format=codecs.encode(format, 'utf-8'), prog=codecs.encode('dot', 'utf-8'))
 
     def id_for_dnskey(self, name, dnskey):
         try:
