@@ -29,7 +29,7 @@ import threading
 import time
 
 from . import query
-from .ipaddr import IPAddr
+from .ipaddr import *
 from . import response as Response
 from . import transport
 from . import util
@@ -292,6 +292,8 @@ class FullResolver:
     MIN_TTL = 60
     MAX_CHAIN = 20
 
+    default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
+
     def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None, max_ttl=None):
 
         self._hints = hints
@@ -302,12 +304,27 @@ class FullResolver:
             odd_ports = {}
         self._odd_ports = odd_ports
         self._transport_manager = transport_manager
-        self._th_factories = th_factories
+        if th_factories is None:
+            self._th_factories = (self.default_th_factory,)
+        else:
+            self._th_factories = th_factories
+        self.allow_loopback_query = not bool([x for x in self._th_factories if not x.cls.allow_loopback_query])
+        self.allow_private_query = not bool([x for x in self._th_factories if not x.cls.allow_private_query])
+
         self._max_ttl = max_ttl
 
         self._cache = {}
         self._expirations = []
         self._cache_lock = threading.Lock()
+
+    def _allow_server(self, server):
+        if not self.allow_loopback_query and (LOOPBACK_IPV4_RE.search(server) is not None or server == LOOPBACK_IPV6):
+            return False
+        if not self.allow_private_query and (RFC_1918_RE.search(server) is not None or LINK_LOCAL_RE.search(server) is not None or UNIQ_LOCAL_RE.search(server) is not None):
+            return False
+        if ZERO_SLASH8_RE.search(server) is not None:
+            return False
+        return True
 
     def flush_cache(self):
         with self._cache_lock:
@@ -539,6 +556,10 @@ class FullResolver:
                                     ns_names[ns_name].add(IPAddr(rdata.address))
 
                     for server in ns_names[ns_name]:
+                        # server disallowed by policy
+                        if not self._allow_server(server):
+                            continue
+
                         q = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53))
                         q.execute(tm=self._transport_manager, th_factories=self._th_factories)
                         is_referral = False
@@ -709,6 +730,9 @@ class FullResolver:
             return ret
 
         raise ServFail('SERVFAIL - no valid responses')
+
+class PrivateFullResolver(FullResolver):
+    default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
 def main():
     import sys

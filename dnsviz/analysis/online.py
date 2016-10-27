@@ -996,8 +996,8 @@ class Analyst(object):
             self.th_factories = (self.default_th_factory,)
         else:
             self.th_factories = th_factories
-        self.allow_loopback_query = bool([x for x in self.th_factories if x.cls.allow_loopback_query])
-        self.allow_private_query = bool([x for x in self.th_factories if x.cls.allow_private_query])
+        self.allow_loopback_query = not bool([x for x in self.th_factories if not x.cls.allow_loopback_query])
+        self.allow_private_query = not bool([x for x in self.th_factories if not x.cls.allow_private_query])
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1340,7 +1340,7 @@ class Analyst(object):
             servers = [x for x in servers if not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6]
         if not self.allow_private_query:
             servers = [x for x in servers if not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x)]
-        return servers
+        return [x for x in servers if ZERO_SLASH8_RE.search(x) is None]
 
     def _filter_servers(self, servers, no_raise=False):
         filtered_servers = self._filter_servers_network(servers)
