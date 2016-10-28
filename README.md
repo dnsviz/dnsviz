@@ -59,9 +59,9 @@ powers the Web-based analysis available at http://dnsviz.net/
   case, and `named(8)` does not need to be running.
 
 
-### Build and Install
+### Generic Build and Install
 
-A typical build and install is performed with the following commands:
+A generic build and install is performed with the following commands:
 
 ```
 $ python setup.py build
@@ -72,6 +72,47 @@ To see all installation options, run the following:
 
 ```
 $ python setup.py --help
+```
+
+
+### RPM Build and Install (RHEL6 or RHEL7)
+
+Install pygraphviz and M2Crypto, after installing their build dependencies.
+```
+$ sudo yum install python-setuptools gcc python-devel graphviz-devel openssl-devel
+$ sudo easy_install pbr
+$ sudo easy_install m2crypto pygraphviz
+```
+
+(RHEL6 only) Install the EPEL repository, and the necessary python libraries
+from that repository.
+```
+$ sudo yum install epel-release
+$ sudo yum install python-importlib python-ordereddict
+```
+
+Install dnspython.
+```
+$ sudo yum install python-dns
+```
+
+Install rpm-build tools to build the RPM.
+```
+$ sudo yum install rpm-build
+```
+
+Download the latest DNSViz release (denoted ${VERS}), extract the files, and
+build using custom install script (to handle man pages).
+```
+$ curl -L -O https://github.com/dnsviz/dnsviz/archive/v${VERS}.tar.gz
+$ tar -zxvf v${VERS}.tar.gz
+$ cd dnsviz-${VERS}/
+$ python setup.py bdist_rpm --install-script contrib/rpm-install.sh --distribution-name el${RHEL_VERS}
+```
+
+Install the newly created RPM file.
+```
+$ sudo rpm -iv dist/dnsviz-${VERS}-1.noarch.rpm
 ```
 
 
