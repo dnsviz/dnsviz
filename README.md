@@ -96,24 +96,15 @@ Install dnspython.
 $ sudo yum install python-dns
 ```
 
-Install rpm-build tools to build the RPM.
+Install rpm-build tools, then build and install the DNSViz RPM.
 ```
 $ sudo yum install rpm-build
-```
-
-Download the latest DNSViz release (denoted ${VERS}), extract the files, and
-build using custom install script (to handle man pages).
-```
-$ curl -L -O https://github.com/dnsviz/dnsviz/archive/v${VERS}.tar.gz
-$ tar -zxvf v${VERS}.tar.gz
-$ cd dnsviz-${VERS}/
 $ python setup.py bdist_rpm --install-script contrib/rpm-install.sh --distribution-name el${RHEL_VERS}
+$ sudo rpm -iv dist/dnsviz-*-1.noarch.rpm
 ```
-
-Install the newly created RPM file.
-```
-$ sudo rpm -iv dist/dnsviz-${VERS}-1.noarch.rpm
-```
+Note that a custom install script is used to properly install the DNSViz man
+pages.  The value of ${RHEL_VERS} corresponds to the RHEL version (e.g., 6 or
+7).
 
 
 ## Usage
