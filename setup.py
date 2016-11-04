@@ -12,7 +12,7 @@ import sys
 from distutils.core import setup
 from distutils.dist import Distribution
 from distutils.command.install import install
-from distutils.command.build import build
+from distutils.command.build_py import build_py
 
 JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
@@ -47,10 +47,10 @@ def make_documentation():
     finally:
         os.chdir('..')
 
-class MyBuild(build):
+class MyBuildPy(build_py):
     def run(self):
         make_documentation()
-        build.run(self)
+        build_py.run(self)
 
 class MyInstall(install):
     def run(self):
@@ -135,5 +135,5 @@ powers the Web-based analysis available at http://dnsviz.net/ .''',
                 'Topic :: Scientific/Engineering :: Visualization',
                 'Topic :: System :: Networking :: Monitoring',
         ],
-        cmdclass={ 'build': MyBuild, 'install': MyInstall },
+        cmdclass={ 'build_py': MyBuildPy, 'install': MyInstall },
 )
