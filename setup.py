@@ -9,10 +9,16 @@ import stat
 import subprocess
 import sys
 
-from distutils.core import setup
-from distutils.dist import Distribution
-from distutils.command.install import install
-from distutils.command.build_py import build_py
+try:
+    import setuptools
+except ImportError:
+    from distutils.core import setup
+    from distutils.command.install import install
+    from distutils.command.build_py import build_py
+else:
+    from setuptools import setup
+    from setuptools.command.install import install
+    from setuptools.command.build_py import build_py
 
 JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
