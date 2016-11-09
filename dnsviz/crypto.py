@@ -244,7 +244,10 @@ def _dnskey_to_ec(alg, key):
     else:
         raise ValueError('Algorithm not supported')
 
-    return EC.pub_key_from_params(curve, EC_NOCOMPRESSION + key)
+    try:
+        return EC.pub_key_from_params(curve, EC_NOCOMPRESSION + key)
+    except ValueError:
+        return None
 
 def _validate_rrsig_rsa(alg, sig, msg, key):
     pubkey = _dnskey_to_rsa(key)
@@ -313,6 +316,10 @@ def _validate_rrsig_gost(alg, sig, msg, key):
 
 def _validate_rrsig_ec(alg, sig, msg, key):
     pubkey = _dnskey_to_ec(alg, key)
+
+    # if the key is invalid, then the signature is also invalid
+    if pubkey is None:
+        return False
 
     if alg in (13,):
         alg='sha256'
