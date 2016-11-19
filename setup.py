@@ -47,6 +47,7 @@ def apply_substitutions(filename, install_prefix):
 
 def make_documentation():
     os.chdir('doc')
+    print 'foobar'
     try:
         if os.system('make') != 0:
             sys.stderr.write('Warning: Some of the included documentation failed to build.  Proceeding without it.\n')
@@ -106,7 +107,7 @@ else:
     map_func = lambda x: codecs.decode(x, 'latin1')
 
 setup(name='dnsviz',
-        version='0.6.4',
+        version='0.6.5',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
