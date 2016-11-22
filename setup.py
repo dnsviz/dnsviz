@@ -47,7 +47,6 @@ def apply_substitutions(filename, install_prefix):
 
 def make_documentation():
     os.chdir('doc')
-    print 'foobar'
     try:
         if os.system('make') != 0:
             sys.stderr.write('Warning: Some of the included documentation failed to build.  Proceeding without it.\n')
