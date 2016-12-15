@@ -250,14 +250,14 @@ class DNSQueryTransportHandler(object):
     timeout_baseline = 0.0
 
     def __init__(self, processed_queue=None, factory=None):
-        self.req = None
-        self.req_len = None
-        self.req_index = None
+        self.msg_send = None
+        self.msg_send_len = None
+        self.msg_send_index = None
 
-        self.res = None
-        self.res_len = None
-        self.res_buf = None
-        self.res_index = None
+        self.msg_recv = None
+        self.msg_recv_len = None
+        self.msg_recv_buf = None
+        self.msg_recv_index = None
         self.err = None
 
         self.dst = None
@@ -294,29 +294,30 @@ class DNSQueryTransportHandler(object):
             self.src = None
 
     def finalize(self):
-        assert self.res is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
+        assert self.msg_recv is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
 
         self._check_source()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
-            self.res = None
+            self.msg_recv = None
 
+    #TODO change this and the overriding child methods to init_msg_recv
     def init_req(self):
         raise NotImplemented
 
-    def _init_res_buffer(self):
-        self.res = b''
-        self.res_buf = b''
-        self.res_index = 0
+    def _init_msg_recv(self):
+        self.msg_recv = b''
+        self.msg_recv_buf = b''
+        self.msg_recv_index = 0
 
     def prepare(self):
-        assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
+        assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
         if self.timeout is None:
             self.timeout = self.timeout_baseline
 
-        self._init_res_buffer()
+        self._init_msg_recv()
         try:
             self._create_socket()
             self._configure_socket()
@@ -404,8 +405,8 @@ class DNSQueryTransportHandler(object):
 
     def do_write(self):
         try:
-            self.req_index += self.sock.send(self.req[self.req_index:])
-            if self.req_index >= self.req_len:
+            self.msg_send_index += self.sock.send(self.msg_send[self.msg_send_index:])
+            if self.msg_send_index >= self.msg_send_len:
                 return True
         except socket.error as e:
             self.err = e
@@ -435,7 +436,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         qtm = self.qtms[0]
         qtm.src = self.src
         qtm.sport = self.sport
-        qtm.res = self.res
+        qtm.res = self.msg_recv
         qtm.err = self.err
         qtm.start_time = self.start_time
         qtm.end_time = self.end_time
@@ -450,32 +451,32 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         self.src = qtm.src
         self.sport = qtm.sport
 
-        self.req = qtm.req
-        self.req_len = len(qtm.req)
-        self.req_index = 0
+        self.msg_send = qtm.req
+        self.msg_send_len = len(qtm.req)
+        self.msg_send_index = 0
 
         # python3/python2 dual compatibility
-        if isinstance(self.req, str):
+        if isinstance(self.msg_send, str):
             map_func = lambda x: ord(x)
         else:
             map_func = lambda x: x
 
-        self._queryid_wire = self.req[:2]
+        self._queryid_wire = self.msg_send[:2]
         index = 12
-        while map_func(self.req[index]) != 0:
-            index += map_func(self.req[index]) + 1
+        while map_func(self.msg_send[index]) != 0:
+            index += map_func(self.msg_send[index]) + 1
         index += 4
-        self._question_wire = self.req[12:index]
+        self._question_wire = self.msg_send[12:index]
 
         if qtm.tcp:
             self.transport_type = socket.SOCK_STREAM
-            self.req = struct.pack(b'!H', self.req_len) + self.req
-            self.req_len += struct.calcsize(b'H')
+            self.msg_send = struct.pack(b'!H', self.msg_send_len) + self.msg_send
+            self.msg_send_len += struct.calcsize(b'H')
         else:
             self.transport_type = socket.SOCK_DGRAM
 
-    def _check_response_consistency(self):
-        if self.require_queryid_match and self.res[:2] != self._queryid_wire:
+    def _check_msg_recv_consistency(self):
+        if self.require_queryid_match and self.msg_recv[:2] != self._queryid_wire:
             return False
         return True
 
@@ -483,12 +484,12 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         # UDP
         if self.sock.type == socket.SOCK_DGRAM:
             try:
-                self.res = self.sock.recv(65536)
-                if self._check_response_consistency():
+                self.msg_recv = self.sock.recv(65536)
+                if self._check_msg_recv_consistency():
                     self.cleanup()
                     return True
                 else:
-                    self.res = b''
+                    self.msg_recv = b''
             except socket.error as e:
                 self.err = e
                 self.cleanup()
@@ -497,27 +498,27 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         # TCP
         else:
             try:
-                if self.res_len is None:
-                    if self.res_buf:
+                if self.msg_recv_len is None:
+                    if self.msg_recv_buf:
                         buf = self.sock.recv(1)
                     else:
                         buf = self.sock.recv(2)
                     if buf == b'':
                         raise EOFError()
 
-                    self.res_buf += buf
-                    if len(self.res_buf) == 2:
-                        self.res_len = struct.unpack(b'!H', self.res_buf)[0]
+                    self.msg_recv_buf += buf
+                    if len(self.msg_recv_buf) == 2:
+                        self.msg_recv_len = struct.unpack(b'!H', self.msg_recv_buf)[0]
 
-                if self.res_len is not None:
-                    buf = self.sock.recv(self.res_len - self.res_index)
+                if self.msg_recv_len is not None:
+                    buf = self.sock.recv(self.msg_recv_len - self.msg_recv_index)
                     if buf == b'':
                         raise EOFError()
 
-                    self.res += buf
-                    self.res_index = len(self.res)
+                    self.msg_recv += buf
+                    self.msg_recv_index = len(self.msg_recv)
 
-                    if self.res_index >= self.res_len:
+                    if self.msg_recv_index >= self.msg_recv_len:
                         self.cleanup()
                         return True
 
@@ -551,14 +552,14 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
             raise self.err
 
         # if there is no content, raise an exception
-        if self.res is None:
+        if self.msg_recv is None:
             raise RemoteQueryTransportError('No content in response')
 
         # load the json content
         try:
-            content = json.loads(lb2s(self.res))
+            content = json.loads(lb2s(self.msg_recv))
         except ValueError:
-            raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
+            raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.msg_recv)
 
         if 'version' not in content:
             raise RemoteQueryTransportError('No version information in response.')
@@ -658,9 +659,9 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def init_req(self):
         data = self._post_data()
-        self.req = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.6.5\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
-        self.req_len = len(self.req)
-        self.req_index = 0
+        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.6.5\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
     def prepare(self):
         super(DNSQueryTransportHandlerHTTP, self).prepare()
@@ -678,14 +679,14 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             buf = self.sock.recv(65536)
             if buf == b'':
                 raise EOFError
-            self.res_buf += buf
+            self.msg_recv_buf += buf
 
             # still reading status and headers
-            if self.chunked_encoding is None and self.res_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.res_buf))
+            if self.chunked_encoding is None and self.msg_recv_len is None:
+                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.msg_recv_buf))
                 if headers_end_match is not None:
-                    headers = self.res_buf[:headers_end_match.start()]
-                    self.res_buf = self.res_buf[headers_end_match.end():]
+                    headers = self.msg_recv_buf[:headers_end_match.start()]
+                    self.msg_recv_buf = self.msg_recv_buf[headers_end_match.end():]
 
                     # check HTTP status
                     status_match = HTTP_STATUS_RE.search(lb2s(headers))
@@ -704,7 +705,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     content_length_match = CONTENT_LENGTH_RE.search(lb2s(headers))
                     if content_length_match is not None:
                         self.chunked_encoding = False
-                        self.res_len = int(content_length_match.group('length'))
+                        self.msg_recv_len = int(content_length_match.group('length'))
                     else:
                         self.chunked_encoding = CHUNKED_ENCODING_RE.search(lb2s(headers)) is not None
 
@@ -712,22 +713,22 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             if self.chunked_encoding:
                 # look through as many chunks as are readily available
                 # (without having to read from socket again)
-                while self.res_buf:
-                    if self.res_len is None:
+                while self.msg_recv_buf:
+                    if self.msg_recv_len is None:
                         # looking for chunk length
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(lb2s(self.res_buf))
+                        crlf_start_match = CRLF_START_RE.search(lb2s(self.msg_recv_buf))
                         if crlf_start_match is not None:
-                            self.res_buf = self.res_buf[crlf_start_match.end():]
+                            self.msg_recv_buf = self.msg_recv_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.res_buf))
+                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.msg_recv_buf))
                         if chunk_len_match is not None:
-                            self.res_len = int(chunk_len_match.group('length'), 16)
-                            self.res_buf = self.res_buf[chunk_len_match.end():]
-                            self.res_index = 0
+                            self.msg_recv_len = int(chunk_len_match.group('length'), 16)
+                            self.msg_recv_buf = self.msg_recv_buf[chunk_len_match.end():]
+                            self.msg_recv_index = 0
                         else:
                             # if we don't currently know the length of the next
                             # chunk, and we don't have enough data to find the
@@ -735,43 +736,43 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                             # don't have any more data to go off of.
                             break
 
-                    if self.res_len is not None:
+                    if self.msg_recv_len is not None:
                         # we know a length of the current chunk
 
-                        if self.res_len == 0:
+                        if self.msg_recv_len == 0:
                             # no chunks left, so clean up and return
                             self.cleanup()
                             return True
 
                         # read remaining bytes
-                        bytes_remaining = self.res_len - self.res_index
-                        if len(self.res_buf) > bytes_remaining:
-                            self.res += self.res_buf[:bytes_remaining]
-                            self.res_index = 0
-                            self.res_buf = self.res_buf[bytes_remaining:]
-                            self.res_len = None
+                        bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                        if len(self.msg_recv_buf) > bytes_remaining:
+                            self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                            self.msg_recv_index = 0
+                            self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                            self.msg_recv_len = None
                         else:
-                            self.res += self.res_buf
-                            self.res_index += len(self.res_buf)
-                            self.res_buf = b''
+                            self.msg_recv += self.msg_recv_buf
+                            self.msg_recv_index += len(self.msg_recv_buf)
+                            self.msg_recv_buf = b''
 
             elif self.chunked_encoding == False:
                 # output is not chunked, so we're either reading until we've
                 # read all the bytes specified by the content-length header (if
                 # specified) or until the server closes the connection (or we
                 # time out)
-                if self.res_len is not None:
-                    bytes_remaining = self.res_len - self.res_index
-                    self.res += self.res_buf[:bytes_remaining]
-                    self.res_buf = self.res_buf[bytes_remaining:]
-                    self.res_index = len(self.res)
+                if self.msg_recv_len is not None:
+                    bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                    self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                    self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                    self.msg_recv_index = len(self.msg_recv)
 
-                    if self.res_index >= self.res_len:
+                    if self.msg_recv_index >= self.msg_recv_len:
                         self.cleanup()
                         return True
                 else:
-                    self.res += self.res_buf
-                    self.res_buf = b''
+                    self.msg_recv += self.msg_recv_buf
+                    self.msg_recv_buf = b''
 
         except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
@@ -781,7 +782,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                 # using chunked encoding, then don't throw an error.  If the
                 # content was bad, then it will be reflected in the decoding of
                 # the content
-                if self.chunked_encoding == False and self.res_len is None:
+                if self.chunked_encoding == False and self.msg_recv_len is None:
                     pass
                 else:
                     self.err = RemoteQueryTransportError('Error communicating with HTTP server: %s' % e)
@@ -840,17 +841,17 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return val
 
     def finalize(self):
-        new_res = b''
+        new_msg_recv = b''
         for i, mask_index in enumerate(self.mask_mapping):
-            mask_octets = struct.unpack(b'!BBBB', self.res[mask_index:mask_index + 4])
+            mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
             if i >= len(self.mask_mapping) - 1:
-                buf = self.res[mask_index + 4:]
+                buf = self.msg_recv[mask_index + 4:]
             else:
-                buf = self.res[mask_index + 4:self.mask_mapping[i + 1]]
+                buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
             for j in range(len(buf)):
                 b = struct.unpack(b'!B', buf[j])[0]
-                new_res += struct.pack(b'!B', b ^ mask_octets[j % 4]);
-        self.res = new_res
+                new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4]);
+        self.msg_recv = new_msg_recv
 
         super(DNSQueryTransportHandlerWebSocket, self).finalize()
 
@@ -865,29 +866,29 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
             header += struct.pack(b'!BH', 126, l)
         else: # 0xffff < len <= 2^63
             header += struct.pack(b'!BL', 127, l)
-        self.req = header + data
-        self.req_len = len(self.req)
-        self.req_index = 0
+        self.msg_send = header + data
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
-    def init_empty_req(self):
-        self.req = b'\x81\x00'
-        self.req_len = len(self.req)
-        self.req_index = 0
+    def init_empty_msg_send(self):
+        self.msg_send = b'\x81\x00'
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
             if buf == b'':
                 raise EOFError
-            self.res_buf += buf
+            self.msg_recv_buf += buf
 
             # look through as many frames as are readily available
             # (without having to read from socket again)
-            while self.res_buf:
-                if self.res_len is None:
+            while self.msg_recv_buf:
+                if self.msg_recv_len is None:
                     # looking for frame length
-                    if len(self.res_buf) >= 2:
-                        byte0, byte1 = struct.unpack(b'!BB', self.res_buf[0:2])
+                    if len(self.msg_recv_buf) >= 2:
+                        byte0, byte1 = struct.unpack(b'!BB', self.msg_recv_buf[0:2])
                         byte1b = byte1 & 0x7f
 
                         # mask must be set
@@ -908,19 +909,19 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                         else: # byte1b == 127:
                             header_len = 10
 
-                        if len(self.res_buf) >= header_len:
+                        if len(self.msg_recv_buf) >= header_len:
                             if byte1b <= 125:
-                                self.res_len = byte1b
+                                self.msg_recv_len = byte1b
                             elif byte1b == 126:
-                                self.res_len = struct.unpack(b'!H', self.res_buf[2:4])[0]
+                                self.msg_recv_len = struct.unpack(b'!H', self.msg_recv_buf[2:4])[0]
                             elif byte1b == 127:
-                                self.res_len = struct.unpack(b'!Q', self.res_buf[2:10])[0]
+                                self.msg_recv_len = struct.unpack(b'!Q', self.msg_recv_buf[2:10])[0]
 
                             # handle mask
-                            self.mask_mapping.append(len(self.res))
-                            self.res_len += 4
+                            self.mask_mapping.append(len(self.msg_recv))
+                            self.msg_recv_len += 4
 
-                            self.res_buf = self.res_buf[header_len:]
+                            self.msg_recv_buf = self.msg_recv_buf[header_len:]
 
                         else:
                             # if we don't currently know the length of the next
@@ -929,22 +930,22 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                             # don't have any more data to go off of.
                             break
 
-                if self.res_len is not None:
+                if self.msg_recv_len is not None:
                     # we know a length of the current chunk
 
                     # read remaining bytes
-                    bytes_remaining = self.res_len - self.res_index
-                    if len(self.res_buf) > bytes_remaining:
-                        self.res += self.res_buf[:bytes_remaining]
-                        self.res_index = 0
-                        self.res_buf = self.res_buf[bytes_remaining:]
-                        self.res_len = None
+                    bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                    if len(self.msg_recv_buf) > bytes_remaining:
+                        self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                        self.msg_recv_index = 0
+                        self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                        self.msg_recv_len = None
                     else:
-                        self.res += self.res_buf
-                        self.res_index += len(self.res_buf)
-                        self.res_buf = b''
+                        self.msg_recv += self.msg_recv_buf
+                        self.msg_recv_index += len(self.msg_recv_buf)
+                        self.msg_recv_buf = b''
 
-                    if self.res_index >= self.res_len and not self.has_more:
+                    if self.msg_recv_index >= self.msg_recv_len and not self.has_more:
                         self.cleanup()
                         return True
 
@@ -1000,7 +1001,7 @@ class DNSQueryTransportHandlerWebSocketFactory:
     def __del__(self):
         try:
             qth = self._f.build()
-            qth.init_empty_req()
+            qth.init_empty_msg_send()
             qth.prepare()
             qth.do_write()
         except:
@@ -1023,7 +1024,7 @@ class DNSQueryTransportHandlerWebSocketPrivateFactory:
     def __del__(self):
         try:
             qth = self._f.build()
-            qth.init_empty_req()
+            qth.init_empty_msg_send()
             qth.prepare()
             qth.do_write()
         except:
