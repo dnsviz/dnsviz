@@ -971,7 +971,7 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
     def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, query_class_mixin=None, logger=_logger, ceiling=None, edns_diagnostics=False,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
@@ -1926,7 +1926,7 @@ class Analyst(object):
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
             for target in name_obj.cname_targets[cname]:
-                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], extra_rdtypes=self.extra_rdtypes, **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], explicit_only=self.explicit_only, extra_rdtypes=self.extra_rdtypes, **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets[cname], target, errors))
                 t.start()
                 threads.append(t)
@@ -1946,7 +1946,7 @@ class Analyst(object):
 
         if self.follow_mx:
             for target in name_obj.mx_targets:
-                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.MX)], extra_rdtypes=[dns.rdatatype.A, dns.rdatatype.AAAA], **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.MX)], explicit_only=True, extra_rdtypes=[dns.rdatatype.A, dns.rdatatype.AAAA], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.mx_targets, target, errors))
                 t.start()
                 threads.append(t)
