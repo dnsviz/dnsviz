@@ -87,6 +87,7 @@ class Socket(SocketWrapper):
         self.writer_fd = sock.fileno()
         self.family = sock.family
         self.type = sock.type
+        self.lock = None
 
     def recv(self, n):
         return self.sock.recv(n)
@@ -113,6 +114,9 @@ class RemoteQueryTransportError(Exception):
     pass
 
 class TransportMetaDeserializationError(Exception):
+    pass
+
+class SocketInUse(Exception):
     pass
 
 class DNSQueryTransportMeta(object):
@@ -284,7 +288,7 @@ class DNSQueryTransportHandler(object):
     allow_private_query = False
     timeout_baseline = 0.0
 
-    def __init__(self, processed_queue=None, factory=None):
+    def __init__(self, sock=None, recycle_sock=False, processed_queue=None, factory=None):
         self.msg_send = None
         self.msg_send_len = None
         self.msg_send_index = None
@@ -306,8 +310,11 @@ class DNSQueryTransportHandler(object):
         self._processed_queue = processed_queue
         self.factory = factory
 
-        self.expiration = None
+        self._sock = sock
         self.sock = None
+        self.recycle_sock = recycle_sock
+
+        self.expiration = None
         self.start_time = None
         self.end_time = None
 
@@ -336,6 +343,30 @@ class DNSQueryTransportHandler(object):
         if self.err is not None:
             self.msg_recv = None
 
+        if self.factory is not None:
+            if self.recycle_sock:
+                # if recycle_sock is requested, add the sock to the factory.
+                # Then add the lock to the sock to prevent concurrent use of
+                # the socket.
+                if self.sock is not None and self._sock is None:
+                    self.factory.lock.acquire()
+                    try:
+                        if self.factory.sock is None:
+                            self.factory.sock = self.sock
+                            self.factory.sock.lock = self.factory.lock
+                    finally:
+                        self.factory.lock.release()
+
+            elif self.sock is not None and self.sock is self.factory.sock:
+                # if recycle_sock is not requested, and this sock is in the
+                # factory, then remove it.
+                self.factory.lock.acquire()
+                try:
+                    if self.sock is self.factory.sock:
+                        self.factory.sock = None
+                finally:
+                    self.factory.lock.release()
+
     #TODO change this and the overriding child methods to init_msg_recv
     def init_req(self):
         raise NotImplemented
@@ -352,15 +383,31 @@ class DNSQueryTransportHandler(object):
             self.timeout = self.timeout_baseline
 
         self._init_msg_recv()
-        try:
-            self._create_socket()
-            self._configure_socket()
-            self._bind_socket()
-            self._set_start_time()
-            self._connect_socket()
-        except socket.error as e:
-            self.err = e
-            self.cleanup()
+        if self._sock is not None:
+            # if a pre-existing socket is available for re-use, then use that
+            # instead
+            try:
+                self._reuse_socket()
+                self._set_start_time()
+            except SocketInUse as e:
+                self.err = e
+                # don't cleanup, as it will re-try
+        else:
+            try:
+                self._create_socket()
+                self._configure_socket()
+                self._bind_socket()
+                self._set_start_time()
+                self._connect_socket()
+            except socket.error as e:
+                self.err = e
+                self.cleanup()
+
+    def _reuse_socket(self):
+        # wait for the lock on the socket
+        if not self._sock.lock.acquire(False):
+            raise SocketInUse()
+        self.sock = self._sock
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -430,7 +477,10 @@ class DNSQueryTransportHandler(object):
 
         # close socket
         if self.sock is not None:
-            self.sock.close()
+            if not self.recycle_sock:
+                self.sock.close()
+            if self.sock.lock is not None:
+                self.sock.lock.release()
 
         # place in processed queue, if specified
         if self._processed_queue is not None:
@@ -624,8 +674,8 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     timeout_baseline = 5.0
 
-    def __init__(self, url, insecure=False, processed_queue=None, factory=None):
-        super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
+    def __init__(self, url, insecure=False, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerHTTP, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
 
         self.transport_type = socket.SOCK_STREAM
 
@@ -675,7 +725,9 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             if self.insecure:
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-            self.sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host))
+            new_sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host))
+            new_sock.lock = self.sock.lock
+            self.sock = new_sock
 
     def _post_data(self):
         return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
@@ -698,7 +750,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def prepare(self):
         super(DNSQueryTransportHandlerHTTP, self).prepare()
-        if self.err is not None:
+        if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error making HTTP connection: %s' % self.err)
 
     def do_write(self):
@@ -833,8 +885,8 @@ class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
 class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
     timeout_baseline = 5.0
 
-    def __init__(self, path, processed_queue=None, factory=None):
-        super(DNSQueryTransportHandlerWebSocket, self).__init__(processed_queue=processed_queue, factory=factory)
+    def __init__(self, path, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerWebSocket, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
 
         self.dst = path
         self.transport_type = socket.SOCK_STREAM
@@ -864,7 +916,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
 
     def prepare(self):
         super(DNSQueryTransportHandlerWebSocket, self).prepare()
-        if self.err is not None:
+        if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error connecting to UNIX domain socket: %s' % self.err)
 
     def do_write(self):
@@ -1005,8 +1057,16 @@ class DNSQueryTransportHandlerFactory(object):
         self.args = args
         self.kwargs = kwargs
         self.kwargs['factory'] = self
+        self.lock = threading.Lock()
+        self.sock = None
+
+    def __del__(self):
+        if self.sock is not None:
+            self.sock.close()
 
     def build(self, **kwargs):
+        if 'sock' not in kwargs and self.sock is not None:
+            kwargs['sock'] = self.sock
         for name in self.kwargs:
             if name not in kwargs:
                 kwargs[name] = self.kwargs[name]
@@ -1100,16 +1160,17 @@ class _DNSQueryTransportManager:
 
     def query(self, qh):
         self._event_map[qh] = threading.Event()
-        self._query(qh)
+        self._query(qh, True)
         self._event_map[qh].wait()
         del self._event_map[qh]
 
     def query_nowait(self, qh):
-        self._query(qh)
+        self._query(qh, True)
 
-    def _query(self, qh):
+    def _query(self, qh, notify):
         self._query_queue.put(qh)
-        os.write(self._notify_write_fd, struct.pack(b'!B', 0))
+        if notify:
+            os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
     def _loop(self):
         '''Return the data resulting from a UDP transaction.'''
@@ -1183,16 +1244,29 @@ class _DNSQueryTransportManager:
                     self._event_map[qh].set()
                 del query_meta[fd]
 
+            if finished_fds:
+                # if any sockets were finished, then notify, in case any
+                # queued messages are waiting to be handled.
+                os.write(self._notify_write_fd, struct.pack(b'!B', 0))
+
             # handle the new queries
             if self._notify_read_fd in rlist_out:
                 # empty the pipe
                 os.read(self._notify_read_fd, 65536)
 
+                requeue = []
                 while True:
                     try:
                         qh = self._query_queue.get_nowait()
                         qh.prepare()
+
                         if qh.err is not None:
+                            if isinstance(qh.err, SocketInUse):
+                                # if this was a SocketInUse, just requeue, and try again
+                                qh.err = None
+                                requeue.append(qh)
+                                continue
+
                             if qh in self._event_map:
                                 self._event_map[qh].set()
                         else:
@@ -1204,6 +1278,9 @@ class _DNSQueryTransportManager:
                             wlist_in.append(qh.sock.writer_fd)
                     except queue.Empty:
                         break
+
+                for qh in requeue:
+                    self._query(qh, False)
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True

@@ -73,6 +73,7 @@ logger = logging.getLogger('dnsviz.analysis.online')
 
 # this needs to be global because of multiprocessing
 tm = None
+th_factories = None
 resolver = None
 bootstrap_resolver = None
 explicit_delegations = None
@@ -135,7 +136,7 @@ def _init_subprocess(use_full):
 
 def _analyze(args):
     (cls, name, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, \
-            stop_at_explicit, extra_rdtypes, explicit_only, cache, cache_level, cache_lock, th_factories) = args
+            stop_at_explicit, extra_rdtypes, explicit_only, cache, cache_level, cache_lock) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
@@ -164,7 +165,7 @@ class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
     use_full_resolver = True
 
-    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories):
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain):
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
         self.client_ipv4 = client_ipv4
@@ -177,14 +178,13 @@ class BulkAnalyst(object):
         self.extra_rdtypes = extra_rdtypes
         self.explicit_only = explicit_only
         self.dlv_domain = dlv_domain
-        self.th_factories = th_factories
 
         self.cache = {}
         self.cache_lock = threading.Lock()
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock, self.th_factories)
+            yield (self.analyst_cls, name, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -274,8 +274,8 @@ class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
     use_full_resolver = None
 
-    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories, processes):
-        super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, th_factories)
+    def __init__(self, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -677,6 +677,7 @@ Options:
 
 def main(argv):
     global tm
+    global th_factories
     global resolver
     global bootstrap_resolver
     global explicit_delegations
@@ -1114,13 +1115,13 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories, processes)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
             else:
                 if cls.use_full_resolver:
                     _init_full_resolver()
                 else:
                     _init_stub_resolver()
-                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, th_factories)
+                a = cls(try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
