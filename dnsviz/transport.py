@@ -74,6 +74,41 @@ CHUNKED_ENCODING_RE = re.compile(r'^Transfer-Encoding: chunked(\r\n|\r|\n)', re.
 CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
 CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
 
+class SocketWrapper(object):
+    def __init__(self):
+        raise NotImplemented
+
+class Socket(SocketWrapper):
+    def __init__(self, sock):
+        self.sock = sock
+        self.reader = sock
+        self.writer = sock
+        self.reader_fd = sock.fileno()
+        self.writer_fd = sock.fileno()
+        self.family = sock.family
+        self.type = sock.type
+
+    def recv(self, n):
+        return self.sock.recv(n)
+
+    def send(self, s):
+        return self.sock.send(s)
+
+    def setblocking(self, b):
+        self.sock.setblocking(b)
+
+    def bind(self, a):
+        self.sock.bind(a)
+
+    def connect(self, a):
+        self.sock.connect(a)
+
+    def getsockname(self):
+        return self.sock.getsockname()
+
+    def close(self):
+        self.sock.close()
+
 class RemoteQueryTransportError(Exception):
     pass
 
@@ -273,7 +308,6 @@ class DNSQueryTransportHandler(object):
 
         self.expiration = None
         self.sock = None
-        self.sockfd = None
         self.start_time = None
         self.end_time = None
 
@@ -336,8 +370,7 @@ class DNSQueryTransportHandler(object):
 
     def _create_socket(self):
         af = self._get_af()
-        self.sock = socket.socket(af, self.transport_type)
-        self.sockfd = self.sock.fileno()
+        self.sock = Socket(socket.socket(af, self.transport_type))
 
     def _configure_socket(self):
         self.sock.setblocking(0)
@@ -642,7 +675,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             if self.insecure:
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-            self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
+            self.sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host))
 
     def _post_data(self):
         return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
@@ -1113,7 +1146,7 @@ class _DNSQueryTransportManager:
                         finished_fds.append(fd)
                     else:
                         wlist_in.remove(fd)
-                        rlist_in.append(fd)
+                        rlist_in.append(qh.sock.reader_fd)
 
             # handle the responses
             for fd in rlist_out:
@@ -1123,7 +1156,7 @@ class _DNSQueryTransportManager:
                 qh = query_meta[fd]
 
                 if qh.do_read():
-                    finished_fds.append(fd)
+                    finished_fds.append(qh.sock.reader_fd)
 
             # handle the expired queries
             future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandlerWrapper(None))))
@@ -1136,17 +1169,18 @@ class _DNSQueryTransportManager:
                     continue
 
                 qh.do_timeout()
-                finished_fds.append(qh.sockfd)
+                finished_fds.append(qh.sock.reader_fd)
             expirations = expirations[future_index:]
 
             # for any fds that need to be finished, do it now
             for fd in finished_fds:
+                qh = query_meta[fd]
                 try:
-                    rlist_in.remove(fd)
+                    rlist_in.remove(qh.sock.reader_fd)
                 except ValueError:
-                    wlist_in.remove(fd)
-                if query_meta[fd] in self._event_map:
-                    self._event_map[query_meta[fd]].set()
+                    wlist_in.remove(qh.sock.writer_fd)
+                if qh in self._event_map:
+                    self._event_map[qh].set()
                 del query_meta[fd]
 
             # handle the new queries
@@ -1164,10 +1198,10 @@ class _DNSQueryTransportManager:
                         else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
-                            fd = qh.sock.fileno()
-                            query_meta[fd] = qh
+                            query_meta[qh.sock.reader_fd] = qh
+                            query_meta[qh.sock.writer_fd] = qh
                             bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
-                            wlist_in.append(fd)
+                            wlist_in.append(qh.sock.writer_fd)
                     except queue.Empty:
                         break
 
