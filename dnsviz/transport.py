@@ -379,9 +379,6 @@ class DNSQueryTransportHandler(object):
     def prepare(self):
         assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
-        if self.timeout is None:
-            self.timeout = self.timeout_baseline
-
         self._init_msg_recv()
         if self._sock is not None:
             # if a pre-existing socket is available for re-use, then use that
@@ -481,7 +478,6 @@ class DNSQueryTransportHandler(object):
                 self.sock.close()
             if self.sock.lock is not None:
                 self.sock.lock.release()
-
         # place in processed queue, if specified
         if self._processed_queue is not None:
             self._processed_queue.put(self)
@@ -627,6 +623,14 @@ class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
 class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
     singleton = False
 
+    def _set_timeout(self, qtm):
+        if self.timeout is None:
+            # allow 5 seconds for looking glass overhead, as a baseline
+            self.timeout = self.timeout_baseline
+        # account for worst case, in which case queries are performed serially
+        # on the remote end
+        self.timeout += qtm.timeout
+
     def finalize(self):
         super(DNSQueryTransportHandlerMulti, self).finalize()
 
@@ -707,14 +711,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.dst = IPAddr(addrinfo[0][4][0])
 
         self.chunked_encoding = None
-
-    def _set_timeout(self, qtm):
-        if self.timeout is None:
-            # allow 5 seconds for HTTP overhead, as a baseline
-            self.timeout = self.timeout_baseline
-        # account for worst case, in which case queries are performed serially
-        # on the remote end
-        self.timeout += qtm.timeout
 
     def _create_socket(self):
         super(DNSQueryTransportHandlerHTTP, self)._create_socket()
@@ -893,14 +889,6 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
 
         self.mask_mapping = []
         self.has_more = None
-
-    def _set_timeout(self, qtm):
-        if self.timeout is None:
-            # allow 5 seconds for browser overhead, as a baseline
-            self.timeout = self.timeout_baseline
-        # account for worst case, in which case queries are performed serially
-        # on the remote end
-        self.timeout += qtm.timeout
 
     def _get_af(self):
         return socket.AF_UNIX
