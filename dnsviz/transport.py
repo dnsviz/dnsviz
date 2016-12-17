@@ -948,6 +948,9 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 
+        # since there are no qtms, we need to set the timeout explicitly
+        self.timeout = 1.0
+
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
