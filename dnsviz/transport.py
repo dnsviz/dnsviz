@@ -282,11 +282,16 @@ class DNSQueryTransportMeta(object):
         self.end_time = time.time()
         self.start_time = self.end_time - (elapsed/1000.0)
 
+QTH_MODE_WRITE_READ = 0
+QTH_MODE_WRITE = 1
+QTH_MODE_READ = 2
+
 class DNSQueryTransportHandler(object):
     singleton = False
     allow_loopback_query = False
     allow_private_query = False
     timeout_baseline = 0.0
+    mode = QTH_MODE_WRITE_READ
 
     def __init__(self, sock=None, recycle_sock=False, processed_queue=None, factory=None):
         self.msg_send = None
@@ -1194,9 +1199,9 @@ class _DNSQueryTransportManager:
                 qh = query_meta[fd]
 
                 if qh.do_write():
-                    if qh.err is not None:
+                    if qh.err is not None or qh.mode == QTH_MODE_WRITE:
                         finished_fds.append(fd)
-                    else:
+                    else: # qh.mode == QTH_MODE_WRITE_READ
                         wlist_in.remove(fd)
                         rlist_in.append(qh.sock.reader_fd)
 
@@ -1207,7 +1212,7 @@ class _DNSQueryTransportManager:
 
                 qh = query_meta[fd]
 
-                if qh.do_read():
+                if qh.do_read(): # qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ)
                     finished_fds.append(qh.sock.reader_fd)
 
             # handle the expired queries
@@ -1266,7 +1271,12 @@ class _DNSQueryTransportManager:
                             query_meta[qh.sock.reader_fd] = qh
                             query_meta[qh.sock.writer_fd] = qh
                             bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
-                            wlist_in.append(qh.sock.writer_fd)
+                            if qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE):
+                                wlist_in.append(qh.sock.writer_fd)
+                            elif qh.mode == QTH_MODE_READ:
+                                rlist_in.append(qh.sock.reader_fd)
+                            else:
+                                raise Exception('Unexpected mode: %d' % qh.mode)
                     except queue.Empty:
                         break
 
