@@ -892,11 +892,12 @@ class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
     allow_private_query = True
 
-class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
+class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
     timeout_baseline = 5.0
+    unmask_on_recv = True
 
     def __init__(self, path, sock=None, recycle_sock=True, processed_queue=None, factory=None):
-        super(DNSQueryTransportHandlerWebSocket, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+        super(DNSQueryTransportHandlerWebSocketServer, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
 
         self.dst = path
         self.transport_type = socket.SOCK_STREAM
@@ -917,30 +918,31 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return self.dst
 
     def prepare(self):
-        super(DNSQueryTransportHandlerWebSocket, self).prepare()
+        super(DNSQueryTransportHandlerWebSocketServer, self).prepare()
         if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error connecting to UNIX domain socket: %s' % self.err)
 
     def do_write(self):
-        val = super(DNSQueryTransportHandlerWebSocket, self).do_write()
+        val = super(DNSQueryTransportHandlerWebSocketServer, self).do_write()
         if self.err is not None:
             self.err = RemoteQueryTransportError('Error writing to UNIX domain socket: %s' % self.err)
         return val
 
     def finalize(self):
-        new_msg_recv = b''
-        for i, mask_index in enumerate(self.mask_mapping):
-            mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
-            if i >= len(self.mask_mapping) - 1:
-                buf = self.msg_recv[mask_index + 4:]
-            else:
-                buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
-            for j in range(len(buf)):
-                b = struct.unpack(b'!B', buf[j])[0]
-                new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4]);
-        self.msg_recv = new_msg_recv
+        if self.unmask_on_recv:
+            new_msg_recv = b''
+            for i, mask_index in enumerate(self.mask_mapping):
+                mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
+                if i >= len(self.mask_mapping) - 1:
+                    buf = self.msg_recv[mask_index + 4:]
+                else:
+                    buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
+                for j in range(len(buf)):
+                    b = struct.unpack(b'!B', buf[j])[0]
+                    new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4]);
+            self.msg_recv = new_msg_recv
 
-        super(DNSQueryTransportHandlerWebSocket, self).finalize()
+        super(DNSQueryTransportHandlerWebSocketServer, self).finalize()
 
     def init_req(self):
         data = json.dumps(self.serialize_requests())
@@ -1007,9 +1009,10 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                             elif byte1b == 127:
                                 self.msg_recv_len = struct.unpack(b'!Q', self.msg_recv_buf[2:10])[0]
 
-                            # handle mask
-                            self.mask_mapping.append(len(self.msg_recv))
-                            self.msg_recv_len += 4
+                            if self.unmask_on_recv:
+                                # handle mask
+                                self.mask_mapping.append(len(self.msg_recv))
+                                self.msg_recv_len += 4
 
                             self.msg_recv_buf = self.msg_recv_buf[header_len:]
 
@@ -1051,7 +1054,10 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         self.err = RemoteQueryTransportError('Read of UNIX domain socket timed out')
         self.cleanup()
 
-class DNSQueryTransportHandlerWebSocketPrivate(DNSQueryTransportHandlerWebSocket):
+class DNSQueryTransportHandlerWebSocketServerPrivate(DNSQueryTransportHandlerWebSocketServer):
+    allow_loopback_query = True
+    allow_private_query = True
+
     allow_loopback_query = True
     allow_private_query = True
 
@@ -1089,12 +1095,12 @@ class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
 class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerHTTPPrivate
 
-class _DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
-    cls = DNSQueryTransportHandlerWebSocket
+class _DNSQueryTransportHandlerWebSocketServerFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocketServer
 
-class DNSQueryTransportHandlerWebSocketFactory:
+class DNSQueryTransportHandlerWebSocketServerFactory:
     def __init__(self, *args, **kwargs):
-        self._f = _DNSQueryTransportHandlerWebSocketFactory(*args, **kwargs)
+        self._f = _DNSQueryTransportHandlerWebSocketServerFactory(*args, **kwargs)
 
     def __del__(self):
         try:
@@ -1112,12 +1118,12 @@ class DNSQueryTransportHandlerWebSocketFactory:
     def build(self, **kwargs):
         return self._f.build(**kwargs)
 
-class _DNSQueryTransportHandlerWebSocketPrivateFactory(DNSQueryTransportHandlerFactory):
-    cls = DNSQueryTransportHandlerWebSocketPrivate
+class _DNSQueryTransportHandlerWebSocketServerPrivateFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocketServerPrivate
 
-class DNSQueryTransportHandlerWebSocketPrivateFactory:
+class DNSQueryTransportHandlerWebSocketServerPrivateFactory:
     def __init__(self, *args, **kwargs):
-        self._f = _DNSQueryTransportHandlerWebSocketPrivateFactory(*args, **kwargs)
+        self._f = _DNSQueryTransportHandlerWebSocketServerPrivateFactory(*args, **kwargs)
 
     def __del__(self):
         try:
