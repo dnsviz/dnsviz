@@ -377,7 +377,7 @@ class DNSQueryTransportHandler(object):
     def init_req(self):
         raise NotImplemented
 
-    def _init_msg_recv(self):
+    def init_msg_recv(self):
         self.msg_recv = b''
         self.msg_recv_buf = b''
         self.msg_recv_index = 0
@@ -386,7 +386,7 @@ class DNSQueryTransportHandler(object):
         assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE), 'prepare() can only be called for modes QTH_MODE_WRITE and QTH_MODE_WRITE_READ'
         assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
-        self._init_msg_recv()
+        self.init_msg_recv()
         if self._sock is not None:
             # if a pre-existing socket is available for re-use, then use that
             # instead
@@ -1152,7 +1152,7 @@ class _DNSQueryTransportManager:
     def __init__(self):
         self._notify_read_fd, self._notify_write_fd = os.pipe()
         fcntl.fcntl(self._notify_read_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-        self._query_queue = queue.Queue()
+        self._msg_queue = queue.Queue()
         self._event_map = {}
 
         self._close = threading.Event()
@@ -1163,17 +1163,17 @@ class _DNSQueryTransportManager:
         self._close.set()
         os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
-    def query(self, qh):
+    def handle_msg(self, qh):
         self._event_map[qh] = threading.Event()
-        self._query(qh, True)
+        self._handle_msg(qh, True)
         self._event_map[qh].wait()
         del self._event_map[qh]
 
-    def query_nowait(self, qh):
-        self._query(qh, True)
+    def handle_msg_nowait(self, qh):
+        self._handle_msg(qh, True)
 
-    def _query(self, qh, notify):
-        self._query_queue.put(qh)
+    def _handle_msg(self, qh, notify):
+        self._msg_queue.put(qh)
         if notify:
             os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
@@ -1262,7 +1262,7 @@ class _DNSQueryTransportManager:
                 requeue = []
                 while True:
                     try:
-                        qh = self._query_queue.get_nowait()
+                        qh = self._msg_queue.get_nowait()
                         qh.prepare()
 
                         if qh.err is not None:
@@ -1290,7 +1290,7 @@ class _DNSQueryTransportManager:
                         break
 
                 for qh in requeue:
-                    self._query(qh, False)
+                    self._handle_msg(qh, False)
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
@@ -1303,11 +1303,11 @@ class DNSQueryTransportManager:
     def __del__(self):
         self.close()
 
-    def query(self, qh):
-        return self._th.query(qh)
+    def handle_msg(self, qh):
+        return self._th.handle_msg(qh)
 
-    def query_nowait(self, qh):
-        return self._th.query_nowait(qh)
+    def handle_msg_nowait(self, qh):
+        return self._th.handle_msg_nowait(qh)
 
     def close(self):
         return self._th.close()

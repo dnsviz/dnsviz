@@ -1328,7 +1328,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         while query_handlers:
             while request_list and time.time() >= request_list[0][0]:
-                tm.query_nowait(request_list.pop(0)[1])
+                tm.handle_msg_nowait(request_list.pop(0)[1])
 
             t = time.time()
             if request_list and t < request_list[0][0]:
