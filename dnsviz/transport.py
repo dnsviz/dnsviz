@@ -340,6 +340,7 @@ class DNSQueryTransportHandler(object):
             self.src = None
 
     def finalize(self):
+        assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ), 'finalize() can only be called for modes QTH_MODE_READ and QTH_MODE_WRITE_READ'
         assert self.msg_recv is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
 
         self._check_source()
@@ -372,7 +373,7 @@ class DNSQueryTransportHandler(object):
                 finally:
                     self.factory.lock.release()
 
-    #TODO change this and the overriding child methods to init_msg_recv
+    #TODO change this and the overriding child methods to init_msg_send
     def init_req(self):
         raise NotImplemented
 
@@ -382,6 +383,7 @@ class DNSQueryTransportHandler(object):
         self.msg_recv_index = 0
 
     def prepare(self):
+        assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE), 'prepare() can only be called for modes QTH_MODE_WRITE and QTH_MODE_WRITE_READ'
         assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
         self._init_msg_recv()
@@ -669,14 +671,21 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
         if 'error' in content:
             raise RemoteQueryTransportError('Remote query error: %s' % content['error'])
 
-        if 'responses' not in content:
-            raise RemoteQueryTransportError('No DNS response information in response.')
+        if self.mode == QTH_MODE_WRITE_READ:
+            if 'responses' not in content:
+                raise RemoteQueryTransportError('No DNS response information in response.')
+        else: # self.mode == QTH_MODE_READ:
+            if 'requests' not in content:
+                raise RemoteQueryTransportError('No DNS requests information in response.')
 
         for i in range(len(self.qtms)):
             try:
-                self.qtms[i].deserialize_response(content['responses'][i])
+                if self.mode == QTH_MODE_WRITE_READ:
+                    self.qtms[i].deserialize_response(content['responses'][i])
+                else: # self.mode == QTH_MODE_READ:
+                    self.qtms[i].deserialize_request(content['requests'][i])
             except IndexError:
-                raise RemoteQueryTransportError('DNS response information missing from response')
+                raise RemoteQueryTransportError('DNS response or request information missing from message')
             except TransportMetaDeserializationError as e:
                 raise RemoteQueryTransportError(str(e))
 
