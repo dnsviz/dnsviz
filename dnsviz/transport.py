@@ -377,7 +377,7 @@ class DNSQueryTransportHandler(object):
     def init_req(self):
         raise NotImplemented
 
-    def init_msg_recv(self):
+    def _init_msg_recv(self):
         self.msg_recv = b''
         self.msg_recv_buf = b''
         self.msg_recv_index = 0
@@ -386,7 +386,7 @@ class DNSQueryTransportHandler(object):
         assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE), 'prepare() can only be called for modes QTH_MODE_WRITE and QTH_MODE_WRITE_READ'
         assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
-        self.init_msg_recv()
+        self._init_msg_recv()
         if self._sock is not None:
             # if a pre-existing socket is available for re-use, then use that
             # instead
