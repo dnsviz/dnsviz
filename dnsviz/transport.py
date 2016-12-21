@@ -381,6 +381,7 @@ class DNSQueryTransportHandler(object):
         self.msg_recv = b''
         self.msg_recv_buf = b''
         self.msg_recv_index = 0
+        self.msg_recv_len = None
 
     def prepare(self):
         assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE), 'prepare() can only be called for modes QTH_MODE_WRITE and QTH_MODE_WRITE_READ'
