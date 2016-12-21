@@ -556,7 +556,7 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # load the json content
         try:
-            content = json.loads(lb2s(self.res))
+            content = json.loads(codecs.decode(self.res, 'utf-8'))
         except ValueError:
             raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
 
@@ -840,6 +840,12 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return val
 
     def finalize(self):
+        # python3/python2 dual compatibility
+        if isinstance(self.msg_recv, str):
+            decode_func = lambda x: struct.unpack(b'!B', x)[0]
+        else:
+            decode_func = lambda x: x
+
         new_res = b''
         for i, mask_index in enumerate(self.mask_mapping):
             mask_octets = struct.unpack(b'!BBBB', self.res[mask_index:mask_index + 4])
@@ -848,14 +854,14 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
             else:
                 buf = self.res[mask_index + 4:self.mask_mapping[i + 1]]
             for j in range(len(buf)):
-                b = struct.unpack(b'!B', buf[j])[0]
+                b = decode_func(buf[j])
                 new_res += struct.pack(b'!B', b ^ mask_octets[j % 4]);
         self.res = new_res
 
         super(DNSQueryTransportHandlerWebSocket, self).finalize()
 
     def init_req(self):
-        data = json.dumps(self.serialize_requests())
+        data = codecs.encode(json.dumps(self.serialize_requests()), 'utf-8')
 
         header = b'\x81'
         l = len(data)
