@@ -864,7 +864,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         elif l <= 0xffff:
             header += struct.pack(b'!BH', 126, l)
         else: # 0xffff < len <= 2^63
-            header += struct.pack(b'!BL', 127, l)
+            header += struct.pack(b'!BLL', 127, 0, l)
         self.req = header + data
         self.req_len = len(self.req)
         self.req_index = 0
@@ -913,7 +913,7 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                                 self.res_len = byte1b
                             elif byte1b == 126:
                                 self.res_len = struct.unpack(b'!H', self.res_buf[2:4])[0]
-                            elif byte1b == 127:
+                            else: # byte1b == 127:
                                 self.res_len = struct.unpack(b'!Q', self.res_buf[2:10])[0]
 
                             # handle mask
