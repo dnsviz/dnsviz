@@ -935,7 +935,7 @@ def main(argv):
                 if url.hostname is not None:
                     usage('WebSocket URL must designate a local UNIX domain socket.')
                     sys.exit(1)
-                th_factories = (transport.DNSQueryTransportHandlerWebSocketFactory(url.path),)
+                th_factories = (transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path),)
             else:
                 usage('Unsupported URL scheme: "%s"' % opts['-u'])
                 sys.exit(1)

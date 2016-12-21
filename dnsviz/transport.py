@@ -26,6 +26,7 @@ import bisect
 import codecs
 import errno
 import fcntl
+import io
 import json
 import os
 import random
@@ -34,6 +35,7 @@ import select
 import socket
 import ssl
 import struct
+import subprocess
 import threading
 import time
 
@@ -109,6 +111,40 @@ class Socket(SocketWrapper):
 
     def close(self):
         self.sock.close()
+
+class ReaderWriter(SocketWrapper):
+    def __init__(self, reader, writer, proc=None):
+        self.reader = reader
+        self.writer = writer
+        self.reader_fd = self.reader.fileno()
+        self.writer_fd = self.writer.fileno()
+        self.family = socket.AF_INET
+        self.type = socket.SOCK_STREAM
+        self.lock = None
+        self.proc = proc
+
+    def recv(self, n):
+        return os.read(self.reader_fd, n)
+
+    def send(self, s):
+        return os.write(self.writer_fd, s)
+
+    def setblocking(self, b):
+        if not b:
+            fcntl.fcntl(self.reader_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+            fcntl.fcntl(self.writer_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+
+    def bind(self, a):
+        pass
+
+    def connect(self, a):
+        pass
+
+    def getsockname(self):
+        return ('localhost', 0)
+
+    def close(self):
+        pass
 
 class RemoteQueryTransportError(Exception):
     pass
@@ -512,6 +548,13 @@ class DNSQueryTransportHandler(object):
         d = {
             'version': DNS_TRANSPORT_VERSION,
             'requests': [q.serialize_request() for q in self.qtms]
+        }
+        return d
+
+    def serialize_responses(self):
+        d = {
+            'version': DNS_TRANSPORT_VERSION,
+            'responses': [q.serialize_response() for q in self.qtms]
         }
         return d
 
@@ -1043,8 +1086,97 @@ class DNSQueryTransportHandlerWebSocketServerPrivate(DNSQueryTransportHandlerWeb
     allow_loopback_query = True
     allow_private_query = True
 
+class DNSQueryTransportHandlerWebSocketClient(DNSQueryTransportHandlerWebSocketServer):
+    unmask_on_recv = False
+
+    def __init__(self, sock, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerWebSocketClient, self).__init__(None, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+    def _init_req(self, data):
+        header = b'\x81'
+        l = len(data)
+        if l <= 125:
+            header += struct.pack(b'!B', l | 0x80)
+        elif l <= 0xffff:
+            header += struct.pack(b'!BH', 126 | 0x80, l)
+        else: # 0xffff < len <= 2^63
+            header += struct.pack(b'!BLL', 127 | 0x80, 0, l)
+
+        mask_int = random.randint(0, 0xffffffff)
+        mask = [(mask_int >> 24) & 0xff,
+                (mask_int >> 16) & 0xff,
+                (mask_int >> 8) & 0xff,
+                mask_int & 0xff]
+
+        header += struct.pack(b'!BBBB', *mask)
+
+        self.msg_send = header
+        for i, b in enumerate(data):
+            self.msg_send += struct.pack('!B', mask[i % 4] ^ ord(b))
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
+
+    def init_req(self):
+        self._init_req(json.dumps(self.serialize_responses()))
+
+    def init_err_send(self, err):
+        self._init_req(err)
+
+class DNSQueryTransportHandlerWebSocketClientReader(DNSQueryTransportHandlerWebSocketClient):
+    mode = QTH_MODE_READ
+
+class DNSQueryTransportHandlerWebSocketClientWriter(DNSQueryTransportHandlerWebSocketClient):
+    mode = QTH_MODE_WRITE
+
+class DNSQueryTransportHandlerCmd(DNSQueryTransportHandlerWebSocketServer):
     allow_loopback_query = True
     allow_private_query = True
+
+    def __init__(self, args, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerCmd, self).__init__(None, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+        self.args = args
+
+    def _get_af(self):
+        return None
+
+    def _bind_socket(self):
+        pass
+
+    def _set_socket_info(self):
+        pass
+
+    def _get_connect_arg(self):
+        return None
+
+    def _create_socket(self):
+        try:
+            p = subprocess.Popen(self.args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        except OSError as e:
+            raise socket.error(str(e))
+        else:
+            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+
+    def _connect_socket(self):
+        pass
+
+    def do_write(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_write()
+
+    def do_read(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_read()
+
+    def cleanup(self):
+        super(DNSQueryTransportHandlerCmd, self).cleanup()
+        if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
+            self.sock.proc.terminate()
+            return True
 
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
@@ -1125,6 +1257,9 @@ class DNSQueryTransportHandlerWebSocketServerPrivateFactory:
 
     def build(self, **kwargs):
         return self._f.build(**kwargs)
+
+class DNSQueryTransportHandlerCmdFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerCmd
 
 class DNSQueryTransportHandlerWrapper(object):
     def __init__(self, qh):
