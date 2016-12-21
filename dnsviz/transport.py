@@ -692,7 +692,7 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
 
         # load the json content
         try:
-            content = json.loads(lb2s(self.msg_recv))
+            content = json.loads(codecs.decode(self.msg_recv, 'utf-8'))
         except ValueError:
             raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.msg_recv)
 
@@ -965,6 +965,13 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
 
     def finalize(self):
         if self.unmask_on_recv:
+
+            # python3/python2 dual compatibility
+            if isinstance(self.msg_recv, str):
+                decode_func = lambda x: struct.unpack(b'!B', x)[0]
+            else:
+                decode_func = lambda x: x
+
             new_msg_recv = b''
             for i, mask_index in enumerate(self.mask_mapping):
                 mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
@@ -973,14 +980,15 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                 else:
                     buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
                 for j in range(len(buf)):
-                    b = struct.unpack(b'!B', buf[j])[0]
-                    new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4]);
+                    b = decode_func(buf[j])
+                    new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4])
+
             self.msg_recv = new_msg_recv
 
         super(DNSQueryTransportHandlerWebSocketServer, self).finalize()
 
     def init_req(self):
-        data = json.dumps(self.serialize_requests())
+        data = codecs.encode(json.dumps(self.serialize_requests()), 'utf-8')
 
         header = b'\x81'
         l = len(data)
@@ -1110,17 +1118,23 @@ class DNSQueryTransportHandlerWebSocketClient(DNSQueryTransportHandlerWebSocketS
 
         header += struct.pack(b'!BBBB', *mask)
 
+        # python3/python2 dual compatibility
+        if isinstance(data, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
         self.msg_send = header
         for i, b in enumerate(data):
-            self.msg_send += struct.pack('!B', mask[i % 4] ^ ord(b))
+            self.msg_send += struct.pack('!B', mask[i % 4] ^ map_func(b))
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 
     def init_req(self):
-        self._init_req(json.dumps(self.serialize_responses()))
+        self._init_req(codecs.encode(json.dumps(self.serialize_responses()), 'utf-8'))
 
     def init_err_send(self, err):
-        self._init_req(err)
+        self._init_req(codecs.encode(err, 'utf-8'))
 
 class DNSQueryTransportHandlerWebSocketClientReader(DNSQueryTransportHandlerWebSocketClient):
     mode = QTH_MODE_READ

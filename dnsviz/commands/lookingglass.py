@@ -22,6 +22,7 @@
 
 from __future__ import unicode_literals
 
+import codecs
 import io
 import json
 import threading
@@ -61,7 +62,7 @@ def main(argv):
 
                 # load the json content
                 try:
-                    content = json.loads(qth_reader.msg_recv)
+                    content = json.loads(codecs.decode(qth_reader.msg_recv, 'utf-8'))
                 except ValueError:
                     raise RemoteQueryError('JSON decoding of request failed: %s' % qth_reader.msg_recv)
 
