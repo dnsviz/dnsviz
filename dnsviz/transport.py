@@ -943,7 +943,7 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
         elif l <= 0xffff:
             header += struct.pack(b'!BH', 126, l)
         else: # 0xffff < len <= 2^63
-            header += struct.pack(b'!BL', 127, l)
+            header += struct.pack(b'!BLL', 127, 0, l)
         self.msg_send = header + data
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
@@ -991,7 +991,7 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                                 self.msg_recv_len = byte1b
                             elif byte1b == 126:
                                 self.msg_recv_len = struct.unpack(b'!H', self.msg_recv_buf[2:4])[0]
-                            elif byte1b == 127:
+                            else: # byte1b == 127:
                                 self.msg_recv_len = struct.unpack(b'!Q', self.msg_recv_buf[2:10])[0]
 
                             if self.unmask_on_recv:
