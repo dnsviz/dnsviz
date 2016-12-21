@@ -398,7 +398,6 @@ class DNSQueryTransportHandler(object):
                 self._set_start_time()
             except SocketInUse as e:
                 self.err = e
-                # don't cleanup, as it will re-try
         else:
             try:
                 self._create_socket()
@@ -408,7 +407,6 @@ class DNSQueryTransportHandler(object):
                 self._connect_socket()
             except socket.error as e:
                 self.err = e
-                self.cleanup()
 
     def _reuse_socket(self):
         # wait for the lock on the socket
@@ -499,7 +497,6 @@ class DNSQueryTransportHandler(object):
                 return True
         except socket.error as e:
             self.err = e
-            self.cleanup()
             return True
 
     def do_read(self):
@@ -575,13 +572,11 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
             try:
                 self.msg_recv = self.sock.recv(65536)
                 if self._check_msg_recv_consistency():
-                    self.cleanup()
                     return True
                 else:
                     self.msg_recv = b''
             except socket.error as e:
                 self.err = e
-                self.cleanup()
                 return True
 
         # TCP
@@ -608,7 +603,6 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                     self.msg_recv_index = len(self.msg_recv)
 
                     if self.msg_recv_index >= self.msg_recv_len:
-                        self.cleanup()
                         return True
 
             except (socket.error, EOFError) as e:
@@ -616,12 +610,10 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
                     pass
                 else:
                     self.err = e
-                    self.cleanup()
                     return True
 
     def do_timeout(self):
         self.err = dns.exception.Timeout()
-        self.cleanup()
 
 class DNSQueryTransportHandlerDNSPrivate(DNSQueryTransportHandlerDNS):
     allow_loopback_query = True
@@ -790,12 +782,10 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     status_match = HTTP_STATUS_RE.search(lb2s(headers))
                     if status_match is None:
                         self.err = RemoteQueryTransportError('Malformed HTTP status line')
-                        self.cleanup()
                         return True
                     status = int(status_match.group('status'))
                     if status != 200:
                         self.err = RemoteQueryTransportError('%d HTTP status' % status)
-                        self.cleanup()
                         return True
 
                     # get content length or determine whether "chunked"
@@ -839,7 +829,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                         if self.msg_recv_len == 0:
                             # no chunks left, so clean up and return
-                            self.cleanup()
                             return True
 
                         # read remaining bytes
@@ -866,7 +855,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     self.msg_recv_index = len(self.msg_recv)
 
                     if self.msg_recv_index >= self.msg_recv_len:
-                        self.cleanup()
                         return True
                 else:
                     self.msg_recv += self.msg_recv_buf
@@ -884,12 +872,10 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                     pass
                 else:
                     self.err = RemoteQueryTransportError('Error communicating with HTTP server: %s' % e)
-                self.cleanup()
                 return True
 
     def do_timeout(self):
         self.err = RemoteQueryTransportError('HTTP request timed out')
-        self.cleanup()
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
@@ -987,7 +973,6 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                         if not byte1 & 0x80:
                             if self.err is not None:
                                 self.err = RemoteQueryTransportError('Mask bit not set in message from server')
-                                self.cleanup()
                                 return True
 
                         # check for FIN flag
@@ -1039,7 +1024,6 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                         self.msg_recv_buf = b''
 
                     if self.msg_recv_index >= self.msg_recv_len and not self.has_more:
-                        self.cleanup()
                         return True
 
         except (socket.error, EOFError) as e:
@@ -1047,12 +1031,10 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                 pass
             else:
                 self.err = e
-                self.cleanup()
                 return True
 
     def do_timeout(self):
         self.err = RemoteQueryTransportError('Read of UNIX domain socket timed out')
-        self.cleanup()
 
 class DNSQueryTransportHandlerWebSocketServerPrivate(DNSQueryTransportHandlerWebSocketServer):
     allow_loopback_query = True
@@ -1215,6 +1197,7 @@ class _DNSQueryTransportManager:
 
                 if qh.do_write():
                     if qh.err is not None or qh.mode == QTH_MODE_WRITE:
+                        qh.cleanup()
                         finished_fds.append(fd)
                     else: # qh.mode == QTH_MODE_WRITE_READ
                         wlist_in.remove(fd)
@@ -1228,6 +1211,7 @@ class _DNSQueryTransportManager:
                 qh = query_meta[fd]
 
                 if qh.do_read(): # qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ)
+                    qh.cleanup()
                     finished_fds.append(qh.sock.reader_fd)
 
             # handle the expired queries
@@ -1241,6 +1225,7 @@ class _DNSQueryTransportManager:
                     continue
 
                 qh.do_timeout()
+                qh.cleanup()
                 finished_fds.append(qh.sock.reader_fd)
             expirations = expirations[future_index:]
 
@@ -1276,10 +1261,11 @@ class _DNSQueryTransportManager:
                                 # if this was a SocketInUse, just requeue, and try again
                                 qh.err = None
                                 requeue.append(qh)
-                                continue
 
-                            if qh in self._event_map:
-                                self._event_map[qh].set()
+                            else:
+                                qh.cleanup()
+                                if qh in self._event_map:
+                                    self._event_map[qh].set()
                         else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
