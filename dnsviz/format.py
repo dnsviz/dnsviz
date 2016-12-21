@@ -168,5 +168,10 @@ def humanize_name(name, idn=False):
     return name.rstrip('.')
 
 def latin1_binary_to_string(s):
-    return codecs.decode(s, 'latin1')
+    # python3/python2 dual compatibility
+    #XXX In places where this method wraps calls to dns.name.Name.to_text(),
+    # this is no longer needed with dnspython 1.15.0
+    if isinstance(s, bytes):
+        return codecs.decode(s, 'latin1')
+    return s
 lb2s = latin1_binary_to_string
