@@ -386,6 +386,9 @@ class DNSQueryTransportHandler(object):
         assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE), 'prepare() can only be called for modes QTH_MODE_WRITE and QTH_MODE_WRITE_READ'
         assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
 
+        if self.timeout is None:
+            self.timeout = self.timeout_baseline
+
         self._init_msg_recv()
         if self._sock is not None:
             # if a pre-existing socket is available for re-use, then use that
@@ -963,9 +966,6 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
         self.msg_send = b'\x81\x00'
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
-
-        # since there are no qtms, we need to set the timeout explicitly
-        self.timeout = 1.0
 
     def do_read(self):
         try:
