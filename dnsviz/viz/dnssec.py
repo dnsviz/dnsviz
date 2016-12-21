@@ -74,6 +74,13 @@ ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
 WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
 ERROR_ICON=os.path.join(ICON_PATH, 'error.png')
 
+# python3/python2.6 dual compatibility
+vers0, vers1, vers2 = sys.version_info[:3]
+if (vers0, vers1) == (2, 6):
+    execv_encode = lambda x: codecs.encode(x, sys.getfilesystemencoding())
+else:
+    execv_encode = lambda x: x
+
 class DNSKEYNonExistent(object):
     def __init__(self, name, algorithm, key_tag):
         self.name = name
@@ -265,7 +272,7 @@ class DNSAuthGraph:
         return s
 
     def to_raphael(self):
-        svg = self.G.draw(format=codecs.encode('svg', sys.getfilesystemencoding()), prog=codecs.encode('dot', sys.getfilesystemencoding()))
+        svg = self.G.draw(format=execv_encode('svg'), prog=execv_encode('dot'))
         dom = xml.dom.minidom.parseString(svg)
 
         s = 'AuthGraph.prototype.draw = function () {\n'
@@ -285,9 +292,9 @@ class DNSAuthGraph:
                 io.open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
-                return self.G.draw(format=codecs.encode(format, sys.getfilesystemencoding()), prog=codecs.encode('dot', sys.getfilesystemencoding()))
+                return self.G.draw(format=execv_encode(format), prog=execv_encode('dot'))
             else:
-                return self.G.draw(path=codecs.encode(path, sys.getfilesystemencoding()), format=codecs.encode(format, sys.getfilesystemencoding()), prog=codecs.encode('dot', sys.getfilesystemencoding()))
+                return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
 
     def id_for_dnskey(self, name, dnskey):
         try:
