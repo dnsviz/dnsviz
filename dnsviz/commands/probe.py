@@ -936,6 +936,8 @@ def main(argv):
                     usage('WebSocket URL must designate a local UNIX domain socket.')
                     sys.exit(1)
                 th_factories = (transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path),)
+            elif url.scheme == 'ssh':
+                th_factories = (transport.DNSQueryTransportHandlerRemoteCmdFactory(opts['-u']),)
             else:
                 usage('Unsupported URL scheme: "%s"' % opts['-u'])
                 sys.exit(1)

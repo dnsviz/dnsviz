@@ -1178,6 +1178,71 @@ class DNSQueryTransportHandlerCmd(DNSQueryTransportHandlerWebSocketServer):
             self.sock.proc.terminate()
             return True
 
+class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
+    def __init__(self, url, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+
+        parse_result = urlparse.urlparse(url)
+        scheme = parse_result.scheme
+        if not scheme:
+            scheme = 'ssh'
+        elif scheme != 'ssh':
+            raise RemoteQueryTransportError('Invalid scheme: %s' % scheme)
+
+        args = ['ssh', '-T']
+        if parse_result.port is not None:
+           args.extend(['-p', str(parse_result.port)])
+        if parse_result.username is not None:
+            args.append('%s@%s' % (parse_result.username, parse_result.hostname))
+        else:
+            args.append('%s' % (parse_result.hostname))
+        if parse_result.path:
+            args.append(parse_result.path)
+        else:
+            args.append('dnsviz lookingglass')
+
+        super(DNSQueryTransportHandlerRemoteCmd, self).__init__(args, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+    def _get_af(self):
+        return None
+
+    def _bind_socket(self):
+        pass
+
+    def _set_socket_info(self):
+        pass
+
+    def _get_connect_arg(self):
+        return None
+
+    def _create_socket(self):
+        try:
+            p = subprocess.Popen(self.args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        except OSError as e:
+            raise socket.error(str(e))
+        else:
+            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+
+    def _connect_socket(self):
+        pass
+
+    def do_write(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_write()
+
+    def do_read(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_read()
+
+    def cleanup(self):
+        super(DNSQueryTransportHandlerCmd, self).cleanup()
+        if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
+            self.sock.proc.terminate()
+            return True
+
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
 
@@ -1260,6 +1325,9 @@ class DNSQueryTransportHandlerWebSocketServerPrivateFactory:
 
 class DNSQueryTransportHandlerCmdFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerCmd
+
+class DNSQueryTransportHandlerRemoteCmdFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerRemoteCmd
 
 class DNSQueryTransportHandlerWrapper(object):
     def __init__(self, qh):
