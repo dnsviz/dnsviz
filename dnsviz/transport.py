@@ -1209,7 +1209,7 @@ class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
             args.append('%s@%s' % (parse_result.username, parse_result.hostname))
         else:
             args.append('%s' % (parse_result.hostname))
-        if parse_result.path:
+        if parse_result.path and parse_result.path != '/':
             args.append(parse_result.path)
         else:
             args.append('dnsviz lookingglass')
