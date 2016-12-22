@@ -82,7 +82,7 @@ The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
 .TP
 .B -u \fIurl\fR
-Specify the URL (HTTP/HTTPS only) for a DNS looking glass that will send the
+Specify the URL (HTTP/HTTPS or SSH) for a DNS looking glass that will send the
 diagnostic queries, rather than sending them locally.
 
 .RS
@@ -100,6 +100,12 @@ http://www.example.com/cgi-bin/dnsviz-lg.cgi
 Same, but use HTTP Basic authentication:
 .P
 http://username:password@www.example.com/cgi-bin/dnsviz-lg.cgi
+.PD
+.P
+.PD 0
+Issue DNS queries from host.example.com on which DNSViz is also installed.
+.P
+ssh://username@host.example.com
 .PD
 .RE
 .P
