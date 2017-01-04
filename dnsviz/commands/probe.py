@@ -543,9 +543,24 @@ def _create_and_serve_zone(zone, mappings, port):
     zonefile.close()
     _serve_zone(zone, zonefile.name, port)
 
+def _cleanup_process(working_dir, pid):
+    if pid is not None:
+        try:
+            os.kill(pid, signal.SIGINT)
+        except OSError:
+            return
+        while True:
+            try:
+                os.kill(pid, 0)
+                time.sleep(0.2)
+            except OSError:
+                break
+    shutil.rmtree(working_dir)
+
 def _serve_zone(zone, zone_file, port):
     tmpdir = tempfile.mkdtemp(prefix='dnsviz')
-    atexit.register(shutil.rmtree, tmpdir)
+    pid = None
+
     io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
 options {
     directory "%s";
@@ -566,29 +581,45 @@ logging {
 	category unmatched { null; };
 };
 ''' % (tmpdir, port, port, lb2s(zone.to_text()), os.path.abspath(zone_file), tmpdir))
+
     try:
         p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
         usage('This option requires executing named-checkconf.  Please ensure that it is installed and in PATH (%s).' % e)
+        _cleanup_process(tmpdir, pid)
         sys.exit(1)
 
     (stdout, stderr) = p.communicate()
     if p.returncode != 0:
         usage('There was an problem with the zone file for "%s":\n%s' % (lb2s(zone.to_text()), stdout))
+        _cleanup_process(tmpdir, pid)
         sys.exit(1)
 
     try:
-        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p = subprocess.Popen(['named', '-L', '%s/named.log' % tmpdir, '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
         usage('This option requires executing named.  Please ensure that it is installed and in PATH (%s).' % e)
-        sys.exit(1)
-    (stdout, stderr) = p.communicate()
-    if p.returncode != 0:
-        usage('There was an problem executing named to serve the "%s" zone\n%s' % (lb2s(zone.to_text()), stdout))
+        _cleanup_process(tmpdir, pid)
         sys.exit(1)
 
-    pid = int(io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8').read())
-    atexit.register(os.kill, pid, signal.SIGINT)
+    (stdout, stderr) = p.communicate()
+    if p.returncode != 0:
+        try:
+            log = io.open('%s/named.log' % tmpdir, 'r', encoding='utf-8').read()
+        except IOError as e:
+            log = ''
+        usage('There was an problem executing named to serve the "%s" zone:\n%s' % (lb2s(zone.to_text()), log))
+        _cleanup_process(tmpdir, pid)
+        sys.exit(1)
+
+    try:
+        pid = int(io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8').read())
+    except (IOError, ValueError) as e:
+        usage('There was an error detecting the process ID for named: %s' % e)
+        _cleanup_process(tmpdir, pid)
+        sys.exit(1)
+
+    atexit.register(_cleanup_process, tmpdir, pid)
 
 def _get_ecs_option(s):
     try:
