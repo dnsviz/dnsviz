@@ -503,7 +503,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if self.response_component_status is not None:
                     zone_status = Status.delegation_status_mapping[self.response_component_status[parent_obj]]
                 else:
-                    zone_status = Status.delegation_status_mapping[Status.INSECURE]
+                    zone_status = Status.delegation_status_mapping[Status.DELEGATION_STATUS_INSECURE]
                 zone_warnings = [w.terse_description for w in parent_obj.zone_warnings]
                 zone_errors = [e.terse_description for e in parent_obj.zone_errors]
                 if parent_obj.parent is not None:
