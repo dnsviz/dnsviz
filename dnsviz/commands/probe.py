@@ -608,6 +608,8 @@ logging {
             log = io.open('%s/named.log' % tmpdir, 'r', encoding='utf-8').read()
         except IOError as e:
             log = ''
+        if not log:
+            log = stdout
         usage('There was an problem executing named to serve the "%s" zone:\n%s' % (lb2s(zone.to_text()), log))
         _cleanup_process(tmpdir, pid)
         sys.exit(1)
