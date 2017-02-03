@@ -143,7 +143,11 @@ class DVCommandLineQuery:
         if self.trace:
             dnsget_args.append('-A')
         else:
-            dnsget_args.extend(['-s', self.nameservers[0]])
+            if ':' in self.nameservers[0]:
+                # add [ ] for ipv6 address
+                dnsget_args.extend(['-s', "["+self.nameservers[0]+"]"])
+            else:
+                dnsget_args.extend(['-s', self.nameservers[0]])
         dnsget_args.append(self.qname)
 
         if self.trusted_keys_file is not None:
