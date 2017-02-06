@@ -143,9 +143,8 @@ class DVCommandLineQuery:
         if self.trace:
             dnsget_args.append('-A')
         else:
-            if ':' in self.nameservers[0]:
-                # add [ ] for ipv6 address
-                dnsget_args.extend(['-s', "["+self.nameservers[0]+"]"])
+            if self.nameservers[0].version == 6:
+                dnsget_args.extend(['-s', '[%s]' % (self.nameservers[0])])
             else:
                 dnsget_args.extend(['-s', self.nameservers[0]])
         dnsget_args.append(self.qname)
