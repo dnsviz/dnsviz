@@ -22,6 +22,7 @@
 
 from __future__ import unicode_literals
 
+import getopt
 import importlib
 import sys
 
@@ -38,7 +39,9 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz <command> [args]
+    sys.stderr.write('''%sUsage: dnsviz [options] <command> [args]
+Options:
+    -p <path>      - add path to the python path
 Commands:
     probe          - issue diagnostic DNS queries
     grok           - assess diagnostic DNS queries
@@ -52,18 +55,29 @@ Commands:
 def main():
     check_deps()
 
-    if len(sys.argv) < 2:
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'p:')
+    except getopt.GetoptError as e:
+        usage(str(e))
+        sys.exit(1)
+
+    opts = dict(opts)
+
+    if len(args) < 1:
         usage()
         sys.exit(0)
 
-    if sys.argv[1] == 'help':
-        if len(sys.argv) < 3:
+    if args[0] == 'help':
+        if len(args) < 2:
             usage()
             sys.exit(0)
 
-        command = sys.argv[2]
+        command = args[1]
     else:
-        command = sys.argv[1]
+        command = args[0]
+
+    if '-p' in opts:
+        sys.path.insert(0, opts['-p'])
 
     # first try importing just the commands module to make sure
     # dnsviz is properly reachable with the current path
@@ -83,10 +97,10 @@ def main():
         usage('Invalid command: %s' % command)
         sys.exit(1)
 
-    if sys.argv[1] == 'help':
+    if args[0] == 'help':
         mod.usage()
     else:
-        mod.main(sys.argv[1:])
+        mod.main(args)
 
 if __name__ == "__main__":
     main()
