@@ -25,6 +25,8 @@ import codecs
 import re
 import socket
 
+INTERFACE_RE = re.compile(r'%[a-z0-9]+$')
+
 class IPAddr(str):
     def __new__(cls, string):
         # python 2/3 compatibility
@@ -33,9 +35,11 @@ class IPAddr(str):
         if ':' in string:
             af = socket.AF_INET6
             vers = 6
+            string = INTERFACE_RE.sub('', string)
         else:
             af = socket.AF_INET
             vers = 4
+
         try:
             ipaddr_bytes = socket.inet_pton(af, string)
         except socket.error:
