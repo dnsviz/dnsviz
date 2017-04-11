@@ -517,10 +517,10 @@ class DNSQueryTransportHandler(object):
         # set end (and start, if necessary) times, as appropriate
         self._set_end_time()
 
-        self._set_socket_info()
-
         # close socket
         if self.sock is not None:
+            self._set_socket_info()
+
             if not self.recycle_sock:
                 self.sock.close()
             if self.sock.lock is not None:
