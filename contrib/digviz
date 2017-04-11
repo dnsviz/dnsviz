@@ -27,6 +27,14 @@ import errno
 import socket
 import sys
 
+# python3/python2 dual compatibility
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+else:
+    urlparse = urllib.parse
+
 import dns.flags, dns.exception, dns.name, dns.opcode, dns.rdataclass, dns.rdatatype
 
 from dnsviz.ipaddr import IPAddr
@@ -312,7 +320,26 @@ class DigCommandLineQuery:
             response_handlers = self.handlers
 
         if self.lg_url is not None:
-            th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url),)
+            # check that version is >= 2.7.9 if HTTPS is requested
+            if self.lg_url.startswith('https'):
+                vers0, vers1, vers2 = sys.version_info[:3]
+                if (2, 7, 9) > (vers0, vers1, vers2):
+                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
+                    sys.exit(1)
+
+            url = urlparse.urlparse(self.lg_url)
+            if url.scheme in ('http', 'https'):
+                th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=options['insecure']),)
+            elif url.scheme == 'ws':
+                if url.hostname is not None:
+                    usage('WebSocket URL must designate a local UNIX domain socket.')
+                    sys.exit(1)
+                th_factories = (transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path),)
+            elif url.scheme == 'ssh':
+                th_factories = (transport.DNSQueryTransportHandlerRemoteCmdFactory(self.lg_url),)
+            else:
+                usage('Unsupported URL scheme: "%s"' % self.lg_url)
+                sys.exit(1)
         else:
             th_factories = None
 
@@ -424,10 +451,10 @@ class DigCommandLineQuery:
             return s
 
         elif response.error in (Q.RESPONSE_ERROR_TIMEOUT, Q.RESPONSE_ERROR_NETWORK_ERROR):
-            return ';; connection timed out; no servers could be reached'
+            return ';; connection timed out; no servers could be reached\n'
 
         else:
-            return ';; the response from %s was malformed' % server
+            return ';; the response from %s was malformed\n' % server
 
     def query_and_display(self, options, filehandle):
         try:
@@ -451,6 +478,7 @@ class DigCommandLine:
             'use_ipv6': None,
             'client_ipv4': None,
             'client_ipv6': None,
+            'insecure': None,
             'port': 53,
         }
 
@@ -624,6 +652,9 @@ class DigCommandLine:
         elif self.args[self.arg_index].startswith('-4'):
             self._get_arg(False)
             self.options['use_ipv4'] = True
+        elif self.args[self.arg_index].startswith('-k'):
+            self._get_arg(False)
+            self.options['insecure'] = True
         else:
             raise CommandLineException('Option "%s" not recognized.' % self.args[self.arg_index][:2])
 
