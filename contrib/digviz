@@ -234,15 +234,15 @@ class DigCommandLineQuery:
                 self.tcp = True
             elif arg in ('+notcp', '+novc'):
                 self.tcp = False
-            elif arg.startswith('+time') and \
-                    (len(arg) <= 5 or arg[5] == '='):
+            elif arg.startswith('+timeout') and \
+                    (len(arg) <= 8 or arg[8] == '='):
                 try:
                     opt, arg = arg.split('=')
                     self.query_timeout = float(arg)
                     if self.query_timeout < 1.0:
                         self.query_timeout = 1.0
                 except ValueError:
-                    raise CommandLineException('+time requires a numerical argument')
+                    raise CommandLineException('+timeout requires a numerical argument')
             #TODO +[no]topdown
             #TODO +[no]trace
             #TODO +[no]tries
