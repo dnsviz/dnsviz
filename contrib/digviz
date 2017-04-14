@@ -98,6 +98,7 @@ class DigCommandLineQuery:
         self.trusted_keys = ()
         self.show_ttl = True
         self.lg_url = None
+        self.lg_factory = None
 
     def process_query_options(self, global_options):
         for arg in global_options + self.query_options:
@@ -309,6 +310,34 @@ class DigCommandLineQuery:
 
         self.nameservers = nameservers + processed_nameservers
 
+    def process_looking_glass(self, looking_glass_cache):
+        if self.lg_url is None:
+            return
+
+        if self.lg_url not in looking_glass_cache:
+            # check that version is >= 2.7.9 if HTTPS is requested
+            if self.lg_url.startswith('https'):
+                vers0, vers1, vers2 = sys.version_info[:3]
+                if (2, 7, 9) > (vers0, vers1, vers2):
+                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
+                    sys.exit(1)
+
+            url = urlparse.urlparse(self.lg_url)
+            if url.scheme in ('http', 'https'):
+                fact = transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=options['insecure'])
+            elif url.scheme == 'ws':
+                if url.hostname is not None:
+                    usage('WebSocket URL must designate a local UNIX domain socket.')
+                    sys.exit(1)
+                fact = transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path)
+            elif url.scheme == 'ssh':
+                fact = transport.DNSQueryTransportHandlerRemoteCmdFactory(self.lg_url)
+            else:
+                usage('Unsupported URL scheme: "%s"' % self.lg_url)
+                sys.exit(1)
+            looking_glass_cache[self.lg_url] = fact
+        self.lg_factory = looking_glass_cache[self.lg_url]
+
     def _get_resolver(self, options):
         class CustomQuery(Q.DNSQueryFactory):
             flags = self.flags
@@ -319,27 +348,8 @@ class DigCommandLineQuery:
             tcp = self.tcp
             response_handlers = self.handlers
 
-        if self.lg_url is not None:
-            # check that version is >= 2.7.9 if HTTPS is requested
-            if self.lg_url.startswith('https'):
-                vers0, vers1, vers2 = sys.version_info[:3]
-                if (2, 7, 9) > (vers0, vers1, vers2):
-                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
-                    sys.exit(1)
-
-            url = urlparse.urlparse(self.lg_url)
-            if url.scheme in ('http', 'https'):
-                th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=options['insecure']),)
-            elif url.scheme == 'ws':
-                if url.hostname is not None:
-                    usage('WebSocket URL must designate a local UNIX domain socket.')
-                    sys.exit(1)
-                th_factories = (transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path),)
-            elif url.scheme == 'ssh':
-                th_factories = (transport.DNSQueryTransportHandlerRemoteCmdFactory(self.lg_url),)
-            else:
-                usage('Unsupported URL scheme: "%s"' % self.lg_url)
-                sys.exit(1)
+        if self.lg_factory is not None:
+            th_factories = (self.lg_factory,)
         else:
             th_factories = None
 
@@ -494,9 +504,11 @@ class DigCommandLine:
         if not self.queries:
             self.queries.append(DigCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
+        looking_glass_cache = {}
         for q in self.queries:
             q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
             q.process_query_options(self.global_query_options)
+            q.process_looking_glass(looking_glass_cache)
 
             if not q.nameservers:
                 raise SemanticException('No nameservers to query')
