@@ -385,7 +385,7 @@ class DigCommandLineQuery:
 
     def display(self, response, server, options):
         if response is None:
-            return ';; no servers were queried'
+            return ';; no servers were queried\n'
 
         elif response.message is not None:
             if self.short:
