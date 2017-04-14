@@ -1190,9 +1190,12 @@ class DNSQueryTransportHandlerCmd(DNSQueryTransportHandlerWebSocketServer):
         super(DNSQueryTransportHandlerCmd, self).cleanup()
         if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
             self.sock.proc.terminate()
+            self.sock.proc.wait()
             return True
 
 class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
+    timeout_baseline = 10.0
+
     def __init__(self, url, sock=None, recycle_sock=True, processed_queue=None, factory=None):
 
         parse_result = urlparse.urlparse(url)
@@ -1255,6 +1258,7 @@ class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
         super(DNSQueryTransportHandlerCmd, self).cleanup()
         if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
             self.sock.proc.terminate()
+            self.sock.proc.wait()
             return True
 
 class DNSQueryTransportHandlerFactory(object):
