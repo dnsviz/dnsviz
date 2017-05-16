@@ -200,7 +200,14 @@ class DigCommandLineQuery:
             elif arg == '+nomultiline':
                 self.multiline = False
             #TODO +ndots=D
-            #TODO +[no]nsid
+            elif arg == '+nsid':
+                if self.edns < 0:
+                    self.edns = 0
+                if not [x for x in filter(lambda x: x.otype == dns.edns.NSID, self.edns_options)]:
+                    self.edns_options.append(dns.edns.GenericOption(dns.edns.NSID, b''))
+            elif arg == '+nonsid':
+                l = [x for x in filter(lambda x: x.otype == dns.edns.NSID, self.edns_options)]
+                self.edns_options.remove(dns.edns.GenericOption(dns.edns.NSID, b''))
             #TODO +[no]nssearch
             #TODO +[no]onesoa
             #TODO +[no]qr
@@ -426,6 +433,17 @@ class DigCommandLineQuery:
                 if response.message.edns >= 0:
                     s += ';; OPT PSEUDOSECTION:\n'
                     s += '; EDNS: version: %d, flags: %s; udp: %d\n' % (response.message.edns, dns.flags.edns_to_text(response.message.ednsflags).lower(), response.message.payload)
+
+                    for opt in response.message.options:
+                        chars = []
+                        if opt.otype == dns.edns.NSID:
+                            s += '; NSID:'
+                            for b in opt.data:
+                                s += ' %02x' % b
+                                chars.append(chr(b))
+                            for c in chars:
+                                s += ' (%s)' % c
+                            s += '\n'
 
             if response.message.question and self.show_question:
                 if self.show_comments:
