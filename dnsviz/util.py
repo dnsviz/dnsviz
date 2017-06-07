@@ -87,6 +87,12 @@ M.ROOT-SERVERS.NET.      3600000      A     202.12.27.33
 M.ROOT-SERVERS.NET.      3600000      AAAA  2001:dc3::35
 '''
 
+HISTORICAL_ROOT_IPS = (
+        (dns.name.from_text('h.root-servers.net.'), IPAddr('2001:500:1::803f:235')), # December 1, 2015
+        (dns.name.from_text('l.root-servers.net.'), IPAddr('2001:500:3::42')), # March 24, 2016
+        (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:84::b')), # June 1, 2017
+)
+
 def tuple_to_dict(t):
     d = {}
     for n, v in t:
