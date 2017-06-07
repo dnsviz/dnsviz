@@ -496,6 +496,27 @@ class OnlineDomainNameAnalysis(object):
 
         return self._glue_ip_mapping
 
+    def get_root_hint_mapping(self):
+        servers = {}
+        hints = util.get_root_hints()
+        for rdata in hints[(dns.name.root, dns.rdatatype.NS)]:
+            servers[rdata.target] = set()
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in hints:
+                    servers[rdata.target].update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
+        for name, server in util.HISTORICAL_ROOT_IPS:
+            if name not in servers:
+                servers[name] = set()
+            servers[name].add(server)
+        return servers
+
+    def _get_servers_from_hints(self, name, hints):
+        servers = set()
+        server_mapping = self._get_server_ip_mapping_from_hints(name, hints)
+        for ns_name in server_mapping:
+            servers.update(server_mapping[ns_name])
+        return servers
+
     def get_auth_ns_ip_mapping(self):
         '''Return a reference to the mapping of NS targets from delegation or
         authoritative source to their authoritative IPv4 and IPv6 addresses.'''
@@ -667,7 +688,10 @@ class OnlineDomainNameAnalysis(object):
 
         if not hasattr(self, '_ip_ns_name_mapping') or self._ip_ns_name_mapping is None:
             self._ip_ns_name_mapping = {}
-            glue_ips = self.get_glue_ip_mapping()
+            if self.name == dns.name.root:
+                glue_ips = self.get_root_hint_mapping()
+            else:
+                glue_ips = self.get_glue_ip_mapping()
             auth_ips = self.get_auth_ns_ip_mapping()
             if self.stub:
                 auth_names = set(auth_ips)
