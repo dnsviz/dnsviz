@@ -27,18 +27,18 @@
 
 from __future__ import unicode_literals
 
+import datetime
 import io
 import os
 import re
 import socket
 
-import dns.message, dns.rdatatype
+import dns.message, dns.name, dns.rdataclass, dns.rdatatype, dns.rrset
 
 from .config import DNSVIZ_SHARE_PATH
 from . import format as fmt
 from .ipaddr import IPAddr
 
-TRUSTED_KEYS_ROOT = os.path.join(DNSVIZ_SHARE_PATH, 'trusted-keys', 'root.txt')
 ROOT_HINTS = os.path.join(DNSVIZ_SHARE_PATH, 'hints', 'named.root')
 
 CR_RE = re.compile(r'\r\n', re.MULTILINE)
@@ -93,6 +93,25 @@ HISTORICAL_ROOT_IPS = (
         (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:84::b')), # June 1, 2017
 )
 
+# The following list should include all current and historical trust anchors
+# for the root zone.  This makes it possible to perform analysis of current DNS
+# responses, but also archived DNS responses.
+#
+# For each root zone trust anchor, the start value is the day it is first
+# published in the root zone.  Even though the key is not yet signing, this
+# draws attention to the fact that it will be signing and likely replacing its
+# predecessor.  The end value is (at least) the minimum of the TTL and the
+# expiration of its last published RRSIG.  This allows us to query caches with
+# contents referring to the old key, even after its replacement has taken over.
+TRUSTED_KEYS_ROOT = (
+        ('. IN DNSKEY 257 3 8 AwEAAagAIKlVZrpC6Ia7gEzahOR+9W29euxhJhVVLOyQbSEW0O8gcCjF FVQUTf6v58fLjwBd0YI0EzrAcQqBGCzh/RStIoO8g0NfnfL2MTJRkxoX bfDaUeVPQuYEhg37NZWAJQ9VnMVDxP/VHL496M/QZxkjf5/Efucp2gaD X6RS6CXpoY68LsvPVjR0ZSwzz1apAzvN9dlzEheX7ICJBBtuA6G3LQpz W5hOA2hzCTMjJPJ8LbqF6dsV6DoBQzgul0sGIcGOYl7OyQdXfZ57relS Qageu+ipAdTTJ25AsRTAoub8ONGcLmqrAmRLKBP1dfwhYB4N7knNnulq QxA+Uk1ihz0=',
+            datetime.datetime(2010, 7, 16, 0, 0, 0, 0, fmt.utc),
+            datetime.datetime(2017, 10, 15, 0, 0, 0, 0, fmt.utc)),
+        ('. IN DNSKEY 257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3 +/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kv ArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF 0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+e oZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfd RUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwN R1AkUTV74bU=',
+            datetime.datetime(2017, 7, 12, 0, 0, 0, 0, fmt.utc),
+            None),
+)
+
 def tuple_to_dict(t):
     d = {}
     for n, v in t:
@@ -119,11 +138,14 @@ def get_trusted_keys(s):
 
     return trusted_keys
 
-def get_default_trusted_keys():
-    try:
-        tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
-    except IOError as e:
-        return []
+def get_default_trusted_keys(date):
+    tk_str = ''
+    for tk, start, end in TRUSTED_KEYS_ROOT:
+        if start is not None and date < start:
+            continue
+        if end is not None and date > end:
+            continue
+        tk_str += tk + '\n'
     return get_trusted_keys(tk_str)
 
 def get_hints(s):
