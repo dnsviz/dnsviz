@@ -1754,15 +1754,19 @@ class DNSKEYNotAtZoneApex(DNSKEYError):
     code = 'DNSKEY_NOT_AT_ZONE_APEX'
     required_params = ['zone', 'name']
 
-class TrustAnchorNotSigning(DNSKEYError):
+class TrustAnchorError(DomainNameAnalysisError):
+    pass
+
+class NoTrustAnchorSigning(TrustAnchorError):
     '''
-    >>> e = TrustAnchorNotSigning()
+    >>> e = NoTrustAnchorSigning(zone='foo.baz.')
     >>> e.description
-    'The key was designated as a trust anchor but was not found signing the RRset.'
+    'One or more keys were designated as trust anchors for foo.baz., but none were found signing the DNSKEY RRset.'
     '''
     _abstract = False
-    description_template = "The key was designated as a trust anchor but was not found signing the RRset."
-    code = 'TRUST_ANCHOR_NOT_SIGNING'
+    description_template = "One or more keys were designated as trust anchors for %(zone)s, but none were found signing the DNSKEY RRset."
+    code = 'NO_TRUST_ANCHOR_SIGNING'
+    required_params = ['zone']
 
 class RevokedNotSigning(DNSKEYError):
     '''

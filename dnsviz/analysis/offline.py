@@ -2133,8 +2133,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return
 
         trusted_keys_rdata = set([k for z, k in trusted_keys if z == self.name])
-        trusted_keys_existing = set()
-        trusted_keys_not_self_signing = set()
+        trusted_keys_self_signing = set()
 
         # buid a list of responsive servers
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
@@ -2146,10 +2145,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # any errors point to their own servers_clients value
         for dnskey in self.get_dnskeys():
-            if dnskey.rdata in trusted_keys_rdata:
-                trusted_keys_existing.add(dnskey)
-                if dnskey not in self.ksks:
-                    trusted_keys_not_self_signing.add(dnskey)
+            if dnskey.rdata in trusted_keys_rdata and dnskey in self.ksks:
+                trusted_keys_self_signing.add(dnskey)
             if dnskey in self.revoked_keys and dnskey not in self.ksks:
                 err = Errors.RevokedNotSigning()
                 err.servers_clients = dnskey.servers_clients
@@ -2170,18 +2167,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # if the key is shown to be signing anything other than the
                 # DNSKEY RRset, or if it associated with a DS or trust anchor,
                 # then mark it as an error; otherwise, mark it as a warning.
-                if dnskey in self.zsks or dnskey in self.dnskey_with_ds or dnskey in trusted_keys_existing:
+                if dnskey in self.zsks or dnskey in self.dnskey_with_ds or dnskey.rdata in trusted_keys_rdata:
                     dnskey.errors.append(err)
                 else:
                     dnskey.warnings.append(err)
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
-        if not trusted_keys_existing.difference(trusted_keys_not_self_signing):
-            for dnskey in trusted_keys_not_self_signing:
-                err = Errors.TrustAnchorNotSigning()
-                err.servers_clients = dnskey.servers_clients
-                dnskey.errors.append(err)
+        if trusted_keys_rdata and not trusted_keys_self_signing:
+            self.zone_errors.append(Errors.NoTrustAnchorSigning(zone=fmt.humanize_name(self.zone.name)))
 
     def populate_response_component_status(self, G):
         response_component_status = {}
