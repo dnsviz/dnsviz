@@ -35,7 +35,7 @@ import dns.exception, dns.name
 
 from dnsviz.analysis import TTLAgnosticOfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.format import latin1_binary_to_string as lb2s
-from dnsviz.util import TRUSTED_KEYS_ROOT, get_trusted_keys
+from dnsviz.util import get_trusted_keys, get_default_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -430,18 +430,7 @@ def main(argv):
                 else:
                     names.append(name)
 
-        if '-t' not in opts:
-            try:
-                tk_str = io.open(TRUSTED_KEYS_ROOT, 'r', encoding='utf-8').read()
-            except IOError as e:
-                logger.error('Error reading trusted keys file "%s": %s' % (TRUSTED_KEYS_ROOT, e.strerror))
-                sys.exit(3)
-            try:
-                trusted_keys.extend(get_trusted_keys(tk_str))
-            except dns.exception.DNSException:
-                logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
-                sys.exit(3)
-
+        latest_analysis_date = None
         name_objs = []
         cache = {}
         for name in names:
@@ -449,10 +438,17 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_objs.append(TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
+            name_obj = TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache)
+            name_objs.append(name_obj)
+
+            if latest_analysis_date is None or latest_analysis_date > name_obj.analysis_end:
+                latest_analysis_date = name_obj.analysis_end
 
         if not name_objs:
             sys.exit(4)
+
+        if '-t' not in opts:
+            trusted_keys = get_default_trusted_keys(latest_analysis_date)
 
         G = DNSAuthGraph()
         for name_obj in name_objs:
