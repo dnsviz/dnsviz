@@ -2002,7 +2002,7 @@ class Analyst(object):
 
     def _check_connectivity(self, name_obj):
         if self.local_ceiling is not None and (self.local_ceiling, dns.rdatatype.NS) in self.explicit_delegations:
-            # this check is only useful if not the desdendant of an explicit
+            # this check is only useful if not the descendant of an explicit
             # delegation
             return
         if name_obj.get_auth_or_designated_servers(4) and self._require_connectivity_ipv4(name_obj) and not name_obj.get_responsive_servers_udp(4):
