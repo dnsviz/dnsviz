@@ -1688,7 +1688,7 @@ class Analyst(object):
                         # for zones we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
                         queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                     else:
-                        # for non-zones we don't need to keey the (UDP) SOA query, if there is no positive response
+                        # for non-zones we don't need to keep the (UDP) SOA query, if there is no positive response
                         exclude_no_answer.add((name_obj.name, dns.rdatatype.SOA))
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
