@@ -1273,7 +1273,7 @@ class ExecutableDNSQuery(DNSQuery):
 
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
-        '''Excecute the query to a given server, and handle it appropriately.'''
+        '''Execute the query to a given server, and handle it appropriately.'''
 
         tm = kwargs.get('tm', None)
         if tm is None:
