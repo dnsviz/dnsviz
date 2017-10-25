@@ -44,6 +44,13 @@ else:
     _supported_algs = set([1,5,7,8,10])
     _supported_digest_algs = set([1,2,4])
 
+try:
+    from libnacl.sign import Verifier as ed25519Verifier
+    import binascii
+    _supported_algs.add(15)
+except ImportError:
+    pass
+
 _supported_nsec3_algs = set([1])
 
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
@@ -357,6 +364,10 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     return pubkey.verify_dsa(digest, r, s) == 1
 
+def _validate_rrsig_ed25519(sig, msg, key):
+    verifier = ed25519Verifier(binascii.hexlify(key))
+    return verifier.verify(sig + msg) == msg
+
 def validate_rrsig(alg, sig, msg, key):
     if not alg_is_supported(alg):
         return None
@@ -370,6 +381,8 @@ def validate_rrsig(alg, sig, msg, key):
         return _validate_rrsig_gost(alg, sig, msg, key)
     elif alg in (13,14):
         return _validate_rrsig_ec(alg, sig, msg, key)
+    elif alg in (15,):
+        return _validate_rrsig_ed25519(sig, msg, key)
 
 def get_digest_for_nsec3(val, salt, alg, iterations):
     if not nsec3_alg_is_supported(alg):
