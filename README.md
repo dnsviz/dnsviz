@@ -51,6 +51,10 @@ powers the Web-based analysis available at http://dnsviz.net/
   $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
   ```
 
+* (optional) libnacl (1.64 or later) - https://libnacl.readthedocs.io/en/latest/index.html
+
+  Used to validate algorithm 15 (ED25519) signatures.
+
 * (optional) ISC BIND - https://www.isc.org/downloads/bind/
 
   When calling `dnsviz probe` if the `-N` option is used or if a zone file is
