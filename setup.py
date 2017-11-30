@@ -117,6 +117,7 @@ powers the Web-based analysis available at http://dnsviz.net/ .''',
         license='LICENSE',
         packages=[map_func(b'dnsviz'), map_func(b'dnsviz.viz'), map_func(b'dnsviz.analysis'), map_func(b'dnsviz.commands')],
         scripts=['bin/dnsviz'],
+        package_dir={ 'dnsviz': 'dnsviz' },
         data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
         requires=[
