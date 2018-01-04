@@ -69,7 +69,8 @@ from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
 lb2s = fmt.latin1_binary_to_string
 
-logger = logging.getLogger('dnsviz.analysis.online')
+logging.basicConfig(level=logging.WARNING, format='%(message)s')
+logger = logging.getLogger()
 
 # this needs to be global because of multiprocessing
 tm = None
@@ -563,7 +564,7 @@ def _serve_zone(zone, zone_file, port):
 
     io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
 options {
-    directory "%s";
+	directory "%s";
 	pid-file "named.pid";
 	listen-on port %s { localhost; };
 	listen-on-v6 port %s { localhost; };
@@ -958,7 +959,7 @@ def main(argv):
             if opts['-u'].startswith('https'):
                 vers0, vers1, vers2 = sys.version_info[:3]
                 if (2, 7, 9) > (vers0, vers1, vers2):
-                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
+                    logger.error('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.')
                     sys.exit(1)
 
             url = urlparse.urlparse(opts['-u'])
@@ -1019,9 +1020,6 @@ def main(argv):
             debug_level = logging.WARNING
         else:
             debug_level = logging.ERROR
-        handler = logging.StreamHandler()
-        handler.setLevel(debug_level)
-        logger.addHandler(handler)
         logger.setLevel(debug_level)
 
         if '-A' in opts:

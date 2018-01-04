@@ -53,7 +53,8 @@ except ImportError:
 LOCAL_MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
-logger = logging.getLogger('dnsviz.analysis.offline')
+logging.basicConfig(level=logging.WARNING, format='%(message)s')
+logger = logging.getLogger()
 
 def usage(err=None):
     if err is not None:
@@ -121,7 +122,7 @@ def test_m2crypto():
     try:
         import M2Crypto
     except ImportError:
-        sys.stderr.write('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.\n''')
+        logger.warning('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.''')
 
 def test_pygraphviz():
     try:
@@ -131,13 +132,13 @@ def test_pygraphviz():
             major = int(major)
             minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
             if (major, minor) < (1,1):
-                sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+                logger.error('''pygraphviz version >= 1.1 is required, but version %s is installed.''' % release.version)
                 sys.exit(2)
         except ValueError:
-            sys.stderr.write('''pygraphviz version >= 1.1 is required, but version %s is installed.\n''' % release.version)
+            logger.error('''pygraphviz version >= 1.1 is required, but version %s is installed.''' % release.version)
             sys.exit(2)
     except ImportError:
-        sys.stderr.write('''pygraphviz is required, but not installed.\n''')
+        logger.error('''pygraphviz is required, but not installed.''')
         sys.exit(2)
 
 def main(argv):
@@ -158,12 +159,12 @@ def main(argv):
                 try:
                     tk_str = io.open(arg, 'r', encoding='utf-8').read()
                 except IOError as e:
-                    sys.stderr.write('%s: "%s"\n' % (e.strerror, arg))
+                    logger.error('%s: "%s"' % (e.strerror, arg))
                     sys.exit(3)
                 try:
                     trusted_keys.extend(get_trusted_keys(tk_str))
                 except dns.exception.DNSException:
-                    sys.stderr.write('There was an error parsing the trusted keys file: "%s"\n' % arg)
+                    logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
                     sys.exit(3)
 
         opts = dict(opts)
@@ -202,11 +203,6 @@ def main(argv):
         if '-o' in opts and '-O' in opts:
             usage('The -o and -O options may not be used together.')
             sys.exit(1)
-
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.WARNING)
-        logger.addHandler(handler)
-        logger.setLevel(logging.WARNING)
 
         if '-r' not in opts or opts['-r'] == '-':
             opt_r = sys.stdin.fileno()
