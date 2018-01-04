@@ -731,6 +731,10 @@ class DNSKEYMeta(DNSResponseComponent):
         elif rdata.algorithm in (13,14):
             return len(key_str)<<3
 
+        # EDDSA keys
+        elif rdata.algorithm in (15,16):
+            return len(key_str)<<3
+
         # other keys - just guess, based on the length of the raw key material
         else:
             return len(key_str)<<3
