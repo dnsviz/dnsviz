@@ -278,12 +278,6 @@ def textualize_status_output(names, show_color):
 
     return s
 
-def test_m2crypto():
-    try:
-        import M2Crypto
-    except ImportError:
-        logger.warning('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.''')
-
 def test_pygraphviz():
     try:
         from pygraphviz import release
@@ -303,7 +297,6 @@ def test_pygraphviz():
 
 def main(argv):
     try:
-        test_m2crypto()
         test_pygraphviz()
 
         try:

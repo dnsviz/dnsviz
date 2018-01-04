@@ -144,12 +144,6 @@ def color_json(s):
 
     return s1.rstrip()
 
-def test_m2crypto():
-    try:
-        import M2Crypto
-    except ImportError:
-        logger.warning('''Warning: M2Crypto is not installed; cryptographic validation of signatures and digests will not be available.''')
-
 def test_pygraphviz():
     try:
         from pygraphviz import release
@@ -169,8 +163,6 @@ def test_pygraphviz():
 
 def main(argv):
     try:
-        test_m2crypto()
-
         #TODO remove -p option (it is now the default, and -c is used to change it)
         try:
             opts, args = getopt.getopt(argv[1:], 'f:r:t:o:cpl:h')

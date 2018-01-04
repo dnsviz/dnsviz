@@ -30,10 +30,29 @@ from __future__ import unicode_literals
 import atexit
 import base64
 import binascii
+import logging
 import struct
 import hashlib
 import os
 import re
+
+logger = logging.getLogger(__name__)
+
+ALG_TYPE_DNSSEC = 0
+ALG_TYPE_DIGEST = 1
+ALG_TYPE_NSEC3 = 2
+
+ALG_TYPE_DNSSEC_TEXT = [
+        'algorithm',
+        'digest algorithm',
+        'NSEC3 algorithm',
+]
+
+_crypto_sources = {
+        'M2Crypto >= 0.21.1': (set([1,5,7,8,10]), set([1,2,4]), set([1])),
+        'M2Crypto >= 0.24.0': (set([3,6,12,13,14]), set([3]), set()),
+}
+_logged_modules = set()
 
 try:
     from M2Crypto import EVP, RSA
@@ -95,6 +114,14 @@ def digest_alg_is_supported(alg):
 def nsec3_alg_is_supported(alg):
     return alg in _supported_nsec3_algs
 
+def _log_unsupported_alg(alg, alg_type):
+    for mod in _crypto_sources:
+        if alg in _crypto_sources[mod][alg_type]:
+            if mod not in _logged_modules:
+                _logged_modules.add(mod)
+                logger.warning('Warning: Without the installation of %s, cryptographic validation of DNSSEC %s %d (and possibly others) is not supported.' % (mod, ALG_TYPE_DNSSEC_TEXT[alg_type], alg))
+            return
+
 def _gost_init():
     try:
         gost = Engine.Engine(b'gost')
@@ -136,6 +163,7 @@ else:
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
     if not digest_alg_is_supported(digest_alg):
+        _log_unsupported_alg(digest_alg, ALG_TYPE_DIGEST)
         return None
 
     if digest_alg == 1:
@@ -330,6 +358,7 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
 def validate_rrsig(alg, sig, msg, key):
     if not alg_is_supported(alg):
+        _log_unsupported_alg(alg, ALG_TYPE_DNSSEC)
         return None
 
     # create an RSA key object for RSA keys
@@ -344,6 +373,7 @@ def validate_rrsig(alg, sig, msg, key):
 
 def get_digest_for_nsec3(val, salt, alg, iterations):
     if not nsec3_alg_is_supported(alg):
+        _log_unsupported_alg(alg, ALG_TYPE_NSEC3)
         return None
 
     if alg == 1:
