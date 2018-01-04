@@ -29,6 +29,7 @@ from __future__ import unicode_literals
 
 import atexit
 import base64
+import binascii
 import struct
 import hashlib
 import os
@@ -165,34 +166,22 @@ def _dnskey_to_dsa(key):
 
     # get Q
     new_offset = offset+20
-    q = b''
-    for c in key[offset:new_offset]:
-        q += b'%02x' % struct.unpack(b'B',c)[0]
-    q = bn_to_mpi(hex_to_bn(q))
+    q = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get P
     new_offset = offset+64+(t<<3)
-    p = b''
-    for c in key[offset:new_offset]:
-        p += b'%02x' % struct.unpack(b'B',c)[0]
-    p = bn_to_mpi(hex_to_bn(p))
+    p = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get G
     new_offset = offset+64+(t<<3)
-    g = b''
-    for c in key[offset:new_offset]:
-        g += b'%02x' % struct.unpack(b'B',c)[0]
-    g = bn_to_mpi(hex_to_bn(g))
+    g = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get Y
     new_offset = offset+64+(t<<3)
-    y = b''
-    for c in key[offset:new_offset]:
-        y += b'%02x' % struct.unpack(b'B',c)[0]
-    y = bn_to_mpi(hex_to_bn(y))
+    y = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # create the DSA public key
@@ -211,17 +200,11 @@ def _dnskey_to_rsa(key):
         offset = 3
 
     # get the exponent
-    e = b''
-    for c in key[offset:offset+e_len]:
-        e += b'%02x' % struct.unpack(b'B',c)[0]
-    e = bn_to_mpi(hex_to_bn(e))
+    e = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:offset+e_len])))
     offset += e_len
 
     # get the modulus
-    n = b''
-    for c in key[offset:]:
-        n += b'%02x' % struct.unpack(b'B',c)[0]
-    n = bn_to_mpi(hex_to_bn(n))
+    n = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:])))
 
     # create the RSA public key
     rsa = RSA.new_pub_key((e,n))
@@ -279,18 +262,12 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
 
     # get R
     new_offset = offset+20
-    r = b''
-    for c in sig[offset:new_offset]:
-        r += b'%02x' % struct.unpack(b'B',c)[0]
-    r = bn_to_mpi(hex_to_bn(r))
+    r = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     # get S
     new_offset = offset+20
-    s = b''
-    for c in sig[offset:new_offset]:
-        s += b'%02x' % struct.unpack(b'B',c)[0]
-    s = bn_to_mpi(hex_to_bn(s))
+    s = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     md = EVP.MessageDigest('sha1')
@@ -337,18 +314,12 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     # get R
     new_offset = offset+sigsize//2
-    r = b''
-    for c in sig[offset:new_offset]:
-        r += b'%02x' % struct.unpack(b'B',c)[0]
-    r = bn_to_mpi(hex_to_bn(r))
+    r = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     # get S
     new_offset = offset+sigsize//2
-    s = b''
-    for c in sig[offset:new_offset]:
-        s += b'%02x' % struct.unpack(b'B',c)[0]
-    s = bn_to_mpi(hex_to_bn(s))
+    s = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     md = EVP.MessageDigest(alg)
