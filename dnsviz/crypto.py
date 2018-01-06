@@ -55,17 +55,17 @@ _crypto_sources = {
 }
 _logged_modules = set()
 
+_supported_algs = set()
+_supported_digest_algs = set()
+_supported_nsec3_algs = set([1])
 try:
     from M2Crypto import EVP, RSA
     from M2Crypto.m2 import hex_to_bn, bn_to_mpi
 except:
-    _supported_algs = set()
-    _supported_digest_algs = set()
+    pass
 else:
-    _supported_algs = set([1,5,7,8,10])
-    _supported_digest_algs = set([1,2,4])
-
-_supported_nsec3_algs = set([1])
+    _supported_algs.update(set([1,5,7,8,10]))
+    _supported_digest_algs.update(set([1,2,4]))
 
 try:
     from libnacl.sign import Verifier as ed25519Verifier
