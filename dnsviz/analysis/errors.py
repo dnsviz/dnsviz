@@ -19,9 +19,16 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import cgi
-import collections
 import datetime
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 
 import dns.dnssec
 
@@ -52,14 +59,11 @@ class DomainNameAnalysisError(object):
     def __str__(self):
         return self.code
 
-    def __unicode__(self):
-        return self.code
-
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.args == other.args
 
     def copy(self):
-        return self.__class__(**dict(zip(self.required_params, self.args)))
+        return self.__class__(**dict(list(zip(self.required_params, self.args))))
 
     @property
     def args(self):
@@ -80,10 +84,10 @@ class DomainNameAnalysisError(object):
         description_template_escaped = cgi.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
-            if isinstance(v, (int, long)):
+            if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
-                if isinstance(v, (str, unicode)):
+                if isinstance(v, str):
                     template_kwargs_escaped[n] = cgi.escape(v)
                 else:
                     template_kwargs_escaped[n] = cgi.escape(str(v))
@@ -106,7 +110,7 @@ class DomainNameAnalysisError(object):
                     del self.servers_clients[(server, client)]
 
     def serialize(self, consolidate_clients=False, html_format=False):
-        d = collections.OrderedDict()
+        d = OrderedDict()
 
         if html_format:
             d['description'] = self.html_description
@@ -291,6 +295,42 @@ class ExpirationInPast(RRSIGError):
         diff = self.template_kwargs['reference_time'] - self.template_kwargs['expiration']
         self.template_kwargs['expired_time'] = fmt.humanize_time(diff.seconds, diff.days)
 
+class InceptionWithinClockSkew(RRSIGError):
+    '''
+    >>> e = InceptionWithinClockSkew(inception=datetime.datetime(2015,1,10,0,0,0), reference_time=datetime.datetime(2015,1,10,0,0,1))
+    >>> e.description
+    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range of the current time (2015-01-10 00:00:01)'.
+    '''
+
+    _abstract = False
+    code = 'INCEPTION_WITHIN_CLOCK_SKEW'
+    description_template = "The value of the Signature Inception field of the RRSIG RR (%(inception)s) is within possible clock skew range (%(difference)s) of the current time (%(reference_time)s)."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['inception', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(InceptionWithinClockSkew, self).__init__(**kwargs)
+        diff = self.template_kwargs['reference_time'] - self.template_kwargs['inception']
+        self.template_kwargs['difference'] = fmt.humanize_time(diff.seconds, diff.days)
+
+class ExpirationWithinClockSkew(RRSIGError):
+    '''
+    >>> e = ExpirationWithinClockSkew(expiration=datetime.datetime(2015,1,10,0,0,1), reference_time=datetime.datetime(2015,1,10,0,0,0))
+    >>> e.description
+    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range of the current time (2015-01-10 00:00:00)'.
+    '''
+
+    _abstract = False
+    code = 'EXPIRATION_WITHIN_CLOCK_SKEW'
+    description_template = "The value of the Signature Expiration field of the RRSIG RR (%(expiration)s) is within possible clock skew range (%(difference)s) of the current time (%(reference_time)s)."
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['expiration', 'reference_time']
+
+    def __init__(self, **kwargs):
+        super(ExpirationWithinClockSkew, self).__init__(**kwargs)
+        diff = self.template_kwargs['expiration'] - self.template_kwargs['reference_time']
+        self.template_kwargs['difference'] = fmt.humanize_time(diff.seconds, diff.days)
+
 class SignatureInvalid(RRSIGError):
     '''
     >>> e = SignatureInvalid()
@@ -473,6 +513,26 @@ class NoClosestEncloserWildcardNODATA(NoClosestEncloser):
 class NoClosestEncloserWildcardAnswer(NoClosestEncloser):
     _abstract = False
     references = ['RFC 5155, Sec. 8.8']
+
+class OptOutFlagNotSet(NSECError):
+    code = 'OPT_OUT_FLAG_NOT_SET'
+    description_template = "The opt-out flag was not set in the %(nsec_type)s RR covering the next closest encloser (%(next_closest_encloser)s) but was required for the NODATA response."
+    required_params = ['next_closest_encloser']
+    nsec_type = 'NSEC3'
+
+class OptOutFlagNotSetNODATA(OptOutFlagNotSet):
+    '''
+    >>> e = OptOutFlagNotSetNODATA(next_closest_encloser='foo.baz.')
+    >>> e.description
+    'The opt-out flag was not set in the NSEC3 RR covering the next closest encloser (foo.baz.) but was required for the NODATA response.'
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.5', 'RFC Errata 3441']
+
+class OptOutFlagNotSetNODATADS(OptOutFlagNotSet):
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.6']
 
 class ReferralWithSOABit(NSECError):
     code = 'REFERRAL_WITH_SOA'
@@ -1306,6 +1366,19 @@ class InconsistentNXDOMAIN(ResponseError):
     required_params = ['qname', 'rdtype_nxdomain', 'rdtype_noerror']
     references = ['RFC 1034, Sec. 4.3.2']
 
+class InconsistentNXDOMAINAncestry(ResponseError):
+    '''
+    >>> e = InconsistentNXDOMAINAncestry(qname='foo.baz.', ancestor_qname='baz.')
+    >>> e.description
+    "A query for foo.baz. results in a NOERROR response, while a query for its ancestor, baz., returns a name error (NXDOMAIN), which indicates that subdomains of baz., including foo.baz., don't exist."
+    '''
+
+    _abstract = False
+    code = 'INCONSISTENT_NXDOMAIN_ANCESTOR'
+    description_template = "A query for %(qname)s results in a NOERROR response, while a query for its ancestor, %(ancestor_qname)s, returns a name error (NXDOMAIN), which indicates that subdomains of %(ancestor_qname)s, including %(qname)s, don't exist."
+    required_params = ['qname', 'ancestor_qname']
+    references = []
+
 class PMTUExceeded(ResponseError):
     '''
     >>> e = PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None)
@@ -1488,18 +1561,66 @@ class GlueMismatchError(DelegationError):
     '''
     >>> e = GlueMismatchError(name='ns1.foo.baz.', glue_addresses=('192.0.2.1',), auth_addresses=('192.0.2.2',))
     >>> e.description
-    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from their respective authoritative address(es) (192.0.2.2).'
+    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from its authoritative address(es) (192.0.2.2).'
     '''
 
     _abstract = False
     code = 'GLUE_MISMATCH'
-    description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from their respective authoritative address(es) (%(auth_addresses_text)s).'
+    description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from its authoritative address(es) (%(auth_addresses_text)s).'
     required_params = ['name', 'glue_addresses', 'auth_addresses']
 
     def __init__(self, **kwargs):
         super(GlueMismatchError, self).__init__(**kwargs)
         self.template_kwargs['glue_addresses_text'] = ', '.join(self.template_kwargs['glue_addresses'])
         self.template_kwargs['auth_addresses_text'] = ', '.join(self.template_kwargs['auth_addresses'])
+
+class MissingGlueIPv4(DelegationError):
+    '''
+    >>> e = MissingGlueIPv4(name='ns1.foo.baz.')
+    >>> e.description
+    'Authoritative A records exist for ns1.foo.baz., but there are no corresponding A glue records.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_IPV4'
+    description_template = "Authoritative A records exist for %(name)s, but there are no corresponding A glue records."
+    required_params = ['name']
+
+class MissingGlueIPv6(DelegationError):
+    '''
+    >>> e = MissingGlueIPv6(name='ns1.foo.baz.')
+    >>> e.description
+    'Authoritative AAAA records exist for ns1.foo.baz., but there are no corresponding AAAA glue records.'
+    '''
+
+    _abstract = False
+    code = 'MISSING_GLUE_IPV6'
+    description_template = "Authoritative AAAA records exist for %(name)s, but there are no corresponding AAAA glue records."
+    required_params = ['name']
+
+class ExtraGlueIPv4(DelegationError):
+    '''
+    >>> e = ExtraGlueIPv4(name='ns1.foo.baz.')
+    >>> e.description
+    'A glue records exist for ns1.foo.baz., but there are no corresponding authoritative A records.'
+    '''
+
+    _abstract = False
+    code = 'EXTRA_GLUE_IPV4'
+    description_template = "A glue records exist for %(name)s, but there are no corresponding authoritative A records."
+    required_params = ['name']
+
+class ExtraGlueIPv6(DelegationError):
+    '''
+    >>> e = ExtraGlueIPv6(name='ns1.foo.baz.')
+    >>> e.description
+    'AAAA glue records exist for ns1.foo.baz., but there are no corresponding authoritative AAAA records.'
+    '''
+
+    _abstract = False
+    code = 'EXTRA_GLUE_IPV6'
+    description_template = "AAAA glue records exist for %(name)s, but there are no corresponding authoritative AAAA records."
+    required_params = ['name']
 
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
@@ -1633,15 +1754,19 @@ class DNSKEYNotAtZoneApex(DNSKEYError):
     code = 'DNSKEY_NOT_AT_ZONE_APEX'
     required_params = ['zone', 'name']
 
-class TrustAnchorNotSigning(DNSKEYError):
+class TrustAnchorError(DomainNameAnalysisError):
+    pass
+
+class NoTrustAnchorSigning(TrustAnchorError):
     '''
-    >>> e = TrustAnchorNotSigning()
+    >>> e = NoTrustAnchorSigning(zone='foo.baz.')
     >>> e.description
-    'The key was designated as a trust anchor but was not found signing the RRset.'
+    'One or more keys were designated as trust anchors for foo.baz., but none were found signing the DNSKEY RRset.'
     '''
     _abstract = False
-    description_template = "The key was designated as a trust anchor but was not found signing the RRset."
-    code = 'TRUST_ANCHOR_NOT_SIGNING'
+    description_template = "One or more keys were designated as trust anchors for %(zone)s, but none were found signing the DNSKEY RRset."
+    code = 'NO_TRUST_ANCHOR_SIGNING'
+    required_params = ['zone']
 
 class RevokedNotSigning(DNSKEYError):
     '''
@@ -1652,3 +1777,18 @@ class RevokedNotSigning(DNSKEYError):
     _abstract = False
     description_template = "The key was revoked but was not found signing the RRset."
     code = 'REVOKED_NOT_SIGNING'
+
+class ZoneDataError(DomainNameAnalysisError):
+    pass
+
+class CNAMEWithOtherData(ZoneDataError):
+    '''
+    >>> e = CNAMEWithOtherData(name='foo.')
+    >>> e.description
+    'The server returned CNAME for foo., but records of other types exist at that name.'
+    '''
+    _abstract = False
+    description_template = "The server returned CNAME for %(name)s, but records of other types exist at that name."
+    code = 'CNAME_WITH_OTHER_DATA'
+    required_params = ['name']
+    references = ['RFC 2181, Sec. 10.1']

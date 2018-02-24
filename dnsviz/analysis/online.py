@@ -25,7 +25,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import collections
+from __future__ import unicode_literals
+
 import datetime
 import logging
 import random
@@ -36,6 +37,12 @@ import threading
 import time
 import uuid
 
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
 import dnsviz.format as fmt
@@ -43,6 +50,8 @@ from dnsviz.ipaddr import *
 import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
+from dnsviz import util
+lb2s = fmt.latin1_binary_to_string
 
 _logger = logging.getLogger(__name__)
 
@@ -59,22 +68,6 @@ class IPv6ConnectivityException(NetworkConnectivityException):
 
 class NoNameservers(NetworkConnectivityException):
     pass
-
-ROOT_NS_IPS = set([
-        IPAddr('198.41.0.4'), IPAddr('2001:503:ba3e::2:30'),   # A
-        IPAddr('192.228.79.201'),                              # B
-        IPAddr('192.33.4.12'),                                 # C
-        IPAddr('199.7.91.13'), IPAddr('2001:500:2d::d'),       # D
-        IPAddr('192.203.230.10'),                              # E
-        IPAddr('192.5.5.241'), IPAddr('2001:500:2f::f'),       # F
-        IPAddr('192.112.36.4'),                                # G
-        IPAddr('198.97.190.53'), IPAddr('2001:500:1::53'),     # H
-        IPAddr('192.36.148.17'), IPAddr('2001:7fe::53'),       # I
-        IPAddr('192.58.128.30'), IPAddr('2001:503:c27::2:30'), # J
-        IPAddr('193.0.14.129'), IPAddr('2001:7fd::1'),         # K
-        IPAddr('199.7.83.42'), IPAddr('2001:500:9f::42'),      # L
-        IPAddr('202.12.27.33'), IPAddr('2001:dc3::35'),        # M
-])
 
 ARPA_NAME = dns.name.from_text('arpa')
 IP6_ARPA_NAME = dns.name.from_text('ip6', ARPA_NAME)
@@ -191,16 +184,16 @@ class OnlineDomainNameAnalysis(object):
         self._valid_servers_clients_tcp = set()
 
     def __repr__(self):
-        return u'<%s %s>' % (self.__class__.__name__, self.__unicode__())
-
-    def __unicode__(self):
-        return fmt.humanize_name(self.name, True)
+        return '<%s %s>' % (self.__class__.__name__, self.__str__())
 
     def __str__(self):
-        return fmt.humanize_name(self.name)
+        return fmt.humanize_name(self.name, True)
 
     def __eq__(self, other):
         return self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
 
     def parent_name(self):
         if self.parent is not None:
@@ -246,8 +239,10 @@ class OnlineDomainNameAnalysis(object):
             return self.parent
     zone = property(_get_zone)
 
-    def single_client(self):
-        return len(self.clients_ipv4) <= 1 and len(self.clients_ipv6) <= 1
+    def single_client(self, exclude_loopback=True, exclude_ipv4_mapped=True):
+        clients_ipv4 = [x for x in self.clients_ipv4 if not exclude_loopback or LOOPBACK_IPV4_RE.match(x) is None]
+        clients_ipv6 = [x for x in self.clients_ipv6 if (not exclude_loopback or x != LOOPBACK_IPV6) and (not exclude_ipv4_mapped or IPV4_MAPPED_IPV6_RE.match(x) is None)]
+        return len(clients_ipv4) <= 1 and len(clients_ipv6) <= 1
 
     def get_name(self, name, trace=None):
         #XXX this whole method is a hack
@@ -419,7 +414,7 @@ class OnlineDomainNameAnalysis(object):
 
         # look for SOA in authority section, in the case of negative responses
         try:
-            soa_rrset = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)[0]
+            soa_rrset = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA][0]
             if soa_rrset.name == self.name:
                 self.has_soa = True
         except IndexError:
@@ -500,6 +495,27 @@ class OnlineDomainNameAnalysis(object):
         IPv6 glue, if any.'''
 
         return self._glue_ip_mapping
+
+    def get_root_hint_mapping(self):
+        servers = {}
+        hints = util.get_root_hints()
+        for rdata in hints[(dns.name.root, dns.rdatatype.NS)]:
+            servers[rdata.target] = set()
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in hints:
+                    servers[rdata.target].update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
+        for name, server in util.HISTORICAL_ROOT_IPS:
+            if name not in servers:
+                servers[name] = set()
+            servers[name].add(server)
+        return servers
+
+    def _get_servers_from_hints(self, name, hints):
+        servers = set()
+        server_mapping = self._get_server_ip_mapping_from_hints(name, hints)
+        for ns_name in server_mapping:
+            servers.update(server_mapping[ns_name])
+        return servers
 
     def get_auth_ns_ip_mapping(self):
         '''Return a reference to the mapping of NS targets from delegation or
@@ -591,7 +607,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -601,7 +617,7 @@ class OnlineDomainNameAnalysis(object):
 
         valid_servers = set([x[0] for x in self._valid_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, valid_servers))
+            return set([x for x in valid_servers if x.version == proto])
         else:
             return valid_servers
 
@@ -611,7 +627,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_udp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -621,7 +637,7 @@ class OnlineDomainNameAnalysis(object):
 
         responsive_servers = set([x[0] for x in self._responsive_servers_clients_tcp])
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, responsive_servers))
+            return set([x for x in responsive_servers if x.version == proto])
         else:
             return responsive_servers
 
@@ -637,7 +653,7 @@ class OnlineDomainNameAnalysis(object):
             servers = self._auth_or_designated_servers
 
         if proto is not None:
-            return set(filter(lambda x: x.version == proto, servers))
+            return set([x for x in servers if x.version == proto])
         else:
             return servers
 
@@ -672,7 +688,10 @@ class OnlineDomainNameAnalysis(object):
 
         if not hasattr(self, '_ip_ns_name_mapping') or self._ip_ns_name_mapping is None:
             self._ip_ns_name_mapping = {}
-            glue_ips = self.get_glue_ip_mapping()
+            if self.name == dns.name.root:
+                glue_ips = self.get_root_hint_mapping()
+            else:
+                glue_ips = self.get_glue_ip_mapping()
             auth_ips = self.get_auth_ns_ip_mapping()
             if self.stub:
                 auth_names = set(auth_ips)
@@ -717,7 +736,7 @@ class OnlineDomainNameAnalysis(object):
 
     def serialize(self, d=None, meta_only=False, trace=None):
         if d is None:
-            d = collections.OrderedDict()
+            d = OrderedDict()
 
         if trace is None:
             trace = []
@@ -725,7 +744,7 @@ class OnlineDomainNameAnalysis(object):
         if self in trace:
             return
 
-        name_str = self.name.canonicalize().to_text()
+        name_str = lb2s(self.name.canonicalize().to_text())
         if name_str in d:
             return
 
@@ -745,7 +764,7 @@ class OnlineDomainNameAnalysis(object):
         clients_ipv6 = list(self.clients_ipv6)
         clients_ipv6.sort()
 
-        d[name_str] = collections.OrderedDict()
+        d[name_str] = OrderedDict()
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
@@ -755,38 +774,38 @@ class OnlineDomainNameAnalysis(object):
             d[name_str]['clients_ipv6'] = clients_ipv6
 
             if self.parent is not None:
-                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
+                d[name_str]['parent'] = lb2s(self.parent_name().canonicalize().to_text())
             if self.dlv_parent is not None:
-                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
+                d[name_str]['dlv_parent'] = lb2s(self.dlv_parent_name().canonicalize().to_text())
             if self.nxdomain_ancestor is not None:
-                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
+                d[name_str]['nxdomain_ancestor'] = lb2s(self.nxdomain_ancestor_name().canonicalize().to_text())
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
             if self.nxdomain_name is not None:
-                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
+                d[name_str]['nxdomain_name'] = lb2s(self.nxdomain_name.to_text())
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
             if self.nxrrset_name is not None:
-                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
+                d[name_str]['nxrrset_name'] = lb2s(self.nxrrset_name.to_text())
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
 
         self._serialize_related(d[name_str], meta_only)
 
     def _serialize_related(self, d, meta_only):
         if self._auth_ns_ip_mapping:
-            d['auth_ns_ip_mapping'] = collections.OrderedDict()
-            ns_names = self._auth_ns_ip_mapping.keys()
+            d['auth_ns_ip_mapping'] = OrderedDict()
+            ns_names = list(self._auth_ns_ip_mapping.keys())
             ns_names.sort()
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
-                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
+                d['auth_ns_ip_mapping'][lb2s(name.canonicalize().to_text())] = addrs
 
         if self.stub:
             return
 
         d['queries'] = []
-        query_keys = self.queries.keys()
+        query_keys = list(self.queries.keys())
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             for query in self.queries[(qname, rdtype)].queries.values():
@@ -818,7 +837,7 @@ class OnlineDomainNameAnalysis(object):
         if name in cache:
             return cache[name]
 
-        name_str = name.canonicalize().to_text()
+        name_str = lb2s(name.canonicalize().to_text())
         d = d1[name_str]
 
         analysis_type = analysis_type_codes[d['type']]
@@ -873,6 +892,7 @@ class OnlineDomainNameAnalysis(object):
     def _deserialize_related(self, d):
         if 'auth_ns_ip_mapping' in d:
             for target in d['auth_ns_ip_mapping']:
+                self.add_auth_ns_ip_mappings((dns.name.from_text(target), None))
                 for addr in d['auth_ns_ip_mapping'][target]:
                     self.add_auth_ns_ip_mappings((dns.name.from_text(target), IPAddr(addr)))
 
@@ -948,10 +968,10 @@ class OnlineDomainNameAnalysis(object):
 
         # these two are optional
         for target in self.ns_dependencies:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
         for target in self.mx_targets:
-            if target.canonicalize().to_text() in d:
+            if lb2s(target.canonicalize().to_text()) in d:
                 self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
@@ -961,37 +981,47 @@ class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
 
 class Analyst(object):
     analysis_model = ActiveDomainNameAnalysis
-    simple_query = Q.SimpleDNSQuery
-    diagnostic_query = Q.DiagnosticQuery
-    tcp_diagnostic_query = Q.TCPDiagnosticQuery
-    pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
-    truncation_diagnostic_query = Q.TruncationDiagnosticQuery
-    edns_version_diagnostic_query = Q.EDNSVersionDiagnosticQuery
-    edns_flag_diagnostic_query = Q.EDNSFlagDiagnosticQuery
-    edns_opt_diagnostic_query = Q.EDNSOptDiagnosticQuery
+    _simple_query = Q.SimpleDNSQuery
+    _diagnostic_query = Q.DiagnosticQuery
+    _tcp_diagnostic_query = Q.TCPDiagnosticQuery
+    _pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
+    _truncation_diagnostic_query = Q.TruncationDiagnosticQuery
+    _edns_version_diagnostic_query = Q.EDNSVersionDiagnosticQuery
+    _edns_flag_diagnostic_query = Q.EDNSFlagDiagnosticQuery
+    _edns_opt_diagnostic_query = Q.EDNSOptDiagnosticQuery
 
     default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
 
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'explicit_only', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories']
+    clone_attrnames = ['dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
-    def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, logger=_logger, ceiling=None, edns_diagnostics=False,
-             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, extra_rdtypes=None, explicit_only=False, analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None):
+    def __init__(self, name, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, query_class_mixin=None, logger=_logger, ceiling=None, edns_diagnostics=False,
+             follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
+             analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
+
+        self.query_class_mixin = query_class_mixin
+        self.simple_query = self._get_query_class(self._simple_query, self.query_class_mixin)
+        self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin)
+        self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin)
+        self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin)
+        self.truncation_diagnostic_query = self._get_query_class(self._truncation_diagnostic_query, self.query_class_mixin)
+        self.edns_version_diagnostic_query = self._get_query_class(self._edns_version_diagnostic_query, self.query_class_mixin)
+        self.edns_flag_diagnostic_query = self._get_query_class(self._edns_flag_diagnostic_query, self.query_class_mixin)
+        self.edns_opt_diagnostic_query = self._get_query_class(self._edns_opt_diagnostic_query, self.query_class_mixin)
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
         else:
             self.transport_manager = transport_manager
-        self.resolver = Resolver.Resolver.from_file('/etc/resolv.conf', Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
 
         if th_factories is None:
             self.th_factories = (self.default_th_factory,)
         else:
             self.th_factories = th_factories
-        self.allow_loopback_query = bool(filter(lambda x: x.cls.allow_loopback_query, self.th_factories))
-        self.allow_private_query = bool(filter(lambda x: x.cls.allow_private_query, self.th_factories))
+        self.allow_loopback_query = not bool([x for x in self.th_factories if not x.cls.allow_loopback_query])
+        self.allow_private_query = not bool([x for x in self.th_factories if not x.cls.allow_private_query])
 
         self.name = name
         self.dlv_domain = dlv_domain
@@ -1001,7 +1031,19 @@ class Analyst(object):
         else:
             self.explicit_delegations = explicit_delegations
 
-        resolver = self.resolver
+        if stop_at_explicit is None:
+            self.stop_at_explicit = {}
+        else:
+            self.stop_at_explicit = stop_at_explicit
+
+        if odd_ports is None:
+            self.odd_ports = {}
+        else:
+            self.odd_ports = odd_ports
+
+        if resolver is None:
+            resolver = self._get_resolver()
+        self.resolver = resolver
 
         self.ceiling = ceiling
 
@@ -1011,7 +1053,7 @@ class Analyst(object):
         c = self.name
         try:
             while True:
-                if c in self.explicit_delegations:
+                if (c, dns.rdatatype.NS) in self.explicit_delegations and self.stop_at_explicit[c]:
                     break
                 c = c.parent()
         except dns.name.NoParent:
@@ -1026,10 +1068,8 @@ class Analyst(object):
             # delegated.
             if ceiling is None or not self.name.is_subdomain(ceiling) or c.is_subdomain(ceiling):
                 ceiling = c
-                resolver = Resolver.Resolver([s for (n,s) in self.explicit_delegations[c]], self.simple_query, transport_manager=self.transport_manager)
 
-        self.local_ceiling = self._detect_ceiling(ceiling, resolver)[0]
-        self._fix_explicit_delegation()
+        self.local_ceiling = self._detect_ceiling(ceiling)[0]
 
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
@@ -1063,6 +1103,19 @@ class Analyst(object):
             self.analysis_cache_lock = analysis_cache_lock
         self._detect_cname_chain()
 
+    def _get_resolver(self):
+        hints = util.get_root_hints()
+        for key in self.explicit_delegations:
+            hints[key] = self.explicit_delegations[key]
+        return Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
+
+    def _get_query_class(self, cls, mixin):
+        if mixin is None:
+            return cls
+        class _foo(mixin, cls):
+            pass
+        return _foo
+
     def _detect_cname_chain(self):
         self._cname_chain = []
 
@@ -1090,12 +1143,12 @@ class Analyst(object):
             except KeyError:
                 return
 
-    def _detect_ceiling(self, ceiling, resolver):
+    def _detect_ceiling(self, ceiling):
         if ceiling == dns.name.root or ceiling is None:
 
             # make sure we can communicate with a resolver; we must be able to
             # resolve the root
-            server, response = resolver.query(dns.name.root, dns.rdatatype.NS)
+            server, response = self.resolver.query(dns.name.root, dns.rdatatype.NS)
             if server is None:
                 raise NetworkConnectivityException('No network connectivity available!')
 
@@ -1107,7 +1160,7 @@ class Analyst(object):
             ceiling = self.name
 
         try:
-            ans = resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
+            ans = self.resolver.query_for_answer(ceiling, dns.rdatatype.NS, dns.rdataclass.IN)
             try:
                 ans.response.find_rrset(ans.response.answer, ceiling, dns.rdataclass.IN, dns.rdatatype.NS)
                 return ceiling, False
@@ -1115,46 +1168,36 @@ class Analyst(object):
                 pass
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             pass
-        except dns.exception.DNSException:
-            parent_ceiling, fail = self._detect_ceiling(ceiling.parent(), resolver)
+        except dns.exception.DNSException as e:
+            parent_ceiling, fail = self._detect_ceiling(ceiling.parent())
             if fail:
                 return parent_ceiling, True
             else:
                 return ceiling, True
-        return self._detect_ceiling(ceiling.parent(), resolver)
+        return self._detect_ceiling(ceiling.parent())
 
-    def _fix_explicit_delegation(self):
-        if self.local_ceiling is None:
-            return
-
-        # at this point, if self.name or any ancestor below self.local_ceiling has an
-        # explicit delegation, then it is obsolete and needs to be applied to
-        # self.local_ceiling instead.
-        n = self.name
-        explicit_delegation = None
-        while n != self.local_ceiling:
-            if n in self.explicit_delegations:
-                if explicit_delegation is None:
-                    explicit_delegation = self.explicit_delegations[n]
-                del self.explicit_delegations[n]
-            n = n.parent()
-        if explicit_delegation is not None:
-            self.explicit_delegations[self.local_ceiling] = explicit_delegation
+    def _get_servers_from_hints(self, name, hints):
+        servers = set()
+        for rdata in hints[(name, dns.rdatatype.NS)]:
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in hints:
+                    servers.update([IPAddr(r.address) for r in hints[(rdata.target, rdtype)]])
+        return servers
 
     def _root_servers(self, proto=None):
         key = None
-        if dns.name.root in self.explicit_delegations:
+        if (dns.name.root, dns.rdatatype.NS) in self.explicit_delegations:
             key = dns.name.root
-        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+        elif (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) in self.explicit_delegations:
             key = WILDCARD_EXPLICIT_DELEGATION
         if key is not None:
-            servers = set([s for (n,s) in self.explicit_delegations[key]])
+            servers = self._get_servers_from_hints(key, self.explicit_delegations)
         else:
-            servers = ROOT_NS_IPS
+            servers = self._get_servers_from_hints(dns.name.root, util.get_root_hints())
         if proto == 4:
-            servers = set(filter(lambda x: x.version == 4, servers))
+            servers = set([x for x in servers if x.version == 4])
         elif proto == 6:
-            servers = set(filter(lambda x: x.version == 6, servers))
+            servers = set([x for x in servers if x.version == 6])
         return servers
 
     def _is_referral_of_type(self, rdtype):
@@ -1205,7 +1248,7 @@ class Analyst(object):
                     rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
 
         # remove duplicates
-        rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
+        rdtypes = list(OrderedDict.fromkeys(rdtypes))
 
         return rdtypes
 
@@ -1224,7 +1267,7 @@ class Analyst(object):
             rdtypes.append(dns.rdatatype.TXT)
         elif name.is_subdomain(ARPA_NAME):
             pass
-        elif PROTO_LABEL_RE.search(name[0]):
+        elif PROTO_LABEL_RE.search(lb2s(name[0])):
             pass
         elif self._is_sld_or_lower(name):
             rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
@@ -1262,7 +1305,7 @@ class Analyst(object):
         determined by examining the structure of the name for _<port>._<proto>
         format.'''
 
-        if len(name) > 2 and DANE_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and DANE_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False
@@ -1272,7 +1315,7 @@ class Analyst(object):
         determined by examining the structure of the name for common
         service-related names.'''
 
-        if len(name) > 2 and SRV_PORT_RE.search(name[0]) is not None and PROTO_LABEL_RE.search(name[1]) is not None:
+        if len(name) > 2 and SRV_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
             return True
 
         return False
@@ -1311,21 +1354,21 @@ class Analyst(object):
 
     def _filter_servers_network(self, servers):
         if not self.try_ipv6:
-            servers = filter(lambda x: x.version != 6, servers)
+            servers = [x for x in servers if x.version != 6]
         if not self.try_ipv4:
-            servers = filter(lambda x: x.version != 4, servers)
+            servers = [x for x in servers if x.version != 4]
         return servers
 
     def _filter_servers_locality(self, servers):
         if not self.allow_loopback_query:
-            servers = filter(lambda x: not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6, servers)
+            servers = [x for x in servers if not LOOPBACK_IPV4_RE.match(x) and not x == LOOPBACK_IPV6]
         if not self.allow_private_query:
-            servers = filter(lambda x: not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x), servers)
-        return servers
+            servers = [x for x in servers if not RFC_1918_RE.match(x) and not LINK_LOCAL_RE.match(x) and not UNIQ_LOCAL_RE.match(x)]
+        return [x for x in servers if ZERO_SLASH8_RE.search(x) is None]
 
-    def _filter_servers(self, servers):
+    def _filter_servers(self, servers, no_raise=False):
         filtered_servers = self._filter_servers_network(servers)
-        if servers and not filtered_servers:
+        if servers and not filtered_servers and not no_raise:
             self._raise_connectivity_error_remote()
         return self._filter_servers_locality(filtered_servers)
 
@@ -1422,12 +1465,15 @@ class Analyst(object):
 
     def _handle_explicit_delegations(self, name_obj):
         key = None
-        if name_obj.name in self.explicit_delegations:
+        if (name_obj.name, dns.rdatatype.NS) in self.explicit_delegations:
             key = name_obj.name
-        elif WILDCARD_EXPLICIT_DELEGATION in self.explicit_delegations:
+        elif (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) in self.explicit_delegations:
             key = WILDCARD_EXPLICIT_DELEGATION
         if key is not None:
-            name_obj.add_auth_ns_ip_mappings(*self.explicit_delegations[key])
+            for ns_rdata in self.explicit_delegations[(key, dns.rdatatype.NS)]:
+                for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                    if (ns_rdata.target, a_rdtype) in self.explicit_delegations:
+                        name_obj.add_auth_ns_ip_mappings(*[(ns_rdata.target, IPAddr(r.address)) for r in self.explicit_delegations[(ns_rdata.target, a_rdtype)]])
             name_obj.explicit_delegation = True
 
     def _analyze_stub(self, name):
@@ -1477,7 +1523,7 @@ class Analyst(object):
         # ceiling or the name is a subdomain of the ceiling
         if name == dns.name.root:
             parent_obj = None
-        elif name in self.explicit_delegations:
+        elif (name, dns.rdatatype.NS) in self.explicit_delegations and self.stop_at_explicit[name]:
             parent_obj = None
         elif self.local_ceiling is not None and self.local_ceiling.is_subdomain(name):
             parent_obj = self._analyze_stub(name.parent())
@@ -1589,6 +1635,8 @@ class Analyst(object):
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
 
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+
         servers = self._filter_servers(servers)
         exclude_no_answer = set()
         queries = {}
@@ -1603,29 +1651,29 @@ class Analyst(object):
                 # EDNS diagnostic queries
                 if self.edns_diagnostics:
                     self.logger.debug('Preparing EDNS diagnostic queries %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+100))] = self.edns_version_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+100))] = self.edns_version_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
                     self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
-                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 if name_obj.nxrrset_name is not None:
                     self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
                 # if the name is SLD or lower, then ask MX and TXT
                 if self._is_sld_or_lower(name_obj.name):
                     self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                     # we also do a query with small UDP payload to elicit and test a truncated response
-                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
@@ -1634,21 +1682,21 @@ class Analyst(object):
             if servers:
                 if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
                     self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
                     if name_obj.is_zone():
                         # for zones we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
-                        queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                        queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                     else:
                         # for non-zones we don't need to keey the (UDP) SOA query, if there is no positive response
                         exclude_no_answer.add((name_obj.name, dns.rdatatype.SOA))
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
                 # we also do a query with small UDP payload to elicit and test a truncated response
-                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
             # query for DS/DLV
             if name_obj.parent is not None:
@@ -1666,16 +1714,20 @@ class Analyst(object):
                         parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
+                parent_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.parent.name])
+
                 self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=parent_odd_ports)
 
                 if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name
                     if dlv_servers:
+                        dlv_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.dlv_parent.name])
+
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
-                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6)
+                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, dns.rdataclass.IN, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=dlv_odd_ports)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
         # get rid of any queries already asked
@@ -1688,18 +1740,18 @@ class Analyst(object):
             for rdtype in self._rdtypes_to_query(name_obj.name):
                 if (name_obj.name, rdtype) not in all_queries:
                     self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-                    queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                    queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
             # if no default queries were identified (e.g., empty non-terminal in
             # in-addr.arpa space), then add a backup.
             if not (queries or name_obj.queries):
                 rdtype = dns.rdatatype.A
                 self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-                queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6)
+                queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
-        Q.ExecutableDNSQuery.execute_queries(*queries.values(), tm=self.transport_manager, th_factories=self.th_factories)
+        Q.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self.transport_manager, th_factories=self.th_factories)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
                 self._add_query(name_obj, query)
@@ -1717,10 +1769,12 @@ class Analyst(object):
                 parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         parent_auth_servers = set(self._filter_servers(parent_auth_servers))
 
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+
         if not parent_auth_servers:
             return False
 
-        servers_queried = collections.OrderedDict(((dns.rdatatype.NS, set()),))
+        servers_queried = OrderedDict(((dns.rdatatype.NS, set()),))
         referral_queries = {}
 
         try:
@@ -1741,7 +1795,7 @@ class Analyst(object):
             name_obj.referral_rdtype = rdtype
 
             self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6)
+            query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
             query.execute(tm=self.transport_manager, th_factories=self.th_factories)
             referral_queries[rdtype] = query
 
@@ -1776,7 +1830,7 @@ class Analyst(object):
             is_nxdomain = query.is_nxdomain_all()
             is_valid = query.is_valid_complete_response_any()
 
-             # (referral type is NS)
+            # (referral type is NS)
             if name_obj.referral_rdtype == dns.rdatatype.NS:
                 # If there was a secondary type, the fact that only NS was queried
                 # for indicates that there was no error and no NXDOMAIN response.
@@ -1796,7 +1850,7 @@ class Analyst(object):
                         name_obj.referral_rdtype = None
                         del referral_queries[dns.rdatatype.NS]
 
-             # (referral type is secondary type)
+            # (referral type is secondary type)
             else:
                 # don't remove either record if there's an NXDOMAIN/YXDOMAIN mismatch
                 if referral_queries[dns.rdatatype.NS].is_nxdomain_all() and \
@@ -1856,19 +1910,19 @@ class Analyst(object):
             # NS query
             servers = auth_servers.difference(servers_queried[dns.rdatatype.NS])
             servers_queried[dns.rdatatype.NS].update(servers)
-            servers = self._filter_servers(servers)
+            servers = self._filter_servers(servers, no_raise=True)
             if servers:
                 self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
-                queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
+                queries.append(self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports))
 
             # secondary query
             if secondary_rdtype is not None and self._ask_non_delegation_queries(name_obj.name):
                 servers = auth_servers.difference(servers_queried[secondary_rdtype])
                 servers_queried[secondary_rdtype].update(servers)
-                servers = self._filter_servers(servers)
+                servers = self._filter_servers(servers, no_raise=True)
                 if servers:
                     self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(secondary_rdtype)))
-                    queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6))
+                    queries.append(self.diagnostic_query(name_obj.name, secondary_rdtype, dns.rdataclass.IN, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports))
 
             # actually execute the queries, then store the results
             Q.ExecutableDNSQuery.execute_queries(*queries, tm=self.transport_manager, th_factories=self.th_factories)
@@ -1896,7 +1950,7 @@ class Analyst(object):
         kwargs = dict([(n, getattr(self, n)) for n in self.clone_attrnames])
         for cname in name_obj.cname_targets:
             for target in name_obj.cname_targets[cname]:
-                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], extra_rdtypes=self.extra_rdtypes, **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.CNAME)], explicit_only=self.explicit_only, extra_rdtypes=self.extra_rdtypes, **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.cname_targets[cname], target, errors))
                 t.start()
                 threads.append(t)
@@ -1916,7 +1970,7 @@ class Analyst(object):
 
         if self.follow_mx:
             for target in name_obj.mx_targets:
-                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.MX)], extra_rdtypes=[dns.rdatatype.A, dns.rdatatype.AAAA], **kwargs)
+                a = self.__class__(target, trace=self.trace + [(name_obj, dns.rdatatype.MX)], explicit_only=True, extra_rdtypes=[dns.rdatatype.A, dns.rdatatype.AAAA], **kwargs)
                 t = threading.Thread(target=self._analyze_dependency, args=(a, name_obj.mx_targets, target, errors))
                 t.start()
                 threads.append(t)
@@ -1927,7 +1981,7 @@ class Analyst(object):
             # raise only the first exception, but log all the ones beyond
             for name, exc_info in errors[1:]:
                 self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
-            raise errors[0][1][0], None, errors[0][1][2]
+            raise errors[0][1][0].with_traceback(errors[0][1][2])
 
     def _set_negative_queries(self, name_obj):
         random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
@@ -1941,13 +1995,13 @@ class Analyst(object):
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
     def _require_connectivity_ipv4(self, name_obj):
-        return bool(filter(lambda x: LOOPBACK_IPV4_RE.match(x) is None, name_obj.clients_ipv4))
+        return bool([x for x in name_obj.clients_ipv4 if LOOPBACK_IPV4_RE.match(x) is None])
 
     def _require_connectivity_ipv6(self, name_obj):
-        return bool(filter(lambda x: x != LOOPBACK_IPV6, name_obj.clients_ipv6))
+        return bool([x for x in name_obj.clients_ipv6 if x != LOOPBACK_IPV6])
 
     def _check_connectivity(self, name_obj):
-        if self.local_ceiling is not None and self.local_ceiling in self.explicit_delegations:
+        if self.local_ceiling is not None and (self.local_ceiling, dns.rdatatype.NS) in self.explicit_delegations:
             # this check is only useful if not the desdendant of an explicit
             # delegation
             return
@@ -1975,8 +2029,8 @@ class Analyst(object):
         if self.try_ipv4 and self.try_ipv6:
             # if we are configured to try both IPv4 and IPv6, then use servers
             # to determine which one is missing
-            has_v4 = bool(filter(lambda x: x.version == 4, servers))
-            has_v6 = bool(filter(lambda x: x.version == 6, servers))
+            has_v4 = bool([x for x in servers if x.version == 4])
+            has_v6 = bool([x for x in servers if x.version == 6])
             if has_v4 and has_v6:
                 # if both IPv4 and IPv6 servers were attempted, then there was
                 # no network connectivity for either protocol
@@ -2008,18 +2062,26 @@ class PrivateAnalyst(Analyst):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
 class RecursiveAnalyst(Analyst):
-    simple_query = Q.RecursiveDNSQuery
-    diagnostic_query = Q.RecursiveDiagnosticQuery
-    tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
-    pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
-    truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
-    edns_version_diagnostic_query = Q.RecursiveEDNSVersionDiagnosticQuery
-    edns_flag_diagnostic_query = Q.RecursiveEDNSFlagDiagnosticQuery
-    edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
+    _simple_query = Q.RecursiveDNSQuery
+    _diagnostic_query = Q.RecursiveDiagnosticQuery
+    _tcp_diagnostic_query = Q.RecursiveTCPDiagnosticQuery
+    _pmtu_diagnostic_query = Q.RecursivePMTUDiagnosticQuery
+    _truncation_diagnostic_query = Q.RecursiveTruncationDiagnosticQuery
+    _edns_version_diagnostic_query = Q.RecursiveEDNSVersionDiagnosticQuery
+    _edns_flag_diagnostic_query = Q.RecursiveEDNSFlagDiagnosticQuery
+    _edns_opt_diagnostic_query = Q.RecursiveEDNSOptDiagnosticQuery
 
     analysis_type = ANALYSIS_TYPE_RECURSIVE
 
-    def _detect_ceiling(self, ceiling, resolver):
+    def _get_resolver(self):
+        servers = set()
+        for rdata in self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)]:
+            for rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                if (rdata.target, rdtype) in self.explicit_delegations:
+                    servers.update([IPAddr(r.address) for r in self.explicit_delegations[(rdata.target, rdtype)]])
+        return Resolver.Resolver(list(servers), Q.StandardRecursiveQueryCD, transport_manager=self.transport_manager)
+
+    def _detect_ceiling(self, ceiling):
         # if there is a ceiling, but the name is not a subdomain
         # of the ceiling, then use the name itself as a base
         if ceiling is not None and not self.name.is_subdomain(ceiling):
@@ -2128,7 +2190,7 @@ class RecursiveAnalyst(Analyst):
         if parent_obj is not None:
             nxdomain_ancestor = parent_obj.nxdomain_ancestor
             if nxdomain_ancestor is None and not parent_obj.stub:
-                rdtype = filter(lambda x: x[0] == parent_obj.name, parent_obj.queries.keys())[0][1]
+                rdtype = [x for x in parent_obj.queries.keys() if x[0] == parent_obj.name][0][1]
                 if parent_obj.queries[(parent_obj.name, rdtype)].is_nxdomain_all():
                     nxdomain_ancestor = parent_obj
 
@@ -2209,6 +2271,8 @@ class RecursiveAnalyst(Analyst):
         if not servers:
             raise NoNameservers('No resolvers available to query!')
 
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+
         # make common query first to prime the cache
 
         # for root and TLD, use type NS
@@ -2226,7 +2290,7 @@ class RecursiveAnalyst(Analyst):
                     rdtype = dns.rdatatype.A
 
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-        query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+        query = self.diagnostic_query(name_obj.name, rdtype, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
         query.execute(tm=self.transport_manager, th_factories=self.th_factories)
         self._add_query(name_obj, query, True)
 
@@ -2248,7 +2312,7 @@ class RecursiveAnalyst(Analyst):
                 # make DS queries (these won't be included in the above mix
                 # because there is no parent on the name_obj)
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
-                query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                 self._add_query(name_obj, query)
 
@@ -2257,7 +2321,7 @@ class RecursiveAnalyst(Analyst):
             # ensure these weren't already queried for (e.g., as part of extra_rdtypes)
             if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
-                query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6)
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, dns.rdataclass.IN, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                 self._add_query(name_obj, query, True)
 

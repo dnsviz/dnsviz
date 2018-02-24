@@ -18,30 +18,32 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz-print 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz-print 1 "18 Nov 2016" "0.6.5"
 .SH NAME
 dnsviz-print \- print the assessment of diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsviz print [options]
-.I [domain_name...]
+.B dnsviz
+\fBprint\fR
+[ \fIoptions\fR ]
+[ \fIdomain_name...\fR ]
 .SH DESCRIPTION
 Process the results of diagnostic DNS queries previously performed, e.g., using
-\fI"dnsviz probe"\fP, to assess the health of the associated DNS deployments
+\fBdnsviz-probe(1)\fR, to assess the health of the associated DNS deployments
 for one or more domain names specified.  The results of this processing are
 presented in textual output.
 
 The source of the diagnostic query input is either a file specified with
-\fI-r\fP or standard input.
+\fB-r\fR or standard input.
 
 Domain names to be processed may be passed either as command-line arguments, in
-a file (using the \fI-f\fP option), or simply implied using the diagnostic
+a file (using the \fB-f\fR option), or simply implied using the diagnostic
 query input.  The latter is the preferred methodology (and the simplest) and is
 useful, except in cases where the input contains diagnostic queries for
 multiple domain names, only a subset of which are to be processed.
 
-If \fI-f\fP is not used and no domain names are supplied on the command line,
+If \fB-f\fR is not used and no domain names are supplied on the command line,
 then the domain names to be processed are extracted from the diagnostic query
-input.  If the \fI-f\fP option is used, then names may not be specified on the
+input.  If the \fB-f\fR option is used, then names may not be specified on the
 command line.
 
 The domain names passed as input are fully-qualified domain names, such as
@@ -54,14 +56,17 @@ The output is appropriate for terminal or text file output, using colors
 a loosely-defined textual format.
 
 .SH OPTIONS
-.IP "-f <filename>"
+.TP
+.B -f \fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
-.IP "-r <filename>"
+.TP
+.B -r \fIfilename\fR
 Read diagnostic query input from the specified file, instead of from standard
 input.
-.IP "-t <filename>"
+.TP
+.B -t \fIfilename\fR
 Specify a file that contains trusted keys for processing diagnostic queries.
 This overrides the default behavior of using the built-in keys for the root
 zone.
@@ -70,15 +75,18 @@ The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
-.IP "-R <type>[,<type>...]"
+.TP
+.B -R \fItype\fR[,\fItype...\fR]
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.
-.IP -O
+.TP
+.B -O
 Save the output to a file, whose name is derived from the domain name.
 
 If this option is used when the diagnostic queries of multiple domain names are
 being processed, a file will be created for each domain name processed.
-.IP "-o <filename>"
+.TP
+.B -o \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
 
@@ -86,64 +94,64 @@ If this option is used when the diagnostic queries of multiple domain name are
 being processed, a single file (the one specified) will be created, which will
 contain the collective output for all domain names processed.
 
-.IP -h
+.TP
+.B -h
 Display the usage and exit.
 
 .SH OUTPUT
 
 The following is an example of the output:
 
-.PP
-.RS 0
+.PD 0
 \fB.\fP [.]
-.RS 0
+.P
 [.]  DNSKEY: 8/1518/256 [.], 8/19036/257 [.]
-.RS 0
+.P
 [.]    RRSIG: ./8/19036 (2015-08-20 - 2015-09-03) [.]
-.RS 0
+.P
 \fBcom\fP [.] [.]
-.RS 0
+.P
 [.]  DS: 8/30909/2 [.]
-.RS 0
+.P
 [.]    RRSIG: ./8/1518 (2015-08-26 - 2015-09-05) [.]
-.RS 0
+.P
 [.]  DNSKEY: 8/30909/257 [.], 8/35864/256 [.]
-.RS 0
+.P
 [.]    RRSIG: com/8/30909 (2015-08-24 - 2015-08-31) [.]
-.RS 0
+.P
 \fBexample.com\fP [.] [.]
-.RS 0
+.P
 [.]  DS: 8/31406/1 [.], 8/31406/2 [.], 8/31589/1 [-], 8/31589/2 [-], 8/43547/1 [-], 8/43547/2 [-]
-.RS 0
+.P
 [.]    RRSIG: com/8/35864 (2015-08-24 - 2015-08-31) [.]
-.RS 0
+.P
 [.]  DNSKEY: 8/54108/256 [.], 8/31406/257 [.], 8/63870/256 [.]
-.RS 0
+.P
 [.]    RRSIG: example.com/8/31406 (2015-08-24 - 2015-09-14) [.]
-.RS 0
+.P
 \fBwww.example.com\fP
-.RS 0
+.P
 [.]  A: 192.0.2.1
-.RS 0
+.P
 [.]    RRSIG: example.com/8/31406 (2015-08-24 - 2015-09-14) [.]
-.RS 0
+.P
 \fBnon-existent.example.com\fP
-.RS 0
+.P
 [.]  A: NXDOMAIN
-.RS 0
+.P
 [.]    SOA: sns.dns.icann.org. noc.dns.icann.org. 2015082401 7200 3600 1209600 3600
-.RS 0
+.P
 [.]      RRSIG: example.com/8/54108 (2015-08-24 - 2015-09-14) [.]
-.RS 0
+.P
 [.]    PROOF:  [.]
-.RS 0
+.P
 [.]      NSEC: example.com. www.example.com. A NS SOA TXT AAAA RRSIG NSEC DNSKEY
-.RS 0
+.P
 [.]        RRSIG: example.com/8/54108 (2015-08-21 - 2015-09-11) [.]
+.PD
 
 .SS Domain Names
 
-.P
 The output above is divided into several sections, each corresponding to the
 domain name that starts the section (e.g., example.com).  Following the headers
 of names that correspond to zones are two sets of characters, each within
@@ -285,4 +293,8 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz (1), dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-query (1)
+.BR dnsviz(1),
+.BR dnsviz-probe(1),
+.BR dnsviz-grok(1),
+.BR dnsviz-graph(1),
+.BR dnsviz-query(1)

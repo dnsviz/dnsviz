@@ -18,30 +18,32 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz-grok 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz-grok 1 "18 Nov 2016" "0.6.5"
 .SH NAME
 dnsviz-grok \- assess diagnostic DNS queries
 .SH SYNOPSIS
-.B dnsviz grok [options]
-.I [domain_name...]
+.B dnsviz
+\fBgrok\fR
+[ \fIoptions\fR ]
+[ \fIdomain_name...\fR ]
 .SH DESCRIPTION
 Process the results of diagnostic DNS queries previously performed, e.g., using
-\fI"dnsviz probe"\fP, to assess the health of the associated DNS deployments for one
+\fBdnsviz-probe(1)\fR, to assess the health of the associated DNS deployments for one
 or more domain names specified.  The results of this processing are serialized
 into JSON format for further programmatic diagnostics or alerts.
 
 The source of the diagnostic query input is either a file specified with
-\fI-r\fP or standard input.
+\fB-r\fR or standard input.
 
 Domain names to be processed may be passed either as command-line arguments, in
-a file (using the \fI-f\fP option), or simply implied using the diagnostic
+a file (using the \fB-f\fR option), or simply implied using the diagnostic
 query input.  The latter is the preferred methodology (and the simplest) and is
 useful, except in cases where the input contains diagnostic queries for
 multiple domain names, only a subset of which are to be processed.
 
-If \fI-f\fP is not used and no domain names are supplied on the command line,
+If \fB-f\fR is not used and no domain names are supplied on the command line,
 then the domain names to be processed are extracted from the diagnostic query
-input.  If the \fI-f\fP option is used, then names may not be specified on the
+input.  If the \fB-f\fR option is used, then names may not be specified on the
 command line.
 
 The domain names passed as input are fully-qualified domain names, such as
@@ -50,14 +52,19 @@ example.com, www.example.com, _443._tcp.example.com, 1.2.0.192.in-addr.arpa, or
 are fully qualified, no trailing dot is necessary.
 
 .SH OPTIONS
-.IP "-f <filename>"
+.TP
+.B -f
+\fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
-.IP "-r <filename>"
+.TP
+.B -r
+\fIfilename\fR
 Read diagnostic query input from the specified file, instead of from standard
 input.
-.IP "-t <filename>"
+.TP
+.B -t \fIfilename\fR
 Specify a file that contains trusted keys for processing diagnostic queries.
 The default is to not use any trusted keys.
 
@@ -65,17 +72,21 @@ The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
-.IP "-o <filename>"
+.TP
+\fB-o\fR \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
-.IP -p
-Make JSON output "pretty" instead of minimal (i.e., using indentation and
+.TP
+.B -c
+Make JSON output minimal instead of "pretty" (i.e., remove indentation and
 newlines).
-.IP "-l <level>"
+.TP
+.B -l \fIlevel\fR
 Display only information at the specified log priority or higher.  Valid values
 (in increasing order of priority) are: "error", "warning", "info", and "debug".
 The default is "debug".
-.IP -h
+.TP
+.B -h
 Display the usage and exit.
 
 .SH EXIT CODES
@@ -91,4 +102,8 @@ There was an error processing the input or saving the output.
 .IP 4
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz (1), dnsviz-probe (1), dnsviz-graph (1), dnsviz-print (1), dnsviz-query (1)
+.BR dnsviz(1),
+.BR dnsviz-probe(1),
+.BR dnsviz-graph(1),
+.BR dnsviz-print(1),
+.BR dnsviz-query(1)

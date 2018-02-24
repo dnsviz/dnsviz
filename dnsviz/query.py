@@ -25,22 +25,35 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import bisect
-import collections
 import errno
-import Queue
+import io
 import socket
-import StringIO
 import struct
 import time
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype
 
-from ipaddr import *
-from response import *
-import transport
+from .ipaddr import *
+from .response import *
+from . import transport
+from .format import latin1_binary_to_string as lb2s
 
 RETRY_CAUSE_NETWORK_ERROR = RESPONSE_ERROR_NETWORK_ERROR = 1
 RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2
@@ -168,7 +181,7 @@ class DNSQueryRetryAttempt:
     def serialize(self):
         '''Return a serialized version of the query.'''
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
         d['time_elapsed'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
@@ -239,8 +252,9 @@ class DNSResponseHandler(object):
         '''Redirect the instantiation of a DNSResponseHandler to create instead a Factory,
         from which a DNSResponseHandler in turn is built.'''
 
+
         if kwargs.pop('__instantiate', None):
-            return super(DNSResponseHandler, cls).__new__(cls, *args, **kwargs)
+            return super(DNSResponseHandler, cls).__new__(cls)
         return DNSResponseHandlerFactory(cls, *args, **kwargs)
 
     def set_context(self, params, history, request):
@@ -320,7 +334,13 @@ class UseTCPOnTCFlagHandler(DNSResponseHandler):
     '''Retry with TCP if the TC flag is set in the response.'''
 
     def handle(self, response_wire, response, response_time):
-        if response_wire is not None and ord(response_wire[2]) & 0x02:
+        # python3/python2 dual compatibility
+        if isinstance(response_wire, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
+        if response_wire is not None and map_func(response_wire[2]) & 0x02:
             self._params['tcp'] = True
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
@@ -382,7 +402,7 @@ class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        filtered_options = filter(lambda x: self._otype == x.otype, self._request.options)
+        filtered_options = [x for x in self._request.options if self._otype == x.otype]
         if not self._params['tcp'] and timeouts >= self._timeouts and filtered_options:
             self._request.options.remove(filtered_options[0])
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, self._otype)
@@ -520,6 +540,12 @@ class PMTUBoundingHandler(DNSResponseHandler):
         is_timeout = isinstance(response, dns.exception.Timeout)
         is_valid = isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN)
 
+        # python3/python2 dual compatibility
+        if isinstance(response_wire, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
         if self._request.edns < 0 or not (self._request.ednsflags & dns.flags.DO):
             self._state = self.INVALID
 
@@ -538,12 +564,12 @@ class PMTUBoundingHandler(DNSResponseHandler):
         elif self._state == self.REDUCED_PAYLOAD:
             self.handle_sub(response_wire, response, response_time)
             if not is_timeout:
-                if (response_wire is not None and ord(response_wire[2]) & 0x02) or is_valid:
+                if (response_wire is not None and map_func(response_wire[2]) & 0x02) or is_valid:
                     self._lower_bound = self._water_mark = len(response_wire)
                     self._params['timeout'] = self._bounding_timeout
                     self._params['tcp'] = True
                     self._state = self.USE_TCP
-                    if response_wire is not None and ord(response_wire[2]) & 0x02:
+                    if response_wire is not None and map_func(response_wire[2]) & 0x02:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                     else:
                         return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None)
@@ -560,7 +586,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
                 self._upper_bound = self._request.payload - 1
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 self._state = self.PICKLE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
@@ -577,7 +603,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             # if the response was truncated, then the size of the payload
             # received via TCP is the largest we can receive
-            elif response_wire is not None and ord(response_wire[2]) & 0x02:
+            elif response_wire is not None and map_func(response_wire[2]) & 0x02:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
@@ -586,7 +612,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
             if self._upper_bound - self._lower_bound <= 1:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                if response_wire is not None and ord(response_wire[2]) & 0x02:
+                if response_wire is not None and map_func(response_wire[2]) & 0x02:
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
                 elif is_timeout:
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None)
@@ -594,7 +620,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_USE_TCP, None)
             elif is_timeout:
                 self._upper_bound = self._request.payload - 1
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
@@ -610,7 +636,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             elif is_valid:
                 self._lower_bound = self._request.payload
-                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)/2
+                payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
@@ -702,7 +728,7 @@ class DNSQueryHandler:
 
     def get_query_transport_meta(self):
         return transport.DNSQueryTransportMeta(self.request.to_wire(), self._server, self.params['tcp'], self.get_timeout(), \
-                self.query.port, src=self._client, sport=self.params['sport'])
+                self.query.odd_ports.get(self._server, self.query.port), src=self._client, sport=self.params['sport'])
 
     def get_remaining_lifetime(self):
         if self._expiration is None:
@@ -745,8 +771,9 @@ class DNSQueryHandler:
                 # Explicitly specifying a client IP that cannot connect to a
                 # given destination (e.g., because it is of the wrong address
                 # scope) will result in a regular network failure with
-                # EHOSTUNREACH, as there is no scope comparison in this code.)
-                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg == errno.EHOSTUNREACH and client is None:
+                # EHOSTUNREACH or ENETUNREACH, as there is no scope comparison
+                # in this code.)
+                if retry_action.cause == RETRY_CAUSE_NETWORK_ERROR and retry_action.cause_arg in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EAFNOSUPPORT) and client is None:
                     raise AcceptResponse
 
                 # if this error was our fault, don't add it to the history
@@ -788,7 +815,7 @@ class AggregateDNSResponse(object):
         msg = response.message
 
         # sort with the most specific DNAME infos first
-        dname_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.DNAME, msg.answer)
+        dname_rrsets = [x for x in msg.answer if x.rdtype == dns.rdatatype.DNAME]
         dname_rrsets.sort(reverse=True)
 
         qname_sought = qname
@@ -827,7 +854,7 @@ class AggregateDNSResponse(object):
             if referral and rdtype != dns.rdatatype.DS:
                 # add referrals
                 try:
-                    rrset = filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, msg.authority)[0]
+                    rrset = [x for x in msg.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
                 except IndexError:
                     pass
                 else:
@@ -1044,12 +1071,12 @@ class DNSQuery(object):
         return False
 
     def serialize(self, meta_only=False):
-        d = collections.OrderedDict((
-            ('qname', self.qname.to_text()),
+        d = OrderedDict((
+            ('qname', lb2s(self.qname.to_text())),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
             ('qtype', dns.rdatatype.to_text(self.rdtype)),
         ))
-        d['options'] = collections.OrderedDict((
+        d['options'] = OrderedDict((
             ('flags', self.flags),
         ))
         if self.edns >= 0:
@@ -1058,17 +1085,17 @@ class DNSQuery(object):
             d['options']['edns_flags'] = self.edns_flags
             d['options']['edns_options'] = []
             for o in self.edns_options:
-                s = StringIO.StringIO()
+                s = io.BytesIO()
                 o.to_wire(s)
-                d['options']['edns_options'].append((o.otype, base64.b64encode(s.getvalue())))
+                d['options']['edns_options'].append((o.otype, lb2s(base64.b64encode(s.getvalue()))))
             d['options']['tcp'] = self.tcp
 
-        d['responses'] = collections.OrderedDict()
-        servers = self.responses.keys()
+        d['responses'] = OrderedDict()
+        servers = list(self.responses.keys())
         servers.sort()
         for server in servers:
-            d['responses'][server] = collections.OrderedDict()
-            clients = self.responses[server].keys()
+            d['responses'][server] = OrderedDict()
+            clients = list(self.responses[server].keys())
             clients.sort()
             for client in clients:
                 if meta_only:
@@ -1136,11 +1163,11 @@ class MultiQuery(object):
         if not (self.qname == query.qname and self.rdtype == query.rdtype and self.rdclass == query.rdclass):
             raise ValueError('DNS query information must be the same as that to which query is being joined.')
 
-        edns_options_str = ''
+        edns_options_str = b''
         for o in query.edns_options:
-            s = StringIO.StringIO()
+            s = io.BytesIO()
             o.to_wire(s)
-            edns_options_str += struct.pack('!H', o.otype) + s.getvalue()
+            edns_options_str += struct.pack(b'!H', o.otype) + s.getvalue()
         params = (query.flags, query.edns, query.edns_max_udp_payload, query.edns_flags, edns_options_str, query.tcp)
         if params in self.queries:
             self.queries[params] = self.queries[params].join(query, bailiwick_map, default_bailiwick)
@@ -1187,7 +1214,7 @@ class ExecutableDNSQuery(DNSQuery):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
-            client_ipv4, client_ipv6, port,
+            client_ipv4, client_ipv6, port, odd_ports,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
@@ -1201,11 +1228,15 @@ class ExecutableDNSQuery(DNSQuery):
                 servers = set([servers])
         if not servers:
             raise ValueError("At least one server must be specified for an ExecutableDNSQuery")
+
         self.servers = servers
         self.bailiwick = bailiwick
         self.client_ipv4 = client_ipv4
         self.client_ipv6 = client_ipv6
         self.port = port
+        if odd_ports is None:
+            odd_ports = {}
+        self.odd_ports = odd_ports
         self.response_handlers = response_handlers
 
         self.query_timeout = query_timeout
@@ -1254,7 +1285,7 @@ class ExecutableDNSQuery(DNSQuery):
             th_factories = (cls.default_th_factory,)
 
         request_list = []
-        response_queue = Queue.Queue()
+        response_queue = queue.Queue()
 
         ignore_queryid = kwargs.get('ignore_queryid', True)
         response_wire_map = {}
@@ -1298,7 +1329,7 @@ class ExecutableDNSQuery(DNSQuery):
 
         while query_handlers:
             while request_list and time.time() >= request_list[0][0]:
-                tm.query_nowait(request_list.pop(0)[1])
+                tm.handle_msg_nowait(request_list.pop(0)[1])
 
             t = time.time()
             if request_list and t < request_list[0][0]:
@@ -1309,7 +1340,7 @@ class ExecutableDNSQuery(DNSQuery):
             try:
                 # pull a response from the queue
                 th = response_queue.get(timeout=timeout)
-            except Queue.Empty:
+            except queue.Empty:
                 continue
             th.finalize()
 
@@ -1325,13 +1356,13 @@ class ExecutableDNSQuery(DNSQuery):
                 if qtm.err is not None:
                     response = qtm.err
                 else:
-                    wire_zero_queryid = '\x00\x00' + qtm.res[2:]
+                    wire_zero_queryid = b'\x00\x00' + qtm.res[2:]
                     if wire_zero_queryid in response_wire_map:
                         response = response_wire_map[wire_zero_queryid]
                     else:
                         try:
                             response = dns.message.from_wire(qtm.res)
-                        except Exception, e:
+                        except Exception as e:
                             response = e
                         if ignore_queryid:
                             response_wire_map[wire_zero_queryid] = response
@@ -1400,11 +1431,14 @@ class ExecutableDNSQuery(DNSQuery):
                             raise PortBindError('Unable to bind to local port %d (%s)' % (qh.params['sport'], errno.errorcode[errno1]))
                         else:
                             raise PortBindError('Unable to bind to local port (%s)' % (errno.errorcode[errno1]))
-                    elif qtm.src is None and errno1 not in (errno.EHOSTUNREACH, errno.ENETUNREACH):
-                        # If source is None it didn't bind properly.  If errno1
-                        # is also EHOSTUNREACH, it is because there was no
-                        # proper IPv4 or IPv6 connectivity (which is handled
-                        # elsewhere); otherwise, it was something unknown, so
+                    elif qtm.src is None and errno1 not in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EAFNOSUPPORT):
+                        # If source is None it didn't bind properly.  If the
+                        # errno1 value after bind() is EHOSTUNREACH or
+                        # ENETUNREACH, it is because there was no proper IPv4
+                        # or IPv6 connectivity (which is handled elsewhere).
+                        # If socket() failed and resulted in an errno value of
+                        # EAFNOSUPPORT, then likewise there is not IPv6
+                        # support. In other cases, it was something unknown, so
                         # raise an error.
                         raise BindError('Unable to bind to local address (%s)' % (errno.errorcode.get(errno1, "unknown")))
 
@@ -1466,7 +1500,7 @@ class DNSQueryFactory(object):
     response_handlers = []
 
     def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
-            client_ipv4=None, client_ipv6=None, port=53,
+            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
 
@@ -1479,7 +1513,7 @@ class DNSQueryFactory(object):
 
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
-                client_ipv4, client_ipv6, port,
+                client_ipv4, client_ipv6, port, odd_ports,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 
@@ -1536,6 +1570,36 @@ class RecursiveDNSSECQuery(DNSSECQuery, RecursiveDNSQuery):
     '''A standard recursive query requesting DNSSEC records.'''
 
     pass
+
+class QuickDNSSECQuery(DNSSECQuery):
+    '''A standard DNSSEC query, designed for quick turnaround.'''
+
+    response_handlers = DNSSECQuery.response_handlers + \
+            [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]
+
+    query_timeout = 1.0
+    max_attempts = 1
+    lifetime = 3.0
+
+class RobustDNSSECQuery(DNSSECQuery):
+    '''A robust query with a number of handlers, designed to get a response,
+    in the midst of compatibility and connectivity issues.'''
+
+    response_handlers = DNSSECQuery.response_handlers + \
+            [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
+            ReduceUDPMaxPayloadOnTimeoutHandler(512, 3),
+            DisableEDNSOnTimeoutHandler(4)]
+
+    # For timeouts:
+    #  1 - no change
+    #  2 - no change
+    #  3 - reduce udp max payload to 512; change timeout to 1 second
+    #  4 - disable EDNS
+    #  5 - return
+
+    query_timeout = 1.0
+    max_attempts = 5
+    lifetime = 7.0
 
 class DiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
@@ -1727,7 +1791,7 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
 
     edns = 0
     edns_max_udp_payload = 512
-    edns_options = [dns.edns.GenericOption(100, '')]
+    edns_options = [dns.edns.GenericOption(100, b'')]
 
     response_handlers = SimpleDNSQuery.response_handlers + \
             [RemoveEDNSOptionOnTimeoutHandler(100, 4),
@@ -1804,7 +1868,7 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
     flags = dns.flags.RD
     edns = 0
     edns_max_udp_payload = 512
-    edns_options = [dns.edns.GenericOption(100, '')]
+    edns_options = [dns.edns.GenericOption(100, b'')]
 
     response_handlers = SimpleDNSQuery.response_handlers + \
             [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
@@ -1877,23 +1941,23 @@ def main():
         cls = RecursiveDiagnosticQuery
     else:
         cls = DiagnosticQuery
-    d = cls(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]), dns.rdataclass.IN, map(IPAddr, args[2:]))
+    d = cls(dns.name.from_text(args[0]), dns.rdatatype.from_text(args[1]), dns.rdataclass.IN, [IPAddr(x) for x in args[2:]])
     d.execute()
 
     if '-j' in opts:
-        print json.dumps(d.serialize(), indent=4, separators=(',', ': '))
+        print(json.dumps(d.serialize(), indent=4, separators=(',', ': ')))
     else:
-        print 'Responses for %s/%s:' % (args[0], args[1])
+        print('Responses for %s/%s:' % (args[0], args[1]))
         for server in d.responses:
             for client, response in d.responses[server].items():
                 if response.message is not None:
-                    print '   from %s: %s (%d bytes in %dms)' % (server, repr(response.message), len(response.message.to_wire()), int(response.response_time*1000))
+                    print('   from %s: %s (%d bytes in %dms)' % (server, repr(response.message), len(response.message.to_wire()), int(response.response_time*1000)))
                 else:
-                    print '   from %s: (ERR: %s) (%dms)' % (server, repr(response.error), int(response.response_time*1000))
+                    print('   from %s: (ERR: %s) (%dms)' % (server, repr(response.error), int(response.response_time*1000)))
 
-                print '   (src: %s)' % (client)
+                print('   (src: %s)' % (client))
                 if response.history:
-                    print '       (history: %s)' % (response.history)
+                    print('       (history: %s)' % (response.history))
 
 if __name__ == '__main__':
     main()

@@ -20,10 +20,20 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import datetime
 import errno
 import socket
 import sys
+
+# python3/python2 dual compatibility
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+else:
+    urlparse = urllib.parse
 
 import dns.flags, dns.exception, dns.name, dns.opcode, dns.rdataclass, dns.rdatatype
 
@@ -88,6 +98,7 @@ class DigCommandLineQuery:
         self.trusted_keys = ()
         self.show_ttl = True
         self.lg_url = None
+        self.lg_factory = None
 
     def process_query_options(self, global_options):
         for arg in global_options + self.query_options:
@@ -189,7 +200,14 @@ class DigCommandLineQuery:
             elif arg == '+nomultiline':
                 self.multiline = False
             #TODO +ndots=D
-            #TODO +[no]nsid
+            elif arg == '+nsid':
+                if self.edns < 0:
+                    self.edns = 0
+                if not [x for x in filter(lambda x: x.otype == dns.edns.NSID, self.edns_options)]:
+                    self.edns_options.append(dns.edns.GenericOption(dns.edns.NSID, b''))
+            elif arg == '+nonsid':
+                l = [x for x in filter(lambda x: x.otype == dns.edns.NSID, self.edns_options)]
+                self.edns_options.remove(dns.edns.GenericOption(dns.edns.NSID, b''))
             #TODO +[no]nssearch
             #TODO +[no]onesoa
             #TODO +[no]qr
@@ -232,15 +250,15 @@ class DigCommandLineQuery:
                 self.tcp = True
             elif arg in ('+notcp', '+novc'):
                 self.tcp = False
-            elif arg.startswith('+time') and \
-                    (len(arg) <= 5 or arg[5] == '='):
+            elif arg.startswith('+timeout') and \
+                    (len(arg) <= 8 or arg[8] == '='):
                 try:
                     opt, arg = arg.split('=')
                     self.query_timeout = float(arg)
                     if self.query_timeout < 1.0:
                         self.query_timeout = 1.0
                 except ValueError:
-                    raise CommandLineException('+time requires a numerical argument')
+                    raise CommandLineException('+timeout requires a numerical argument')
             #TODO +[no]topdown
             #TODO +[no]trace
             #TODO +[no]tries
@@ -264,7 +282,7 @@ class DigCommandLineQuery:
                 else:
                     try:
                         tk_str = open(arg).read()
-                    except IOError, e:
+                    except IOError as e:
                         raise CommandLineException('%s: "%s"' % (e.strerror, arg))
                     try:
                         self.trusted_keys = get_trusted_keys(tk_str)
@@ -293,11 +311,39 @@ class DigCommandLineQuery:
             processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not use_ipv4:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not use_ipv6:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = nameservers + processed_nameservers
+
+    def process_looking_glass(self, looking_glass_cache):
+        if self.lg_url is None:
+            return
+
+        if self.lg_url not in looking_glass_cache:
+            # check that version is >= 2.7.9 if HTTPS is requested
+            if self.lg_url.startswith('https'):
+                vers0, vers1, vers2 = sys.version_info[:3]
+                if (2, 7, 9) > (vers0, vers1, vers2):
+                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
+                    sys.exit(1)
+
+            url = urlparse.urlparse(self.lg_url)
+            if url.scheme in ('http', 'https'):
+                fact = transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=options['insecure'])
+            elif url.scheme == 'ws':
+                if url.hostname is not None:
+                    usage('WebSocket URL must designate a local UNIX domain socket.')
+                    sys.exit(1)
+                fact = transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path)
+            elif url.scheme == 'ssh':
+                fact = transport.DNSQueryTransportHandlerRemoteCmdFactory(self.lg_url)
+            else:
+                usage('Unsupported URL scheme: "%s"' % self.lg_url)
+                sys.exit(1)
+            looking_glass_cache[self.lg_url] = fact
+        self.lg_factory = looking_glass_cache[self.lg_url]
 
     def _get_resolver(self, options):
         class CustomQuery(Q.DNSQueryFactory):
@@ -309,8 +355,8 @@ class DigCommandLineQuery:
             tcp = self.tcp
             response_handlers = self.handlers
 
-        if self.lg_url is not None:
-            th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url),)
+        if self.lg_factory is not None:
+            th_factories = (self.lg_factory,)
         else:
             th_factories = None
 
@@ -346,7 +392,7 @@ class DigCommandLineQuery:
 
     def display(self, response, server, options):
         if response is None:
-            return ';; no servers were queried'
+            return ';; no servers were queried\n'
 
         elif response.message is not None:
             if self.short:
@@ -388,6 +434,17 @@ class DigCommandLineQuery:
                     s += ';; OPT PSEUDOSECTION:\n'
                     s += '; EDNS: version: %d, flags: %s; udp: %d\n' % (response.message.edns, dns.flags.edns_to_text(response.message.ednsflags).lower(), response.message.payload)
 
+                    for opt in response.message.options:
+                        chars = []
+                        if opt.otype == dns.edns.NSID:
+                            s += '; NSID:'
+                            for b in opt.data:
+                                s += ' %02x' % b
+                                chars.append(chr(b))
+                            for c in chars:
+                                s += ' (%s)' % c
+                            s += '\n'
+
             if response.message.question and self.show_question:
                 if self.show_comments:
                     s += ';; QUESTION SECTION:\n'
@@ -422,15 +479,15 @@ class DigCommandLineQuery:
             return s
 
         elif response.error in (Q.RESPONSE_ERROR_TIMEOUT, Q.RESPONSE_ERROR_NETWORK_ERROR):
-            return ';; connection timed out; no servers could be reached'
+            return ';; connection timed out; no servers could be reached\n'
 
         else:
-            return ';; the response from %s was malformed' % server
+            return ';; the response from %s was malformed\n' % server
 
     def query_and_display(self, options, filehandle):
         try:
             server, response = self.query(options)
-        except transport.RemoteQueryTransportError, e:
+        except transport.RemoteQueryTransportError as e:
             sys.stderr.write('%s\n' % e)
         else:
             output = self.display(response, server, options)
@@ -449,6 +506,7 @@ class DigCommandLine:
             'use_ipv6': None,
             'client_ipv4': None,
             'client_ipv6': None,
+            'insecure': None,
             'port': 53,
         }
 
@@ -464,9 +522,11 @@ class DigCommandLine:
         if not self.queries:
             self.queries.append(DigCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
+        looking_glass_cache = {}
         for q in self.queries:
             q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
             q.process_query_options(self.global_query_options)
+            q.process_looking_glass(looking_glass_cache)
 
             if not q.nameservers:
                 raise SemanticException('No nameservers to query')
@@ -582,7 +642,7 @@ class DigCommandLine:
             try:
                 s = socket.socket(family)
                 s.bind((addr, 0))
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EADDRNOTAVAIL:
                     raise SemanticException('Cannot bind to specified IP address: "%s"' % addr)
             else:
@@ -622,6 +682,9 @@ class DigCommandLine:
         elif self.args[self.arg_index].startswith('-4'):
             self._get_arg(False)
             self.options['use_ipv4'] = True
+        elif self.args[self.arg_index].startswith('-k'):
+            self._get_arg(False)
+            self.options['insecure'] = True
         else:
             raise CommandLineException('Option "%s" not recognized.' % self.args[self.arg_index][:2])
 
@@ -684,9 +747,9 @@ class DigCommandLine:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
         if not self.options['use_ipv4']:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
         if not self.options['use_ipv6']:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
 
@@ -694,7 +757,7 @@ def main():
     try:
         q = DigCommandLine(sys.argv[1:])
         q.query_and_display()
-    except (CommandLineException, SemanticException), e:
+    except (CommandLineException, SemanticException) as e:
         sys.stderr.write('%s\n' % e)
         sys.exit(1)
     except KeyboardInterrupt:

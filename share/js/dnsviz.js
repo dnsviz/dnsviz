@@ -55,6 +55,8 @@ function AuthGraph(anchorElement, maxPaperWidth, imageScale) {
 		12: 'GOST R 34.10-2001',
 		13: 'ECDSA Curve P-256 with SHA-256',
 		14: 'ECDSA Curve P-384 with SHA-384',
+		15: 'Ed25519',
+		16: 'Ed448',
 	}
 	this._digest_algorithms = {
 		1: 'SHA-1',

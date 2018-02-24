@@ -25,25 +25,34 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import errno
 import cgi
-import collections
+import codecs
 import datetime
 import hashlib
+import io
 import logging
-import StringIO
 import socket
 import struct
 import time
 
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
-import base32
-import crypto
-import format as fmt
-from ipaddr import IPAddr
-from util import tuple_to_dict
+from . import base32
+from . import crypto
+from . import format as fmt
+from .ipaddr import IPAddr
+from .util import tuple_to_dict
+lb2s = fmt.latin1_binary_to_string
 
 class DNSResponse:
     '''A DNS response, including meta information'''
@@ -74,15 +83,15 @@ class DNSResponse:
         if review_history:
             self._review_history()
 
-    def __unicode__(self):
-        import query as Q
+    def __str__(self):
+        from . import query as Q
         if self.message is not None:
             return repr(self.message)
         else:
             return Q.response_errors.get(self.error)
 
     def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
+        return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
     def initial_query_tag(self):
         s = ''
@@ -166,7 +175,7 @@ class DNSResponse:
         self.responsive_cause_index_tcp = responsive_cause_index_tcp
 
     def _review_history(self):
-        import query as Q
+        from . import query as Q
 
         flags = self.query.flags
         edns = self.query.edns
@@ -243,9 +252,9 @@ class DNSResponse:
                 edns_flags &= ~retry.action_arg
             elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
                 #TODO option data
-                edns_options.append(dns.edns.GenericOption(retry.action_arg, ''))
+                edns_options.append(dns.edns.GenericOption(retry.action_arg, b''))
             elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
-                filtered_options = filter(lambda x: retry.action_arg == x.otype, edns_options)
+                filtered_options = [x for x in edns_options if retry.action_arg == x.otype]
                 if filtered_options:
                     edns_options.remove(filtered_options[0])
             elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
@@ -341,7 +350,7 @@ class DNSResponse:
             return False
         # if the name exists in the answer section with the requested rdtype or
         # CNAME, then it can't be a referral
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME)]:
             return False
         # if an SOA record with the given qname exists, then the server
         # is authoritative for the name, so it is a referral
@@ -353,13 +362,13 @@ class DNSResponse:
         # if proper referral is requested and qname is equal to of an NS RRset
         # in the authority, then it is a referral
         if proper:
-            if filter(lambda x: qname == x.name and x.rdtype == dns.rdatatype.NS, self.message.authority):
+            if [x for x in self.message.authority if qname == x.name and x.rdtype == dns.rdatatype.NS]:
                 return True
-        # if proper referral is NOT requested and qname is a subdomain of
-        # (including equal to) an NS RRset in the authority, then it is a
-        # referral
+        # if proper referral is NOT requested, qname is a subdomain of
+        # (including equal to) an NS RRset in the authority, and qname is not
+        # equal to bailiwick, then it is a referral
         else:
-            if filter(lambda x: qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS, self.message.authority):
+            if [x for x in self.message.authority if qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS]:
                 return True
         return False
 
@@ -370,7 +379,7 @@ class DNSResponse:
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
         return bool(not self.is_authoritative() and \
-                filter(lambda x: x.name != qname and qname.is_subdomain(x.name), self.message.authority))
+                [x for x in self.message.authority if x.name != qname and qname.is_subdomain(x.name)])
 
     def is_answer(self, qname, rdtype, include_cname=True):
         '''Return True if this response yields an answer for the queried name
@@ -379,12 +388,12 @@ class DNSResponse:
 
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
-        if rdtype == dns.rdatatype.ANY and filter(lambda x: x.name == qname, self.message.answer):
+        if rdtype == dns.rdatatype.ANY and [x for x in self.message.answer if x.name == qname]:
             return True
         rdtypes = [rdtype]
         if include_cname:
             rdtypes.append(dns.rdatatype.CNAME)
-        if filter(lambda x: x.name == qname and x.rdtype in rdtypes, self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in rdtypes]:
             return True
         return False
 
@@ -395,7 +404,7 @@ class DNSResponse:
         if not (self.is_valid_response() and self.is_complete_response()):
             return False
 
-        if filter(lambda x: x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME), self.message.answer):
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME)]:
             return False
 
         if self.message.rcode() == dns.rcode.NXDOMAIN:
@@ -448,9 +457,9 @@ class DNSResponse:
         return ip_mapping
 
     def serialize_meta(self):
-        import query as Q
+        from . import query as Q
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
 
         # populate history, if not already populated
         if self.effective_flags is None:
@@ -466,15 +475,15 @@ class DNSResponse:
             d['rcode'] = dns.rcode.to_text(self.message.rcode())
             if self.message.edns >= 0:
                 d['edns_version'] = self.message.edns
-            d['answer'] = collections.OrderedDict((
+            d['answer'] = OrderedDict((
                 ('count', self.section_rr_count(self.message.answer)),
                 ('digest', self.section_digest(self.message.answer)),
             ))
-            d['authority'] = collections.OrderedDict((
+            d['authority'] = OrderedDict((
                 ('count', self.section_rr_count(self.message.authority)),
                 ('digest', self.section_digest(self.message.authority)),
             ))
-            d['additional'] = collections.OrderedDict((
+            d['additional'] = OrderedDict((
                 ('count', self.section_rr_count(self.message.additional)),
                 ('digest', self.section_digest(self.message.additional)),
             ))
@@ -491,7 +500,7 @@ class DNSResponse:
         d['retries'] = self.retries()
         if self.history:
             d['cumulative_response_time'] = int(self.total_response_time() * 1000)
-            d['effective_query_options'] = collections.OrderedDict((
+            d['effective_query_options'] = OrderedDict((
                 ('flags', self.effective_flags),
                 ('edns_version', self.effective_edns),
                 ('edns_max_udp_payload', self.effective_edns_max_udp_payload),
@@ -499,13 +508,13 @@ class DNSResponse:
                 ('edns_options', []),
             ))
             for o in self.effective_edns_options:
-                s = StringIO.StringIO()
+                s = io.BytesIO()
                 o.to_wire(s)
                 d['effective_query_options']['edns_options'].append(base64.b64encode(s.getvalue()))
             d['effective_query_options']['tcp'] = self.effective_tcp
 
             if self.responsive_cause_index is not None:
-                d['responsiveness_impediment'] = collections.OrderedDict((
+                d['responsiveness_impediment'] = OrderedDict((
                     ('cause', Q.retry_causes[self.history[self.responsive_cause_index].cause]),
                     ('action', Q.retry_actions[self.history[self.responsive_cause_index].action])
                 ))
@@ -513,9 +522,9 @@ class DNSResponse:
         return d
 
     def serialize(self):
-        import query as Q
+        from . import query as Q
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
         if self.message is None:
             d['message'] = None
             d['error'] = Q.response_errors[self.error]
@@ -524,7 +533,7 @@ class DNSResponse:
                 if errno_name is not None:
                     d['errno'] = errno_name
         else:
-            d['message'] = base64.b64encode(self.message.to_wire())
+            d['message'] = lb2s(base64.b64encode(self.message.to_wire()))
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['time_elapsed'] = int(self.response_time * 1000)
@@ -535,7 +544,7 @@ class DNSResponse:
 
     @classmethod
     def deserialize(cls, d, query):
-        import query as Q
+        from . import query as Q
 
         if 'msg_size' in d:
             msg_size = int(d['msg_size'])
@@ -563,7 +572,7 @@ class DNSResponse:
             wire = base64.b64decode(d['message'])
             try:
                 message = dns.message.from_wire(wire)
-            except Exception, e:
+            except Exception as e:
                 message = None
                 if isinstance(e, (struct.error, dns.exception.FormError)):
                     error = Q.RESPONSE_ERROR_FORMERR
@@ -625,7 +634,7 @@ class DNSKEYMeta(DNSResponseComponent):
         self.key_tag_no_revoke = self.calc_key_tag(rdata, True)
         self.key_len = self.calc_key_len(rdata)
 
-    def __unicode__(self):
+    def __str__(self):
         return 'DNSKEY for %s (algorithm %d (%s), key tag %d)' % (fmt.humanize_name(self.name), self.rdata.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.rdata.algorithm, self.rdata.algorithm), self.key_tag)
 
     @classmethod
@@ -634,21 +643,31 @@ class DNSKEYMeta(DNSResponseComponent):
         clear_revoke is True, then clear the revoke flag of the DNSKEY RR
         first.'''
 
+        # python3/python2 dual compatibility
+        if isinstance(rdata.key, bytes):
+            if isinstance(rdata.key, str):
+                map_func = lambda x, y: ord(x[y])
+            else:
+                map_func = lambda x, y: x[y]
+        else:
+            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
+
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
-            key_tag, = struct.unpack('!H', rdata.key[-3:-1])
-            return key_tag
+            b1 = map_func(rdata.key, -3)
+            b2 = map_func(rdata.key, -2)
+            return (b1 << 8) | b2
 
         if clear_revoke:
             flags = rdata.flags & (~fmt.DNSKEY_FLAGS['revoke'])
         else:
             flags = rdata.flags
 
-        key_str = struct.pack('!HBB', flags, rdata.protocol, rdata.algorithm) + rdata.key
+        key_str = struct.pack(b'!HBB', flags, rdata.protocol, rdata.algorithm) + rdata.key
 
         ac = 0
         for i in range(len(key_str)):
-            b, = struct.unpack('B',key_str[i])
+            b = map_func(key_str, i)
             if i & 1:
                 ac += b
             else:
@@ -663,28 +682,45 @@ class DNSKEYMeta(DNSResponseComponent):
 
         key_str = rdata.key
 
+        # python3/python2 dual compatibility
+        if isinstance(rdata.key, bytes):
+            if isinstance(rdata.key, str):
+                map_func = lambda x, y: ord(x[y])
+            else:
+                map_func = lambda x, y: x[y]
+        else:
+            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
+
         # RSA keys
         if rdata.algorithm in (1,5,7,8,10):
             try:
                 # get the exponent length
-                e_len, = struct.unpack('B',key_str[0])
+                e_len = map_func(key_str, 0)
             except IndexError:
                 return 0
 
             offset = 1
             if e_len == 0:
-                e_len, = struct.unpack('!H',key_str[1:3])
+                b1 = map_func(rdata.key[1])
+                b2 = map_func(rdata.key[2])
+                e_len = (b1 << 8) | b2
                 offset = 3
 
             # get the exponent
             offset += e_len
 
             # get the modulus
-            return (len(key_str) - offset) << 3
+            key_len = len(key_str) - offset
+
+            # if something went wrong here, use key length of rdata key
+            if key_len <= 0:
+                return len(key_str)<<3
+
+            return key_len << 3
 
         # DSA keys
         elif rdata.algorithm in (3,6):
-            t, = struct.unpack('B',key_str[0])
+            t = map_func(key_str, 0)
             return (64 + t*8)<<3
 
         # GOST keys
@@ -695,7 +731,13 @@ class DNSKEYMeta(DNSResponseComponent):
         elif rdata.algorithm in (13,14):
             return len(key_str)<<3
 
-        return None
+        # EDDSA keys
+        elif rdata.algorithm in (15,16):
+            return len(key_str)<<3
+
+        # other keys - just guess, based on the length of the raw key material
+        else:
+            return len(key_str)<<3
 
     def message_for_ds(self, clear_revoke=False):
         '''Return the string value suitable for hashing to create a DS
@@ -706,25 +748,21 @@ class DNSKEYMeta(DNSResponseComponent):
         else:
             flags = self.rdata.flags
 
-        s = StringIO.StringIO()
-
-        self.name.canonicalize().to_wire(s)
+        name_wire = self.name.canonicalize().to_wire()
 
         # write DNSKEY rdata in wire format
-        rdata_wire = struct.pack('!HBB', flags, self.rdata.protocol, self.rdata.algorithm)
-        s.write(rdata_wire)
-        s.write(self.rdata.key)
+        rdata_wire = struct.pack(b'!HBB', flags, self.rdata.protocol, self.rdata.algorithm)
 
-        return s.getvalue()
+        return name_wire + rdata_wire + self.rdata.key
 
     def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
-        from analysis import status as Status
+        from .analysis import status as Status
 
         show_id = loglevel <= logging.INFO or \
                 (self.warnings and loglevel <= logging.WARNING) or \
                 (self.errors and loglevel <= logging.ERROR)
 
-        d = collections.OrderedDict()
+        d = OrderedDict()
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -734,11 +772,11 @@ class DNSKEYMeta(DNSResponseComponent):
         if show_id:
             d['id'] = '%d/%d' % (self.rdata.algorithm, self.key_tag)
         if loglevel <= logging.DEBUG:
-            d['description'] = formatter(unicode(self))
+            d['description'] = formatter(str(self))
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm
-            d['key'] = base64.b64encode(self.rdata.key)
+            d['key'] = lb2s(base64.b64encode(self.rdata.key))
             d['ttl'] = self.ttl
             d['key_length'] = self.key_len
             d['key_tag'] = self.key_tag
@@ -780,6 +818,19 @@ class DNSKEYMeta(DNSResponseComponent):
 
         return d
 
+#XXX This class is necessary because of a bug in dnspython, in which
+# comparisons are not properly made for the purposes of sorting rdata for RRSIG
+# validation
+class RdataWrapper(object):
+    def __init__(self, rdata):
+        self._rdata = rdata
+
+    def __eq__(self, other):
+        return self._rdata.to_digestable() == other._rdata.to_digestable()
+
+    def __lt__(self, other):
+        return self._rdata.to_digestable() < other._rdata.to_digestable()
+
 class RRsetInfo(DNSResponseComponent):
     def __init__(self, rrset, ttl_cmp, dname_info=None):
         super(RRsetInfo, self).__init__()
@@ -794,14 +845,14 @@ class RRsetInfo(DNSResponseComponent):
 
         self.cname_info_from_dname = []
 
-    def __unicode__(self):
+    def __str__(self):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
             return 'RRset for %s/%s' % (fmt.format_nsec3_name(self.rrset.name).rstrip('.'), dns.rdatatype.to_text(self.rrset.rdtype))
         else:
             return 'RRset for %s/%s' % (fmt.humanize_name(self.rrset.name), dns.rdatatype.to_text(self.rrset.rdtype))
 
     def __repr__(self):
-        return '<%s: "%s">' % (self.__class__.__name__, unicode(self))
+        return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
     def __eq__(self, other):
         if not (self.rrset == other.rrset and self.dname_info == other.dname_info):
@@ -810,39 +861,27 @@ class RRsetInfo(DNSResponseComponent):
             return False
         return True
 
-    @classmethod
-    def rdata_cmp(cls, a, b):
-        '''Compare the wire value of rdata a and rdata b.'''
-
-        #XXX This is necessary because of a bug in dnspython
-        a_val = a.to_digestable()
-        b_val = b.to_digestable()
-
-        if a_val < b_val:
-            return -1
-        elif a_val > b_val:
-            return 1
-        else:
-            return 0
+    def __hash__(self):
+        return hash(id(self))
 
     @classmethod
     def rrset_canonicalized_to_wire(cls, rrset, name, ttl):
-        s = StringIO.StringIO()
+        s = b''
+        name_wire = name.to_wire()
 
-        rdata_list = list(rrset)
-        rdata_list.sort(cmp=cls.rdata_cmp)
+        rdata_list = [RdataWrapper(x) for x in rrset]
+        rdata_list.sort()
 
-        for rdata in rdata_list:
+        for rdataw in rdata_list:
+            rdata = rdataw._rdata
             rdata_wire = rdata.to_digestable()
             rdata_len = len(rdata_wire)
 
-            name.to_wire(s)
             stuff = struct.pack("!HHIH", rrset.rdtype, rrset.rdclass,
                                 ttl, rdata_len)
-            s.write(stuff)
-            s.write(rdata_wire)
+            s += name_wire + stuff + rdata_wire
 
-        return s.getvalue()
+        return s
 
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
@@ -888,16 +927,14 @@ class RRsetInfo(DNSResponseComponent):
             self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, is_referral)
 
     def message_for_rrsig(self, rrsig):
-        s = StringIO.StringIO()
 
         # write RRSIG in wire format
-        rdata_wire = struct.pack('!HBBIIIH', rrsig.type_covered,
+        rdata_wire = struct.pack(b'!HBBIIIH', rrsig.type_covered,
                              rrsig.algorithm, rrsig.labels,
                              rrsig.original_ttl, rrsig.expiration,
                              rrsig.inception, rrsig.key_tag)
-        s.write(rdata_wire)
-        rrsig.signer.canonicalize().to_wire(s)
-        rrsig_canonicalized_wire = s.getvalue()
+        signer_wire = rrsig.signer.canonicalize().to_wire()
+        rrsig_canonicalized_wire = rdata_wire + signer_wire
 
         rrset_name = self.reduce_wildcard(rrsig).canonicalize()
         rrset_canonicalized_wire = self.rrset_canonicalized_to_wire(self.rrset, rrset_name, rrsig.original_ttl)
@@ -905,7 +942,7 @@ class RRsetInfo(DNSResponseComponent):
         return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
     def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
-        d = collections.OrderedDict()
+        d = OrderedDict()
 
         if html_format:
             formatter = lambda x: cgi.escape(x, True)
@@ -915,17 +952,22 @@ class RRsetInfo(DNSResponseComponent):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
             d['name'] = formatter(fmt.format_nsec3_name(self.rrset.name))
         else:
-            d['name'] = formatter(self.rrset.name.canonicalize().to_text())
+            d['name'] = formatter(lb2s(self.rrset.name.canonicalize().to_text()))
         d['ttl'] = self.rrset.ttl
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
-        rdata_list = list(self.rrset)
-        rdata_list.sort(cmp=self.rdata_cmp)
-        for rdata in rdata_list:
+        rdata_list = [RdataWrapper(x) for x in self.rrset]
+        rdata_list.sort()
+        for rdataw in rdata_list:
+            rdata = rdataw._rdata
             if self.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
-                d['rdata'].append(formatter(rdata.to_text()))
+                s = rdata.to_text()
+                # python3/python2 dual compatibility
+                if not isinstance(s, str):
+                    s = lb2s(s)
+                d['rdata'].append(formatter(s))
 
         if loglevel <= logging.INFO:
             servers = tuple_to_dict(self.servers_clients)
@@ -965,10 +1007,13 @@ class NegativeResponseInfo(DNSResponseComponent):
     def __eq__(self, other):
         return self.qname == other.qname and self.rdtype == other.rdtype
 
+    def __hash__(self):
+        return hash(id(self))
+
     def create_or_update_soa_info(self, server, client, response, is_referral):
-        soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name), response.message.authority)
+        soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name)]
         if not soa_rrsets:
-            soa_rrsets = filter(lambda x: x.rdtype == dns.rdatatype.SOA, response.message.authority)
+            soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA]
         soa_rrsets.sort(reverse=True)
         try:
             soa_rrset = soa_rrsets[0]
@@ -986,7 +1031,7 @@ class NegativeResponseInfo(DNSResponseComponent):
 
     def create_or_update_nsec_info(self, server, client, response, is_referral):
         for rdtype in dns.rdatatype.NSEC, dns.rdatatype.NSEC3:
-            nsec_rrsets = filter(lambda x: x.rdtype == rdtype, response.message.authority)
+            nsec_rrsets = [x for x in response.message.authority if x.rdtype == rdtype]
             if not nsec_rrsets:
                 continue
 
@@ -1026,11 +1071,14 @@ class NSECSet(DNSResponseComponent):
 
         self.servers_clients = {}
 
+    def __repr__(self):
+        return '<%s>' % (self.__class__.__name__)
+
     def __eq__(self, other):
         return self.rrsets == other.rrsets
 
-    def __repr__(self):
-        return '<%s>' % (self.__class__.__name__)
+    def __hash__(self):
+        return hash(id(self))
 
     def project(self, *names):
         if set(names).difference(self.rrsets):
@@ -1063,12 +1111,18 @@ class NSECSet(DNSResponseComponent):
         self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
 
     def is_valid_nsec3_name(self, nsec_name, algorithm):
+        # python3/python2 dual compatibility
+        if isinstance(nsec_name[0], str):
+            map_func = lambda x: codecs.encode(x.upper(), 'latin1')
+        else:
+            map_func = lambda x: codecs.encode(chr(x).upper(), 'latin1')
+
         # check that NSEC3 name is valid
         if algorithm == 1:
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if filter(lambda x: x.upper() not in base32.b32alphabet, nsec_name[0]):
+        if [x for x in nsec_name[0] if map_func(x) not in base32.b32alphabet]:
             return False
         return True
 
@@ -1099,7 +1153,11 @@ class NSECSet(DNSResponseComponent):
         bitmap_index, bitmap_offset = divmod(rdtype_bitmap, 8)
         for (window, bitmap) in self.rrsets[nsec_name].rrset[0].windows:
             try:
-                if window == rdtype_window and ord(bitmap[bitmap_index]) & (0x80 >> bitmap_offset):
+                # dnspython <= 1.12.x uses strings, but dnspython 1.13 uses bytearray (for python3)
+                byte = bitmap[bitmap_index]
+                if isinstance(bitmap, str):
+                    byte = ord(byte)
+                if window == rdtype_window and byte & (0x80 >> bitmap_offset):
                     return True
             except IndexError:
                 pass
@@ -1246,6 +1304,9 @@ class DNSResponseError(DNSResponseComponent):
     def __eq__(self, other):
         return self.code == other.code and self.arg == other.arg
 
+    def __hash__(self):
+        return hash(id(self))
+
 class ReferralResponse(DNSResponseComponent):
     def __init__(self, name):
         super(ReferralResponse, self).__init__()
@@ -1254,6 +1315,9 @@ class ReferralResponse(DNSResponseComponent):
     def __eq__(self, other):
         return self.name == other.name
 
+    def __hash__(self):
+        return hash(id(self))
+
 class TruncatedResponse(DNSResponseComponent):
     def __init__(self, wire):
         super(TruncatedResponse, self).__init__()
@@ -1261,3 +1325,6 @@ class TruncatedResponse(DNSResponseComponent):
 
     def __eq__(self, other):
         return self.wire == other.wire
+
+    def __hash__(self):
+        return hash(id(self))

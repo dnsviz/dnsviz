@@ -4,5 +4,12 @@ include doc/COPYRIGHT
 include doc/Makefile
 include doc/src/*dot
 include doc/src/*svg
-include contrib/*
+recursive-include contrib *
 recursive-exclude external *
+# The following are for versions of setuptools that don't seem to pull in the
+# files that are listed in setup.py
+include README.md
+include doc/images/warning.png doc/images/error.png doc/images/logo*png
+include doc/dnsviz-graph.html
+recursive-include doc/man *
+recursive-include share *

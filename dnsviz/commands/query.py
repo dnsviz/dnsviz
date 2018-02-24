@@ -20,6 +20,8 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import getopt
 import socket
 import subprocess
@@ -90,6 +92,8 @@ class DVCommandLineQuery:
                     (len(arg) <= 12 or arg[12] == '='):
                 try:
                     opt, arg = arg.split('=')
+                    if not arg:
+                        raise ValueError()
                 except ValueError:
                     usage('+trusted-key requires a filename argument.')
                     sys.exit(1)
@@ -99,10 +103,15 @@ class DVCommandLineQuery:
                 usage('Option "%s" not recognized.' % arg)
                 sys.exit(1)
 
-    def process_nameservers(self, nameservers):
+    def process_nameservers(self, nameservers, use_ipv4, use_ipv6):
         processed_nameservers = []
         for addr in self.nameservers:
             processed_nameservers.extend(_get_nameservers_for_name(addr))
+
+        if not use_ipv4:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
+        if not use_ipv6:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = nameservers + processed_nameservers
 
@@ -122,9 +131,9 @@ class DVCommandLineQuery:
         dnsget_args = ['dnsviz', 'probe']
         dnsviz_args = ['dnsviz', 'print']
         dnsget_args.extend(['-d', '1', '-a', '.'])
-        if options['use_ipv4']:
+        if options['use_ipv4'] and not options['use_ipv6']:
             dnsget_args.append('-4')
-        if options['use_ipv6']:
+        if options['use_ipv6'] and not options['use_ipv4']:
             dnsget_args.append('-6')
         if options['client_ipv4'] is not None:
             dnsget_args.extend(['-b', options['client_ipv4']])
@@ -134,7 +143,10 @@ class DVCommandLineQuery:
         if self.trace:
             dnsget_args.append('-A')
         else:
-            dnsget_args.extend(['-s', self.nameservers[0]])
+            if self.nameservers[0].version == 6:
+                dnsget_args.extend(['-s', '[%s]' % (self.nameservers[0])])
+            else:
+                dnsget_args.extend(['-s', self.nameservers[0]])
         dnsget_args.append(self.qname)
 
         if self.trusted_keys_file is not None:
@@ -144,7 +156,7 @@ class DVCommandLineQuery:
         try:
             dnsget_p = subprocess.Popen(dnsget_args, stdout=subprocess.PIPE)
             dnsviz_p = subprocess.Popen(dnsviz_args, stdin=dnsget_p.stdout)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write('error: %s\n' % e)
             return False
         else:
@@ -158,8 +170,8 @@ class DVCommandLine:
         self.arg_index = 0
 
         self.options = {
-            'rdtype': dns.rdatatype.A,
-            'rdclass': dns.rdataclass.IN,
+            'rdtype': None,
+            'rdclass': None,
             'use_ipv4': None,
             'use_ipv6': None,
             'client_ipv4': None,
@@ -172,18 +184,24 @@ class DVCommandLine:
         self.queries = []
 
         self._process_args()
+        self._process_network()
         self._process_nameservers()
 
         if not self.queries:
             self.queries.append(DVCommandLineQuery('.', dns.rdatatype.NS, dns.rdataclass.IN))
 
         for q in self.queries:
-            q.process_nameservers(self.nameservers)
+            q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
             q.process_query_options(self.global_query_options)
 
             if not q.nameservers and not q.trace:
                 sys.stderr.write('No nameservers to query\n')
                 sys.exit(1)
+
+        if self.options['rdtype'] is None:
+            self.options['rdtype'] = dns.rdatatype.A
+        if self.options['rdclass'] is None:
+            self.options['rdclass'] = dns.rdataclass.IN
 
     def query_and_display(self):
         ret = True
@@ -235,6 +253,27 @@ class DVCommandLine:
         qname = self._get_arg(True)
         return DVCommandLineQuery(qname, None, None)
 
+    def _add_default_option(self):
+        if self.options['rdclass'] is None:
+            try:
+                self.options['rdclass'] = dns.rdataclass.from_text(self.args[self.arg_index])
+            except dns.rdataclass.UnknownRdataclass:
+                pass
+            else:
+                self.arg_index += 1
+                return True
+
+        if self.options['rdtype'] is None:
+            try:
+                self.options['rdtype'] = dns.rdatatype.from_text(self.args[self.arg_index])
+            except dns.rdatatype.UnknownRdatatype:
+                pass
+            else:
+                self.arg_index += 1
+                return True
+
+        return False
+
     def _add_qname(self):
         qname = self.args[self.arg_index]
         self.arg_index += 1
@@ -249,14 +288,14 @@ class DVCommandLine:
         else:
             self.arg_index += 1
 
-            # now check for optional class
-            try:
-                rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
-            except (IndexError, dns.rdataclass.UnknownRdataclass):
-                # no class detected; use default rdclass
-                rdclass = None
-            else:
-                self.arg_index += 1
+        # now check for optional class
+        try:
+            rdclass = dns.rdataclass.from_text(self.args[self.arg_index])
+        except (IndexError, dns.rdataclass.UnknownRdataclass):
+            # no class detected; use default rdclass
+            rdclass = None
+        else:
+            self.arg_index += 1
 
         return DVCommandLineQuery(qname, rdtype, rdclass)
 
@@ -280,7 +319,7 @@ class DVCommandLine:
             try:
                 s = socket.socket(family)
                 s.bind((addr, 0))
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EADDRNOTAVAIL:
                     sys.stderr.write('Cannot bind to specified IP address: "%s"\n' % addr)
                     sys.exit(1)
@@ -346,6 +385,10 @@ class DVCommandLine:
             elif self.args[self.arg_index][0] == '+':
                 self._add_query_option(query)
 
+            # global query class/type
+            elif query is None and self._add_default_option():
+                pass
+
             # name to be queried
             else:
                 query = self._add_qname()
@@ -353,22 +396,14 @@ class DVCommandLine:
 
     def _process_network(self):
         if self.options['use_ipv4'] is None and self.options['use_ipv6'] is None:
-            use_ipv4 = True
-            use_ipv6 = True
-        else:
-            if self.options['use_ipv4']:
-                use_ipv4 = True
-            else:
-                use_ipv4 = False
-            if self.options['use_ipv6']:
-                use_ipv6 = True
-            else:
-                use_ipv6 = False
-        return use_ipv4, use_ipv6
+            self.options['use_ipv4'] = True
+            self.options['use_ipv6'] = True
+        if not self.options['use_ipv4']:
+            self.options['use_ipv4'] = False
+        if not self.options['use_ipv6']:
+            self.options['use_ipv6'] = False
 
     def _process_nameservers(self):
-        use_ipv4, use_ipv6 = self._process_network()
-
         if not self.nameservers:
             processed_nameservers = Resolver.get_standard_resolver()._servers
         else:
@@ -376,10 +411,10 @@ class DVCommandLine:
             for addr in self.nameservers:
                 processed_nameservers.extend(_get_nameservers_for_name(addr))
 
-        if not use_ipv4:
-            processed_nameservers = filter(lambda x: x.version != 4, processed_nameservers)
-        if not use_ipv6:
-            processed_nameservers = filter(lambda x: x.version != 6, processed_nameservers)
+        if not self.options['use_ipv4']:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 4]
+        if not self.options['use_ipv6']:
+            processed_nameservers = [x for x in processed_nameservers if x.version != 6]
 
         self.nameservers = processed_nameservers
 

@@ -19,28 +19,51 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+from __future__ import unicode_literals
+
 import base64
 import bisect
-import collections
+import codecs
 import errno
 import fcntl
+import io
 import json
 import os
-import Queue
 import random
 import re
 import select
 import socket
 import ssl
 import struct
+import subprocess
 import threading
 import time
-import urllib
-import urlparse
+
+# minimal support for python2.6
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
+# python3/python2 dual compatibility
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+try:
+    import urllib.parse
+except ImportError:
+    import urlparse
+    import urllib
+    urlquote = urllib
+else:
+    urlparse = urllib.parse
+    urlquote = urllib.parse
 
 import dns.exception
 
-from ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
+from .format import latin1_binary_to_string as lb2s
 
 DNS_TRANSPORT_VERSION = 1.0
 
@@ -53,10 +76,83 @@ CHUNKED_ENCODING_RE = re.compile(r'^Transfer-Encoding: chunked(\r\n|\r|\n)', re.
 CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
 CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
 
+class SocketWrapper(object):
+    def __init__(self):
+        raise NotImplemented
+
+class Socket(SocketWrapper):
+    def __init__(self, sock):
+        self.sock = sock
+        self.reader = sock
+        self.writer = sock
+        self.reader_fd = sock.fileno()
+        self.writer_fd = sock.fileno()
+        self.family = sock.family
+        self.type = sock.type
+        self.lock = None
+
+    def recv(self, n):
+        return self.sock.recv(n)
+
+    def send(self, s):
+        return self.sock.send(s)
+
+    def setblocking(self, b):
+        self.sock.setblocking(b)
+
+    def bind(self, a):
+        self.sock.bind(a)
+
+    def connect(self, a):
+        self.sock.connect(a)
+
+    def getsockname(self):
+        return self.sock.getsockname()
+
+    def close(self):
+        self.sock.close()
+
+class ReaderWriter(SocketWrapper):
+    def __init__(self, reader, writer, proc=None):
+        self.reader = reader
+        self.writer = writer
+        self.reader_fd = self.reader.fileno()
+        self.writer_fd = self.writer.fileno()
+        self.family = socket.AF_INET
+        self.type = socket.SOCK_STREAM
+        self.lock = None
+        self.proc = proc
+
+    def recv(self, n):
+        return os.read(self.reader_fd, n)
+
+    def send(self, s):
+        return os.write(self.writer_fd, s)
+
+    def setblocking(self, b):
+        if not b:
+            fcntl.fcntl(self.reader_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+            fcntl.fcntl(self.writer_fd, fcntl.F_SETFL, os.O_NONBLOCK)
+
+    def bind(self, a):
+        pass
+
+    def connect(self, a):
+        pass
+
+    def getsockname(self):
+        return ('localhost', 0)
+
+    def close(self):
+        pass
+
 class RemoteQueryTransportError(Exception):
     pass
 
 class TransportMetaDeserializationError(Exception):
+    pass
+
+class SocketInUse(Exception):
     pass
 
 class DNSQueryTransportMeta(object):
@@ -76,8 +172,8 @@ class DNSQueryTransportMeta(object):
         self.end_time = None
 
     def serialize_request(self):
-        d = collections.OrderedDict()
-        d['req'] = base64.b64encode(self.req)
+        d = OrderedDict()
+        d['req'] = lb2s(base64.b64encode(self.req))
         d['dst'] = self.dst
         d['dport'] = self.dport
         if self.src is not None:
@@ -147,9 +243,9 @@ class DNSQueryTransportMeta(object):
         return cls(req, dst, tcp, timeout, dport, src, sport)
 
     def serialize_response(self):
-        d = collections.OrderedDict()
+        d = OrderedDict()
         if self.res is not None:
-            d['res'] = base64.b64encode(self.res)
+            d['res'] = lb2s(base64.b64encode(self.res))
         else:
             d['res'] = None
         if self.err is not None:
@@ -222,21 +318,26 @@ class DNSQueryTransportMeta(object):
         self.end_time = time.time()
         self.start_time = self.end_time - (elapsed/1000.0)
 
+QTH_MODE_WRITE_READ = 0
+QTH_MODE_WRITE = 1
+QTH_MODE_READ = 2
+
 class DNSQueryTransportHandler(object):
     singleton = False
     allow_loopback_query = False
     allow_private_query = False
     timeout_baseline = 0.0
+    mode = QTH_MODE_WRITE_READ
 
-    def __init__(self, processed_queue=None, factory=None):
-        self.req = None
-        self.req_len = None
-        self.req_index = None
+    def __init__(self, sock=None, recycle_sock=False, processed_queue=None, factory=None):
+        self.msg_send = None
+        self.msg_send_len = None
+        self.msg_send_index = None
 
-        self.res = None
-        self.res_len = None
-        self.res_buf = None
-        self.res_index = None
+        self.msg_recv = None
+        self.msg_recv_len = None
+        self.msg_recv_buf = None
+        self.msg_recv_index = None
         self.err = None
 
         self.dst = None
@@ -250,9 +351,11 @@ class DNSQueryTransportHandler(object):
         self._processed_queue = processed_queue
         self.factory = factory
 
-        self.expiration = None
+        self._sock = sock
         self.sock = None
-        self.sockfd = None
+        self.recycle_sock = recycle_sock
+
+        self.expiration = None
         self.start_time = None
         self.end_time = None
 
@@ -273,38 +376,82 @@ class DNSQueryTransportHandler(object):
             self.src = None
 
     def finalize(self):
-        assert self.res is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
+        assert self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ), 'finalize() can only be called for modes QTH_MODE_READ and QTH_MODE_WRITE_READ'
+        assert self.msg_recv is not None or self.err is not None, 'Query must have been executed before finalize() can be called'
 
         self._check_source()
 
         # clear out any partial responses if there was an error
         if self.err is not None:
-            self.res = None
+            self.msg_recv = None
 
+        if self.factory is not None:
+            if self.recycle_sock:
+                # if recycle_sock is requested, add the sock to the factory.
+                # Then add the lock to the sock to prevent concurrent use of
+                # the socket.
+                if self.sock is not None and self._sock is None:
+                    self.factory.lock.acquire()
+                    try:
+                        if self.factory.sock is None:
+                            self.factory.sock = self.sock
+                            self.factory.sock.lock = self.factory.lock
+                    finally:
+                        self.factory.lock.release()
+
+            elif self.sock is not None and self.sock is self.factory.sock:
+                # if recycle_sock is not requested, and this sock is in the
+                # factory, then remove it.
+                self.factory.lock.acquire()
+                try:
+                    if self.sock is self.factory.sock:
+                        self.factory.sock = None
+                finally:
+                    self.factory.lock.release()
+
+    #TODO change this and the overriding child methods to init_msg_send
     def init_req(self):
         raise NotImplemented
 
-    def _init_res_buffer(self):
-        self.res = ''
-        self.res_buf = ''
-        self.res_index = 0
+    def _init_msg_recv(self):
+        self.msg_recv = b''
+        self.msg_recv_buf = b''
+        self.msg_recv_index = 0
+        self.msg_recv_len = None
 
     def prepare(self):
-        assert self.req is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
+        if self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE):
+            assert self.msg_send is not None, 'Request must be initialized with init_req() before be added before prepare() can be called'
+
+        if self.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ):
+            self._init_msg_recv()
 
         if self.timeout is None:
             self.timeout = self.timeout_baseline
 
-        self._init_res_buffer()
-        try:
-            self._create_socket()
-            self._configure_socket()
-            self._bind_socket()
-            self._set_start_time()
-            self._connect_socket()
-        except socket.error, e:
-            self.err = e
-            self.cleanup()
+        if self._sock is not None:
+            # if a pre-existing socket is available for re-use, then use that
+            # instead
+            try:
+                self._reuse_socket()
+                self._set_start_time()
+            except SocketInUse as e:
+                self.err = e
+        else:
+            try:
+                self._create_socket()
+                self._configure_socket()
+                self._bind_socket()
+                self._set_start_time()
+                self._connect_socket()
+            except socket.error as e:
+                self.err = e
+
+    def _reuse_socket(self):
+        # wait for the lock on the socket
+        if not self._sock.lock.acquire(False):
+            raise SocketInUse()
+        self.sock = self._sock
 
     def _get_af(self):
         if self.dst.version == 6:
@@ -314,8 +461,7 @@ class DNSQueryTransportHandler(object):
 
     def _create_socket(self):
         af = self._get_af()
-        self.sock = socket.socket(af, self.transport_type)
-        self.sockfd = self.sock.fileno()
+        self.sock = Socket(socket.socket(af, self.transport_type))
 
     def _configure_socket(self):
         self.sock.setblocking(0)
@@ -338,7 +484,7 @@ class DNSQueryTransportHandler(object):
                 try:
                     self.sock.bind((src, sport))
                     break
-                except socket.error, e:
+                except socket.error as e:
                     i += 1
                     if i > MAX_PORT_BIND_ATTEMPTS or e.errno != socket.errno.EADDRINUSE:
                         raise
@@ -354,7 +500,7 @@ class DNSQueryTransportHandler(object):
     def _connect_socket(self):
         try:
             self.sock.connect(self._get_connect_arg())
-        except socket.error, e:
+        except socket.error as e:
             if e.errno != socket.errno.EINPROGRESS:
                 raise
 
@@ -371,24 +517,25 @@ class DNSQueryTransportHandler(object):
         # set end (and start, if necessary) times, as appropriate
         self._set_end_time()
 
-        self._set_socket_info()
-
         # close socket
         if self.sock is not None:
-            self.sock.close()
+            self._set_socket_info()
 
+            if not self.recycle_sock:
+                self.sock.close()
+            if self.sock.lock is not None:
+                self.sock.lock.release()
         # place in processed queue, if specified
         if self._processed_queue is not None:
             self._processed_queue.put(self)
 
     def do_write(self):
         try:
-            self.req_index += self.sock.send(self.req[self.req_index:])
-            if self.req_index >= self.req_len:
+            self.msg_send_index += self.sock.send(self.msg_send[self.msg_send_index:])
+            if self.msg_send_index >= self.msg_send_len:
                 return True
-        except socket.error, e:
+        except socket.error as e:
             self.err = e
-            self.cleanup()
             return True
 
     def do_read(self):
@@ -404,6 +551,13 @@ class DNSQueryTransportHandler(object):
         }
         return d
 
+    def serialize_responses(self):
+        d = {
+            'version': DNS_TRANSPORT_VERSION,
+            'responses': [q.serialize_response() for q in self.qtms]
+        }
+        return d
+
 class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
     singleton = True
 
@@ -414,7 +568,7 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         qtm = self.qtms[0]
         qtm.src = self.src
         qtm.sport = self.sport
-        qtm.res = self.res
+        qtm.res = self.msg_recv
         qtm.err = self.err
         qtm.start_time = self.start_time
         qtm.end_time = self.end_time
@@ -429,26 +583,32 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         self.src = qtm.src
         self.sport = qtm.sport
 
-        self.req = qtm.req
-        self.req_len = len(qtm.req)
-        self.req_index = 0
+        self.msg_send = qtm.req
+        self.msg_send_len = len(qtm.req)
+        self.msg_send_index = 0
 
-        self._queryid_wire = self.req[:2]
+        # python3/python2 dual compatibility
+        if isinstance(self.msg_send, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
+        self._queryid_wire = self.msg_send[:2]
         index = 12
-        while ord(self.req[index]) != 0:
-            index += ord(self.req[index]) + 1
+        while map_func(self.msg_send[index]) != 0:
+            index += map_func(self.msg_send[index]) + 1
         index += 4
-        self._question_wire = self.req[12:index]
+        self._question_wire = self.msg_send[12:index]
 
         if qtm.tcp:
             self.transport_type = socket.SOCK_STREAM
-            self.req = struct.pack('!H', self.req_len) + self.req
-            self.req_len += struct.calcsize('H')
+            self.msg_send = struct.pack(b'!H', self.msg_send_len) + self.msg_send
+            self.msg_send_len += struct.calcsize(b'H')
         else:
             self.transport_type = socket.SOCK_DGRAM
 
-    def _check_response_consistency(self):
-        if self.require_queryid_match and self.res[:2] != self._queryid_wire:
+    def _check_msg_recv_consistency(self):
+        if self.require_queryid_match and self.msg_recv[:2] != self._queryid_wire:
             return False
         return True
 
@@ -456,55 +616,50 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         # UDP
         if self.sock.type == socket.SOCK_DGRAM:
             try:
-                self.res = self.sock.recv(65536)
-                if self._check_response_consistency():
-                    self.cleanup()
+                self.msg_recv = self.sock.recv(65536)
+                if self._check_msg_recv_consistency():
                     return True
                 else:
-                    self.res = ''
-            except socket.error, e:
+                    self.msg_recv = b''
+            except socket.error as e:
                 self.err = e
-                self.cleanup()
                 return True
 
         # TCP
         else:
             try:
-                if self.res_len is None:
-                    if self.res_buf:
+                if self.msg_recv_len is None:
+                    if self.msg_recv_buf:
                         buf = self.sock.recv(1)
                     else:
                         buf = self.sock.recv(2)
-                    if buf == '':
+                    if buf == b'':
                         raise EOFError()
 
-                    self.res_buf += buf
-                    if len(self.res_buf) == 2:
-                        self.res_len = struct.unpack('!H', self.res_buf)[0]
+                    self.msg_recv_buf += buf
+                    if len(self.msg_recv_buf) == 2:
+                        self.msg_recv_len = struct.unpack(b'!H', self.msg_recv_buf)[0]
 
-                if self.res_len is not None:
-                    buf = self.sock.recv(self.res_len - self.res_index)
-                    if buf == '':
+                if self.msg_recv_len is not None:
+                    buf = self.sock.recv(self.msg_recv_len - self.msg_recv_index)
+                    if buf == b'':
                         raise EOFError()
 
-                    self.res += buf
-                    self.res_index = len(self.res)
+                    self.msg_recv += buf
+                    self.msg_recv_index = len(self.msg_recv)
 
-                    if self.res_index >= self.res_len:
-                        self.cleanup()
+                    if self.msg_recv_index >= self.msg_recv_len:
                         return True
 
-            except (socket.error, EOFError), e:
+            except (socket.error, EOFError) as e:
                 if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                     pass
                 else:
                     self.err = e
-                    self.cleanup()
                     return True
 
     def do_timeout(self):
         self.err = dns.exception.Timeout()
-        self.cleanup()
 
 class DNSQueryTransportHandlerDNSPrivate(DNSQueryTransportHandlerDNS):
     allow_loopback_query = True
@@ -516,6 +671,14 @@ class DNSQueryTransportHandlerDNSLoose(DNSQueryTransportHandlerDNS):
 class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
     singleton = False
 
+    def _set_timeout(self, qtm):
+        if self.timeout is None:
+            # allow 5 seconds for looking glass overhead, as a baseline
+            self.timeout = self.timeout_baseline
+        # account for worst case, in which case queries are performed serially
+        # on the remote end
+        self.timeout += qtm.timeout
+
     def finalize(self):
         super(DNSQueryTransportHandlerMulti, self).finalize()
 
@@ -524,47 +687,54 @@ class DNSQueryTransportHandlerMulti(DNSQueryTransportHandler):
             raise self.err
 
         # if there is no content, raise an exception
-        if self.res is None:
+        if self.msg_recv is None:
             raise RemoteQueryTransportError('No content in response')
 
         # load the json content
         try:
-            content = json.loads(self.res)
+            content = json.loads(codecs.decode(self.msg_recv, 'utf-8'))
         except ValueError:
-            raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.res)
+            raise RemoteQueryTransportError('JSON decoding of response failed: %s' % self.msg_recv)
 
         if 'version' not in content:
             raise RemoteQueryTransportError('No version information in response.')
         try:
-            major_vers, minor_vers = map(int, str(content['version']).split('.', 1))
+            major_vers, minor_vers = [int(x) for x in str(content['version']).split('.', 1)]
         except ValueError:
             raise RemoteQueryTransportError('Version of JSON input in response is invalid: %s' % content['version'])
 
         # ensure major version is a match and minor version is no greater
         # than the current minor version
-        curr_major_vers, curr_minor_vers = map(int, str(DNS_TRANSPORT_VERSION).split('.', 1))
+        curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_TRANSPORT_VERSION).split('.', 1)]
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
             raise RemoteQueryTransportError('Version %d.%d of JSON input in response is incompatible with this software.' % (major_vers, minor_vers))
 
         if 'error' in content:
             raise RemoteQueryTransportError('Remote query error: %s' % content['error'])
 
-        if 'responses' not in content:
-            raise RemoteQueryTransportError('No DNS response information in response.')
+        if self.mode == QTH_MODE_WRITE_READ:
+            if 'responses' not in content:
+                raise RemoteQueryTransportError('No DNS response information in response.')
+        else: # self.mode == QTH_MODE_READ:
+            if 'requests' not in content:
+                raise RemoteQueryTransportError('No DNS requests information in response.')
 
         for i in range(len(self.qtms)):
             try:
-                self.qtms[i].deserialize_response(content['responses'][i])
+                if self.mode == QTH_MODE_WRITE_READ:
+                    self.qtms[i].deserialize_response(content['responses'][i])
+                else: # self.mode == QTH_MODE_READ:
+                    self.qtms[i].deserialize_request(content['requests'][i])
             except IndexError:
-                raise RemoteQueryTransportError('DNS response information missing from response')
-            except TransportMetaDeserializationError, e:
+                raise RemoteQueryTransportError('DNS response or request information missing from message')
+            except TransportMetaDeserializationError as e:
                 raise RemoteQueryTransportError(str(e))
 
 class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     timeout_baseline = 5.0
 
-    def __init__(self, url, insecure=False, processed_queue=None, factory=None):
-        super(DNSQueryTransportHandlerHTTP, self).__init__(processed_queue=processed_queue, factory=factory)
+    def __init__(self, url, insecure=False, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerHTTP, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
 
         self.transport_type = socket.SOCK_STREAM
 
@@ -597,14 +767,6 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
         self.chunked_encoding = None
 
-    def _set_timeout(self, qtm):
-        if self.timeout is None:
-            # allow 5 seconds for HTTP overhead, as a baseline
-            self.timeout = self.timeout_baseline
-        # account for worst case, in which case queries are performed serially
-        # on the remote end
-        self.timeout += qtm.timeout
-
     def _create_socket(self):
         super(DNSQueryTransportHandlerHTTP, self)._create_socket()
 
@@ -614,10 +776,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
             if self.insecure:
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-            self.sock = ctx.wrap_socket(self.sock, server_hostname=self.host)
+            new_sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host))
+            new_sock.lock = self.sock.lock
+            self.sock = new_sock
 
     def _post_data(self):
-        return 'content=' + urllib.quote(json.dumps(self.serialize_requests()))
+        return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
 
     def _authentication_header(self):
         if not self.username:
@@ -627,17 +791,17 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         username = self.username
         if self.password:
             username += ':' + self.password
-        return 'Authorization: Basic %s\r\n' % (base64.b64encode(username))
+        return 'Authorization: Basic %s\r\n' % (lb2s(base64.b64encode(codecs.encode(username, 'utf-8'))))
 
     def init_req(self):
         data = self._post_data()
-        self.req = 'POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.5.2\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data)
-        self.req_len = len(self.req)
-        self.req_index = 0
+        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.6.5\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
     def prepare(self):
         super(DNSQueryTransportHandlerHTTP, self).prepare()
-        if self.err is not None:
+        if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error making HTTP connection: %s' % self.err)
 
     def do_write(self):
@@ -649,58 +813,56 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
-            self.res_buf += buf
+            self.msg_recv_buf += buf
 
             # still reading status and headers
-            if self.chunked_encoding is None and self.res_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(self.res_buf)
+            if self.chunked_encoding is None and self.msg_recv_len is None:
+                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.msg_recv_buf))
                 if headers_end_match is not None:
-                    headers = self.res_buf[:headers_end_match.start()]
-                    self.res_buf = self.res_buf[headers_end_match.end():]
+                    headers = self.msg_recv_buf[:headers_end_match.start()]
+                    self.msg_recv_buf = self.msg_recv_buf[headers_end_match.end():]
 
                     # check HTTP status
-                    status_match = HTTP_STATUS_RE.search(headers)
+                    status_match = HTTP_STATUS_RE.search(lb2s(headers))
                     if status_match is None:
                         self.err = RemoteQueryTransportError('Malformed HTTP status line')
-                        self.cleanup()
                         return True
                     status = int(status_match.group('status'))
                     if status != 200:
                         self.err = RemoteQueryTransportError('%d HTTP status' % status)
-                        self.cleanup()
                         return True
 
                     # get content length or determine whether "chunked"
                     # transfer encoding is used
-                    content_length_match = CONTENT_LENGTH_RE.search(headers)
+                    content_length_match = CONTENT_LENGTH_RE.search(lb2s(headers))
                     if content_length_match is not None:
                         self.chunked_encoding = False
-                        self.res_len = int(content_length_match.group('length'))
+                        self.msg_recv_len = int(content_length_match.group('length'))
                     else:
-                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(headers) is not None
+                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(lb2s(headers)) is not None
 
             # handle chunked encoding first
             if self.chunked_encoding:
                 # look through as many chunks as are readily available
                 # (without having to read from socket again)
-                while self.res_buf:
-                    if self.res_len is None:
+                while self.msg_recv_buf:
+                    if self.msg_recv_len is None:
                         # looking for chunk length
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(self.res_buf)
+                        crlf_start_match = CRLF_START_RE.search(lb2s(self.msg_recv_buf))
                         if crlf_start_match is not None:
-                            self.res_buf = self.res_buf[crlf_start_match.end():]
+                            self.msg_recv_buf = self.msg_recv_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(self.res_buf)
+                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.msg_recv_buf))
                         if chunk_len_match is not None:
-                            self.res_len = int(chunk_len_match.group('length'), 16)
-                            self.res_buf = self.res_buf[chunk_len_match.end():]
-                            self.res_index = 0
+                            self.msg_recv_len = int(chunk_len_match.group('length'), 16)
+                            self.msg_recv_buf = self.msg_recv_buf[chunk_len_match.end():]
+                            self.msg_recv_index = 0
                         else:
                             # if we don't currently know the length of the next
                             # chunk, and we don't have enough data to find the
@@ -708,45 +870,43 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                             # don't have any more data to go off of.
                             break
 
-                    if self.res_len is not None:
+                    if self.msg_recv_len is not None:
                         # we know a length of the current chunk
 
-                        if self.res_len == 0:
+                        if self.msg_recv_len == 0:
                             # no chunks left, so clean up and return
-                            self.cleanup()
                             return True
 
                         # read remaining bytes
-                        bytes_remaining = self.res_len - self.res_index
-                        if len(self.res_buf) > bytes_remaining:
-                            self.res += self.res_buf[:bytes_remaining]
-                            self.res_index = 0
-                            self.res_buf = self.res_buf[bytes_remaining:]
-                            self.res_len = None
+                        bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                        if len(self.msg_recv_buf) > bytes_remaining:
+                            self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                            self.msg_recv_index = 0
+                            self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                            self.msg_recv_len = None
                         else:
-                            self.res += self.res_buf
-                            self.res_index += len(self.res_buf)
-                            self.res_buf = ''
+                            self.msg_recv += self.msg_recv_buf
+                            self.msg_recv_index += len(self.msg_recv_buf)
+                            self.msg_recv_buf = b''
 
             elif self.chunked_encoding == False:
                 # output is not chunked, so we're either reading until we've
                 # read all the bytes specified by the content-length header (if
                 # specified) or until the server closes the connection (or we
                 # time out)
-                if self.res_len is not None:
-                    bytes_remaining = self.res_len - self.res_index
-                    self.res += self.res_buf[:bytes_remaining]
-                    self.res_buf = self.res_buf[bytes_remaining:]
-                    self.res_index = len(self.res)
+                if self.msg_recv_len is not None:
+                    bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                    self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                    self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                    self.msg_recv_index = len(self.msg_recv)
 
-                    if self.res_index >= self.res_len:
-                        self.cleanup()
+                    if self.msg_recv_index >= self.msg_recv_len:
                         return True
                 else:
-                    self.res += self.res_buf
-                    self.res_buf = ''
+                    self.msg_recv += self.msg_recv_buf
+                    self.msg_recv_buf = b''
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:
@@ -754,40 +914,31 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
                 # using chunked encoding, then don't throw an error.  If the
                 # content was bad, then it will be reflected in the decoding of
                 # the content
-                if self.chunked_encoding == False and self.res_len is None:
+                if self.chunked_encoding == False and self.msg_recv_len is None:
                     pass
                 else:
                     self.err = RemoteQueryTransportError('Error communicating with HTTP server: %s' % e)
-                self.cleanup()
                 return True
 
     def do_timeout(self):
         self.err = RemoteQueryTransportError('HTTP request timed out')
-        self.cleanup()
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
     allow_private_query = True
 
-class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
+class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
     timeout_baseline = 5.0
+    unmask_on_recv = True
 
-    def __init__(self, path, processed_queue=None, factory=None):
-        super(DNSQueryTransportHandlerWebSocket, self).__init__(processed_queue=processed_queue, factory=factory)
+    def __init__(self, path, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerWebSocketServer, self).__init__(sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
 
         self.dst = path
         self.transport_type = socket.SOCK_STREAM
 
         self.mask_mapping = []
         self.has_more = None
-
-    def _set_timeout(self, qtm):
-        if self.timeout is None:
-            # allow 5 seconds for browser overhead, as a baseline
-            self.timeout = self.timeout_baseline
-        # account for worst case, in which case queries are performed serially
-        # on the remote end
-        self.timeout += qtm.timeout
 
     def _get_af(self):
         return socket.AF_UNIX
@@ -802,72 +953,80 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
         return self.dst
 
     def prepare(self):
-        super(DNSQueryTransportHandlerWebSocket, self).prepare()
-        if self.err is not None:
+        super(DNSQueryTransportHandlerWebSocketServer, self).prepare()
+        if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error connecting to UNIX domain socket: %s' % self.err)
 
     def do_write(self):
-        val = super(DNSQueryTransportHandlerWebSocket, self).do_write()
+        val = super(DNSQueryTransportHandlerWebSocketServer, self).do_write()
         if self.err is not None:
             self.err = RemoteQueryTransportError('Error writing to UNIX domain socket: %s' % self.err)
         return val
 
     def finalize(self):
-        new_res = ''
-        for i, mask_index in enumerate(self.mask_mapping):
-            mask_octets = struct.unpack('!BBBB', self.res[mask_index:mask_index + 4])
-            if i >= len(self.mask_mapping) - 1:
-                buf = self.res[mask_index + 4:]
-            else:
-                buf = self.res[mask_index + 4:self.mask_mapping[i + 1]]
-            for j in range(len(buf)):
-                b = struct.unpack('!B', buf[j])[0]
-                new_res += struct.pack('!B', b ^ mask_octets[j % 4]);
-        self.res = new_res
+        if self.unmask_on_recv:
 
-        super(DNSQueryTransportHandlerWebSocket, self).finalize()
+            # python3/python2 dual compatibility
+            if isinstance(self.msg_recv, str):
+                decode_func = lambda x: struct.unpack(b'!B', x)[0]
+            else:
+                decode_func = lambda x: x
+
+            new_msg_recv = b''
+            for i, mask_index in enumerate(self.mask_mapping):
+                mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
+                if i >= len(self.mask_mapping) - 1:
+                    buf = self.msg_recv[mask_index + 4:]
+                else:
+                    buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
+                for j in range(len(buf)):
+                    b = decode_func(buf[j])
+                    new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4])
+
+            self.msg_recv = new_msg_recv
+
+        super(DNSQueryTransportHandlerWebSocketServer, self).finalize()
 
     def init_req(self):
-        data = json.dumps(self.serialize_requests())
+        data = codecs.encode(json.dumps(self.serialize_requests()), 'utf-8')
 
-        header = '\x81'
+        header = b'\x81'
         l = len(data)
         if l <= 125:
-            header += struct.pack('!B', l)
+            header += struct.pack(b'!B', l)
         elif l <= 0xffff:
-            header += struct.pack('!BH', 126, l)
+            header += struct.pack(b'!BH', 126, l)
         else: # 0xffff < len <= 2^63
-            header += struct.pack('!BL', 127, l)
-        self.req = header + data
-        self.req_len = len(self.req)
-        self.req_index = 0
+            header += struct.pack(b'!BLL', 127, 0, l)
+        self.msg_send = header + data
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
-    def init_empty_req(self):
-        self.req = '\x81\x00'
-        self.req_len = len(self.req)
-        self.req_index = 0
+    def init_empty_msg_send(self):
+        self.msg_send = b'\x81\x00'
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
 
     def do_read(self):
         try:
             buf = self.sock.recv(65536)
-            if buf == '':
+            if buf == b'':
                 raise EOFError
-            self.res_buf += buf
+            self.msg_recv_buf += buf
 
             # look through as many frames as are readily available
             # (without having to read from socket again)
-            while self.res_buf:
-                if self.res_len is None:
+            while self.msg_recv_buf:
+                if self.msg_recv_len is None:
                     # looking for frame length
-                    if len(self.res_buf) >= 2:
-                        byte0, byte1 = struct.unpack('!BB', self.res_buf[0:2])
+                    if len(self.msg_recv_buf) >= 2:
+                        byte0, byte1 = struct.unpack(b'!BB', self.msg_recv_buf[0:2])
                         byte1b = byte1 & 0x7f
 
                         # mask must be set
                         if not byte1 & 0x80:
                             if self.err is not None:
                                 self.err = RemoteQueryTransportError('Mask bit not set in message from server')
-                                self.cleanup()
                                 return True
 
                         # check for FIN flag
@@ -881,19 +1040,20 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                         else: # byte1b == 127:
                             header_len = 10
 
-                        if len(self.res_buf) >= header_len:
+                        if len(self.msg_recv_buf) >= header_len:
                             if byte1b <= 125:
-                                self.res_len = byte1b
+                                self.msg_recv_len = byte1b
                             elif byte1b == 126:
-                                self.res_len = struct.unpack('!H', self.res_buf[2:4])[0]
-                            elif byte1b == 127:
-                                self.res_len = struct.unpack('!Q', self.res_buf[2:10])[0]
+                                self.msg_recv_len = struct.unpack(b'!H', self.msg_recv_buf[2:4])[0]
+                            else: # byte1b == 127:
+                                self.msg_recv_len = struct.unpack(b'!Q', self.msg_recv_buf[2:10])[0]
 
-                            # handle mask
-                            self.mask_mapping.append(len(self.res))
-                            self.res_len += 4
+                            if self.unmask_on_recv:
+                                # handle mask
+                                self.mask_mapping.append(len(self.msg_recv))
+                                self.msg_recv_len += 4
 
-                            self.res_buf = self.res_buf[header_len:]
+                            self.msg_recv_buf = self.msg_recv_buf[header_len:]
 
                         else:
                             # if we don't currently know the length of the next
@@ -902,40 +1062,204 @@ class DNSQueryTransportHandlerWebSocket(DNSQueryTransportHandlerMulti):
                             # don't have any more data to go off of.
                             break
 
-                if self.res_len is not None:
+                if self.msg_recv_len is not None:
                     # we know a length of the current chunk
 
                     # read remaining bytes
-                    bytes_remaining = self.res_len - self.res_index
-                    if len(self.res_buf) > bytes_remaining:
-                        self.res += self.res_buf[:bytes_remaining]
-                        self.res_index = 0
-                        self.res_buf = self.res_buf[bytes_remaining:]
-                        self.res_len = None
+                    bytes_remaining = self.msg_recv_len - self.msg_recv_index
+                    if len(self.msg_recv_buf) > bytes_remaining:
+                        self.msg_recv += self.msg_recv_buf[:bytes_remaining]
+                        self.msg_recv_index = 0
+                        self.msg_recv_buf = self.msg_recv_buf[bytes_remaining:]
+                        self.msg_recv_len = None
                     else:
-                        self.res += self.res_buf
-                        self.res_index += len(self.res_buf)
-                        self.res_buf = ''
+                        self.msg_recv += self.msg_recv_buf
+                        self.msg_recv_index += len(self.msg_recv_buf)
+                        self.msg_recv_buf = b''
 
-                    if self.res_index >= self.res_len and not self.has_more:
-                        self.cleanup()
+                    if self.msg_recv_index >= self.msg_recv_len and not self.has_more:
                         return True
 
-        except (socket.error, EOFError), e:
+        except (socket.error, EOFError) as e:
             if isinstance(e, socket.error) and e.errno == socket.errno.EAGAIN:
                 pass
             else:
                 self.err = e
-                self.cleanup()
                 return True
 
     def do_timeout(self):
         self.err = RemoteQueryTransportError('Read of UNIX domain socket timed out')
-        self.cleanup()
 
-class DNSQueryTransportHandlerWebSocketPrivate(DNSQueryTransportHandlerWebSocket):
+class DNSQueryTransportHandlerWebSocketServerPrivate(DNSQueryTransportHandlerWebSocketServer):
     allow_loopback_query = True
     allow_private_query = True
+
+class DNSQueryTransportHandlerWebSocketClient(DNSQueryTransportHandlerWebSocketServer):
+    unmask_on_recv = False
+
+    def __init__(self, sock, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerWebSocketClient, self).__init__(None, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+    def _init_req(self, data):
+        header = b'\x81'
+        l = len(data)
+        if l <= 125:
+            header += struct.pack(b'!B', l | 0x80)
+        elif l <= 0xffff:
+            header += struct.pack(b'!BH', 126 | 0x80, l)
+        else: # 0xffff < len <= 2^63
+            header += struct.pack(b'!BLL', 127 | 0x80, 0, l)
+
+        mask_int = random.randint(0, 0xffffffff)
+        mask = [(mask_int >> 24) & 0xff,
+                (mask_int >> 16) & 0xff,
+                (mask_int >> 8) & 0xff,
+                mask_int & 0xff]
+
+        header += struct.pack(b'!BBBB', *mask)
+
+        # python3/python2 dual compatibility
+        if isinstance(data, str):
+            map_func = lambda x: ord(x)
+        else:
+            map_func = lambda x: x
+
+        self.msg_send = header
+        for i, b in enumerate(data):
+            self.msg_send += struct.pack('!B', mask[i % 4] ^ map_func(b))
+        self.msg_send_len = len(self.msg_send)
+        self.msg_send_index = 0
+
+    def init_req(self):
+        self._init_req(codecs.encode(json.dumps(self.serialize_responses()), 'utf-8'))
+
+    def init_err_send(self, err):
+        self._init_req(codecs.encode(err, 'utf-8'))
+
+class DNSQueryTransportHandlerWebSocketClientReader(DNSQueryTransportHandlerWebSocketClient):
+    mode = QTH_MODE_READ
+
+class DNSQueryTransportHandlerWebSocketClientWriter(DNSQueryTransportHandlerWebSocketClient):
+    mode = QTH_MODE_WRITE
+
+class DNSQueryTransportHandlerCmd(DNSQueryTransportHandlerWebSocketServer):
+    allow_loopback_query = True
+    allow_private_query = True
+
+    def __init__(self, args, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+        super(DNSQueryTransportHandlerCmd, self).__init__(None, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+        self.args = args
+
+    def _get_af(self):
+        return None
+
+    def _bind_socket(self):
+        pass
+
+    def _set_socket_info(self):
+        pass
+
+    def _get_connect_arg(self):
+        return None
+
+    def _create_socket(self):
+        try:
+            p = subprocess.Popen(self.args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        except OSError as e:
+            raise socket.error(str(e))
+        else:
+            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+
+    def _connect_socket(self):
+        pass
+
+    def do_write(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_write()
+
+    def do_read(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_read()
+
+    def cleanup(self):
+        super(DNSQueryTransportHandlerCmd, self).cleanup()
+        if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
+            self.sock.proc.terminate()
+            self.sock.proc.wait()
+            return True
+
+class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
+    timeout_baseline = 10.0
+
+    def __init__(self, url, sock=None, recycle_sock=True, processed_queue=None, factory=None):
+
+        parse_result = urlparse.urlparse(url)
+        scheme = parse_result.scheme
+        if not scheme:
+            scheme = 'ssh'
+        elif scheme != 'ssh':
+            raise RemoteQueryTransportError('Invalid scheme: %s' % scheme)
+
+        args = ['ssh', '-T']
+        if parse_result.port is not None:
+           args.extend(['-p', str(parse_result.port)])
+        if parse_result.username is not None:
+            args.append('%s@%s' % (parse_result.username, parse_result.hostname))
+        else:
+            args.append('%s' % (parse_result.hostname))
+        if parse_result.path and parse_result.path != '/':
+            args.append(parse_result.path)
+        else:
+            args.append('dnsviz lookingglass')
+
+        super(DNSQueryTransportHandlerRemoteCmd, self).__init__(args, sock=sock, recycle_sock=recycle_sock, processed_queue=processed_queue, factory=factory)
+
+    def _get_af(self):
+        return None
+
+    def _bind_socket(self):
+        pass
+
+    def _set_socket_info(self):
+        pass
+
+    def _get_connect_arg(self):
+        return None
+
+    def _create_socket(self):
+        try:
+            p = subprocess.Popen(self.args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        except OSError as e:
+            raise socket.error(str(e))
+        else:
+            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+
+    def _connect_socket(self):
+        pass
+
+    def do_write(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_write()
+
+    def do_read(self):
+        if self.sock.proc.poll() is not None:
+            self.err = RemoteQueryTransportError('Subprocess has ended with status %d.' % (self.sock.proc.returncode))
+            return True
+        return super(DNSQueryTransportHandlerCmd, self).do_read()
+
+    def cleanup(self):
+        super(DNSQueryTransportHandlerCmd, self).cleanup()
+        if self.sock is not None and not self.recycle_sock and self.sock.proc is not None and self.sock.proc.poll() is None:
+            self.sock.proc.terminate()
+            self.sock.proc.wait()
+            return True
 
 class DNSQueryTransportHandlerFactory(object):
     cls = DNSQueryTransportHandler
@@ -944,8 +1268,16 @@ class DNSQueryTransportHandlerFactory(object):
         self.args = args
         self.kwargs = kwargs
         self.kwargs['factory'] = self
+        self.lock = threading.Lock()
+        self.sock = None
+
+    def __del__(self):
+        if self.sock is not None:
+            self.sock.close()
 
     def build(self, **kwargs):
+        if 'sock' not in kwargs and self.sock is not None:
+            kwargs['sock'] = self.sock
         for name in self.kwargs:
             if name not in kwargs:
                 kwargs[name] = self.kwargs[name]
@@ -963,17 +1295,17 @@ class DNSQueryTransportHandlerHTTPFactory(DNSQueryTransportHandlerFactory):
 class DNSQueryTransportHandlerHTTPPrivateFactory(DNSQueryTransportHandlerFactory):
     cls = DNSQueryTransportHandlerHTTPPrivate
 
-class _DNSQueryTransportHandlerWebSocketFactory(DNSQueryTransportHandlerFactory):
-    cls = DNSQueryTransportHandlerWebSocket
+class _DNSQueryTransportHandlerWebSocketServerFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocketServer
 
-class DNSQueryTransportHandlerWebSocketFactory:
+class DNSQueryTransportHandlerWebSocketServerFactory:
     def __init__(self, *args, **kwargs):
-        self._f = _DNSQueryTransportHandlerWebSocketFactory(*args, **kwargs)
+        self._f = _DNSQueryTransportHandlerWebSocketServerFactory(*args, **kwargs)
 
     def __del__(self):
         try:
             qth = self._f.build()
-            qth.init_empty_req()
+            qth.init_empty_msg_send()
             qth.prepare()
             qth.do_write()
         except:
@@ -986,17 +1318,17 @@ class DNSQueryTransportHandlerWebSocketFactory:
     def build(self, **kwargs):
         return self._f.build(**kwargs)
 
-class _DNSQueryTransportHandlerWebSocketPrivateFactory(DNSQueryTransportHandlerFactory):
-    cls = DNSQueryTransportHandlerWebSocketPrivate
+class _DNSQueryTransportHandlerWebSocketServerPrivateFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerWebSocketServerPrivate
 
-class DNSQueryTransportHandlerWebSocketPrivateFactory:
+class DNSQueryTransportHandlerWebSocketServerPrivateFactory:
     def __init__(self, *args, **kwargs):
-        self._f = _DNSQueryTransportHandlerWebSocketPrivateFactory(*args, **kwargs)
+        self._f = _DNSQueryTransportHandlerWebSocketServerPrivateFactory(*args, **kwargs)
 
     def __del__(self):
         try:
             qth = self._f.build()
-            qth.init_empty_req()
+            qth.init_empty_msg_send()
             qth.prepare()
             qth.do_write()
         except:
@@ -1008,6 +1340,22 @@ class DNSQueryTransportHandlerWebSocketPrivateFactory:
 
     def build(self, **kwargs):
         return self._f.build(**kwargs)
+
+class DNSQueryTransportHandlerCmdFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerCmd
+
+class DNSQueryTransportHandlerRemoteCmdFactory(DNSQueryTransportHandlerFactory):
+    cls = DNSQueryTransportHandlerRemoteCmd
+
+class DNSQueryTransportHandlerWrapper(object):
+    def __init__(self, qh):
+        self.qh = qh
+
+    def __eq__(self, other):
+        return False
+
+    def __lt__(self, other):
+        return False
 
 class _DNSQueryTransportManager:
     '''A class that handles'''
@@ -1016,7 +1364,7 @@ class _DNSQueryTransportManager:
     def __init__(self):
         self._notify_read_fd, self._notify_write_fd = os.pipe()
         fcntl.fcntl(self._notify_read_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-        self._query_queue = Queue.Queue()
+        self._msg_queue = queue.Queue()
         self._event_map = {}
 
         self._close = threading.Event()
@@ -1025,20 +1373,21 @@ class _DNSQueryTransportManager:
 
     def close(self):
         self._close.set()
-        os.write(self._notify_write_fd, struct.pack('!B', 0))
+        os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
-    def query(self, qh):
+    def handle_msg(self, qh):
         self._event_map[qh] = threading.Event()
-        self._query(qh)
+        self._handle_msg(qh, True)
         self._event_map[qh].wait()
         del self._event_map[qh]
 
-    def query_nowait(self, qh):
-        self._query(qh)
+    def handle_msg_nowait(self, qh):
+        self._handle_msg(qh, True)
 
-    def _query(self, qh):
-        self._query_queue.put(qh)
-        os.write(self._notify_write_fd, struct.pack('!B', 0))
+    def _handle_msg(self, qh, notify):
+        self._msg_queue.put(qh)
+        if notify:
+            os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
     def _loop(self):
         '''Return the data resulting from a UDP transaction.'''
@@ -1071,11 +1420,12 @@ class _DNSQueryTransportManager:
                 qh = query_meta[fd]
 
                 if qh.do_write():
-                    if qh.err is not None:
+                    if qh.err is not None or qh.mode == QTH_MODE_WRITE:
+                        qh.cleanup()
                         finished_fds.append(fd)
-                    else:
+                    else: # qh.mode == QTH_MODE_WRITE_READ
                         wlist_in.remove(fd)
-                        rlist_in.append(fd)
+                        rlist_in.append(qh.sock.reader_fd)
 
             # handle the responses
             for fd in rlist_out:
@@ -1084,53 +1434,79 @@ class _DNSQueryTransportManager:
 
                 qh = query_meta[fd]
 
-                if qh.do_read():
-                    finished_fds.append(fd)
+                if qh.do_read(): # qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ)
+                    qh.cleanup()
+                    finished_fds.append(qh.sock.reader_fd)
 
             # handle the expired queries
-            future_index = bisect.bisect_right(expirations, ((time.time(), None)))
+            future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandlerWrapper(None))))
             for i in range(future_index):
-                qh = expirations[i][1]
+                qh = expirations[i][1].qh
 
-                # perhaps this query actually finished earlier in the loop
+                # this query actually finished earlier in this iteration of the
+                # loop, so don't indicate that it timed out
                 if qh.end_time is not None:
                     continue
 
                 qh.do_timeout()
-                finished_fds.append(qh.sockfd)
+                qh.cleanup()
+                finished_fds.append(qh.sock.reader_fd)
             expirations = expirations[future_index:]
 
             # for any fds that need to be finished, do it now
             for fd in finished_fds:
+                qh = query_meta[fd]
                 try:
-                    rlist_in.remove(fd)
+                    rlist_in.remove(qh.sock.reader_fd)
                 except ValueError:
-                    wlist_in.remove(fd)
-                if query_meta[fd] in self._event_map:
-                    self._event_map[query_meta[fd]].set()
+                    wlist_in.remove(qh.sock.writer_fd)
+                if qh in self._event_map:
+                    self._event_map[qh].set()
                 del query_meta[fd]
+
+            if finished_fds:
+                # if any sockets were finished, then notify, in case any
+                # queued messages are waiting to be handled.
+                os.write(self._notify_write_fd, struct.pack(b'!B', 0))
 
             # handle the new queries
             if self._notify_read_fd in rlist_out:
                 # empty the pipe
                 os.read(self._notify_read_fd, 65536)
 
+                requeue = []
                 while True:
                     try:
-                        qh = self._query_queue.get_nowait()
+                        qh = self._msg_queue.get_nowait()
                         qh.prepare()
+
                         if qh.err is not None:
-                            if qh in self._event_map:
-                                self._event_map[qh].set()
+                            if isinstance(qh.err, SocketInUse):
+                                # if this was a SocketInUse, just requeue, and try again
+                                qh.err = None
+                                requeue.append(qh)
+
+                            else:
+                                qh.cleanup()
+                                if qh in self._event_map:
+                                    self._event_map[qh].set()
                         else:
                             # if we successfully bound and connected the
                             # socket, then put this socket in the write fd list
-                            fd = qh.sock.fileno()
-                            query_meta[fd] = qh
-                            bisect.insort(expirations, (qh.expiration, qh))
-                            wlist_in.append(fd)
-                    except Queue.Empty:
+                            query_meta[qh.sock.reader_fd] = qh
+                            query_meta[qh.sock.writer_fd] = qh
+                            bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
+                            if qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE):
+                                wlist_in.append(qh.sock.writer_fd)
+                            elif qh.mode == QTH_MODE_READ:
+                                rlist_in.append(qh.sock.reader_fd)
+                            else:
+                                raise Exception('Unexpected mode: %d' % qh.mode)
+                    except queue.Empty:
                         break
+
+                for qh in requeue:
+                    self._handle_msg(qh, False)
 
 class DNSQueryTransportHandlerHTTPPrivate(DNSQueryTransportHandlerHTTP):
     allow_loopback_query = True
@@ -1143,11 +1519,11 @@ class DNSQueryTransportManager:
     def __del__(self):
         self.close()
 
-    def query(self, qh):
-        return self._th.query(qh)
+    def handle_msg(self, qh):
+        return self._th.handle_msg(qh)
 
-    def query_nowait(self, qh):
-        return self._th.query_nowait(qh)
+    def handle_msg_nowait(self, qh):
+        return self._th.handle_msg_nowait(qh)
 
     def close(self):
         return self._th.close()

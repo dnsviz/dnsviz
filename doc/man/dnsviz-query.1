@@ -18,66 +18,87 @@
 .\" You should have received a copy of the GNU General Public License along
 .\" with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 .\"
-.TH dnsviz-query 1 "13 Dec 2015" "v0.5.0"
+.TH dnsviz-query 1 "18 Nov 2016" "0.6.5"
 .SH NAME
 dnsviz-query \- assess a DNS query
 .SH SYNOPSIS
-\fBdnsviz query\fR [@server] [\fB\-b\ \fR\fB\fIaddress\fR\fR] [\fB\-c\ \fR\fB\fIclass\fR\fR] [\fB\-q\ \fR\fB\fIname\fR\fR] [\fB\-t\ \fR\fB\fItype\fR\fR] [\fB\-x\ \fR\fB\fIaddr\fR\fR] [\fB\-4\fR] [\fB\-6\fR] [name] [type] [class] [queryopt...]
+.B dnsviz
+\fBquery\fR
+[ \fB@\fR\fIserver\fR ]
+[ \fB-b\fR \fIaddress\fR ]
+[ \fB-c\fR \fIclass\fR ]
+[ \fB-q\fR \fIname\fR ]
+[ \fB-t\fR \fItype\fR ]
+[ \fB-x\fR \fIaddr\fR ]
+[ \fB-4\fR ] [ \fB-6\fR ]
+[ \fIname\fR ]
+[ \fItype\fR ]
+[ \fIclass\fR ]
+[ \fIqueryopt...\fR ]
 .HP 4
-\fBdnsviz query\fR [\fB\-h\fR]
+\fBdnsviz query\fR [ \fB-h\fR ]
 .HP 4
-\fBdnsviz query\fR [global\-queryopt...] [query...]
+\fBdnsviz query\fR [ \fIglobal\-queryopt...\fR ] [ \fIquery...\fR ]
 .SH DESCRIPTION
 Issue queries for the names and types specified on the command line to DNS
-servers, process the output, and present it to the user.  \fI"dnsviz query"\fP
-adopts a subset of the command-line options used by ISC's \fIdig(1)\fP but uses
-\fI"dnsviz probe"\fP and \fI"dnsviz print"\fP to issue queries and assess the
+servers, process the output, and present it to the user.  \fBdnsviz-query\fR
+adopts a subset of the command-line options used by ISC's \fBdig(1)\fR but uses
+\fBdnsviz-probe(1)\fR and \fBdnsviz-print(1)\fR to issue queries and assess the
 results.  It is meant to be a shortcut for quickly assessing DNS queries and
-diagnosing problems by invoking \fI"dnsviz probe"\fP and \fI"dnsviz print"\fP
+diagnosing problems by invoking \fBdnsviz-probe(1)\fR and \fBdnsviz-print(1)\fR
 with their most commonly used options and with a usage familiar similar to (but
-not equal to) \fIdig(1)\fP.  For a more detailed analysis, revealing the nature
-of errors, the user should use \fI"dnsviz probe"\fP, \fI"dnsviz grok"\fP,
-\fI"dnsviz print"\fP, and \fI"dnsviz graph"\fP directly.
+not equal to) \fBdig(1)\fR.  For a more detailed analysis, revealing the nature
+of errors, the user should use \fBdnsviz-probe(1)\fR, \fBdnsviz-grok(1)\fR,
+\fBdnsviz-print(1)\fR, and \fBdnsviz-graph(1)\fR directly.
 
 By default diagnostic queries are sent to recursive servers.  If no servers are
 specified with "@", then the first server in /etc/resolv.conf is selected.
-Note that unlike \fIdig(1)\fP \fB"dnsviz query"\fP only tries one server.
+Note that unlike \fBdig(1)\fR \fBdnsviz-query(1)\fR only tries one server.
 
-If \fI+trace\fP is used, the behavior changes, and the root authoritative
+If \fB+trace\fR is used, the behavior changes, and the root authoritative
 servers are first queried and referrals are followed downwards to the name(s)
 in question.
 
 To simplify usage a default root trusted key if none is specified on the
-command line with \fI+trusted-key\fP.
+command line with \fB+trusted-key\fR.
 
 .SH OPTIONS
-.IP "-x <address>"
+.TP
+.B -x \fIaddress\fR
 Specify and IPv4 or IPv6 address for a reverse DNS (i.e., PTR) lookup.
-.IP "-b <address>"
+.TP
+.B -b \fIaddress\fR
 Specify a source IPv4 or IPv6 address for queries, rather than detecting it.
 This option can be used more than once to supply both an IPv4 and an IPv6
 address.
 
 The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
-.IP "-q <name>"
+.TP
+.B -q \fIname\fR
 Specify a query name.
-.IP "-t <type>"
+.TP
+.B -t \fItype\fR
 Specify a query type.
-.IP "-c <class>"
+.TP
+.B -c \fIclass\fR
 Specify a query class (currently, only IN is supported; all other classes are ignored).
-.IP -4
+.TP
+.B -4
 Use IPv4 only.  If this is specified, then queries over IPv6 are not
-attempted, unless \fI-6\fP is also specified.
-.IP -6
+attempted, unless \fB-6\fR is also specified.
+.TP
+.B -6
 Use IPv6 only.  If this is specified, then queries over IPv4 are not
-attempted, unless \fI-4\fP is also specified.
+attempted, unless \fB-4\fR is also specified.
 
 .SH QUERY OPTIONS
-.IP +[no]trace
+.TP
+.B +[no]trace
 Query authoritative servers, beginning at the DNS root, and follow referrals
 downwards.  The default is to query a recursive server instead.
-.IP +trusted-key=<filename>
+.TP
+.B +trusted-key\fR=\fIfilename\fI
 Specify a file that contains trusted keys for processing diagnostic queries.
 
 The format of this file is master zone file format and should contain DNSKEY
@@ -89,4 +110,8 @@ Program terminated normally.
 .IP 1
 Program execution was interrupted, or an unknown error ocurred.
 .SH SEE ALSO
-.BR dnsviz (1), dnsviz-probe (1), dnsviz-grok (1), dnsviz-graph (1), dnsviz-print (1)
+.BR dnsviz(1),
+.BR dnsviz-probe(1),
+.BR dnsviz-grok(1),
+.BR dnsviz-graph(1),
+.BR dnsviz-print(1)

@@ -12,7 +12,7 @@ digraph {
 		style=filled];
 	"DNSKEY-0|example.com|8|12345"	 [color="#000000",
 		fillcolor="#ffffff",
-		label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT></TD><TD VALIGN="bottom"><IMG SRC="images/error.png"/></TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="10">alg=8, id=12345</FONT></TD></TR></TABLE>>,
+		label=<<TABLE BORDER="0" CELLPADDING="0"><TR><TD></TD><TD VALIGN="bottom"><FONT POINT-SIZE="12" FACE="Helvetica">DNSKEY</FONT></TD><TD VALIGN="bottom"><IMG SRC="images/error.png"/></TD></TR><TR><TD COLSPAN="3" VALIGN="top"><FONT POINT-SIZE="10">alg=8, id=12345<BR/>1024 bits</FONT></TD></TR></TABLE>>,
 		shape=ellipse,
 		style=filled];
 	"NSEC-0|foobar.example.com|A" [color="#000000",
