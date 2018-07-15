@@ -2167,7 +2167,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # if the key is shown to be signing anything other than the
                 # DNSKEY RRset, or if it associated with a DS or trust anchor,
                 # then mark it as an error; otherwise, mark it as a warning.
-                if dnskey in self.zsks or dnskey in self.dnskey_with_ds or dnskey.rdata in trusted_keys_rdata:
+
+                ##paras/shuque: suggested change to only warn if a KSK has a corresponding DS record in parent
+                ### Changes suggested related to Model2 of https://tools.ietf.org/html/draft-huque-dnsop-multi-provider-dnssec-03
+                if dnskey in self.zsks  or dnskey.rdata in trusted_keys_rdata:
                     dnskey.errors.append(err)
                 else:
                     dnskey.warnings.append(err)
