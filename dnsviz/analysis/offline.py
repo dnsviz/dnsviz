@@ -292,6 +292,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if not hasattr(self, '_response_info') or self._response_info is None:
             self._response_info = {}
         if (name, rdtype) not in self._response_info:
+            self._response_info[(name, rdtype)] = None
             self._response_info[(name, rdtype)] = self._get_response_info(name, rdtype)
         return self._response_info[(name, rdtype)]
 
