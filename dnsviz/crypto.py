@@ -79,6 +79,7 @@ GOST_DIGEST_NAME = b'GOST R 34.11-94'
 
 EC_NOCOMPRESSION = b'\x04'
 
+
 def _init_dynamic():
     try:
         Engine.load_dynamic()
@@ -197,7 +198,10 @@ def validate_ds_digest(digest_alg, digest, dnskey_msg):
 
 def _dnskey_to_dsa(key):
     # get T
-    t, = struct.unpack(b'B',key[0])
+    t = key[0]
+    # python3/python2 dual compatibility
+    if not isinstance(t, int):
+        t = ord(t)
     offset = 1
 
     # get Q
@@ -226,9 +230,12 @@ def _dnskey_to_dsa(key):
 def _dnskey_to_rsa(key):
     try:
         # get the exponent length
-        e_len, = struct.unpack(b'B',key[0])
+        e_len = key[0]
     except IndexError:
         return None
+    # python3/python2 dual compatibility
+    if not isinstance(e_len, int):
+        e_len = ord(e_len)
 
     offset = 1
     if e_len == 0:
@@ -293,7 +300,10 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
     pubkey = _dnskey_to_dsa(key)
 
     # get T
-    t, = struct.unpack(b'B',sig[0])
+    t = sig[0]
+    # python3/python2 dual compatibility
+    if not isinstance(t, int):
+        t = ord(t)
     offset = 1
 
     # get R
