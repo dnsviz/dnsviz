@@ -36,6 +36,9 @@ import hashlib
 import os
 import re
 
+from . import format as fmt
+lb2s = fmt.latin1_binary_to_string
+
 logger = logging.getLogger(__name__)
 
 ALG_TYPE_DNSSEC = 0
@@ -75,7 +78,13 @@ else:
     _supported_algs.add(15)
 
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
+GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
+
+# python3/python2 dual compatibility
+if not isinstance(GOST_ENGINE_NAME, str):
+    GOST_ENGINE_NAME = lb2s(GOST_ENGINE_NAME)
+    GOST_DIGEST_NAME = lb2s(GOST_DIGEST_NAME)
 
 EC_NOCOMPRESSION = b'\x04'
 
@@ -133,7 +142,7 @@ def _log_unsupported_alg(alg, alg_type):
 
 def _gost_init():
     try:
-        gost = Engine.Engine(b'gost')
+        gost = Engine.Engine(GOST_ENGINE_NAME)
         gost.init()
         gost.set_default()
     except ValueError:
@@ -142,7 +151,7 @@ def _gost_init():
 def _gost_cleanup():
     from M2Crypto import Engine
     try:
-        gost = Engine.Engine(b'gost')
+        gost = Engine.Engine(GOST_ENGINE_NAME)
     except ValueError:
         pass
     else:
