@@ -33,17 +33,17 @@ def apply_substitutions(filename, install_prefix):
     if os.path.exists(filename_out) and os.path.getctime(filename_out) > os.path.getctime(filename):
         return
 
-    in_fh = open(filename, 'r')
-    out_fh = open(filename_out, 'w')
-    s = in_fh.read()
+    with open(filename, 'r') as in_fh:
+        s = in_fh.read()
+
     s = s.replace('__DNSVIZ_INSTALL_PREFIX__', install_prefix)
     s = s.replace('__JQUERY_PATH__', JQUERY_PATH)
     s = s.replace('__JQUERY_UI_PATH__', JQUERY_UI_PATH)
     s = s.replace('__JQUERY_UI_CSS_PATH__', JQUERY_UI_CSS_PATH)
     s = s.replace('__RAPHAEL_PATH__', RAPHAEL_PATH)
-    out_fh.write(s)
-    in_fh.close()
-    out_fh.close()
+
+    with open(filename_out, 'w') as out_fh:
+        out_fh.write(s)
 
 def make_documentation():
     os.chdir('doc')
