@@ -22,7 +22,13 @@
 from __future__ import unicode_literals
 
 import os
-DNSVIZ_SHARE_PATH = os.path.join('__DNSVIZ_INSTALL_PREFIX__', 'share', 'dnsviz')
+import sys
+
+if hasattr(sys, 'real_prefix'):
+    DNSVIZ_INSTALL_PREFIX = sys.prefix
+else:
+    DNSVIZ_INSTALL_PREFIX = '__DNSVIZ_INSTALL_PREFIX__'
+DNSVIZ_SHARE_PATH = os.path.join(DNSVIZ_INSTALL_PREFIX, 'share', 'dnsviz')
 JQUERY_PATH = __JQUERY_PATH__
 JQUERY_UI_PATH = __JQUERY_UI_PATH__
 JQUERY_UI_CSS_PATH = __JQUERY_UI_CSS_PATH__

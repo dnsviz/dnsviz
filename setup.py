@@ -56,6 +56,15 @@ def make_documentation():
 class MyBuildPy(build_py):
     def run(self):
         make_documentation()
+        # Create dnsviz/config.py, so version exists for packages that don't
+        # require calling install.  Even though the install prefix is the empty
+        # string, the use case for this is virtual environments, which won't
+        # use it.
+        apply_substitutions(os.path.join('dnsviz','config.py.in'), '')
+        # update the timestamp of config.py.in, so if/when the install command
+        # is called, config.py will be rewritten, i.e., with the real install
+        # prefix.
+        os.utime(os.path.join('dnsviz', 'config.py.in'), None)
         build_py.run(self)
 
 class MyInstall(install):
