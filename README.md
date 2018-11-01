@@ -56,6 +56,12 @@ powers the Web-based analysis available at http://dnsviz.net/
   libnacl is necessary to validate DNSSEC signatures with algorithm 15
   (Ed25519).
 
+* (optional) OpenSSL GOST Engine - https://github.com/gost-engine/engine
+
+  With OpenSSL version 1.1.0 and later, the OpenSSL GOST Engine is necessary to
+  validate DNSSEC signatures with algorithm 12 (GOST R 34.10-2001) and create
+  digests of type 3 (GOST R 34.11-94).
+
 * (optional) ISC BIND - https://www.isc.org/downloads/bind/
 
   When calling `dnsviz probe` if the `-N` option is used or if a zone file is
