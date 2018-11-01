@@ -53,8 +53,9 @@ ALG_TYPE_DNSSEC_TEXT = [
 
 _crypto_sources = {
         'M2Crypto >= 0.21.1': (set([1,5,7,8,10]), set([1,2,4]), set([1])),
-        'M2Crypto >= 0.24.0': (set([3,6,12,13,14]), set([3]), set()),
-        'libnacl': (set([15]), set([3]), set()),
+        'M2Crypto >= 0.24.0': (set([3,6,13,14]), set(), set()),
+        'M2Crypto >= 0.24.0 and either openssl < 1.1.0 or openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
+        'libnacl': (set([15]), set(), set()),
 }
 _logged_modules = set()
 
