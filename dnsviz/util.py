@@ -88,9 +88,9 @@ M.ROOT-SERVERS.NET.      3600000      AAAA  2001:dc3::35
 '''
 
 HISTORICAL_ROOT_IPS = (
-        (dns.name.from_text('h.root-servers.net.'), IPAddr('2001:500:1::803f:235')), # December 1, 2015
-        (dns.name.from_text('l.root-servers.net.'), IPAddr('2001:500:3::42')), # March 24, 2016
-        (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:84::b')), # June 1, 2017
+        (dns.name.from_text('h.root-servers.net.'), IPAddr('2001:500:1::803f:235')), # 2015-12-01
+        (dns.name.from_text('l.root-servers.net.'), IPAddr('2001:500:3::42')), # 2016-03-24
+        (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:84::b')), # 2017-06-01
 )
 
 # The following list should include all current and historical trust anchors
@@ -106,9 +106,9 @@ HISTORICAL_ROOT_IPS = (
 TRUSTED_KEYS_ROOT = (
         ('. IN DNSKEY 257 3 8 AwEAAagAIKlVZrpC6Ia7gEzahOR+9W29euxhJhVVLOyQbSEW0O8gcCjF FVQUTf6v58fLjwBd0YI0EzrAcQqBGCzh/RStIoO8g0NfnfL2MTJRkxoX bfDaUeVPQuYEhg37NZWAJQ9VnMVDxP/VHL496M/QZxkjf5/Efucp2gaD X6RS6CXpoY68LsvPVjR0ZSwzz1apAzvN9dlzEheX7ICJBBtuA6G3LQpz W5hOA2hzCTMjJPJ8LbqF6dsV6DoBQzgul0sGIcGOYl7OyQdXfZ57relS Qageu+ipAdTTJ25AsRTAoub8ONGcLmqrAmRLKBP1dfwhYB4N7knNnulq QxA+Uk1ihz0=',
             datetime.datetime(2010, 7, 16, 0, 0, 0, 0, fmt.utc),
-            None),
+            datetime.datetime(2018, 10, 15, 16, 0, 0, 0, fmt.utc)), # 2018-10-11 16:00:00 UTC + 4 days (2*TTL)
         ('. IN DNSKEY 257 3 8 AwEAAaz/tAm8yTn4Mfeh5eyI96WSVexTBAvkMgJzkKTOiW1vkIbzxeF3 +/4RgWOq7HrxRixHlFlExOLAJr5emLvN7SWXgnLh4+B5xQlNVz8Og8kv ArMtNROxVQuCaSnIDdD5LKyWbRd2n9WGe2R8PzgCmr3EgVLrjyBxWezF 0jLHwVN8efS3rCj/EWgvIWgb9tarpVUDK/b58Da+sqqls3eNbuv7pr+e oZG+SrDK6nWeL3c6H5Apxz7LjVc1uTIdsIXxuOLYA4/ilBmSVIzuDWfd RUfhHdY6+cn8HFRm+2hM8AnXGXws9555KrUB5qihylGa8subX2Nn6UwN R1AkUTV74bU=',
-            datetime.datetime(2017, 7, 12, 0, 0, 0, 0, fmt.utc),
+            datetime.datetime(2017, 8, 11, 0, 0, 0, 0, fmt.utc), # 2017-07-12 00:00:00 UTC + 30 days (RFC 5011 add hold-down time)
             None),
 )
 
