@@ -267,7 +267,7 @@ def _dnskey_to_rsa(key):
 
 def _dnskey_to_gost(key):
     der = GOST_PREFIX + key
-    pem = bytes('-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+'-----END PUBLIC KEY-----')
+    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+b'-----END PUBLIC KEY-----'
 
     return EVP.load_key_string_pubkey(pem)
 
