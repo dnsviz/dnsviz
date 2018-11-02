@@ -53,18 +53,20 @@ def make_documentation():
     finally:
         os.chdir('..')
 
+def create_config(prefix):
+    # Create dnsviz/config.py, so version exists for packages that don't
+    # require calling install.  Even though the install prefix is the empty
+    # string, the use case for this is virtual environments, which won't
+    # use it.
+    apply_substitutions(os.path.join('dnsviz','config.py.in'), prefix)
+    # update the timestamp of config.py.in, so if/when the install command
+    # is called, config.py will be rewritten, i.e., with the real install
+    # prefix.
+    os.utime(os.path.join('dnsviz', 'config.py.in'), None)
+
 class MyBuildPy(build_py):
     def run(self):
         make_documentation()
-        # Create dnsviz/config.py, so version exists for packages that don't
-        # require calling install.  Even though the install prefix is the empty
-        # string, the use case for this is virtual environments, which won't
-        # use it.
-        apply_substitutions(os.path.join('dnsviz','config.py.in'), '')
-        # update the timestamp of config.py.in, so if/when the install command
-        # is called, config.py will be rewritten, i.e., with the real install
-        # prefix.
-        os.utime(os.path.join('dnsviz', 'config.py.in'), None)
         build_py.run(self)
 
 class MyInstall(install):
@@ -75,7 +77,7 @@ class MyInstall(install):
             install_data = os.path.join(os.path.sep, os.path.relpath(self.install_data, self.root))
         else:
             install_data = self.install_data
-        apply_substitutions(os.path.join('dnsviz','config.py.in'), install_data)
+        create_config(install_data)
         install.run(self)
 
 DOC_FILES = [('share/doc/dnsviz', ['README.md'])]
@@ -114,6 +116,7 @@ if isinstance(b'', str):
 else:
     map_func = lambda x: codecs.decode(x, 'latin1')
 
+create_config('')
 setup(name='dnsviz',
         version='0.6.5',
         author='Casey Deccio',
