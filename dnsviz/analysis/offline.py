@@ -1678,6 +1678,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             else:
                 return
 
+        ds_rrset_exists = False
         secure_path = False
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
@@ -1705,6 +1706,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # there are CNAMEs that show up here...
             if not (ds_rrset_info.rrset.name == name and ds_rrset_info.rrset.rdtype == rdtype):
                 continue
+            ds_rrset_exists = True
 
             # for each set of DS records provided by one or more servers,
             # identify the set of DNSSEC algorithms and the set of digest
@@ -1820,10 +1822,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:
-                if secure_path:
-                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
+                if ds_rrset_exists:
+                    # DS RRs exist
+                    if secure_path:
+                        # If any DNSSEC algorithms are supported, then status
+                        # is bogus because there should have been matching KSK.
+                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
+                    else:
+                        # If no algorithsm are supported, then this is a
+                        # provably insecure delegation.
+                        self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                 else:
-                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
+                    # Only CNAME returned for DS query.  With no DS records and
+                    # no valid non-existence proof, the delegation is bogus.
+                    self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
             elif self.parent.signed:
                 self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
                 for nsec_status_list in [self.nxdomain_status[n] for n in self.nxdomain_status if n.qname == name and n.rdtype == dns.rdatatype.DS] + \
