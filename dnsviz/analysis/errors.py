@@ -344,6 +344,97 @@ class SignatureInvalid(RRSIGError):
     references = ['RFC 4035, Sec. 5.3.3']
     required_params = []
 
+class RRSIGBadLength(RRSIGError):
+    pass
+
+class RRSIGBadLengthGOST(RRSIGBadLength):
+    '''
+    >>> e = RRSIGBadLengthGOST(length=500)
+    >>> e.description
+    'The length of the signature is 500 bits, but a GOST signature (DNSSEC algorithm 12) must be 512 bits long.'
+    '''
+    _abstract = False
+    description_template = 'The length of the signature is %(length)d bits, but a GOST signature (DNSSEC algorithm 12) must be 512 bits long.'
+    code = 'RRSIG_BAD_LENGTH_GOST'
+    references = ['RFC 5933, Sec. 5.2']
+    required_params = ['length']
+
+class RRSIGBadLengthECDSA(RRSIGBadLength):
+    curve = None
+    algorithm = None
+    correct_length = None
+    description_template = 'The length of the signature is %(length)d bits, but an ECDSA signature made with Curve %(curve)s (DNSSEC algorithm %(algorithm)d) must be %(correct_length)d bits long.'
+    references = ['RFC 6605, Sec. 4']
+    required_params = ['length']
+
+    def __init__(self, **kwargs):
+        super(RRSIGBadLengthECDSA, self).__init__(**kwargs)
+        self.template_kwargs['curve'] = self.curve
+        self.template_kwargs['algorithm'] = self.algorithm
+        self.template_kwargs['correct_length'] = self.correct_length
+
+class RRSIGBadLengthECDSA256(RRSIGBadLengthECDSA):
+    '''
+    >>> e = RRSIGBadLengthECDSA256(length=500)
+    >>> e.description
+    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.'
+    '''
+    curve = 'P-256'
+    algorithm = 13
+    correct_length = 512
+    _abstract = False
+    code = 'RRSIG_BAD_LENGTH_ECDSA256'
+
+class RRSIGBadLengthECDSA384(RRSIGBadLengthECDSA):
+    '''
+    >>> e = RRSIGBadLengthECDSA384(length=500)
+    >>> e.description
+    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.'
+    '''
+    curve = 'P-384'
+    algorithm = 14
+    correct_length = 768
+    _abstract = False
+    code = 'RRSIG_BAD_LENGTH_ECDSA384'
+
+class RRSIGBadLengthEdDSA(RRSIGBadLength):
+    curve = None
+    algorithm = None
+    correct_length = None
+    description_template = 'The length of the signature is %(length)d bits, but an %(curve)s signature (DNSSEC algorithm %(algorithm)d) must be %(correct_length)d bits long.'
+    references = ['RFC 8080, Sec. 4']
+    required_params = ['length']
+
+    def __init__(self, **kwargs):
+        super(RRSIGBadLengthEdDSA, self).__init__(**kwargs)
+        self.template_kwargs['curve'] = self.curve
+        self.template_kwargs['algorithm'] = self.algorithm
+        self.template_kwargs['correct_length'] = self.correct_length
+
+class RRSIGBadLengthEd25519(RRSIGBadLengthEdDSA):
+    '''
+    >>> e = RRSIGBadLengthEd25519(length=500)
+    >>> e.description
+    'The length of the signature is 500 bits, but an Ed25519 signature (DNSSEC algorithm 15) must be 512 bits long.'
+    '''
+    curve = 'Ed25519'
+    algorithm = 15
+    correct_length = 512
+    _abstract = False
+    code = 'RRSIG_BAD_LENGTH_ED25519'
+
+class RRSIGBadLengthEd448(RRSIGBadLengthEdDSA):
+    '''
+    >>> e = RRSIGBadLengthEd448(length=500)
+    >>> e.description
+    'The length of the signature is 500 bits, but an Ed448 signature (DNSSEC algorithm 16) must be 912 bits long.'
+    '''
+    curve = 'Ed448'
+    algorithm = 16
+    correct_length = 912
+    _abstract = False
+    code = 'RRSIG_BAD_LENGTH_ED448'
+
 class DSError(DomainNameAnalysisError):
     pass
 

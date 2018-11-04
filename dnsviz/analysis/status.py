@@ -153,6 +153,15 @@ dname_status_mapping = {
         DNAME_STATUS_INVALID: 'INVALID',
 }
 
+RRSIG_SIG_LENGTHS_BY_ALGORITHM = {
+        12: 512, 13: 512, 14: 768, 15: 512, 16: 912,
+}
+RRSIG_SIG_LENGTH_ERRORS = {
+        12: Errors.RRSIGBadLengthGOST, 13: Errors.RRSIGBadLengthECDSA256,
+        14: Errors.RRSIGBadLengthECDSA384, 15: Errors.RRSIGBadLengthEd25519,
+        16: Errors.RRSIGBadLengthEd448,
+}
+
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
@@ -205,6 +214,11 @@ class RRSIGStatus(object):
                 self.errors.append(Errors.DNSKEYRevokedRRSIG())
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INVALID
+
+        sig_len = len(self.rrsig.signature) << 3
+        if self.rrsig.algorithm in RRSIG_SIG_LENGTHS_BY_ALGORITHM and \
+                sig_len != RRSIG_SIG_LENGTHS_BY_ALGORITHM[self.rrsig.algorithm]:
+            self.errors.append(RRSIG_SIG_LENGTH_ERRORS[self.rrsig.algorithm](length=sig_len))
 
         if self.reference_ts < self.rrsig.inception:
             if self.validation_status == RRSIG_STATUS_VALID:
