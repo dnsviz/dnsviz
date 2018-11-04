@@ -47,12 +47,22 @@ except ImportError:
 
 import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
+from .analysis import errors as Errors
 from . import base32
 from . import crypto
 from . import format as fmt
 from .ipaddr import IPAddr
 from .util import tuple_to_dict
 lb2s = fmt.latin1_binary_to_string
+
+DNSSEC_KEY_LENGTHS_BY_ALGORITHM = {
+        12: 512, 13: 512, 14: 768, 15: 256, 16: 456,
+}
+DNSSEC_KEY_LENGTH_ERRORS = {
+        12: Errors.DNSKEYBadLengthGOST, 13: Errors.DNSKEYBadLengthECDSA256,
+        14: Errors.DNSKEYBadLengthECDSA384, 15: Errors.DNSKEYBadLengthEd25519,
+        16: Errors.DNSKEYBadLengthEd448,
+}
 
 class DNSResponse:
     '''A DNS response, including meta information'''
@@ -738,6 +748,11 @@ class DNSKEYMeta(DNSResponseComponent):
         # other keys - just guess, based on the length of the raw key material
         else:
             return len(key_str)<<3
+
+    def validate_key_len(self):
+        if self.rdata.algorithm in DNSSEC_KEY_LENGTHS_BY_ALGORITHM and \
+                self.key_len != DNSSEC_KEY_LENGTHS_BY_ALGORITHM[self.rdata.algorithm]:
+            self.errors.append(DNSSEC_KEY_LENGTH_ERRORS[self.rdata.algorithm](length=self.key_len))
 
     def message_for_ds(self, clear_revoke=False):
         '''Return the string value suitable for hashing to create a DS

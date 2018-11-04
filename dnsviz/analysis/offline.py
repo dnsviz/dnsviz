@@ -2187,6 +2187,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
+            dnskey.validate_key_len()
+
         if trusted_keys_rdata and not trusted_keys_self_signing:
             self.zone_errors.append(Errors.NoTrustAnchorSigning(zone=fmt.humanize_name(self.zone.name)))
 

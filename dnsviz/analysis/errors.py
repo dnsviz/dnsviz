@@ -1754,6 +1754,97 @@ class DNSKEYNotAtZoneApex(DNSKEYError):
     code = 'DNSKEY_NOT_AT_ZONE_APEX'
     required_params = ['zone', 'name']
 
+class DNSKEYBadLength(DNSKEYError):
+    pass
+
+class DNSKEYBadLengthGOST(DNSKEYBadLength):
+    '''
+    >>> e = DNSKEYBadLengthGOST(length=500)
+    >>> e.description
+    'The length of the key is 500 bits, but a GOST public key (DNSSEC algorithm 12) must be 512 bits long.'
+    '''
+    _abstract = False
+    description_template = 'The length of the key is %(length)d bits, but a GOST public key (DNSSEC algorithm 12) must be 512 bits long.'
+    code = 'DNSKEY_BAD_LENGTH_GOST'
+    references = ['RFC 5933, Sec. 5.1']
+    required_params = ['length']
+
+class DNSKEYBadLengthECDSA(DNSKEYBadLength):
+    curve = None
+    algorithm = None
+    correct_length = None
+    description_template = 'The length of the key is %(length)d bits, but an ECDSA public key using Curve %(curve)s (DNSSEC algorithm %(algorithm)d) must be %(correct_length)d bits long.'
+    references = ['RFC 6605, Sec. 4']
+    required_params = ['length']
+
+    def __init__(self, **kwargs):
+        super(DNSKEYBadLengthECDSA, self).__init__(**kwargs)
+        self.template_kwargs['curve'] = self.curve
+        self.template_kwargs['algorithm'] = self.algorithm
+        self.template_kwargs['correct_length'] = self.correct_length
+
+class DNSKEYBadLengthECDSA256(DNSKEYBadLengthECDSA):
+    '''
+    >>> e = DNSKEYBadLengthECDSA256(length=500)
+    >>> e.description
+    'The length of the key is 500 bits, but an ECDSA public key using Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.'
+    '''
+    curve = 'P-256'
+    algorithm = 13
+    correct_length = 512
+    _abstract = False
+    code = 'DNSKEY_BAD_LENGTH_ECDSA256'
+
+class DNSKEYBadLengthECDSA384(DNSKEYBadLengthECDSA):
+    '''
+    >>> e = DNSKEYBadLengthECDSA384(length=500)
+    >>> e.description
+    'The length of the key is 500 bits, but an ECDSA public key using Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.'
+    '''
+    curve = 'P-384'
+    algorithm = 14
+    correct_length = 768
+    _abstract = False
+    code = 'DNSKEY_BAD_LENGTH_ECDSA384'
+
+class DNSKEYBadLengthEdDSA(DNSKEYBadLength):
+    curve = None
+    algorithm = None
+    correct_length = None
+    description_template = 'The length of the key is %(length)d bits, but an %(curve)s public key (DNSSEC algorithm %(algorithm)d) must be %(correct_length)d bits long.'
+    references = ['RFC 8080, Sec. 3']
+    required_params = ['length']
+
+    def __init__(self, **kwargs):
+        super(DNSKEYBadLengthEdDSA, self).__init__(**kwargs)
+        self.template_kwargs['curve'] = self.curve
+        self.template_kwargs['algorithm'] = self.algorithm
+        self.template_kwargs['correct_length'] = self.correct_length
+
+class DNSKEYBadLengthEd25519(DNSKEYBadLengthEdDSA):
+    '''
+    >>> e = DNSKEYBadLengthEd25519(length=500)
+    >>> e.description
+    'The length of the key is 500 bits, but an Ed25519 public key (DNSSEC algorithm 15) must be 256 bits long.'
+    '''
+    curve = 'Ed25519'
+    algorithm = 15
+    correct_length = 256
+    _abstract = False
+    code = 'DNSKEY_BAD_LENGTH_ED25519'
+
+class DNSKEYBadLengthEd448(DNSKEYBadLengthEdDSA):
+    '''
+    >>> e = DNSKEYBadLengthEd448(length=500)
+    >>> e.description
+    'The length of the key is 500 bits, but an Ed448 public key (DNSSEC algorithm 16) must be 456 bits long.'
+    '''
+    curve = 'Ed448'
+    algorithm = 16
+    correct_length = 456
+    _abstract = False
+    code = 'DNSKEY_BAD_LENGTH_ED448'
+
 class TrustAnchorError(DomainNameAnalysisError):
     pass
 
