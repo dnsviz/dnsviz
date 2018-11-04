@@ -299,7 +299,7 @@ class InceptionWithinClockSkew(RRSIGError):
     '''
     >>> e = InceptionWithinClockSkew(inception=datetime.datetime(2015,1,10,0,0,0), reference_time=datetime.datetime(2015,1,10,0,0,1))
     >>> e.description
-    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range of the current time (2015-01-10 00:00:01)'.
+    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:01).'
     '''
 
     _abstract = False
@@ -317,7 +317,7 @@ class ExpirationWithinClockSkew(RRSIGError):
     '''
     >>> e = ExpirationWithinClockSkew(expiration=datetime.datetime(2015,1,10,0,0,1), reference_time=datetime.datetime(2015,1,10,0,0,0))
     >>> e.description
-    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range of the current time (2015-01-10 00:00:00)'.
+    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:00).'
     '''
 
     _abstract = False
