@@ -424,7 +424,7 @@ class OnlineDomainNameAnalysis(object):
         if query.qname == self.name and detect_ns:
             # if this is a referral, also grab the referral information, if it
             # pertains to this name (could alternatively be a parent)
-            if response.is_referral(query.qname, query.rdtype, bailiwick):
+            if response.is_referral(query.qname, query.rdtype, query.rdclass, bailiwick):
                 try:
                     rrset = response.message.find_rrset(response.message.authority, self.name, query.rdclass, dns.rdatatype.NS)
                 except KeyError:

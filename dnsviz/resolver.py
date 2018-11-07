@@ -603,7 +603,7 @@ class FullResolver:
                                     cname_rrset = Response.cname_from_dname(qname, dname_rrset)
                                     ret = [dname_rrset, cname_rrset]
 
-                            if response.is_referral(qname, rdtype, bailiwick):
+                            if response.is_referral(qname, rdtype, rdclass, bailiwick):
                                 is_referral = True
                                 a_rrsets = {}
                                 min_ttl = None

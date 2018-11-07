@@ -878,7 +878,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         for server in query1.responses:
                             bailiwick = bailiwick_map.get(server, default_bailiwick)
                             for client in query1.responses[server]:
-                                if query1.responses[server][client].is_referral(self.name, rdtype, bailiwick, proper=True):
+                                if query1.responses[server][client].is_referral(self.name, rdtype, query.rdclass, bailiwick, proper=True):
                                     self.yxdomain.add(self.name)
                                     raise FoundYXDOMAIN
                 except FoundYXDOMAIN:
@@ -1699,7 +1699,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client in dnskey_query.responses[server]:
                     response = dnskey_query.responses[server][client]
-                    if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, bailiwick):
+                    if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, self.rdclass, bailiwick):
                         dnskey_server_client_responses.add((server,client,response))
 
         for ds_rrset_info in ds_rrset_answer_info:

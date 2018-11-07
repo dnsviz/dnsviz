@@ -344,7 +344,7 @@ class DNSResponse:
 
         return self.message is not None and bool(self.message.flags & dns.flags.AA)
 
-    def is_referral(self, qname, rdtype, bailiwick, proper=False):
+    def is_referral(self, qname, rdtype, rdclass, bailiwick, proper=False):
         '''Return True if this response yields a referral for the queried
         name.'''
 
@@ -360,25 +360,25 @@ class DNSResponse:
             return False
         # if the name exists in the answer section with the requested rdtype or
         # CNAME, then it can't be a referral
-        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME)]:
+        if [x for x in self.message.answer if x.name == qname and x.rdtype in (rdtype, dns.rdatatype.CNAME) and x.rdclass == rdclass]:
             return False
         # if an SOA record with the given qname exists, then the server
         # is authoritative for the name, so it is a referral
         try:
-            self.message.find_rrset(self.message.authority, qname, dns.rdataclass.IN, dns.rdatatype.SOA)
+            self.message.find_rrset(self.message.authority, qname, rdclass, dns.rdatatype.SOA)
             return False
         except KeyError:
             pass
         # if proper referral is requested and qname is equal to of an NS RRset
         # in the authority, then it is a referral
         if proper:
-            if [x for x in self.message.authority if qname == x.name and x.rdtype == dns.rdatatype.NS]:
+            if [x for x in self.message.authority if qname == x.name and x.rdtype == dns.rdatatype.NS and x.rdclass == rdclass]:
                 return True
         # if proper referral is NOT requested, qname is a subdomain of
         # (including equal to) an NS RRset in the authority, and qname is not
         # equal to bailiwick, then it is a referral
         else:
-            if [x for x in self.message.authority if qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS]:
+            if [x for x in self.message.authority if qname.is_subdomain(x.name) and bailiwick != x.name and x.rdtype == dns.rdatatype.NS and x.rdclass == rdclass]:
                 return True
         return False
 

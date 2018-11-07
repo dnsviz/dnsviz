@@ -802,7 +802,7 @@ class AggregateDNSResponse(object):
     def _aggregate_response(self, server, client, response, qname, rdtype, rdclass, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
-                is_referral = response.is_referral(qname, rdtype, bailiwick)
+                is_referral = response.is_referral(qname, rdtype, rdclass, bailiwick)
                 self._aggregate_answer(server, client, response, is_referral, qname, rdtype, rdclass)
             else:
                 truncated_info = TruncatedResponse(response.message.to_wire())
@@ -1057,7 +1057,7 @@ class DNSQuery(object):
         for server in self.responses:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in self.responses[server].items():
-                if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.qname, self.rdtype, bailiwick):
+                if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.qname, self.rdtype, self.rdclass, bailiwick):
                     servers_clients.add((server, client))
         return servers_clients
 
