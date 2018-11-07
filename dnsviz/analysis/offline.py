@@ -1686,7 +1686,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if (self.name, dns.rdatatype.DNSKEY) in self.queries:
             dnskey_multiquery = self.queries[(self.name, dns.rdatatype.DNSKEY)]
         else:
-            dnskey_multiquery = self._query_cls(self.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN)
+            dnskey_multiquery = self._query_cls(self.name, dns.rdatatype.DNSKEY, self.rdclass)
 
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
