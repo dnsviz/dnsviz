@@ -799,11 +799,11 @@ class AggregateDNSResponse(object):
         self.truncated_info = []
         self.error_info = []
 
-    def _aggregate_response(self, server, client, response, qname, rdtype, bailiwick):
+    def _aggregate_response(self, server, client, response, qname, rdtype, rdclass, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
                 is_referral = response.is_referral(qname, rdtype, bailiwick)
-                self._aggregate_answer(server, client, response, is_referral, qname, rdtype)
+                self._aggregate_answer(server, client, response, is_referral, qname, rdtype, rdclass)
             else:
                 truncated_info = TruncatedResponse(response.message.to_wire())
                 DNSResponseComponent.insert_into_list(truncated_info, self.truncated_info, server, client, response)
@@ -811,11 +811,11 @@ class AggregateDNSResponse(object):
         else:
             self._aggregate_error(server, client, response)
 
-    def _aggregate_answer(self, server, client, response, referral, qname, rdtype):
+    def _aggregate_answer(self, server, client, response, referral, qname, rdtype, rdclass):
         msg = response.message
 
         # sort with the most specific DNAME infos first
-        dname_rrsets = [x for x in msg.answer if x.rdtype == dns.rdatatype.DNAME]
+        dname_rrsets = [x for x in msg.answer if x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass]
         dname_rrsets.sort(reverse=True)
 
         qname_sought = qname
@@ -831,10 +831,10 @@ class AggregateDNSResponse(object):
                         break
 
                 try:
-                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype, referral)
+                    rrset_info = self._aggregate_answer_rrset(server, client, response, qname_sought, rdtype, rdclass, referral)
 
                     # if there was a synthesized CNAME, add it to the rrset_info
-                    if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and synthesized_cname_info is not None:
+                    if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and rrset_info.rrset.rdclass == rdclass and synthesized_cname_info is not None:
                         synthesized_cname_info = rrset_info.create_or_update_cname_from_dname_info(synthesized_cname_info, server, client, response)
                         synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, referral)
 
@@ -845,7 +845,7 @@ class AggregateDNSResponse(object):
                     synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, referral)
                     rrset_info = synthesized_cname_info
 
-                if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
+                if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and rrset_info.rrset.rdclass == rdclass:
                     qname_sought = rrset_info.rrset[0].target
                 else:
                     break
@@ -854,7 +854,7 @@ class AggregateDNSResponse(object):
             if referral and rdtype != dns.rdatatype.DS:
                 # add referrals
                 try:
-                    rrset = [x for x in msg.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
+                    rrset = [x for x in msg.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS and x.rdclass == rdclass][0]
                 except IndexError:
                     pass
                 else:
@@ -879,13 +879,13 @@ class AggregateDNSResponse(object):
             neg_response_info.create_or_update_nsec_info(server, client, response, referral)
             neg_response_info.create_or_update_soa_info(server, client, response, referral)
 
-    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, referral):
+    def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, rdclass, referral):
         msg = response.message
 
         try:
-            rrset = msg.find_rrset(msg.answer, qname, dns.rdataclass.IN, rdtype)
+            rrset = msg.find_rrset(msg.answer, qname, rdclass, rdtype)
         except KeyError:
-            rrset = msg.find_rrset(msg.answer, qname, dns.rdataclass.IN, dns.rdatatype.CNAME)
+            rrset = msg.find_rrset(msg.answer, qname, rdclass, dns.rdatatype.CNAME)
 
         rrset_info = RRsetInfo(rrset, self.ttl_cmp)
         rrset_info = DNSResponseComponent.insert_into_list(rrset_info, self.answer_info, server, client, response)
@@ -1147,7 +1147,7 @@ class DNSQueryAggregateDNSResponse(DNSQuery, AggregateDNSResponse):
 
     def add_response(self, server, client, response, bailiwick):
         super(DNSQueryAggregateDNSResponse, self).add_response(server, client, response, bailiwick)
-        self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
+        self._aggregate_response(server, client, response, self.qname, self.rdtype, self.rdclass, bailiwick)
 
 class MultiQuery(object):
     '''An simple DNS Query and its responses.'''
@@ -1203,7 +1203,7 @@ class MultiQueryAggregateDNSResponse(MultiQuery, AggregateDNSResponse):
         for server in query.responses:
             bailiwick = bailiwick_map.get(server, default_bailiwick)
             for client, response in query.responses[server].items():
-                self._aggregate_response(server, client, response, self.qname, self.rdtype, bailiwick)
+                self._aggregate_response(server, client, response, self.qname, self.rdtype, self.rdclass, bailiwick)
 
 class TTLDistinguishingMultiQueryAggregateDNSResponse(MultiQueryAggregateDNSResponse):
     ttl_cmp = True
