@@ -1152,6 +1152,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if response.is_complete_response() and response.message.rcode() == dns.rcode.NOERROR and qname_obj.nxdomain_ancestor is not None:
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAINAncestry(qname=fmt.humanize_name(response.query.qname), ancestor_qname=fmt.humanize_name(qname_obj.nxdomain_ancestor.name)), errors, server, client, response)
 
+    def _populate_foreign_key_warnings(self, query, response, server, client, warnings):
+        # if there was foriegn class data, then warn about it
+        ans_cls = [r.rrset.rdclass for r in query.foreign_class_answer_info if (server, client) in r.servers_clients]
+        auth_cls = [r.rrset.rdclass for r in query.foreign_class_authority_info if (server, client) in r.servers_clients]
+        add_cls = [r.rrset.rdclass for r in query.foreign_class_additional_info if (server, client) in r.servers_clients]
+        if ans_cls:
+            Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAnswer(cls=dns.rdataclass.to_text(ans_cls[0])), warnings, server, client, response)
+        if auth_cls:
+            Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAuthority(cls=dns.rdataclass.to_text(auth_cls[0])), warnings, server, client, response)
+        if add_cls:
+            Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAdditional(cls=dns.rdataclass.to_text(add_cls[0])), warnings, server, client, response)
+
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
@@ -1358,6 +1370,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server,client in rrset_info.servers_clients:
                 for response in rrset_info.servers_clients[(server,client)]:
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+                    self._populate_foreign_key_warnings(query, response, server, client, self.rrset_warnings[rrset_info])
 
     def _populate_invalid_response_status(self, query):
         self.response_errors[query] = []

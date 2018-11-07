@@ -1493,6 +1493,46 @@ class PMTUExceeded(ResponseError):
         if self.template_kwargs['pmtu_lower_bound'] is not None and self.template_kwargs['pmtu_upper_bound'] is not None:
             self.template_kwargs['description'] += ' The PMTU was bounded between %(pmtu_lower_bound)d and %(pmtu_upper_bound)d bytes.' % self.template_kwargs
 
+class ForeignClassData(ResponseError):
+    section = None
+    description_template = 'Data of class %(cls)s was found in the %(section)s section of the response.'
+    references = ['RFC 1034', 'RFC 1035']
+    required_params = ['cls']
+
+    def __init__(self, **kwargs):
+        super(ForeignClassData, self).__init__(**kwargs)
+        self.template_kwargs['section'] = self.section
+
+class ForeignClassDataAnswer(ForeignClassData):
+    '''
+    >>> e = ForeignClassDataAnswer(cls='CH')
+    >>> e.description
+    'Data of class CH was found in the Answer section of the response.'
+    '''
+    section = 'Answer'
+    _abstract = False
+    code = 'FOREIGN_CLASS_DATA_ANSWER'
+
+class ForeignClassDataAuthority(ForeignClassData):
+    '''
+    >>> e = ForeignClassDataAuthority(cls='CH')
+    >>> e.description
+    'Data of class CH was found in the Authority section of the response.'
+    '''
+    section = 'Authority'
+    _abstract = False
+    code = 'FOREIGN_CLASS_DATA_AUTHORITY'
+
+class ForeignClassDataAdditional(ForeignClassData):
+    '''
+    >>> e = ForeignClassDataAdditional(cls='CH')
+    >>> e.description
+    'Data of class CH was found in the Additional section of the response.'
+    '''
+    section = 'Additional'
+    _abstract = False
+    code = 'FOREIGN_CLASS_DATA_ADDITIONAL'
+
 class DelegationError(DomainNameAnalysisError):
     pass
 
