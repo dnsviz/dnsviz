@@ -835,14 +835,14 @@ class AggregateDNSResponse(object):
 
                     # if there was a synthesized CNAME, add it to the rrset_info
                     if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and rrset_info.rrset.rdclass == rdclass and synthesized_cname_info is not None:
-                        synthesized_cname_info = rrset_info.create_or_update_cname_from_dname_info(synthesized_cname_info, server, client, response)
-                        synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, referral)
+                        synthesized_cname_info = rrset_info.create_or_update_cname_from_dname_info(synthesized_cname_info, server, client, response, rdclass)
+                        synthesized_cname_info.update_rrsig_info(server, client, response, msg.answer, rdclass, referral)
 
                 except KeyError:
                     if synthesized_cname_info is None:
                         raise
                     synthesized_cname_info = DNSResponseComponent.insert_into_list(synthesized_cname_info, self.answer_info, server, client, response)
-                    synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, referral)
+                    synthesized_cname_info.dname_info.update_rrsig_info(server, client, response, msg.answer, rdclass, referral)
                     rrset_info = synthesized_cname_info
 
                 if rrset_info.rrset.rdtype == dns.rdatatype.CNAME and rrset_info.rrset.rdclass == rdclass:
@@ -876,8 +876,8 @@ class AggregateDNSResponse(object):
 
             neg_response_info = NegativeResponseInfo(qname_sought, rdtype, self.ttl_cmp)
             neg_response_info = DNSResponseComponent.insert_into_list(neg_response_info, neg_response_info_list, server, client, response)
-            neg_response_info.create_or_update_nsec_info(server, client, response, referral)
-            neg_response_info.create_or_update_soa_info(server, client, response, referral)
+            neg_response_info.create_or_update_nsec_info(server, client, response, rdclass, referral)
+            neg_response_info.create_or_update_soa_info(server, client, response, rdclass, referral)
 
     def _aggregate_answer_rrset(self, server, client, response, qname, rdtype, rdclass, referral):
         msg = response.message
@@ -890,7 +890,7 @@ class AggregateDNSResponse(object):
         rrset_info = RRsetInfo(rrset, self.ttl_cmp)
         rrset_info = DNSResponseComponent.insert_into_list(rrset_info, self.answer_info, server, client, response)
 
-        rrset_info.update_rrsig_info(server, client, response, msg.answer, referral)
+        rrset_info.update_rrsig_info(server, client, response, msg.answer, rdclass, referral)
 
         return rrset_info
 

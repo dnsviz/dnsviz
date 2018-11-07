@@ -901,27 +901,27 @@ class RRsetInfo(DNSResponseComponent):
     def get_rrsig_info(self, rrsig):
         return self.rrsig_info[rrsig]
 
-    def update_rrsig_info(self, server, client, response, section, is_referral):
+    def update_rrsig_info(self, server, client, response, section, rdclass, is_referral):
         try:
-            rrsig_rrset = response.message.find_rrset(section, self.rrset.name, dns.rdataclass.IN, dns.rdatatype.RRSIG, self.rrset.rdtype)
+            rrsig_rrset = response.message.find_rrset(section, self.rrset.name, rdclass, dns.rdatatype.RRSIG, self.rrset.rdtype)
             for rrsig in rrsig_rrset:
-                self.create_or_update_rrsig_info(rrsig, rrsig_rrset.ttl, server, client, response, is_referral)
+                self.create_or_update_rrsig_info(rrsig, rrsig_rrset.ttl, server, client, response, rdclass, is_referral)
         except KeyError:
             pass
 
         if self.dname_info is not None:
-            self.dname_info.update_rrsig_info(server, client, response, section, is_referral)
+            self.dname_info.update_rrsig_info(server, client, response, section, rdclass, is_referral)
 
-    def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response, is_referral):
+    def create_or_update_rrsig_info(self, rrsig, ttl, server, client, response, rdclass, is_referral):
         try:
             rrsig_info = self.get_rrsig_info(rrsig)
         except KeyError:
             rrsig_info = self.rrsig_info[rrsig] = RDataMeta(self.rrset.name, ttl, dns.rdatatype.RRSIG, rrsig)
         rrsig_info.add_server_client(server, client, response)
-        self.set_wildcard_info(rrsig, server, client, response, is_referral)
+        self.set_wildcard_info(rrsig, server, client, response, rdclass, is_referral)
 
-    def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response):
-        return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response)
+    def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response, rdclass):
+        return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response, rdclass)
 
     def is_wildcard(self, rrsig):
         if self.rrset.name[0] == '*':
@@ -933,13 +933,13 @@ class RRsetInfo(DNSResponseComponent):
             return dns.name.Name(('*',)+self.rrset.name.labels[-(rrsig.labels+1):])
         return self.rrset.name
 
-    def set_wildcard_info(self, rrsig, server, client, response, is_referral):
+    def set_wildcard_info(self, rrsig, server, client, response, rdclass, is_referral):
         if self.is_wildcard(rrsig):
             wildcard_name = self.reduce_wildcard(rrsig)
             if wildcard_name not in self.wildcard_info:
                 self.wildcard_info[wildcard_name] = NegativeResponseInfo(self.rrset.name, self.rrset.rdtype, self.ttl_cmp)
             self.wildcard_info[wildcard_name].add_server_client(server, client, response)
-            self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, is_referral)
+            self.wildcard_info[wildcard_name].create_or_update_nsec_info(server, client, response, rdclass, is_referral)
 
     def message_for_rrsig(self, rrsig):
 
@@ -1025,10 +1025,10 @@ class NegativeResponseInfo(DNSResponseComponent):
     def __hash__(self):
         return hash(id(self))
 
-    def create_or_update_soa_info(self, server, client, response, is_referral):
-        soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and self.qname.is_subdomain(x.name)]
+    def create_or_update_soa_info(self, server, client, response, rdclass, is_referral):
+        soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and x.rdclass == rdclass and self.qname.is_subdomain(x.name)]
         if not soa_rrsets:
-            soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA]
+            soa_rrsets = [x for x in response.message.authority if x.rdtype == dns.rdatatype.SOA and x.rdclass == rdclass]
         soa_rrsets.sort(reverse=True)
         try:
             soa_rrset = soa_rrsets[0]
@@ -1040,13 +1040,13 @@ class NegativeResponseInfo(DNSResponseComponent):
 
         soa_rrset_info = RRsetInfo(soa_rrset, self.ttl_cmp)
         soa_rrset_info = self.insert_into_list(soa_rrset_info, self.soa_rrset_info, server, client, response)
-        soa_rrset_info.update_rrsig_info(server, client, response, response.message.authority, is_referral)
+        soa_rrset_info.update_rrsig_info(server, client, response, response.message.authority, rdclass, is_referral)
 
         return soa_rrset_info
 
-    def create_or_update_nsec_info(self, server, client, response, is_referral):
+    def create_or_update_nsec_info(self, server, client, response, rdclass, is_referral):
         for rdtype in dns.rdatatype.NSEC, dns.rdatatype.NSEC3:
-            nsec_rrsets = [x for x in response.message.authority if x.rdtype == rdtype]
+            nsec_rrsets = [x for x in response.message.authority if x.rdtype == rdtype and x.rdclass == rdclass]
             if not nsec_rrsets:
                 continue
 
@@ -1054,7 +1054,7 @@ class NegativeResponseInfo(DNSResponseComponent):
             nsec_set_info = self.insert_into_list(nsec_set_info, self.nsec_set_info, server, client, response)
 
             for name in nsec_set_info.rrsets:
-                nsec_set_info.rrsets[name].update_rrsig_info(server, client, response, response.message.authority, is_referral)
+                nsec_set_info.rrsets[name].update_rrsig_info(server, client, response, response.message.authority, rdclass, is_referral)
 
 class NSECSet(DNSResponseComponent):
     def __init__(self, rrsets, referral, ttl_cmp):
@@ -1122,8 +1122,8 @@ class NSECSet(DNSResponseComponent):
         for name, rrset_info in self.rrsets.items():
             rrset_info.add_server_client(server, client, response)
 
-    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response, is_referral):
-        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, is_referral)
+    def create_or_update_rrsig_info(self, name, rrsig, ttl, server, client, response, rdclass, is_referral):
+        self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, rdclass, is_referral)
 
     def is_valid_nsec3_name(self, nsec_name, algorithm):
         # python3/python2 dual compatibility
