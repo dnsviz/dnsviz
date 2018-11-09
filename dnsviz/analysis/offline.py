@@ -559,10 +559,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tup.append(name_tup)
 
         for response_info in response_info_list:
-            if (response_info.qname, response_info.rdtype) in processed:
-                continue
-            processed.add((response_info.qname, response_info.rdtype))
-
             # if we've already done this one (above) then just move along.
             # These were only done if the name is a zone.
             if response_info.name_obj.is_zone() and \
