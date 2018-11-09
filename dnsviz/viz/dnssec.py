@@ -1067,9 +1067,8 @@ class DNSAuthGraph:
                 self.add_rrsig(rrsig_status, name_obj, signer_obj, signed_node, port=port)
 
     def graph_rrset_auth(self, name_obj, name, rdtype):
-        if (name, rdtype) in self.processed_rrsets:
-            return self.processed_rrsets[(name, rdtype)]
-        self.processed_rrsets[(name, rdtype)] = []
+        if (name, rdtype) not in self.processed_rrsets:
+            self.processed_rrsets[(name, rdtype)] = []
 
         #XXX there are reasons for this (e.g., NXDOMAIN, after which no further
         # queries are made), but it would be good to have a sanity check, so
