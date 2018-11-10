@@ -24,10 +24,12 @@ dnsviz \- issue and assess diagnostic DNS queries
 .SH SYNOPSIS
 .P
 .B dnsviz
+[ \fIoptions \fR ]
 \fIcommand\fR
-[ \fIoptions\fR ]
+[ \fIargs\fR ]
 .TP
 .B dnsviz
+[ \fIoptions \fR ]
 \fBhelp\fR [ \fIcommand\fR ]
 .SH DESCRIPTION
 .P
@@ -44,6 +46,10 @@ command line, followed by arguments specific to that command.  If the first
 argument is "help", then the usage of the command specified by the second
 argument is displayed.  If no second argument is provided, then a general usage
 message is given.
+.SH OPTIONS
+.TP
+.B -p \fIpath\fR
+Add a path to the python path.
 .SH COMMANDS
 .TP
 .B probe
