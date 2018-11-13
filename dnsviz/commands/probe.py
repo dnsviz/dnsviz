@@ -1062,7 +1062,7 @@ def main(argv):
                 logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
                 sys.exit(3)
 
-        names = []
+        names = OrderedDict()
         if '-f' in opts:
             if opts['-f'] == '-':
                 opts['-f'] = sys.stdin.fileno()
@@ -1080,7 +1080,8 @@ def main(argv):
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
                 else:
-                    names.append(name)
+                    if name not in names:
+                        names[name] = None
             f.close()
         else:
             if args:
@@ -1101,7 +1102,8 @@ def main(argv):
                 except dns.exception.DNSException:
                     logger.error('The domain name was invalid: "%s"' % name)
                 else:
-                    names.append(name)
+                    if name not in names:
+                        names[name] = None
 
         if '-p' in opts:
             kwargs = { 'indent': 4, 'separators': (',', ': ') }
