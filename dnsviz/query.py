@@ -959,7 +959,7 @@ class DNSQuery(object):
         if not (isinstance(query, DNSQuery)):
             raise ValueError('A DNSQuery instance can only be joined with another DNSQuery instance.')
 
-        if not (self.qname == query.qname and self.rdtype == query.rdtype and \
+        if not (self.qname.to_text() == query.qname.to_text() and self.rdtype == query.rdtype and \
                 self.rdclass == query.rdclass and self.flags == query.flags and \
                 self.edns == query.edns and self.edns_max_udp_payload == query.edns_max_udp_payload and \
                 self.edns_flags == query.edns_flags and self.edns_options == query.edns_options and \
