@@ -1533,6 +1533,19 @@ class ForeignClassDataAdditional(ForeignClassData):
     _abstract = False
     code = 'FOREIGN_CLASS_DATA_ADDITIONAL'
 
+class CasePreservationError(ResponseError):
+    '''
+    >>> e = CasePreservationError(qname='ExAmPlE.CoM')
+    >>> e.description
+    'The case of the query name (ExAmPlE.CoM) was not preserved in the Question section of the response.'
+    '''
+
+    _abstract = False
+    code = 'CASE_NOT_PRESERVED'
+    description_template = '%(description)s'
+    description_template = 'The case of the query name (%(qname)s) was not preserved in the Question section of the response.'
+    required_params = ['qname']
+
 class DelegationError(DomainNameAnalysisError):
     pass
 

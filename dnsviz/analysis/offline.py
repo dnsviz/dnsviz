@@ -1160,6 +1160,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if add_cls:
             Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAdditional(cls=dns.rdataclass.to_text(add_cls[0])), warnings, server, client, response)
 
+    def _populate_case_preservation_warnings(self, response, server, client, warnings):
+        query = response.query
+        msg = response.message
+
+        # if there was a case mismatch, then warn about it
+        if msg.question and query.qname.to_text() != msg.question[0].name.to_text():
+            Errors.DomainNameAnalysisError.insert_into_list(Errors.CasePreservationError(qname=fmt.humanize_name(query.qname, canonicalize=False)), warnings, server, client, response)
+
     def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
@@ -1367,6 +1375,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for response in rrset_info.servers_clients[(server,client)]:
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_foreign_class_warnings(query, response, server, client, self.rrset_warnings[rrset_info])
+                    self._populate_case_preservation_warnings(response, server, client, self.rrset_warnings[rrset_info])
 
     def _populate_invalid_response_status(self, query):
         self.response_errors[query] = []

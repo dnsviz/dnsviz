@@ -1663,6 +1663,12 @@ class Analyst(object):
                     queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                     queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
 
+                # Query with a mixed-case name for 0x20, if possible
+                mixed_case_name = self._mix_case(name_obj.name)
+                if mixed_case_name is not None:
+                    self.logger.debug('Preparing 0x20 queries %s/%s...' % (fmt.humanize_name(mixed_case_name, canonicalize=False), dns.rdatatype.to_text(dns.rdatatype.SOA)))
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+103))] = self.diagnostic_query(mixed_case_name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
+
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
@@ -1990,6 +1996,25 @@ class Analyst(object):
             for name, exc_info in errors[1:]:
                 self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
             raise errors[0][1][0].with_traceback(errors[0][1][2])
+
+    def _mix_case(self, name):
+        name = name.to_text().lower()
+        name_len = len(name)
+        rnd = random.getrandbits((name_len + 8) - (name_len % 8))
+        new_name = ''
+        changed = False
+        for i, c in enumerate(name):
+            # If the character is a lower case letter, mix it up randomly.
+            # Always make the first letter upper case, to ensure that it isn't
+            # completely lower case.
+            if ord('a') <= ord(c) <= ord('z') and ((rnd & (1 << i)) or not changed):
+                new_name += chr(ord(c) - 32)
+                changed = True
+            else:
+                new_name += c
+        if not changed:
+            return None
+        return dns.name.from_text(new_name)
 
     def _set_negative_queries(self, name_obj):
         random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
