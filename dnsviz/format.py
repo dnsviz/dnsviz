@@ -156,14 +156,16 @@ def format_nsec3_name(name):
 def format_nsec3_rrset_text(nsec3_rrset_text):
     return re.sub(r'^(\d+\s+\d+\s+\d+\s+\S+\s+)([0-9a-zA-Z]+)', lambda x: '%s%s' % (x.group(1), x.group(2).upper()), nsec3_rrset_text).rstrip('.')
 
-def humanize_name(name, idn=False):
+def humanize_name(name, idn=False, canonicalize=True):
+    if canonicalize:
+        name = name.canonicalize()
     if idn:
         try:
-            name = name.canonicalize().to_unicode()
+            name = name.to_unicode()
         except UnicodeError:
-            name = lb2s(name.canonicalize().to_text())
+            name = lb2s(name.to_text())
     else:
-        name = lb2s(name.canonicalize().to_text())
+        name = lb2s(name.to_text())
     if name == '.':
         return name
     return name.rstrip('.')
