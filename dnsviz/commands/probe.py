@@ -1040,10 +1040,14 @@ def main(argv):
             except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
                 sys.exit(3)
+            if not analysis_str:
+                if opt_r != sys.stdin.fileno():
+                    logger.error('No input.')
+                sys.exit(3)
             try:
                 analysis_structured = json.loads(analysis_str)
             except ValueError:
-                logger.error('There was an error parsing the json input: "%s"' % opts['-r'])
+                logger.error('There was an error parsing the JSON input: "%s"' % opts['-r'])
                 sys.exit(3)
 
             # check version
@@ -1092,7 +1096,7 @@ def main(argv):
                 try:
                     args = analysis_structured['_meta._dnsviz.']['names']
                 except KeyError:
-                    logger.error('No names found in json input!')
+                    logger.error('No names found in JSON input!')
                     sys.exit(3)
             for name in args:
                 try:
