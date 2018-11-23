@@ -716,7 +716,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
             return self._server_responsive_with_condition(server, client, tcp,
                     lambda x: x.effective_edns >= 0 and \
-                            not [x for x in x.effective_edns_options if action_arg == x.otype] and \
+                            not [y for y in x.effective_edns_options if action_arg == y.otype] and \
 
                             ((x.effective_tcp and x.tcp_responsive) or \
                             (not x.effective_tcp and x.udp_responsive)) and \
@@ -725,7 +725,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         elif action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
             return self._server_responsive_with_condition(server, client, tcp,
                     lambda x: x.effective_edns >= 0 and \
-                            [x for x in x.effective_edns_options if action_arg == x.otype] and \
+                            [y for y in x.effective_edns_options if action_arg == y.otype] and \
 
                             ((x.effective_tcp and x.tcp_responsive) or \
                             (not x.effective_tcp and x.udp_responsive)) and \
