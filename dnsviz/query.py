@@ -396,16 +396,18 @@ class ChangeEDNSVersionOnTimeoutHandler(DNSResponseHandler):
 class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
     '''Remove EDNS option after a given number of timeouts.'''
 
-    def __init__(self, otype, timeouts):
-        self._otype = otype
+    def __init__(self, timeouts):
         self._timeouts = timeouts
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        filtered_options = [x for x in self._request.options if self._otype == x.otype]
-        if not self._params['tcp'] and timeouts >= self._timeouts and filtered_options:
-            self._request.options.remove(filtered_options[0])
-            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, self._otype)
+        try:
+            opt = self._request.options[0]
+        except IndexError:
+            opt = None
+        if not self._params['tcp'] and timeouts >= self._timeouts and opt is not None:
+            self._request.options.remove(opt)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, opt.otype)
 
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
     '''Disable EDNS after a given number of timeouts.  Some servers don't
@@ -1810,7 +1812,7 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
     edns_options = [dns.edns.GenericOption(100, b'')]
 
     response_handlers = SimpleDNSQuery.response_handlers + \
-            [RemoveEDNSOptionOnTimeoutHandler(100, 4),
+            [RemoveEDNSOptionOnTimeoutHandler(4),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
             ChangeTimeoutOnTimeoutHandler(2.0, 4)]
@@ -1888,7 +1890,7 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
 
     response_handlers = SimpleDNSQuery.response_handlers + \
             [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-            RemoveEDNSOptionOnTimeoutHandler(100, 5),
+            RemoveEDNSOptionOnTimeoutHandler(5),
             ChangeTimeoutOnTimeoutHandler(2.0, 2),
             ChangeTimeoutOnTimeoutHandler(4.0, 3),
             ChangeTimeoutOnTimeoutHandler(8.0, 4),
