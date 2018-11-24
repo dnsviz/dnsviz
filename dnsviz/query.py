@@ -1872,19 +1872,18 @@ class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
             [
                     ChangeEDNSVersionOnTimeoutHandler(0, 4),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
-                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 4)
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
-    #  3 - change timeout to 4 seconds
-    #  4 - change EDNS version to 0; change timeout to 2 seconds
+    #  3 - no change
+    #  4 - change EDNS version to 0; change timeout to 1 second
     #  5 - return
 
     query_timeout = 1.0
     max_attempts = 5
-    lifetime = 15.0
+    lifetime = 7.0
 
 class EDNSOptDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS option compatibility.'''
@@ -1898,20 +1897,22 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
             [
                     RemoveEDNSOptionOnTimeoutHandler(4),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
-                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 4)
             ]
 
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
-    #  3 - change timeout to 4 seconds
-    #  4 - remove EDNS option; change timeout to 2 seconds
-    #  5 - return
+    #  3 - no change
+    #  4 - remove EDNS option (if any); change timeout to 1 second
+    #  5 - remove EDNS option (if any)
+    #  6 - remove EDNS option (if any)
+    #  7 - remove EDNS option (if any)
+    #  8 - return
 
     query_timeout = 1.0
-    max_attempts = 5
-    lifetime = 15.0
+    max_attempts = 8
+    lifetime = 11.0
 
 class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS flag compatibility.'''
@@ -1923,22 +1924,26 @@ class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
     response_handlers = \
             SimpleDNSQuery.response_handlers + \
             [
-                    ClearEDNSFlagOnTimeoutHandler(0x80, 4),
+                    RemoveEDNSOptionOnTimeoutHandler(4),
+                    ClearEDNSFlagOnTimeoutHandler(0x80, 8),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
-                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 4)
             ]
 
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
-    #  3 - change timeout to 4 seconds
-    #  4 - clear EDNS flag; change timeout to 2 seconds
-    #  5 - return
+    #  3 - no change
+    #  4 - remove EDNS option (if any); change timeout to 1 second
+    #  5 - remove EDNS option (if any)
+    #  6 - remove EDNS option (if any)
+    #  7 - remove EDNS option (if any)
+    #  8 - clear EDNS flag
+    #  9 - return
 
     query_timeout = 1.0
-    max_attempts = 5
-    lifetime = 15.0
+    max_attempts = 9
+    lifetime = 12.0
 
 class RecursiveEDNSVersionDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS version compatibility on recursive
@@ -1956,19 +1961,19 @@ class RecursiveEDNSVersionDiagnosticQuery(SimpleDNSQuery):
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(4.0, 3),
                     ChangeTimeoutOnTimeoutHandler(8.0, 4),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 5)
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
     #  4 - change timeout to 8 seconds
-    #  5 - change EDNS version to 0; change timeout to 2 seconds
+    #  5 - change EDNS version to 0; change timeout to 1 second
     #  6 - return
 
     query_timeout = 1.0
     max_attempts = 6
-    lifetime = 25.0
+    lifetime = 18.0
 
 class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS option compatibility on recursive
@@ -1987,7 +1992,7 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(4.0, 3),
                     ChangeTimeoutOnTimeoutHandler(8.0, 4),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 5)
             ]
 
     # For timeouts:
@@ -1995,12 +2000,15 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
     #  4 - change timeout to 8 seconds
-    #  5 - remove EDNS option; change timeout to 2 seconds
-    #  6 - return
+    #  5 - remove EDNS option (if any); change timeout to 1 second
+    #  6 - remove EDNS option (if any)
+    #  7 - remove EDNS option (if any)
+    #  8 - remove EDNS option (if any)
+    #  9 - return
 
     query_timeout = 1.0
-    max_attempts = 6
-    lifetime = 25.0
+    max_attempts = 9
+    lifetime = 21.0
 
 class RecursiveEDNSFlagDiagnosticQuery(SimpleDNSQuery):
     '''A query designed to test unknown EDNS flag compatibility on recursive
@@ -2015,11 +2023,12 @@ class RecursiveEDNSFlagDiagnosticQuery(SimpleDNSQuery):
             SimpleDNSQuery.response_handlers + \
             [
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-                    ClearEDNSFlagOnTimeoutHandler(0x80, 5),
+                    RemoveEDNSOptionOnTimeoutHandler(5),
+                    ClearEDNSFlagOnTimeoutHandler(0x80, 9),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(4.0, 3),
                     ChangeTimeoutOnTimeoutHandler(8.0, 4),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+                    ChangeTimeoutOnTimeoutHandler(1.0, 5)
             ]
 
     # For timeouts:
@@ -2027,12 +2036,16 @@ class RecursiveEDNSFlagDiagnosticQuery(SimpleDNSQuery):
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
     #  4 - change timeout to 8 seconds
-    #  5 - clear EDNS flag; change timeout to 2 seconds
-    #  6 - return
+    #  5 - remove EDNS option (if any); change timeout to 1 second
+    #  6 - remove EDNS option (if any)
+    #  7 - remove EDNS option (if any)
+    #  8 - remove EDNS option (if any)
+    #  9 - clear EDNS flag
+    #  10 - return
 
     query_timeout = 1.0
-    max_attempts = 6
-    lifetime = 25.0
+    max_attempts = 10
+    lifetime = 22.0
 
 def main():
     import json
