@@ -62,9 +62,9 @@ Read diagnostic query input from the specified file, instead of querying
 servers.  Specify "-" to read from standard input.
 .TP
 .B -t \fIthreads\fR
-Specify the number of threads to use for issuing diagnostic queries for
-different names in parallel.  The default is to execute diagnostic queries of
-names serially.
+Issue diagnostic queries for different names in parallel using the specified
+number of threads.  The default is to execute diagnostic queries of names
+serially.
 .TP
 .B -4
 Use IPv4 only.
@@ -73,7 +73,8 @@ Use IPv4 only.
 Use IPv6 only.
 .TP
 .B -b \fIaddress\fR
-Specify a source IPv4 or IPv6 address for queries, rather than detecting it.
+Use the specified source IPv4 or IPv6 address for queries, rather than
+detecting it.
 
 This option can be used more than once to supply both an IPv4 and an IPv6
 address.
@@ -82,8 +83,9 @@ The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
 .TP
 .B -u \fIurl\fR
-Specify the URL (HTTP/HTTPS or SSH) for a DNS looking glass that will send the
-diagnostic queries, rather than sending them locally.
+Issue queries through the DNS looking glass at the specified URL (HTTP(S) or
+SSH).  The queries will appear to come from the looking glass rather than from
+the local machine.
 
 .RS
 .RS
@@ -116,8 +118,8 @@ version 2.7.9 or greater.
 
 .TP
 .B -k
-When \fB-u\fR is used to specify the URL of a DNS looking glass, don't verify
-the server-side TLS cert.
+Do not verify the server-side TLS certificate for a HTTPS-based DNS looking
+glass that was specified using \fB-u\fR.
 .TP
 .B -a \fIancestor\fR
 Issue diagnostic queries of each domain name through the specified ancestor.  The
@@ -133,8 +135,8 @@ TLSA or SRV records, etc.) and whether there are NS records detected (i.e., it
 is a zone).
 .TP
 .B -s \fIserver\fR[,\fIserver...\fR]
-Designate one or more servers for recursive queries, rather than using those
-specified in \fI/etc/resolv.conf\fR.
+Query the specified recursive resolver(s), rather than using those specified in
+\fI/etc/resolv.conf\fR.
 
 Each server specified may either be an address (IPv4 or IPv6), a domain name
 (which will be resolved to an address using the standard resolution process),
@@ -176,10 +178,11 @@ This option cannot be used in conjunction with \fB-A\fR.
 Query authoritative servers, rather than (the default) recursive servers.
 .TP
 .B -x \fIdomain\fR[\fB+\fR]\fB:\fR\fIserver\fR[,\fIserver...\fR]
-Explicitly designate authoritative servers for a domain, rather than learning
-them by following delegations.  This option dictates which servers will be
-queried for a domain, but the servers specified will not be used to check NS or
-glue record consistency with the child; for that behavior, see \fB-N\fR.
+Treat the specified servers as authoritative for a domain, rather than learning
+authoritative servers by following delegations.  This option dictates which
+servers will be queried for a domain, but the servers specified will not be
+used to check NS or glue record consistency with the child; for that behavior,
+see \fB-N\fR.
 
 The default behavior is to identify and query servers authoritative for
 ancestors of the specified domain, if other options so dictate.  However, if
@@ -219,9 +222,9 @@ This option can only be used in conjunction with \fB-A\fR.
 .RE
 .TP
 .B -N \fIdomain\fR\fB:\fR\fIserver\fR[,\fIserver...\fR]
-Specify delegation information for a domain, i.e., the NS and glue records for
-the domain, which would be served by the domain's parent.  This is used for
-testing new delegations or testing a potential change to a delegation.
+Use the specified delegation information for a domain, i.e., the NS and glue
+records for the domain, which would be served by the domain's parent.  This is
+used for testing new delegations or testing a potential change to a delegation.
 
 This option has similar usage to that of the \fB-x\fR option.  The major
 difference is that the server names supplied comprise the NS record set, and
@@ -234,7 +237,7 @@ In lieu of specifying the record data itself on the command line, a file may be
 specified, which contains the delegation NS and glue records for the domain.
 .TP
 .B -D \fIdomain\fR\fB:\fR\fIds\fR[,\fIds...\fR]
-Specify one or more delegation signer (DS) records for a domain.  This is used
+Use the specified delegation signer (DS) records for a domain.  This is used
 in conjunction with the \fB-N\fR option for testing the introduction or change
 of DS records.
 
@@ -275,13 +278,13 @@ This option must be used in conjunction with the \fB-N\fR option.
 .B -n
 Use the NSID EDNS option with every DNS query issued.
 .TP
-.B -e \fIsubnet\fR[\fB:\fR\fIprefix\fR]
+.B -e \fIsubnet\fR[\fB:\fR\fIprefix_len\fR]
 Use the EDNS Client Subnet option with every DNS query issued, using the
-specified \fIsubnet\fR and \fIprefix\fR as values.  If \fIprefix\fR is not
+specified \fIsubnet\fR and \fIprefix_len\fR as values.  If \fIprefix\fR is not
 specified, the prefix is the length of the entire address.
 .TP
 .B -E
-Include diagnostic DNS queries that can assess EDNS compatibility of servers.
+Issue queries to check EDNS compatibility of servers.
 
 If this option is used, each server probed will be queried with "future" EDNS
 settings, the respective responses can later be assessed for proper behavior.
@@ -293,8 +296,8 @@ Write the output to the specified file instead of to standard output, which
 is the default.
 .TP
 .B -p
-Make JSON output "pretty" instead of minimal (i.e., using indentation and
-newlines).  Note that this is the default when the output is a TTY.
+Output "pretty" instead of minimal JSON output, i.e., using indentation and
+newlines.  Note that this is the default when the output is a TTY.
 .TP
 .B -h
 Display the usage and exit.

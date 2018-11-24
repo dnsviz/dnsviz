@@ -67,7 +67,7 @@ Read diagnostic query input from the specified file, instead of from standard
 input.
 .TP
 .B -t \fIfilename\fR
-Specify a file that contains trusted keys for processing diagnostic queries.
+Use trusted keys from the specified file when processing diagnostic queries.
 This overrides the default behavior of using the installed keys for the root
 zone.
 
@@ -96,8 +96,8 @@ being processed, a single file (the one specified) will be created, which will
 contain the collective output for all domain names processed.
 .TP
 .B -T \fIformat\fR
-Specify the format of the format from among the following: "dot", "png", "jpg",
-"svg", and "html".  The default is "dot".
+Use the specified output format for the graph, selected from among the
+following: "dot", "png", "jpg", "svg", and "html".  The default is "dot".
 .TP
 .B -h
 Display the usage and exit.

@@ -678,37 +678,44 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz probe [options] [domain_name...]
+    sys.stderr.write('''%sUsage: %s %s [options] [domain_name...]
+
+Issue diagnostic DNS queries.
+
 Options:
-    -f <filename>  - read names from a file
-    -d <level>     - set debug level
-    -r <filename>  - read diagnostic queries from a file
-    -t <threads>   - specify number of threads to use for parallel queries
-    -4             - use IPv4 only
-    -6             - use IPv6 only
-    -b             - specify a source IPv4 or IPv6 address for queries
-    -u <url>       - URL for DNS looking glass
-    -k             - Do not verify TLS cert for DNS looking glass using HTTPS
-    -a <ancestor>  - query the ancestry of each domain name through ancestor
+    -f <filename>  - Read names from a file.
+    -d <level>     - Set debug level.
+    -r <filename>  - Read diagnostic queries from a file.
+    -t <threads>   - Use the specified number of threads for parallel queries.
+    -4             - Use IPv4 only.
+    -6             - Use IPv6 only.
+    -b <addr>      - Use the specified source IPv4 or IPv6 address for queries.
+    -u <url>       - Issue queries through the DNS looking glass at the
+                     specified URL.
+    -k             - Do not verify the TLS certificate for a DNS looking glass
+                     using HTTPS.
+    -a <ancestor>  - Query the ancestry of each domain name through the
+                     specified ancestor.
     -R <type>[,<type>...]
-                   - perform analysis using only the specified type(s)
+                   - Issue queries for only the specified type(s) during analysis.
     -s <server>[,<server>...]
-                   - designate servers for recursive analysis
-    -A             - query analysis against authoritative servers
+                   - Query the specified recursive server(s).
+    -A             - Query authoritative servers, instead of recursive servers.
     -x <domain>[+]:<server>[,<server>...]
-                   - designate authoritative servers explicitly for a domain
+                   - Query the specified authoritative servers for a domain.
     -N <domain>:<server>[,<server>...]
-                   - specify delegation information for a domain
+                   - Use the specified delegation information for a domain.
     -D <domain>:"<ds>"[,"<ds>"...]
-                   - specify DS records for a domain
-    -n             - use the NSID EDNS option
-    -e <subnet>[:<prefix>]
-                   - use the EDNS client subnet option with subnet/prefix
-    -E             - include EDNS compatibility diagnostics
-    -p             - make json output pretty instead of minimal
-    -o <filename>    - write the analysis to the specified file
-    -h             - display the usage and exit
-''' % (err))
+                   - Use the specified DS records for a domain.
+    -n             - Use the NSID EDNS option in queries.
+    -e <subnet>[:<prefix_len>]
+                   - Use the DNS client subnet option with the specified subnet
+                     and prefix length in queries.
+    -E             - Issue queries to check EDNS compatibility.
+    -o <filename>  - Write the analysis to the specified file.
+    -p             - Format JSON output with indentation and newlines.
+    -h             - Display the usage and exit.
+''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
 def main(argv):
     global tm

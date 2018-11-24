@@ -63,17 +63,20 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz print [options] [domain name...]
+    sys.stderr.write('''%sUsage: %s %s [options] [domain_name...]
+
+Print the assessment of diagnostic DNS queries.
+
 Options:
-    -f <filename>  - read names from a file
-    -r <filename>  - read diagnostic queries from a file
-    -t <filename>  - specify file containing trusted keys
+    -f <filename>  - Read names from a file.
+    -r <filename>  - Read diagnostic queries from a file.
+    -t <filename>  - Use trusted keys from the designated file.
     -R <type>[,<type>...]
-                   - Process queries of only the specified type(s)
-    -O             - derive the filename(s) from domain name(s)
-    -o <filename>  - save the output to the specified file
-    -h             - display the usage and exit
-''' % (err))
+                   - Process queries of only the specified type(s).
+    -O             - Derive the filename(s) from domain name(s).
+    -o <filename>  - Save the output to the specified file.
+    -h             - Display the usage and exit.
+''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
 def finish_graph(G, name_objs, rdtypes, trusted_keys, filename):
     G.add_trust(trusted_keys)

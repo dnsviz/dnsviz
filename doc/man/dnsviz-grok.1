@@ -65,8 +65,9 @@ Read diagnostic query input from the specified file, instead of from standard
 input.
 .TP
 .B -t \fIfilename\fR
-Specify a file that contains trusted keys for processing diagnostic queries.
-The default is to not use any trusted keys.
+Use trusted keys from the specified file when processing diagnostic queries.
+This overrides the default behavior of using the installed keys for the root
+zone.
 
 The format of this file is master zone file format and should contain DNSKEY
 records that correspond to one more trusted keys for one or more DNS zones.
@@ -78,7 +79,7 @@ Write the output to the specified file instead of to standard output, which
 is the default.
 .TP
 .B -c
-Make JSON output minimal instead of "pretty" (i.e., remove indentation and
+Format JSON output minimally instead of "pretty" (i.e., with indentation and
 newlines).
 .TP
 .B -l \fIlevel\fR

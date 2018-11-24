@@ -97,16 +97,19 @@ def usage(err=None):
         err += '\n\n'
     else:
         err = ''
-    sys.stderr.write('''%sUsage: dnsviz grok [options] [domain name...]
+    sys.stderr.write('''%sUsage: %s %s [options] [domain_name...]
+
+Assess diagnostic DNS queries.
+
 Options:
-    -f <filename>  - read names from a file
-    -r <filename>  - read diagnostic queries from a file
-    -t <filename>  - specify file containing trusted keys
-    -o <filename>  - save the output to the specified file
-    -c             - make json output minimal instead of pretty
-    -l <loglevel>  - set log level to one of: error, warning, info, debug
-    -h             - display the usage and exit
-''' % (err))
+    -f <filename>  - Read names from a file.
+    -r <filename>  - Read diagnostic queries from a file.
+    -t <filename>  - Use trusted keys from the designated file.
+    -o <filename>  - Save the output to the specified file.
+    -c             - Format JSON output minimally, instead of "pretty".
+    -l <loglevel>  - Log at the specified level: error, warning, info, debug.
+    -h             - Display the usage and exit.
+''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
 def color_json(s):
     error = None
