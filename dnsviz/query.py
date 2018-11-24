@@ -514,33 +514,20 @@ class PMTUBoundingHandler(DNSResponseHandler):
     TCP_FINAL = 7
     INVALID = 8
 
-    def __init__(self, reduced_payload, initial_timeouts, bounding_timeout, subhandlers):
+    def __init__(self, reduced_payload, initial_timeouts, max_timeouts, bounding_timeout):
         self._reduced_payload = reduced_payload
         self._initial_timeouts = initial_timeouts
+        self._max_timeouts = max_timeouts
         self._bounding_timeout = bounding_timeout
-
-        self._subhandlers = [h.build() for h in subhandlers]
 
         self._lower_bound = None
         self._upper_bound = None
         self._water_mark = None
         self._state = self.START
 
-    def set_context(self, params, history, request):
-        '''Set local parameters pertaining to DNS query.'''
-
-        super(PMTUBoundingHandler, self).set_context(params, history, request)
-        for handler in self._subhandlers:
-            handler.set_context(params, history, request)
-
-    def handle_sub(self, response_wire, response, response_time):
-        for handler in self._subhandlers:
-            handler.handle(response_wire, response, response_time)
-
     def handle(self, response_wire, response, response_time):
-        timeouts = self._get_num_timeouts(response)
-        is_timeout = isinstance(response, dns.exception.Timeout)
-        is_valid = isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN)
+        if self._state == self.INVALID:
+            return
 
         # python3/python2 dual compatibility
         if isinstance(response_wire, str):
@@ -548,14 +535,23 @@ class PMTUBoundingHandler(DNSResponseHandler):
         else:
             map_func = lambda x: x
 
-        if self._request.edns < 0 or not (self._request.ednsflags & dns.flags.DO):
+        timeouts = self._get_num_timeouts(response)
+        is_timeout = isinstance(response, dns.exception.Timeout)
+        is_valid = isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN)
+        is_truncated = response_wire is not None and map_func(response_wire[2]) & 0x02
+        if response_wire is not None:
+            response_len = len(response_wire)
+        else:
+            response_len = None
+
+        if self._request.edns >= 0 and \
+                (is_timeout or is_valid or is_truncated):
+            pass
+        else:
             self._state = self.INVALID
+            return
 
-        if self._state == self.INVALID:
-            self.handle_sub(response_wire, response, response_time)
-
-        elif self._state == self.START:
-            self.handle_sub(response_wire, response, response_time)
+        if self._state == self.START:
             if timeouts >= self._initial_timeouts:
                 self._lower_bound = self._reduced_payload
                 self._upper_bound = self._request.payload - 1
@@ -564,26 +560,29 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
         elif self._state == self.REDUCED_PAYLOAD:
-            self.handle_sub(response_wire, response, response_time)
+            if timeouts >= self._max_timeouts:
+                self._state == self.INVALID
+                return None
+
             if not is_timeout:
-                if (response_wire is not None and map_func(response_wire[2]) & 0x02) or is_valid:
-                    self._lower_bound = self._water_mark = len(response_wire)
+                if is_truncated or is_valid:
+                    self._lower_bound = self._water_mark = response_len
                     self._params['timeout'] = self._bounding_timeout
                     self._params['tcp'] = True
                     self._state = self.USE_TCP
-                    if response_wire is not None and map_func(response_wire[2]) & 0x02:
-                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
+                    if is_truncated:
+                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, response_len, RETRY_ACTION_USE_TCP, None)
                     else:
-                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_USE_TCP, None)
+                        return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, response_len, RETRY_ACTION_USE_TCP, None)
 
         elif self._state == self.USE_TCP:
             if not is_timeout and is_valid:
                 #XXX this is cheating because we're not reporting the change to UDP
                 self._params['tcp'] = False
-                payload = len(response_wire) - 1
+                payload = response_len - 1
                 self._request.payload = payload
                 self._state = self.TCP_MINUS_ONE
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, response_len, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
         elif self._state == self.TCP_MINUS_ONE:
             if is_timeout:
@@ -593,7 +592,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._state = self.PICKLE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
-            elif response_wire is not None and len(response_wire) < self._water_mark:
+            elif response_wire is not None and response_len < self._water_mark:
                 # but if this isn't the first time, just quit.  it could be that
                 # the server simply has some wonky way of determining how/where to truncate.
                 if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_CHANGE_SPORT:
@@ -605,17 +604,17 @@ class PMTUBoundingHandler(DNSResponseHandler):
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, None, RETRY_ACTION_CHANGE_SPORT, None)
             # if the response was truncated, then the size of the payload
             # received via TCP is the largest we can receive
-            elif response_wire is not None and map_func(response_wire[2]) & 0x02:
+            elif is_truncated:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, response_len, RETRY_ACTION_USE_TCP, None)
 
         elif self._state == self.PICKLE:
             if self._upper_bound - self._lower_bound <= 1:
                 self._params['tcp'] = True
                 self._state = self.TCP_FINAL
-                if response_wire is not None and map_func(response_wire[2]) & 0x02:
-                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
+                if is_truncated:
+                    return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, response_len, RETRY_ACTION_USE_TCP, None)
                 elif is_timeout:
                     return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_USE_TCP, None)
                 elif not is_valid:
@@ -626,7 +625,7 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._request.payload = payload
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
-            elif len(response_wire) < self._water_mark:
+            elif response_len < self._water_mark:
                 # but if this isn't the first time, just quit.  it could be that
                 # the server simply has some wonky way of determining how/where to truncate.
                 if self._history[-1].cause == RETRY_CAUSE_DIAGNOSTIC and self._history[-1].action == RETRY_ACTION_CHANGE_SPORT:
@@ -640,9 +639,12 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 self._lower_bound = self._request.payload
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
                 self._request.payload = payload
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, len(response_wire), RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, response_len, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
         elif self._state == self.TCP_FINAL:
+            pass
+
+        elif self._state == self.INVALID:
             pass
 
 class ChangeTimeoutOnTimeoutHandler(ActionIndependentDNSResponseHandler):
@@ -1713,16 +1715,14 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
 class PMTUDiagnosticQuery(DNSSECQuery):
 
-    response_handlers = [PMTUBoundingHandler(512, 4, 1.0,
-            (MaxTimeoutsHandler(8),
-                LifetimeHandler(18.0),
-                ChangeTimeoutOnTimeoutHandler(2.0, 2),
-                ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                ChangeTimeoutOnTimeoutHandler(1.0, 4),
-                ChangeTimeoutOnTimeoutHandler(2.0, 5))),
+    response_handlers = [PMTUBoundingHandler(512, 4, 6, 1.0),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7)]
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(1.0, 4),
+            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
 
     query_timeout = 1.0
     max_attempts = 15
@@ -1730,17 +1730,15 @@ class PMTUDiagnosticQuery(DNSSECQuery):
 
 class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
 
-    response_handlers = [PMTUBoundingHandler(512, 5, 1.0,
-            (MaxTimeoutsHandler(8),
-                LifetimeHandler(25.0),
-                ChangeTimeoutOnTimeoutHandler(2.0, 2),
-                ChangeTimeoutOnTimeoutHandler(4.0, 3),
-                ChangeTimeoutOnTimeoutHandler(8.0, 4),
-                ChangeTimeoutOnTimeoutHandler(1.0, 5),
-                ChangeTimeoutOnTimeoutHandler(2.0, 6))),
+    response_handlers = [PMTUBoundingHandler(512, 5, 7, 1.0),
             UseTCPOnTCFlagHandler(),
             DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8)]
+            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8),
+            ChangeTimeoutOnTimeoutHandler(2.0, 2),
+            ChangeTimeoutOnTimeoutHandler(4.0, 3),
+            ChangeTimeoutOnTimeoutHandler(8.0, 4),
+            ChangeTimeoutOnTimeoutHandler(1.0, 5),
+            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
 
     query_timeout = 1.0
     max_attempts = 15
