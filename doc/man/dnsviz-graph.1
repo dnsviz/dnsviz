@@ -80,6 +80,13 @@ This option may be used multiple times on the command line.
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.
 .TP
+.B -e
+Do not remove redundant RRSIG edges from the graph.
+
+As described in \fB"RRSIGs"\fR, some edges representing RRSIGs made by KSKs are
+removed from the graph to reduce visual complexity.  If this option is used,
+those edges are preserved.
+.TP
 .B -O
 Save the output to a file, whose name is derived from the format (i.e.,
 provided to \fB-T\fR) and the domain name.

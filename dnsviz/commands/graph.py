@@ -77,15 +77,18 @@ Options:
     -t <filename>  - Use trusted keys from the designated file.
     -R <type>[,<type>...]
                    - Process queries of only the specified type(s).
+    -e             - Do not remove redundant RRSIG edges from the graph.
     -O             - Derive the filename(s) from the format and domain name(s).
     -o <filename>  - Save the output to the specified file.
     -T <format>    - Use the specified output format.
     -h             - Display the usage and exit.
 ''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename):
+def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, remove_edges):
     G.add_trust(trusted_keys)
-    G.remove_extra_edges()
+
+    if remove_edges:
+        G.remove_extra_edges()
 
     if fmt == 'html':
         try:
@@ -149,7 +152,7 @@ def main(argv):
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:R:t:Oo:T:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:R:et:Oo:T:h')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -191,6 +194,8 @@ def main(argv):
                 sys.exit(1)
         else:
             rdtypes = None
+
+        remove_edges = '-e' not in opts
 
         if '-T' in opts:
             fmt = opts['-T']
@@ -330,14 +335,14 @@ def main(argv):
                     name = 'root'
                 else:
                     name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
-                finish_graph(G, [name_obj], rdtypes, trusted_keys, fmt, '%s.%s' % (name, fmt))
+                finish_graph(G, [name_obj], rdtypes, trusted_keys, fmt, '%s.%s' % (name, fmt), remove_edges)
                 G = DNSAuthGraph()
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None, remove_edges)
             else:
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'])
+                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'], remove_edges)
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
