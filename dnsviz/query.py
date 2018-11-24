@@ -1558,7 +1558,9 @@ class RecursiveDNSQuery(SimpleDNSQuery):
 class StandardQuery(SimpleDNSQuery):
     '''A standard old-school DNS query that handles truncated packets.'''
 
-    response_handlers = SimpleDNSQuery.response_handlers + [UseTCPOnTCFlagHandler()]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [UseTCPOnTCFlagHandler()]
 
 class StandardRecursiveQuery(StandardQuery, RecursiveDNSQuery):
     '''A standard old-school recursive DNS query that handles truncated packets.'''
@@ -1569,7 +1571,9 @@ class StandardRecursiveQueryCD(StandardRecursiveQuery):
     '''A recursive DNS query that retries with checking disabled if the
     response code is SERVFAIL.'''
 
-    response_handlers = StandardRecursiveQuery.response_handlers + [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
+    response_handlers = \
+            StandardRecursiveQuery.response_handlers + \
+            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL)]
 
 class EDNS0Query(StandardQuery):
     '''A standard query with EDNS0.'''
@@ -1595,7 +1599,10 @@ class QuickDNSSECQuery(DNSSECQuery):
     '''A standard DNSSEC query, designed for quick turnaround.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
-            [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler()]
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    DisableEDNSOnRcodeHandler()
+            ]
 
     query_timeout = 1.0
     max_attempts = 1
@@ -1606,9 +1613,12 @@ class RobustDNSSECQuery(DNSSECQuery):
     in the midst of compatibility and connectivity issues.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
-            [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 3),
-            DisableEDNSOnTimeoutHandler(4)]
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    DisableEDNSOnRcodeHandler(),
+                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 3),
+                    DisableEDNSOnTimeoutHandler(4)
+            ]
 
     # For timeouts:
     #  1 - no change
@@ -1626,13 +1636,17 @@ class DiagnosticQuery(DNSSECQuery):
     compatibility and connectivity issues.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
-            [DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    DisableEDNSOnRcodeHandler(),
+                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
+                    ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6),
+                    DisableEDNSOnTimeoutHandler(7),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1652,14 +1666,19 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
     common DNS compatibility and connectivity issues.'''
 
     response_handlers = DNSSECQuery.response_handlers + \
-            [DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4),
-            ChangeTimeoutOnTimeoutHandler(1.0, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    DisableEDNSOnRcodeHandler(),
+                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
+                    ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7),
+                    DisableEDNSOnTimeoutHandler(8),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 5),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 6)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1681,9 +1700,12 @@ class TCPDiagnosticQuery(DNSSECQuery):
 
     tcp = True
 
-    response_handlers = [
-            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ChangeTimeoutOnTimeoutHandler(4.0, 2)]
+    response_handlers = \
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    DisableEDNSOnRcodeHandler(),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 2)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 4 seconds
@@ -1699,10 +1721,14 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
     tcp = True
 
-    response_handlers = [
-            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ChangeTimeoutOnTimeoutHandler(4.0, 2),
-            ChangeTimeoutOnTimeoutHandler(8.0, 3)]
+    response_handlers = \
+            [
+                    DisableEDNSOnFormerrHandler(),
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    DisableEDNSOnRcodeHandler(),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 3)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 4 seconds
@@ -1715,14 +1741,19 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
 class PMTUDiagnosticQuery(DNSSECQuery):
 
-    response_handlers = [PMTUBoundingHandler(512, 4, 6, 1.0),
-            UseTCPOnTCFlagHandler(),
-            DisableEDNSOnFormerrHandler(), DisableEDNSOnRcodeHandler(),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6), DisableEDNSOnTimeoutHandler(7),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(1.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+    response_handlers = \
+            [
+                    PMTUBoundingHandler(512, 4, 6, 1.0),
+                    UseTCPOnTCFlagHandler(),
+                    DisableEDNSOnFormerrHandler(),
+                    DisableEDNSOnRcodeHandler(),
+                    ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 6),
+                    DisableEDNSOnTimeoutHandler(7),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+            ]
 
     query_timeout = 1.0
     max_attempts = 15
@@ -1730,15 +1761,21 @@ class PMTUDiagnosticQuery(DNSSECQuery):
 
 class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
 
-    response_handlers = [PMTUBoundingHandler(512, 5, 7, 1.0),
-            UseTCPOnTCFlagHandler(),
-            DisableEDNSOnFormerrHandler(), SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL), DisableEDNSOnRcodeHandler(),
-            ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7), DisableEDNSOnTimeoutHandler(8),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4),
-            ChangeTimeoutOnTimeoutHandler(1.0, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 6)]
+    response_handlers = \
+            [
+                    PMTUBoundingHandler(512, 5, 7, 1.0),
+                    UseTCPOnTCFlagHandler(),
+                    DisableEDNSOnFormerrHandler(),
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    DisableEDNSOnRcodeHandler(),
+                    ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 7),
+                    DisableEDNSOnTimeoutHandler(8),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 5),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 6)
+            ]
 
     query_timeout = 1.0
     max_attempts = 15
@@ -1748,7 +1785,11 @@ class TruncationDiagnosticQuery(DNSSECQuery):
     '''A simple query to test the results of a query with capabilities of only
     receiving back a small (512 byte) payload.'''
 
-    response_handlers = [ChangeTimeoutOnTimeoutHandler(2.0, 2), ChangeTimeoutOnTimeoutHandler(4.0, 3)]
+    response_handlers = \
+            [
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1764,10 +1805,13 @@ class RecursiveTruncationDiagnosticQuery(DNSSECQuery, RecursiveDNSQuery):
     '''A simple recursive query to test the results of a query with
     capabilities of only receiving back a small (512 byte) payload.'''
 
-    response_handlers = [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4)]
+    response_handlers = \
+            [
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1786,11 +1830,14 @@ class EDNSVersionDiagnosticQuery(SimpleDNSQuery):
     edns = 100
     edns_max_udp_payload = 512
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [ChangeEDNSVersionOnTimeoutHandler(0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    ChangeEDNSVersionOnTimeoutHandler(0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1809,11 +1856,14 @@ class EDNSOptDiagnosticQuery(SimpleDNSQuery):
     edns_max_udp_payload = 512
     edns_options = [dns.edns.GenericOption(100, b'')]
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [RemoveEDNSOptionOnTimeoutHandler(4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    RemoveEDNSOptionOnTimeoutHandler(4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+            ]
 
     # For timeouts:
     #  1 - no change
@@ -1833,11 +1883,14 @@ class EDNSFlagDiagnosticQuery(SimpleDNSQuery):
     edns_max_udp_payload = 512
     edns_flags = SimpleDNSQuery.edns_flags | 0x80
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [ClearEDNSFlagOnTimeoutHandler(0x80, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(2.0, 4)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    ClearEDNSFlagOnTimeoutHandler(0x80, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 4)
+            ]
 
     # For timeouts:
     #  1 - no change
@@ -1858,13 +1911,16 @@ class RecursiveEDNSVersionDiagnosticQuery(SimpleDNSQuery):
     edns = 100
     edns_max_udp_payload = 512
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-            ChangeEDNSVersionOnTimeoutHandler(0, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    ChangeEDNSVersionOnTimeoutHandler(0, 5),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+            ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
@@ -1886,13 +1942,16 @@ class RecursiveEDNSOptDiagnosticQuery(SimpleDNSQuery):
     edns_max_udp_payload = 512
     edns_options = [dns.edns.GenericOption(100, b'')]
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-            RemoveEDNSOptionOnTimeoutHandler(5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    RemoveEDNSOptionOnTimeoutHandler(5),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+            ]
 
     # For timeouts:
     #  1 - no change
@@ -1915,13 +1974,16 @@ class RecursiveEDNSFlagDiagnosticQuery(SimpleDNSQuery):
     edns_max_udp_payload = 512
     edns_flags = SimpleDNSQuery.edns_flags | 0x80
 
-    response_handlers = SimpleDNSQuery.response_handlers + \
-            [SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
-            ClearEDNSFlagOnTimeoutHandler(0x80, 5),
-            ChangeTimeoutOnTimeoutHandler(2.0, 2),
-            ChangeTimeoutOnTimeoutHandler(4.0, 3),
-            ChangeTimeoutOnTimeoutHandler(8.0, 4),
-            ChangeTimeoutOnTimeoutHandler(2.0, 5)]
+    response_handlers = \
+            SimpleDNSQuery.response_handlers + \
+            [
+                    SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
+                    ClearEDNSFlagOnTimeoutHandler(0x80, 5),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 2),
+                    ChangeTimeoutOnTimeoutHandler(4.0, 3),
+                    ChangeTimeoutOnTimeoutHandler(8.0, 4),
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5)
+            ]
 
     # For timeouts:
     #  1 - no change
