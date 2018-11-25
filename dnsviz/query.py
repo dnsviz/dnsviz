@@ -1264,7 +1264,7 @@ class ExecutableDNSQuery(DNSQuery):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
-            client_ipv4, client_ipv6, port, odd_ports,
+            client_ipv4, client_ipv6, port, odd_ports, cookie_jar, server_cookie_placeholder,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
@@ -1287,6 +1287,10 @@ class ExecutableDNSQuery(DNSQuery):
         if odd_ports is None:
             odd_ports = {}
         self.odd_ports = odd_ports
+        if cookie_jar is None:
+            cookie_jar = {}
+        self.cookie_jar = cookie_jar
+        self.server_cookie_placeholder = server_cookie_placeholder
         self.response_handlers = response_handlers
 
         self.query_timeout = query_timeout
@@ -1300,6 +1304,20 @@ class ExecutableDNSQuery(DNSQuery):
 
     def get_query_handler(self, server):
         edns_options = copy.deepcopy(self.edns_options)
+        try:
+            cookie_opt = [o for o in edns_options if o.otype == 10][0]
+        except IndexError:
+            pass
+        else:
+            if len(cookie_opt.data) >= 16 and cookie_opt.data[8:] == self.server_cookie_placeholder:
+                if server in self.cookie_jar:
+                    # if there is a cookie for this server,
+                    # then add it
+                    cookie_opt.data = cookie_opt.data[:8] + self.cookie_jar[server]
+                else:
+                    # otherwise, send just the client cookie.
+                    cookie_opt.data = cookie_opt.data[:8]
+
         request = dns.message.Message()
         request.flags = self.flags
         request.find_rrset(request.question, self.qname, self.rdclass, self.rdtype, create=True, force_unique=True)
@@ -1551,7 +1569,7 @@ class DNSQueryFactory(object):
     response_handlers = []
 
     def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
-            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None,
+            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None, cookie_jar=None, server_cookie_placeholder=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
 
@@ -1564,7 +1582,7 @@ class DNSQueryFactory(object):
 
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
-                client_ipv4, client_ipv6, port, odd_ports,
+                client_ipv4, client_ipv6, port, odd_ports, cookie_jar, server_cookie_placeholder,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 
