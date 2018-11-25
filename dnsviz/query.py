@@ -473,7 +473,7 @@ class AddServerCookieOnBADCOOKIE(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         if isinstance(response, dns.message.Message) and response.rcode() == 23:
             if self._add_server_cookie(response):
-                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_UPDATE_DNS_COOKIE, 10)
+                return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_UPDATE_DNS_COOKIE, None)
 
 class UseUDPOnTimeoutHandler(DNSResponseHandler):
     '''Revert to UDP if TCP connectivity fails.'''
