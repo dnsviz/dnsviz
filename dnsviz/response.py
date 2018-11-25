@@ -166,6 +166,17 @@ class DNSResponse:
             t += retry.response_time
         return t
 
+    def get_server_cookie(self):
+        if self.message is None:
+            return None
+        try:
+            cookie_opt = [o for o in self.message.options if o.otype == 10][0]
+        except IndexError:
+            return None
+        if len(cookie_opt.data) > 8:
+            return cookie_opt.data[8:]
+        return None
+
     def copy(self):
         clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, review_history=False)
         clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp)
