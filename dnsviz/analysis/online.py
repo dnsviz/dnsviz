@@ -98,7 +98,7 @@ analysis_type_codes = {
 class OnlineDomainNameAnalysis(object):
     QUERY_CLASS = Q.MultiQuery
 
-    def __init__(self, name, rdclass=dns.rdataclass.IN, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE):
+    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE):
 
         ##################################################
         # General attributes
@@ -106,7 +106,6 @@ class OnlineDomainNameAnalysis(object):
 
         # The name that is the focus of the analysis (serialized).
         self.name = name
-        self.rdclass = rdclass
         self.analysis_type = analysis_type
         self.stub = stub
 
@@ -768,7 +767,6 @@ class OnlineDomainNameAnalysis(object):
         d[name_str] = OrderedDict()
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
-        d[name_str]['rdclass'] = dns.rdataclass.to_text(self.rdclass)
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -844,11 +842,6 @@ class OnlineDomainNameAnalysis(object):
 
         analysis_type = analysis_type_codes[d['type']]
         stub = d['stub']
-        try:
-            rdclass = dns.rdataclass.from_text(d['rdclass'])
-        except KeyError:
-            # default to class IN
-            rdclass = dns.rdataclass.IN
 
         if 'parent' in d:
             parent_name = dns.name.from_text(d['parent'])
@@ -872,7 +865,7 @@ class OnlineDomainNameAnalysis(object):
 
         _logger.info('Loading %s' % fmt.humanize_name(name))
 
-        cache[name] = a = cls(name, rdclass=rdclass, stub=stub, analysis_type=analysis_type)
+        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
@@ -912,7 +905,7 @@ class OnlineDomainNameAnalysis(object):
         #XXX backwards compatibility with previous version
         if isinstance(d['queries'], list):
             for query in d['queries']:
-                key = (dns.name.from_text(query['qname']), dns.rdatatype.from_text(query['qtype']), dns.rdataclass.from_text(query['qclass']))
+                key = (dns.name.from_text(query['qname']), dns.rdatatype.from_text(query['qtype']))
                 if key not in query_map:
                     query_map[key] = []
                 query_map[key].append(query)
@@ -921,8 +914,7 @@ class OnlineDomainNameAnalysis(object):
                 vals = query_str.split('/')
                 qname = dns.name.from_text('/'.join(vals[:-2]))
                 rdtype = dns.rdatatype.from_text(vals[-1])
-                rdclass = dns.rdataclass.from_text(vals[-2])
-                key = (qname, rdtype, rdclass)
+                key = (qname, rdtype)
                 query_map[key] = []
                 for query in d['queries'][query_str]:
                     query_map[key].append(query)
@@ -936,7 +928,7 @@ class OnlineDomainNameAnalysis(object):
             # don't re-import
             if (self.name, rdtype) in self.queries:
                 continue
-            key = (self.name, rdtype, self.rdclass)
+            key = (self.name, rdtype)
             if key in query_map:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
                 for query in query_map[key]:
@@ -946,7 +938,7 @@ class OnlineDomainNameAnalysis(object):
             self.set_ns_dependencies()
 
         for key in query_map:
-            qname, rdtype, rdclass = key
+            qname, rdtype = key
             # if the query has already been imported, then
             # don't re-import
             if (qname, rdtype) in self.queries:
@@ -1386,7 +1378,7 @@ class Analyst(object):
                 name_obj = self.analysis_cache[name]
             except KeyError:
                 if lock:
-                    name_obj = self.analysis_cache[name] = self.analysis_model(name, rdclass=self.rdclass, stub=stub, analysis_type=self.analysis_type)
+                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub, analysis_type=self.analysis_type)
                     return name_obj
                 # if not locking, then return None
                 else:
