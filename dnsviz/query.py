@@ -1264,7 +1264,7 @@ class ExecutableDNSQuery(DNSQuery):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
-            client_ipv4, client_ipv6, port, odd_ports, cookie_jar, server_cookie_placeholder,
+            client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
@@ -1290,7 +1290,7 @@ class ExecutableDNSQuery(DNSQuery):
         if cookie_jar is None:
             cookie_jar = {}
         self.cookie_jar = cookie_jar
-        self.server_cookie_placeholder = server_cookie_placeholder
+        self.cookie_standin = cookie_standin
         self.response_handlers = response_handlers
 
         self.query_timeout = query_timeout
@@ -1309,7 +1309,7 @@ class ExecutableDNSQuery(DNSQuery):
         except IndexError:
             pass
         else:
-            if len(cookie_opt.data) >= 16 and cookie_opt.data[8:] == self.server_cookie_placeholder:
+            if len(cookie_opt.data) >= 16 and cookie_opt.data[8:] == self.cookie_standin:
                 if server in self.cookie_jar:
                     # if there is a cookie for this server,
                     # then add it
@@ -1569,7 +1569,7 @@ class DNSQueryFactory(object):
     response_handlers = []
 
     def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
-            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None, cookie_jar=None, server_cookie_placeholder=None,
+            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None, cookie_jar=None, cookie_standin=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
 
@@ -1582,7 +1582,7 @@ class DNSQueryFactory(object):
 
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
-                client_ipv4, client_ipv6, port, odd_ports, cookie_jar, server_cookie_placeholder,
+                client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 
