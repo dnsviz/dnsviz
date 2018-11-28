@@ -23,6 +23,7 @@
 from __future__ import unicode_literals
 
 import atexit
+import binascii
 import codecs
 import errno
 import getopt
@@ -32,6 +33,7 @@ import logging
 import multiprocessing
 import multiprocessing.managers
 import os
+import random
 import re
 import shutil
 import signal
@@ -88,6 +90,8 @@ PORT_RE = re.compile(r'^(.*):(\d+)$')
 STOP_RE = re.compile(r'^(.*)\+$')
 NAME_VAL_DELIM_RE = re.compile(r'\s*=\s*')
 
+COOKIE_STANDIN = b'********'
+
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
 def _setattr_dummy(self, name, value):
@@ -135,14 +139,14 @@ def _init_subprocess(use_full):
     _init_interrupt_handler()
 
 def _analyze(args):
-    (cls, name, rdclass, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, \
+    (cls, name, rdclass, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, \
             stop_at_explicit, extra_rdtypes, explicit_only, cache, cache_level, cache_lock) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, rdclass=rdclass, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=resolver)
+        a = cls(name, rdclass=rdclass, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, cookie_standin=cookie_standin, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=resolver)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -158,14 +162,11 @@ def _analyze(args):
         logger.exception('Error analyzing %s' % fmt.humanize_name(name))
         return None
 
-class CustomQueryMixin(object):
-    pass
-
 class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
     use_full_resolver = True
 
-    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain):
+    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain):
         self.rdclass = rdclass
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
@@ -174,6 +175,7 @@ class BulkAnalyst(object):
         self.query_class_mixin = query_class_mixin
         self.ceiling = ceiling
         self.edns_diagnostics = edns_diagnostics
+        self.cookie_standin = cookie_standin
         self.stop_at_explicit = stop_at_explicit
         self.cache_level = cache_level
         self.extra_rdtypes = extra_rdtypes
@@ -185,7 +187,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.rdclass, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
+            yield (self.analyst_cls, name, self.rdclass, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.cookie_standin, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -275,8 +277,8 @@ class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
     use_full_resolver = None
 
-    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, processes):
-        super(ParallelAnalystMixin, self).__init__(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain)
+    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -672,6 +674,26 @@ def _get_nsid_option():
 
     return dns.edns.GenericOption(dns.edns.NSID, b'')
 
+def _get_dns_cookie_option(cookie=None):
+    if cookie is None:
+        r = random.getrandbits(64)
+        cookie = struct.pack('Q', r)
+    else:
+        try:
+            cookie = binascii.unhexlify(cookie)
+        except TypeError:
+            usage('The DNS cookie provided was not valid hexadecimal: "%s"' % cookie)
+            sys.exit(1)
+
+        if len(cookie) != 8:
+            usage('The DNS client cookie provided had a length of %d, but only a length of %d is valid .' % (len(cookie), 8))
+            sys.exit(1)
+
+    return dns.edns.GenericOption(10, cookie)
+
+class CustomQueryMixin(object):
+    edns_options = []
+
 def usage(err=None):
     if err is not None:
         err += '\n\n'
@@ -710,6 +732,7 @@ Options:
     -e <subnet>[:<prefix_len>]
                    - Use the DNS client subnet option with the specified subnet
                      and prefix length in queries.
+    -c <cookie>    - Use the specified DNS cookie value in queries.
     -E             - Issue queries to check EDNS compatibility.
     -o <filename>  - Write the analysis to the specified file.
     -p             - Format JSON output with indentation and newlines.
@@ -727,7 +750,7 @@ def main(argv):
 
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:c:r:t:64b:u:kmpo:a:R:x:N:D:ne:EAs:Fh')
+            opts, args = getopt.getopt(argv[1:], 'f:d:l:C:r:t:64b:u:kmpo:a:R:x:N:D:ne:c:EAs:Fh')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -960,6 +983,7 @@ def main(argv):
                 cls = BulkAnalyst
 
         edns_diagnostics = '-E' in opts
+        cookie_standin = '-c' not in opts or opts['-c']
 
         if '-u' in opts:
 
@@ -998,7 +1022,7 @@ def main(argv):
         # the following option is not documented in usage, as it doesn't
         # apply to most users
         try:
-            cache_level = int(opts['-c'])
+            cache_level = int(opts['-C'])
         except (KeyError, ValueError):
             cache_level = None
 
@@ -1142,15 +1166,23 @@ def main(argv):
 
         flush = '-F' in opts
 
-        if '-n' in opts or '-e' in opts:
-            CustomQueryMixin.edns_options = []
-            if '-e' in opts:
-                CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
-            if '-n' in opts:
-                CustomQueryMixin.edns_options.append(_get_nsid_option())
-            query_class_mixin = CustomQueryMixin
+        query_class_mixin = CustomQueryMixin
+        if '-e' in opts:
+            CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
+        if '-n' in opts:
+            CustomQueryMixin.edns_options.append(_get_nsid_option())
+        if '-c' in opts:
+            if opts['-c']:
+                cookie_standin = COOKIE_STANDIN
+                CustomQueryMixin.edns_options.append(_get_dns_cookie_option(opts['-c']))
+            else:
+                # A blank cookie option was specified, so
+                # don't add a cookie at all
+                cookie_standin = None
         else:
-            query_class_mixin = None
+            # No cookie option was specified, so generate one
+            cookie_standin = COOKIE_STANDIN
+            CustomQueryMixin.edns_options.append(_get_dns_cookie_option())
 
         name_objs = []
         if '-r' in opts:
@@ -1162,13 +1194,13 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
+                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
             else:
                 if cls.use_full_resolver:
                     _init_full_resolver()
                 else:
                     _init_stub_resolver()
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
+                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
