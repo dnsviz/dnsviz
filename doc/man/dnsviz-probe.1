@@ -283,6 +283,16 @@ Use the EDNS Client Subnet option with every DNS query issued, using the
 specified \fIsubnet\fR and \fIprefix_len\fR as values.  If \fIprefix\fR is not
 specified, the prefix is the length of the entire address.
 .TP
+.B -c \fIcookie\fR
+Send the specified DNS client cookie with every DNS query issued.  The value
+specified is for a client cookie only and thus should be exactly 64 bits long.
+The value for the cookie is specified using hexadecimal representation, e.g.,
+deadbeef1580f00d.
+
+If the \fB-c\fR option is not used, the default behavior is for a DNS client
+cookie to be generated randomly to be sent with queries.  If an empty string is
+specified, then DNS cookies are disabled.
+.TP
 .B -E
 Issue queries to check EDNS compatibility of servers.
 
