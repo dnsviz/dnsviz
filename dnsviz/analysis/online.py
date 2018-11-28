@@ -27,6 +27,7 @@
 
 from __future__ import unicode_literals
 
+import copy
 import datetime
 import logging
 import random
@@ -1001,14 +1002,14 @@ class Analyst(object):
              analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
 
         self.query_class_mixin = query_class_mixin
-        self.simple_query = self._get_query_class(self._simple_query, self.query_class_mixin)
-        self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin)
-        self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin)
-        self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin)
-        self.truncation_diagnostic_query = self._get_query_class(self._truncation_diagnostic_query, self.query_class_mixin)
-        self.edns_version_diagnostic_query = self._get_query_class(self._edns_version_diagnostic_query, self.query_class_mixin)
-        self.edns_flag_diagnostic_query = self._get_query_class(self._edns_flag_diagnostic_query, self.query_class_mixin)
-        self.edns_opt_diagnostic_query = self._get_query_class(self._edns_opt_diagnostic_query, self.query_class_mixin)
+        self.simple_query = self._get_query_class(self._simple_query, self.query_class_mixin, None)
+        self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin, None)
+        self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin, None)
+        self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin, None)
+        self.truncation_diagnostic_query = self._get_query_class(self._truncation_diagnostic_query, self.query_class_mixin, None)
+        self.edns_version_diagnostic_query = self._get_query_class(self._edns_version_diagnostic_query, self.query_class_mixin, None)
+        self.edns_flag_diagnostic_query = self._get_query_class(self._edns_flag_diagnostic_query, self.query_class_mixin, None)
+        self.edns_opt_diagnostic_query = self._get_query_class(self._edns_opt_diagnostic_query, self.query_class_mixin, None)
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
@@ -1109,12 +1110,18 @@ class Analyst(object):
             hints[key] = self.explicit_delegations[key]
         return Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
 
-    def _get_query_class(self, cls, mixin):
+    def _get_query_class(self, cls, mixin, mod_func):
         if mixin is None:
-            return cls
-        class _foo(mixin, cls):
-            pass
-        return _foo
+            ret = cls
+        else:
+            class _foo(cls):
+                flags = cls.flags | getattr(mixin, 'flags', 0)
+                edns_flags = cls.edns_flags | getattr(mixin, 'edns_flags', 0)
+                edns_options = cls.edns_options + copy.deepcopy(getattr(mixin, 'edns_options', []))
+            ret = _foo
+        if mod_func is not None:
+            mod_func(ret)
+        return ret
 
     def _detect_cname_chain(self):
         self._cname_chain = []
