@@ -343,18 +343,10 @@ class OnlineDomainNameAnalysis(object):
         for ns in self.get_ns_names_in_child().difference(self.get_ns_names_in_parent()):
             self.ns_dependencies[ns] = None
 
-    def set_server_cookies(self):
-        if self.cookie_rdtype is None:
-            return
-        servers = self.get_auth_or_designated_servers()
-        for query in self.queries[(self.name, self.cookie_rdtype)].queries.values():
-            for server in query.responses:
-                for response in query.responses[server].values():
-                    server_cookie = response.get_server_cookie()
-                    if server_cookie is None:
-                        continue
-                    if server in servers and server not in self.cookie_jar:
-                        self.cookie_jar[server] = server_cookie
+    def _set_server_cookies(self, response, server):
+        server_cookie = response.get_server_cookie()
+        if server_cookie is not None and server not in self.cookie_jar:
+            self.cookie_jar[server] = server_cookie
 
     def _process_response_answer_rrset(self, rrset, query, response):
         if query.qname in (self.name, self.dlv_name):
@@ -384,12 +376,15 @@ class OnlineDomainNameAnalysis(object):
         if rrset.rdtype == dns.rdatatype.CNAME:
             self._handle_cname_response(rrset)
 
-    def _process_response(self, response, server, client, query, bailiwick, detect_ns):
+    def _process_response(self, response, server, client, query, bailiwick, detect_ns, detect_cookies):
         '''Process a DNS response from a query, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
 
         if response.message is None:
             return
+
+        if detect_cookies:
+            self._set_server_cookies(response, server)
 
         is_authoritative = response.is_authoritative()
 
@@ -471,7 +466,7 @@ class OnlineDomainNameAnalysis(object):
             if ip is not None:
                 self._auth_ns_ip_mapping[name].add(ip)
 
-    def add_query(self, query, detect_ns):
+    def add_query(self, query, detect_ns, detect_cookies):
         '''Process a DNS query and its responses, setting and updating instance
         variables appropriately, and calling helper methods as necessary.'''
 
@@ -507,7 +502,7 @@ class OnlineDomainNameAnalysis(object):
                 if response.tcp_responsive:
                     self._responsive_servers_clients_tcp.add((server, client))
 
-                self._process_response(query.responses[server][client], server, client, query, bailiwick, detect_ns)
+                self._process_response(query.responses[server][client], server, client, query, bailiwick, detect_ns, detect_cookies)
 
     def get_glue_ip_mapping(self):
         '''Return a reference to the mapping of targets of delegation records
@@ -956,11 +951,14 @@ class OnlineDomainNameAnalysis(object):
         # Import the following first, in this order:
         #   - Queries used to detect delegation (NS and referral_rdtype)
         #   - Queries used to detect NS records from authority section (auth_rdtype)
+        #   - Queries used to detect server cookies (cookie_rdtype)
         delegation_types = OrderedDict(((dns.rdatatype.NS, None),))
         if self.referral_rdtype is not None:
             delegation_types[self.referral_rdtype] = None
         if self.auth_rdtype is not None:
             delegation_types[self.auth_rdtype] = None
+        if self.cookie_rdtype is not None:
+            delegation_types[self.cookie_rdtype] = None
         for rdtype in delegation_types:
             # if the query has already been imported, then
             # don't re-import
@@ -970,19 +968,13 @@ class OnlineDomainNameAnalysis(object):
             if key in query_map:
                 _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(rdtype)))
                 for query in query_map[key]:
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), True)
+                    detect_ns = rdtype in (dns.rdatatype.NS, self.referral_rdtype, self.auth_rdtype)
+                    detect_cookies = rdtype == self.cookie_rdtype
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), detect_ns, detect_cookies)
+
         # set the NS dependencies for the name
         if self.is_zone():
             self.set_ns_dependencies()
-
-        # import the cookie query, if any
-        if self.cookie_rdtype is not None:
-            key = (self.name, self.cookie_rdtype)
-            if key not in self.queries:
-                _logger.debug('Importing %s/%s...' % (fmt.humanize_name(self.name), dns.rdatatype.to_text(self.cookie_rdtype)))
-                for query in query_map[key]:
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), False)
-            self.set_server_cookies()
 
         for key in query_map:
             qname, rdtype = key
@@ -1000,7 +992,7 @@ class OnlineDomainNameAnalysis(object):
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in query_map[key]:
-                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), False)
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), False, False)
 
     def _deserialize_dependencies(self, d, cache):
         if self.stub:
@@ -1131,7 +1123,7 @@ class Analyst(object):
         self.edns_diagnostics = edns_diagnostics
 
         cookie_opt = self._get_cookie_opt(self.diagnostic_query)
-        self.dns_cookies = cookie_opt is not None and cookie_opt.data[8:] == self.cookie_standin
+        self.dns_cookies = cookie_opt is not None
 
         self.follow_ns = follow_ns
         self.follow_mx = follow_mx
@@ -1421,14 +1413,14 @@ class Analyst(object):
             return False
         return True
 
-    def _add_query(self, name_obj, query, detect_ns, iterative=False):
+    def _add_query(self, name_obj, query, detect_ns, detect_cookies, iterative=False):
         # if this query is empty (i.e., nothing was actually asked, e.g., due
         # to client-side connectivity failure), then raise a connectivity
         # failure
         if not query.responses and not iterative:
             self._raise_connectivity_error_local(query.servers)
 
-        name_obj.add_query(query, detect_ns)
+        name_obj.add_query(query, detect_ns, detect_cookies)
 
     def _filter_servers_network(self, servers):
         if not self.try_ipv6:
@@ -1726,15 +1718,13 @@ class Analyst(object):
             # If 1) this is a zone, 2) DNS cookies are supported, 3) there is a
             # standin option, and 4) cookies have not yet been elicited, then
             # issue queries now to elicit DNS cookies.
-            if name_obj.is_zone() and self.dns_cookies and \
-                    self.cookie_standin is not None and name_obj.cookie_rdtype is None:
+            if name_obj.is_zone() and self.dns_cookies and name_obj.cookie_rdtype is None:
                 self.logger.debug('Querying for DNS server cookies %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                 query = self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-                self._add_query(name_obj, query, False)
+                self._add_query(name_obj, query, False, True)
 
                 name_obj.cookie_rdtype = dns.rdatatype.SOA
-                name_obj.set_server_cookies()
 
             # queries specific to zones for which non-delegation-related
             # queries are being issued
@@ -1854,7 +1844,7 @@ class Analyst(object):
         Q.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self.transport_manager, th_factories=self.th_factories)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
-                self._add_query(name_obj, query, False)
+                self._add_query(name_obj, query, False, False)
 
     def _analyze_delegation(self, name_obj):
         if name_obj.parent is None:
@@ -1971,14 +1961,27 @@ class Analyst(object):
 
             # add remaining queries
             for query in referral_queries.values():
-                self._add_query(name_obj, query, True)
+                self._add_query(name_obj, query, True, False)
 
             # return a positive response only if not nxdomain
             return not is_nxdomain
 
-        # add any queries made
+        if self.dns_cookies:
+            # An NS query to authoritative servers will always be used to
+            # elicit a server query.
+            name_obj.cookie_rdtype = dns.rdatatype.NS
+            cookie_jar = name_obj.cookie_jar
+        else:
+            name_obj.cookie_rdtype = None
+            cookie_jar = None
+
+
+        # Add any queries made.  At this point, at least one of the queries is
+        # for type NS. If there is a second, it is because the first resulted
+        # in NXDOMAIN, and the type for the second query is secondary_rdtype.
         for query in referral_queries.values():
-            self._add_query(name_obj, query, True)
+            detect_cookies = query.rdtype = name_obj.cookie_rdtype
+            self._add_query(name_obj, query, True, detect_cookies)
 
         # Identify auth_rdtype, the rdtype used to query the authoritative
         # servers to retrieve NS records in the authority section.
@@ -2021,7 +2024,9 @@ class Analyst(object):
             servers = self._filter_servers(servers, no_raise=True)
             if servers:
                 self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
-                queries.append(self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports))
+                query = self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
+                query.execute(tm=self.transport_manager, th_factories=self.th_factories)
+                self._add_query(name_obj, query, True, True, True)
 
             # secondary query
             if secondary_rdtype is not None and self._ask_non_delegation_queries(name_obj.name):
@@ -2030,22 +2035,15 @@ class Analyst(object):
                 servers = self._filter_servers(servers, no_raise=True)
                 if servers:
                     self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(secondary_rdtype)))
-                    queries.append(self.diagnostic_query_no_server_cookie(name_obj.name, secondary_rdtype, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports))
-
-            # actually execute the queries, then store the results
-            Q.ExecutableDNSQuery.execute_queries(*queries, tm=self.transport_manager, th_factories=self.th_factories)
-            for query in queries:
-                self._add_query(name_obj, query, True, True)
+                    query = self.diagnostic_query(name_obj.name, secondary_rdtype, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    query.execute(tm=self.transport_manager, th_factories=self.th_factories)
+                    self._add_query(name_obj, query, True, False, True)
 
             names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
 
         #TODO now go back and look at servers authoritative for both parent and
         #child that have authoritative referrals and re-classify them as
         #non-referrals (do this in deserialize (and dnsvizwww retrieve also)
-
-        if self.cookie_standin is not None:
-            name_obj.cookie_rdtype = dns.rdatatype.NS
-            name_obj.set_server_cookies()
 
         return True
 
@@ -2424,10 +2422,12 @@ class RecursiveAnalyst(Analyst):
         self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
         query = self.diagnostic_query_no_server_cookie(name_obj.name, rdtype, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
         query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-        self._add_query(name_obj, query, True)
+        self._add_query(name_obj, query, True, True)
 
-        name_obj.cookie_rdtype = rdtype
-        name_obj.set_server_cookies()
+        if self.dns_cookies:
+            name_obj.cookie_rdtype = rdtype
+        else:
+            name_obj.cookie_rdtype = None
 
         # if there were no valid responses, then exit out early
         if not query.is_valid_complete_response_any() and not self.explicit_only:
@@ -2449,7 +2449,7 @@ class RecursiveAnalyst(Analyst):
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-                self._add_query(name_obj, query, False)
+                self._add_query(name_obj, query, False, False)
 
         # for non-TLDs make NS queries after all others
         if len(name_obj.name) > 2:
@@ -2458,7 +2458,7 @@ class RecursiveAnalyst(Analyst):
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-                self._add_query(name_obj, query, True)
+                self._add_query(name_obj, query, True, False)
 
         return name_obj
 
