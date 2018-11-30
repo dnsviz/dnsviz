@@ -1704,7 +1704,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if (self.name, dns.rdatatype.DNSKEY) in self.queries:
             dnskey_multiquery = self.queries[(self.name, dns.rdatatype.DNSKEY)]
         else:
-            dnskey_multiquery = self._query_cls(self.name, dns.rdatatype.DNSKEY, self.rdclass)
+            dnskey_multiquery = self._query_cls(self.name, dns.rdatatype.DNSKEY, dns.rdataclass.IN)
 
         # populate all the servers queried for DNSKEYs to determine
         # what problems there were with regard to DS records and if
@@ -1717,7 +1717,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 bailiwick = bailiwick_map.get(server, default_bailiwick)
                 for client in dnskey_query.responses[server]:
                     response = dnskey_query.responses[server][client]
-                    if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, self.rdclass, bailiwick):
+                    if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, dnskey_query.rdclass, bailiwick):
                         dnskey_server_client_responses.add((server,client,response))
 
         for ds_rrset_info in ds_rrset_answer_info:
