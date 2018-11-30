@@ -1421,7 +1421,7 @@ class Analyst(object):
             return False
         return True
 
-    def _add_query(self, name_obj, query, detect_ns=False, iterative=False):
+    def _add_query(self, name_obj, query, detect_ns, iterative=False):
         # if this query is empty (i.e., nothing was actually asked, e.g., due
         # to client-side connectivity failure), then raise a connectivity
         # failure
@@ -1731,7 +1731,7 @@ class Analyst(object):
                 self.logger.debug('Querying for DNS server cookies %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                 query = self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-                self._add_query(name_obj, query)
+                self._add_query(name_obj, query, False)
 
                 name_obj.cookie_rdtype = dns.rdatatype.SOA
                 name_obj.set_server_cookies()
@@ -1854,7 +1854,7 @@ class Analyst(object):
         Q.ExecutableDNSQuery.execute_queries(*list(queries.values()), tm=self.transport_manager, th_factories=self.th_factories)
         for key, query in queries.items():
             if query.is_answer_any() or key not in exclude_no_answer:
-                self._add_query(name_obj, query)
+                self._add_query(name_obj, query, False)
 
     def _analyze_delegation(self, name_obj):
         if name_obj.parent is None:
@@ -2449,7 +2449,7 @@ class RecursiveAnalyst(Analyst):
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
                 query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
-                self._add_query(name_obj, query)
+                self._add_query(name_obj, query, False)
 
         # for non-TLDs make NS queries after all others
         if len(name_obj.name) > 2:
