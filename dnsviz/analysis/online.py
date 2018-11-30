@@ -120,9 +120,11 @@ class OnlineDomainNameAnalysis(object):
         self.analysis_start = None
         self.analysis_end = None
 
-        # The record types queried with the name when eliciting a referral and
-        # eliciting DNS cookies (serialized).
+        # The record types queried with the name when eliciting a referral,
+        # eliciting authority section NS records, and eliciting DNS cookies
+        # (serialized).
         self.referral_rdtype = None
+        self.auth_rdtype = None
         self.cookie_rdtype = None
 
         # Whether or not the delegation was specified explicitly or learned
@@ -799,6 +801,8 @@ class OnlineDomainNameAnalysis(object):
                 d[name_str]['nxdomain_ancestor'] = lb2s(self.nxdomain_ancestor_name().canonicalize().to_text())
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
+            if self.auth_rdtype is not None:
+                d[name_str]['auth_rdtype'] = dns.rdatatype.to_text(self.auth_rdtype)
             if self.cookie_rdtype is not None:
                 d[name_str]['cookie_rdtype'] = dns.rdatatype.to_text(self.cookie_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
@@ -902,6 +906,8 @@ class OnlineDomainNameAnalysis(object):
         if not a.stub:
             if 'referral_rdtype' in d:
                 a.referral_rdtype = dns.rdatatype.from_text(d['referral_rdtype'])
+            if 'auth_rdtype' in d:
+                a.auth_rdtype = dns.rdatatype.from_text(d['auth_rdtype'])
             if 'cookie_rdtype' in d:
                 a.cookie_rdtype = dns.rdatatype.from_text(d['cookie_rdtype'])
             a.explicit_delegation = d['explicit_delegation']
@@ -947,10 +953,14 @@ class OnlineDomainNameAnalysis(object):
                 for query in d['queries'][query_str]:
                     query_map[key].append(query)
 
-        # import delegation NS queries first
-        delegation_types = set([dns.rdatatype.NS])
+        # Import the following first, in this order:
+        #   - Queries used to detect delegation (NS and referral_rdtype)
+        #   - Queries used to detect NS records from authority section (auth_rdtype)
+        delegation_types = OrderedDict(((dns.rdatatype.NS, None),))
         if self.referral_rdtype is not None:
-            delegation_types.add(self.referral_rdtype)
+            delegation_types[self.referral_rdtype] = None
+        if self.auth_rdtype is not None:
+            delegation_types[self.auth_rdtype] = None
         for rdtype in delegation_types:
             # if the query has already been imported, then
             # don't re-import
@@ -1970,11 +1980,18 @@ class Analyst(object):
         for query in referral_queries.values():
             self._add_query(name_obj, query, True)
 
-        # now identify the authoritative NS RRset from all servers, resolve all
-        # names referred to in the NS RRset(s), and query each corresponding
-        # server, until all names have been queried
+        # Identify auth_rdtype, the rdtype used to query the authoritative
+        # servers to retrieve NS records in the authority section.
+        name_obj.auth_rdtype = secondary_rdtype
+
+        # Now identify the authoritative NS RRset from all servers, both by
+        # querying the authoritative servers for NS and by querying them for
+        # another type and looking for NS in the authority section.  Resolve
+        # all names referred to in the NS RRset(s), and query each
+        # corresponding server, until all names have been resolved and all
+        # corresponding addresses queried..
         names_resolved = set()
-        names_not_resolved = name_obj.get_ns_names().difference(names_resolved)
+        names_not_resolved = name_obj.get_ns_names()
         while names_not_resolved:
             # resolve every name in the NS RRset
             query_tuples = []
