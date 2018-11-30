@@ -942,7 +942,8 @@ class OnlineDomainNameAnalysis(object):
                 qname = dns.name.from_text('/'.join(vals[:-2]))
                 rdtype = dns.rdatatype.from_text(vals[-1])
                 key = (qname, rdtype)
-                query_map[key] = []
+                if key not in query_map:
+                    query_map[key] = []
                 for query in d['queries'][query_str]:
                     query_map[key].append(query)
 
