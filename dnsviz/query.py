@@ -1689,31 +1689,32 @@ class DiagnosticQuery(DNSSECQuery):
                     AddServerCookieOnBADCOOKIE(),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler(),
-                    RemoveEDNSOptionOnTimeoutHandler(4),
-                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 8),
+                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
+                    RemoveEDNSOptionOnTimeoutHandler(6),
                     ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 10),
                     DisableEDNSOnTimeoutHandler(11),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(1.0, 4),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 9)
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 6),
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - no change
-    #  4 - remove EDNS option (if any); change timeout to 1 second
-    #  5 - remove EDNS option (if any)
-    #  6 - remove EDNS option (if any)
+    #  4 - reduce udp max payload to 512; change timeout to 1 second
+    #  5 - change timeout to 2 seconds
+    #  6 - remove EDNS option (if any); change timeout to 1 second
     #  7 - remove EDNS option (if any)
-    #  8 - reduce udp max payload to 512
-    #  9 - change timeout to 2 seconds
+    #  8 - remove EDNS option (if any)
+    #  9 - remove EDNS option (if any)
     #  10 - clear DO flag;
     #  11 - disable EDNS
     #  12 - return (give up)
 
     query_timeout = 1.0
     max_attempts = 12
-    lifetime = 18.0
+    lifetime = 16.0
 
 class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
     '''A robust query to a cache with a number of handlers, designed to detect
@@ -1725,34 +1726,35 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
                     DisableEDNSOnFormerrHandler(),
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
                     DisableEDNSOnRcodeHandler(),
-                    RemoveEDNSOptionOnTimeoutHandler(5),
-                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 9),
+                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 5),
+                    RemoveEDNSOptionOnTimeoutHandler(7),
                     ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 11),
                     DisableEDNSOnTimeoutHandler(12),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(4.0, 3),
                     ChangeTimeoutOnTimeoutHandler(8.0, 4),
                     ChangeTimeoutOnTimeoutHandler(1.0, 5),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 10)
+                    ChangeTimeoutOnTimeoutHandler(2.0, 6),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 7),
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
     #  4 - change timeout to 8 seconds
-    #  5 - remove EDNS option (if any); change timeout to 1 second
-    #  6 - remove EDNS option (if any)
-    #  7 - remove EDNS option (if any)
+    #  5 - reduce udp max payload to 512; change timeout to 1 second
+    #  6 - change timeout to 2 seconds
+    #  7 - remove EDNS option (if any); change timeout to 1 second
     #  8 - remove EDNS option (if any)
-    #  9 - reduce udp max payload to 512
-    #  10 - change timeout to 2 seconds
+    #  9 - remove EDNS option (if any)
+    #  10 - remove EDNS option (if any)
     #  11 - clear DO flag
     #  12 - disable EDNS
     #  13 - return (give up)
 
     query_timeout = 1.0
     max_attempts = 13
-    lifetime = 28.0
+    lifetime = 26.0
 
 class TCPDiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
@@ -1802,74 +1804,76 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 class PMTUDiagnosticQuery(DNSSECQuery):
 
     response_handlers = \
-            [PMTUBoundingHandler(512, 8, 10, 1.0)] + \
+            [PMTUBoundingHandler(512, 4, 6, 1.0)] + \
             DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler(),
-                    RemoveEDNSOptionOnTimeoutHandler(4),
+                    RemoveEDNSOptionOnTimeoutHandler(6),
                     ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 10),
                     DisableEDNSOnTimeoutHandler(11),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(1.0, 4),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 9)
+                    ChangeTimeoutOnTimeoutHandler(2.0, 5),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 6),
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - no change
-    #  4 - remove EDNS option (if any); change timeout to 1 second
-    #  5 - remove EDNS option (if any)
-    #  6 - remove EDNS option (if any)
+    #  4 - reduce udp max payload to 512; change timeout to 1 second
+    #  5 - change timeout to 2 seconds
+    #  6 - remove EDNS option (if any); change timeout to 1 second
     #  7 - remove EDNS option (if any)
-    #  8 - reduce udp max payload to 512
-    #  9 - change timeout to 2 seconds
+    #  8 - remove EDNS option (if any)
+    #  9 - remove EDNS option (if any)
     #  10 - clear DO flag;
     #  11 - disable EDNS
     #  12 - return (give up)
 
     query_timeout = 1.0
     max_attempts = 12
-    lifetime = 24.0 # set this a little longer due to pickle stage
+    lifetime = 22.0 # set this a little longer due to pickle stage
 
 class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
 
     response_handlers = \
-            [PMTUBoundingHandler(512, 9, 11, 1.0)] + \
+            [PMTUBoundingHandler(512, 5, 7, 1.0)] + \
             DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
                     DisableEDNSOnFormerrHandler(),
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
                     DisableEDNSOnRcodeHandler(),
-                    RemoveEDNSOptionOnTimeoutHandler(5),
+                    RemoveEDNSOptionOnTimeoutHandler(7),
                     ClearEDNSFlagOnTimeoutHandler(dns.flags.DO, 11),
                     DisableEDNSOnTimeoutHandler(12),
                     ChangeTimeoutOnTimeoutHandler(2.0, 2),
                     ChangeTimeoutOnTimeoutHandler(4.0, 3),
                     ChangeTimeoutOnTimeoutHandler(8.0, 4),
                     ChangeTimeoutOnTimeoutHandler(1.0, 5),
-                    ChangeTimeoutOnTimeoutHandler(2.0, 10)
+                    ChangeTimeoutOnTimeoutHandler(2.0, 6),
+                    ChangeTimeoutOnTimeoutHandler(1.0, 7),
             ]
     # For timeouts:
     #  1 - no change
     #  2 - change timeout to 2 seconds
     #  3 - change timeout to 4 seconds
     #  4 - change timeout to 8 seconds
-    #  5 - remove EDNS option (if any); change timeout to 1 second
-    #  6 - remove EDNS option (if any)
-    #  7 - remove EDNS option (if any)
+    #  5 - reduce udp max payload to 512; change timeout to 1 second
+    #  6 - change timeout to 2 seconds
+    #  7 - remove EDNS option (if any); change timeout to 1 second
     #  8 - remove EDNS option (if any)
-    #  9 - reduce udp max payload to 512
-    #  10 - change timeout to 2 seconds
+    #  9 - remove EDNS option (if any)
+    #  10 - remove EDNS option (if any)
     #  11 - clear DO flag
     #  12 - disable EDNS
     #  13 - return (give up)
 
     query_timeout = 1.0
     max_attempts = 13
-    lifetime = 34.0 # set this a little longer due to pickle stage
+    lifetime = 32.0 # set this a little longer due to pickle stage
 
 class TruncationDiagnosticQuery(DNSSECQuery):
     '''A simple query to test the results of a query with capabilities of only
