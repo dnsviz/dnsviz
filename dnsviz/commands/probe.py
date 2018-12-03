@@ -628,10 +628,10 @@ logging {
 
 def _get_ecs_option(s):
     try:
-        addr, prefix = s.split('/', 1)
+        addr, prefix_len = s.split('/', 1)
     except ValueError:
         addr = s
-        prefix = None
+        prefix_len = None
 
     try:
         addr = IPAddr(addr)
@@ -646,25 +646,25 @@ def _get_ecs_option(s):
         addrlen = 16
         family = 2
 
-    if prefix is None:
-        prefix = addrlen << 3
+    if prefix_len is None:
+        prefix_len = addrlen << 3
     else:
         try:
-            prefix = int(prefix)
+            prefix_len = int(prefix_len)
         except ValueError:
-            usage('The mask length was invalid: "%s"' % prefix)
+            usage('The mask length was invalid: "%s"' % prefix_len)
             sys.exit(1)
 
-        if prefix < 0 or prefix > (addrlen << 3):
-            usage('The mask length was invalid: "%d"' % prefix)
+        if prefix_len < 0 or prefix_len > (addrlen << 3):
+            usage('The mask length was invalid: "%d"' % prefix_len)
             sys.exit(1)
 
-    bytes_masked, remainder = divmod(prefix, 8)
+    bytes_masked, remainder = divmod(prefix_len, 8)
     if remainder:
         bytes_masked += 1
 
     wire = struct.pack('!H', family)
-    wire += struct.pack('!B', prefix)
+    wire += struct.pack('!B', prefix_len)
     wire += struct.pack('!B', 0)
     wire += addr._ipaddr_bytes[:bytes_masked]
 
