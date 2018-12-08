@@ -1438,6 +1438,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_responsiveness_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
+                    self._populate_case_preservation_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
@@ -2009,6 +2010,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self._populate_responsiveness_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_foreign_class_warnings(qname_obj, response, server, client, warnings, errors)
+                self._populate_case_preservation_warnings(qname_obj, response, server, client, warnings, errors)
 
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
