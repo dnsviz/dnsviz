@@ -833,10 +833,6 @@ class AggregateDNSResponse(object):
         self.truncated_info = []
         self.error_info = []
 
-        self.foreign_class_answer_info = []
-        self.foreign_class_authority_info = []
-        self.foreign_class_additional_info = []
-
     def _aggregate_response(self, server, client, response, qname, rdtype, rdclass, bailiwick):
         if response.is_valid_response():
             if response.is_complete_response():
@@ -845,8 +841,6 @@ class AggregateDNSResponse(object):
             else:
                 truncated_info = TruncatedResponse(response.message.to_wire())
                 DNSResponseComponent.insert_into_list(truncated_info, self.truncated_info, server, client, response)
-
-            self._aggregate_foreign_class_data(server, client, response, rdclass)
 
         else:
             self._aggregate_error(server, client, response)
@@ -941,16 +935,6 @@ class AggregateDNSResponse(object):
         else:
             error_info = DNSResponseError(RESPONSE_ERROR_INVALID_RCODE, msg.rcode())
         error_info = DNSResponseComponent.insert_into_list(error_info, self.error_info, server, client, response)
-
-    def _aggregate_foreign_class_data(self, server, client, response, rdclass):
-        msg = response.message
-
-        for (section, section_list) in ((msg.answer, self.foreign_class_answer_info),
-                (msg.authority, self.foreign_class_authority_info),
-                (msg.additional, self.foreign_class_additional_info)):
-            for rrset in [x for x in section if x.rdclass != rdclass]:
-                rrset_info = RRsetInfo(rrset, self.ttl_cmp)
-                rrset_info = DNSResponseComponent.insert_into_list(rrset_info, section_list, server, client, response)
 
 class DNSQuery(object):
     '''An simple DNS Query and its responses.'''

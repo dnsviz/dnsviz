@@ -1150,9 +1150,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def _populate_foreign_class_warnings(self, query, response, server, client, warnings):
         # if there was foriegn class data, then warn about it
-        ans_cls = [r.rrset.rdclass for r in query.foreign_class_answer_info if (server, client) in r.servers_clients]
-        auth_cls = [r.rrset.rdclass for r in query.foreign_class_authority_info if (server, client) in r.servers_clients]
-        add_cls = [r.rrset.rdclass for r in query.foreign_class_additional_info if (server, client) in r.servers_clients]
+        ans_cls = [r.rdclass for r in response.message.answer if r.rdclass != query.rdclass]
+        auth_cls = [r.rdclass for r in response.message.authority if r.rdclass != query.rdclass]
+        add_cls = [r.rdclass for r in response.message.additional if r.rdclass != query.rdclass]
         if ans_cls:
             Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAnswer(cls=dns.rdataclass.to_text(ans_cls[0])), warnings, server, client, response)
         if auth_cls:
@@ -1424,6 +1424,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server, client in truncated_info.servers_clients:
                 for response in truncated_info.servers_clients[(server, client)]:
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
+                    self._populate_foreign_class_warnings(response.query, response, server, client, self.response_warnings[query])
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
@@ -1993,6 +1994,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers_missing_nsec.add((server, client, response))
 
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
+                self._populate_foreign_class_warnings(response.query, response, server, client, warnings)
 
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
