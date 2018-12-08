@@ -904,11 +904,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self.status = Status.NAME_STATUS_NXDOMAIN
                     break
 
-    def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
+    def _populate_responsiveness_errors(self, qname_obj, response, server, client, warnings, errors):
         # if we had to make some change to elicit a response, find out why that
         # was
         change_err = None
-        edns_errs = []
         if response.responsive_cause_index is not None:
             retry = response.history[response.responsive_cause_index]
 
@@ -1083,52 +1082,58 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 group = warnings
             Errors.DomainNameAnalysisError.insert_into_list(change_err, group, server, client, response)
 
+    def _populate_edns_errors(self, qname_obj, response, server, client, warnings, errors):
+
         # if we actually got a message response (as opposed to timeout, network
         # error, form error, etc.)
-        if response.message is not None:
+        if response.message is None:
+            return
 
-            # if the effective request used EDNS
-            if response.effective_edns >= 0:
-                # if the message response didn't use EDNS, then create an error
-                if response.message.edns < 0:
-                    # if there were indicators that the server supported EDNS
-                    # (e.g., by RRSIGs in the answer), then report it as such
-                    if [x for x in response.message.answer if x.rdtype == dns.rdatatype.RRSIG]:
-                        edns_errs.append(Errors.EDNSSupportNoOpt())
-                    # otherwise, simply report it as a server not responding
-                    # properly to EDNS requests
-                    else:
-                        edns_errs.append(Errors.EDNSIgnored())
+        edns_errs = []
 
-                # the message response did use EDNS
+        # if the effective request used EDNS
+        if response.effective_edns >= 0:
+            # if the message response didn't use EDNS, then create an error
+            if response.message.edns < 0:
+                # if there were indicators that the server supported EDNS
+                # (e.g., by RRSIGs in the answer), then report it as such
+                if [x for x in response.message.answer if x.rdtype == dns.rdatatype.RRSIG]:
+                    edns_errs.append(Errors.EDNSSupportNoOpt())
+                # otherwise, simply report it as a server not responding
+                # properly to EDNS requests
                 else:
-                    if response.message.rcode() == dns.rcode.BADVERS:
-                        # if the message response code was BADVERS, then the EDNS
-                        # version in the response should have been less than
-                        # that of the request
-                        if response.message.edns >= response.effective_edns:
-                            edns_errs.append(Errors.ImplementedEDNSVersionNotProvided(request_version=response.effective_edns, response_version=response.message.edns))
+                    edns_errs.append(Errors.EDNSIgnored())
 
-                    # if the message response used a version of EDNS other than
-                    # that requested, then create an error (should have been
-                    # answered with BADVERS)
-                    elif response.message.edns != response.effective_edns:
-                        edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
-
-                    # check that all EDNS flags are all zero, except for DO
-                    undefined_edns_flags_set = (response.message.ednsflags & 0xffff) & ~EDNS_DEFINED_FLAGS
-                    if undefined_edns_flags_set:
-                        edns_errs.append(Errors.EDNSUndefinedFlagsSet(flags=undefined_edns_flags_set))
-
+            # the message response did use EDNS
             else:
-                # if the effective request didn't use EDNS, and we got a
-                # message response with an OPT record
-                if response.message.edns >= 0:
-                    edns_errs.append(Errors.GratuitousOPT())
+                if response.message.rcode() == dns.rcode.BADVERS:
+                    # if the message response code was BADVERS, then the EDNS
+                    # version in the response should have been less than
+                    # that of the request
+                    if response.message.edns >= response.effective_edns:
+                        edns_errs.append(Errors.ImplementedEDNSVersionNotProvided(request_version=response.effective_edns, response_version=response.message.edns))
+
+                # if the message response used a version of EDNS other than
+                # that requested, then create an error (should have been
+                # answered with BADVERS)
+                elif response.message.edns != response.effective_edns:
+                    edns_errs.append(Errors.EDNSVersionMismatch(request_version=response.effective_edns, response_version=response.message.edns))
+
+                # check that all EDNS flags are all zero, except for DO
+                undefined_edns_flags_set = (response.message.ednsflags & 0xffff) & ~EDNS_DEFINED_FLAGS
+                if undefined_edns_flags_set:
+                    edns_errs.append(Errors.EDNSUndefinedFlagsSet(flags=undefined_edns_flags_set))
+
+        else:
+            # if the effective request didn't use EDNS, and we got a
+            # message response with an OPT record
+            if response.message.edns >= 0:
+                edns_errs.append(Errors.GratuitousOPT())
 
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
 
+    def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
         if qname_obj is not None:
             # if the response was complete (not truncated), then mark any
             # response flag issues as errors.  Otherwise, mark them as
@@ -1379,6 +1384,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if populate_response_errors:
             for server,client in rrset_info.servers_clients:
                 for response in rrset_info.servers_clients[(server,client)]:
+                    self._populate_responsiveness_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_foreign_class_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_case_preservation_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
@@ -1429,6 +1435,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for truncated_info in query.truncated_info:
             for server, client in truncated_info.servers_clients:
                 for response in truncated_info.servers_clients[(server, client)]:
+                    self._populate_responsiveness_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
@@ -1999,6 +2006,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers_without_soa.add((server, client, response))
                 servers_missing_nsec.add((server, client, response))
 
+                self._populate_responsiveness_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_foreign_class_warnings(qname_obj, response, server, client, warnings, errors)
 
