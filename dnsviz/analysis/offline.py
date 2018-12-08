@@ -1148,11 +1148,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if response.is_complete_response() and response.message.rcode() == dns.rcode.NOERROR and qname_obj.nxdomain_ancestor is not None:
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.InconsistentNXDOMAINAncestry(qname=fmt.humanize_name(response.query.qname), ancestor_qname=fmt.humanize_name(qname_obj.nxdomain_ancestor.name)), errors, server, client, response)
 
-    def _populate_foreign_class_warnings(self, query, response, server, client, warnings):
+    def _populate_foreign_class_warnings(self, qname_obj, response, server, client, warnings, errors):
+        query = response.query
+        cls = query.rdclass
+
+        if response.message is None:
+            return
+
         # if there was foriegn class data, then warn about it
-        ans_cls = [r.rdclass for r in response.message.answer if r.rdclass != query.rdclass]
-        auth_cls = [r.rdclass for r in response.message.authority if r.rdclass != query.rdclass]
-        add_cls = [r.rdclass for r in response.message.additional if r.rdclass != query.rdclass]
+        ans_cls = [r.rdclass for r in response.message.answer if r.rdclass != cls]
+        auth_cls = [r.rdclass for r in response.message.authority if r.rdclass != cls]
+        add_cls = [r.rdclass for r in response.message.additional if r.rdclass != cls]
         if ans_cls:
             Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAnswer(cls=dns.rdataclass.to_text(ans_cls[0])), warnings, server, client, response)
         if auth_cls:
@@ -1160,7 +1166,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if add_cls:
             Errors.DomainNameAnalysisError.insert_into_list(Errors.ForeignClassDataAdditional(cls=dns.rdataclass.to_text(add_cls[0])), warnings, server, client, response)
 
-    def _populate_case_preservation_warnings(self, response, server, client, warnings):
+    def _populate_case_preservation_warnings(self, qname_obj, response, server, client, warnings, errors):
         query = response.query
         msg = response.message
 
@@ -1374,8 +1380,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server,client in rrset_info.servers_clients:
                 for response in rrset_info.servers_clients[(server,client)]:
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
-                    self._populate_foreign_class_warnings(query, response, server, client, self.rrset_warnings[rrset_info])
-                    self._populate_case_preservation_warnings(response, server, client, self.rrset_warnings[rrset_info])
+                    self._populate_foreign_class_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+                    self._populate_case_preservation_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
 
     def _populate_invalid_response_status(self, query):
         self.response_errors[query] = []
@@ -1424,7 +1430,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for server, client in truncated_info.servers_clients:
                 for response in truncated_info.servers_clients[(server, client)]:
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
-                    self._populate_foreign_class_warnings(response.query, response, server, client, self.response_warnings[query])
+                    self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
     def _populate_rrsig_status_all(self, supported_algs):
         self.rrset_warnings = {}
@@ -1994,7 +2000,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers_missing_nsec.add((server, client, response))
 
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
-                self._populate_foreign_class_warnings(response.query, response, server, client, warnings)
+                self._populate_foreign_class_warnings(qname_obj, response, server, client, warnings, errors)
 
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
