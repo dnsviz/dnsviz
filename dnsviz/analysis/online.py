@@ -109,6 +109,7 @@ class OnlineDomainNameAnalysis(object):
         self.name = name
         self.analysis_type = analysis_type
         self.stub = stub
+        self.cookie_standin = cookie_standin
 
         # a class for constructing the queries
         self._query_cls = self.QUERY_CLASS
@@ -782,6 +783,8 @@ class OnlineDomainNameAnalysis(object):
         d[name_str] = OrderedDict()
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
+        if self.cookie_standin is not None:
+            d[name_str]['cookie_standin'] = self.cookie_standin.decode('latin-1')
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -928,6 +931,7 @@ class OnlineDomainNameAnalysis(object):
             return
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+        cookie_standin = self.cookie_standin
 
         query_map = {}
         #XXX backwards compatibility with previous version
