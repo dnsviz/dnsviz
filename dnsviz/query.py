@@ -143,6 +143,13 @@ retry_action_codes = {
         'UPDATE_DNS_COOKIE': RETRY_ACTION_UPDATE_DNS_COOKIE,
 }
 
+DNS_COOKIE_NO_COOKIE = 0
+DNS_COOKIE_CLIENT_COOKIE_ONLY = 1
+DNS_COOKIE_SERVER_COOKIE_FRESH = 2
+DNS_COOKIE_SERVER_COOKIE_STATIC = 3
+DNS_COOKIE_SERVER_COOKIE_BAD = 4
+DNS_COOKIE_IMPROPER_LENGTH = 5
+
 MIN_QUERY_TIMEOUT = 0.1
 MAX_CNAME_REDIRECTION = 40
 
@@ -735,10 +742,12 @@ class MaxTimeoutsHandler(ActionIndependentDNSResponseHandler):
 class DNSQueryHandler:
     '''A handler associated with a DNS query to a server.'''
 
-    def __init__(self, query, request, params, response_handlers, server, client):
+    def __init__(self, query, request, server_cookie, server_cookie_status, params, response_handlers, server, client):
         self.query = query
         self.request = request
         self.params = params
+        self.server_cookie = server_cookie
+        self.server_cookie_status = server_cookie_status
         self._response_handlers = response_handlers
         self.history = []
         self._server = server
@@ -1140,7 +1149,7 @@ class DNSQuery(object):
         return d
 
     @classmethod
-    def deserialize(self, d, bailiwick_map, default_bailiwick):
+    def deserialize(self, d, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin):
         qname = dns.name.from_text(d['qname'])
         rdclass = dns.rdataclass.from_text(d['qclass'])
         rdtype = dns.rdatatype.from_text(d['qtype'])
@@ -1166,10 +1175,35 @@ class DNSQuery(object):
         q = DNSQuery(qname, rdtype, rdclass,
                 flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
 
+        server_cookie = None
+        server_cookie_status = DNS_COOKIE_NO_COOKIE
+        try:
+            cookie_opt = [o for o in edns_options if o.otype == 10][0]
+        except IndexError:
+            pass
+        else:
+            if len(cookie_opt.data) == 8:
+                server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+            elif len(cookie_opt.data) >= 16:
+                if cookie_opt.data[8:] == cookie_standin:
+                    # initially assume that there is a cookie for the server;
+                    # change the value later if there isn't
+                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
+                else:
+                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+            else:
+                server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
+
         for server in d['responses']:
-            bailiwick = bailiwick_map.get(IPAddr(server), default_bailiwick)
+            server_ip = IPAddr(server)
+            bailiwick = bailiwick_map.get(server_ip, default_bailiwick)
+            cookie_jar = cookie_jar_map.get(server_ip, default_cookie_jar)
+            server_cookie = cookie_jar.get(server_ip, None)
+            status = server_cookie_status
+            if status == DNS_COOKIE_SERVER_COOKIE_FRESH and server_cookie is None:
+                status = DNS_COOKIE_CLIENT_COOKIE_ONLY
             for client in d['responses'][server]:
-                q.add_response(IPAddr(server), IPAddr(client), DNSResponse.deserialize(d['responses'][server][client], q), bailiwick)
+                q.add_response(server_ip, IPAddr(client), DNSResponse.deserialize(d['responses'][server][client], q, server_cookie, status), bailiwick)
         return q
 
 class DNSQueryAggregateDNSResponse(DNSQuery, AggregateDNSResponse):
@@ -1288,19 +1322,31 @@ class ExecutableDNSQuery(DNSQuery):
 
     def get_query_handler(self, server):
         edns_options = copy.deepcopy(self.edns_options)
+        server_cookie = None
+        server_cookie_status = DNS_COOKIE_NO_COOKIE
         try:
             cookie_opt = [o for o in edns_options if o.otype == 10][0]
         except IndexError:
             pass
         else:
-            if len(cookie_opt.data) >= 16 and cookie_opt.data[8:] == self.cookie_standin:
-                if server in self.cookie_jar:
-                    # if there is a cookie for this server,
-                    # then add it
-                    cookie_opt.data = cookie_opt.data[:8] + self.cookie_jar[server]
+            if len(cookie_opt.data) == 8:
+                server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+            elif len(cookie_opt.data) >= 16:
+                if cookie_opt.data[8:] == self.cookie_standin:
+                    if server in self.cookie_jar:
+                        # if there is a cookie for this server,
+                        # then add it
+                        server_cookie = self.cookie_jar[server]
+                        cookie_opt.data = cookie_opt.data[:8] + server_cookie
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
+                    else:
+                        # otherwise, send just the client cookie.
+                        cookie_opt.data = cookie_opt.data[:8]
+                        server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
                 else:
-                    # otherwise, send just the client cookie.
-                    cookie_opt.data = cookie_opt.data[:8]
+                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+            else:
+                server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
 
         request = dns.message.Message()
         request.flags = self.flags
@@ -1322,7 +1368,7 @@ class ExecutableDNSQuery(DNSQuery):
         if self.lifetime is not None:
             response_handlers.append(LifetimeHandler(self.lifetime).build())
 
-        return DNSQueryHandler(self, request, params, response_handlers, server, client)
+        return DNSQueryHandler(self, request, server_cookie, server_cookie_status, params, response_handlers, server, client)
 
     @classmethod
     def execute_queries(cls, *queries, **kwargs):
@@ -1458,7 +1504,7 @@ class ExecutableDNSQuery(DNSQuery):
                         errno1 = response.errno
                     else:
                         errno1 = None
-                response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query)
+                response_obj = DNSResponse(msg, msg_size, err, errno1, qh.history, response_time, query, qh.server_cookie, qh.server_cookie_status)
 
                 # if client IP is not specified, and there is a socket
                 # failure, then src might be None

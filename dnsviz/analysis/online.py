@@ -295,6 +295,14 @@ class OnlineDomainNameAnalysis(object):
                 self._bailiwick_mapping = dict([(s,self.parent_name()) for s in self.parent.get_auth_or_designated_servers()]), self.name
         return self._bailiwick_mapping
 
+    def get_cookie_jar_mapping(self):
+        if not hasattr(self, '_cookie_jar_mapping') or self._cookie_jar_mapping is None:
+            if self.parent is None:
+                self._cookie_jar_mapping = {}, self.cookie_jar
+            else:
+                self._cookie_jar_mapping = dict([(s,self.parent.cookie_jar) for s in self.parent.get_auth_or_designated_servers()]), self.cookie_jar
+        return self._cookie_jar_mapping
+
     def _add_glue_ip_mapping(self, response):
         '''Extract a mapping of NS targets to IP addresses from A and AAAA
         records in the additional section of a referral.'''
@@ -931,6 +939,7 @@ class OnlineDomainNameAnalysis(object):
             return
 
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
+        cookie_jar_map, default_cookie_jar = self.get_cookie_jar_mapping()
         cookie_standin = self.cookie_standin
 
         query_map = {}
@@ -974,7 +983,7 @@ class OnlineDomainNameAnalysis(object):
                 for query in query_map[key]:
                     detect_ns = rdtype in (dns.rdatatype.NS, self.referral_rdtype, self.auth_rdtype)
                     detect_cookies = rdtype == self.cookie_rdtype
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), detect_ns, detect_cookies)
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin), detect_ns, detect_cookies)
 
         # set the NS dependencies for the name
         if self.is_zone():
@@ -996,7 +1005,7 @@ class OnlineDomainNameAnalysis(object):
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in query_map[key]:
-                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick), False, False)
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin), False, False)
 
     def _deserialize_dependencies(self, d, cache):
         if self.stub:

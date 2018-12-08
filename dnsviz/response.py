@@ -28,6 +28,7 @@
 from __future__ import unicode_literals
 
 import base64
+import copy
 import errno
 import cgi
 import codecs
@@ -67,7 +68,7 @@ DNSSEC_KEY_LENGTH_ERRORS = {
 class DNSResponse:
     '''A DNS response, including meta information'''
 
-    def __init__(self, message, msg_size, error, errno1, history, response_time, query, review_history=True):
+    def __init__(self, message, msg_size, error, errno1, history, response_time, query, server_cookie, server_cookie_status, review_history=True):
         self.message = message
         self.msg_size = msg_size
         self.error = error
@@ -76,6 +77,8 @@ class DNSResponse:
         self.response_time = response_time
 
         self.query = query
+        self.server_cookie = server_cookie
+        self.server_cookie_status = server_cookie_status
 
         self.effective_flags = None
         self.effective_edns = None
@@ -83,6 +86,7 @@ class DNSResponse:
         self.effective_edns_flags = None
         self.effective_edns_options = None
         self.effective_tcp = None
+        self.effective_server_cookie_status = None
 
         self.udp_attempted = None
         self.udp_responsive = None
@@ -166,30 +170,34 @@ class DNSResponse:
             t += retry.response_time
         return t
 
-    def get_server_cookie(self):
+    def get_cookie_opt(self):
         if self.message is None:
             return None
         try:
-            cookie_opt = [o for o in self.message.options if o.otype == 10][0]
+            return [o for o in self.message.options if o.otype == 10][0]
         except IndexError:
             return None
-        if len(cookie_opt.data) > 8:
+
+    def get_server_cookie(self):
+        cookie_opt = self.get_cookie_opt()
+        if cookie_opt is not None and len(cookie_opt.data) > 8:
             return cookie_opt.data[8:]
         return None
 
     def copy(self):
-        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, review_history=False)
-        clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp)
+        clone = DNSResponse(self.message, self.msg_size, self.error, self.errno, self.history, self.response_time, self.query, self.server_cookie, self.server_cookie_status, review_history=False)
+        clone.set_effective_request_options(self.effective_flags, self.effective_edns, self.effective_edns_max_udp_payload, self.effective_edns_flags, self.effective_edns_options, self.effective_tcp, self.effective_server_cookie_status)
         clone.set_responsiveness(self.udp_attempted, self.udp_responsive, self.tcp_attempted, self.tcp_responsive, self.responsive_cause_index, self.responsive_cause_index_tcp)
         return clone
 
-    def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options, effective_tcp):
+    def set_effective_request_options(self, flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp, server_cookie_status):
         self.effective_flags = flags
         self.effective_edns = edns
         self.effective_edns_max_udp_payload = edns_max_udp_payload
         self.effective_edns_flags = edns_flags
         self.effective_edns_options = edns_options
-        self.effective_tcp = effective_tcp
+        self.effective_tcp = tcp
+        self.effective_server_cookie_status = server_cookie_status
 
     def set_responsiveness(self, udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index, responsive_cause_index_tcp):
         self.udp_attempted = udp_attempted
@@ -206,7 +214,8 @@ class DNSResponse:
         edns = self.query.edns
         edns_max_udp_payload = self.query.edns_max_udp_payload
         edns_flags = self.query.edns_flags
-        edns_options = self.query.edns_options[:]
+        edns_options = copy.deepcopy(self.query.edns_options)
+        server_cookie_status = self.server_cookie_status
 
         # mark whether TCP or UDP was attempted initially
         tcp_attempted = tcp = self.query.tcp
@@ -286,6 +295,8 @@ class DNSResponse:
                 pass
             elif retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
                 edns = retry.action_arg
+            elif retry.action == Q.RETRY_ACTION_UPDATE_DNS_COOKIE:
+                server_cookie_status = Q.DNS_COOKIE_SERVER_COOKIE_FRESH
 
             prev_index = i
 
@@ -311,7 +322,7 @@ class DNSResponse:
                     responsive_cause_index = prev_index
                     responsive_cause_index_tcp = tcp
 
-        self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp)
+        self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp, server_cookie_status)
         self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index, responsive_cause_index_tcp)
 
     def recursion_desired(self):
@@ -568,7 +579,7 @@ class DNSResponse:
         return d
 
     @classmethod
-    def deserialize(cls, d, query):
+    def deserialize(cls, d, query, server_cookie, server_cookie_status):
         from . import query as Q
 
         if 'msg_size' in d:
@@ -615,7 +626,7 @@ class DNSResponse:
         history = []
         for retry in d['history']:
             history.append(Q.DNSQueryRetryAttempt.deserialize(retry))
-        return DNSResponse(message, msg_size, error, errno1, history, response_time, query)
+        return DNSResponse(message, msg_size, error, errno1, history, response_time, query, server_cookie, server_cookie_status)
 
 class DNSResponseComponent(object):
     def __init__(self):
