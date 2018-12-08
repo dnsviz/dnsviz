@@ -1980,7 +1980,7 @@ class Analyst(object):
         # for type NS. If there is a second, it is because the first resulted
         # in NXDOMAIN, and the type for the second query is secondary_rdtype.
         for query in referral_queries.values():
-            detect_cookies = query.rdtype = name_obj.cookie_rdtype
+            detect_cookies = query.rdtype == name_obj.cookie_rdtype
             self._add_query(name_obj, query, True, detect_cookies)
 
         # Identify auth_rdtype, the rdtype used to query the authoritative
