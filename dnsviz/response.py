@@ -107,39 +107,56 @@ class DNSResponse:
     def __repr__(self):
         return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
-    def initial_query_tag(self):
+    @classmethod
+    def _query_tag(cls, tcp, flags, edns, edns_flags, edns_max_udp_payload, edns_options, qname):
         s = ''
-        if self.query.tcp:
-            s += 'TCP_'
+        if flags & dns.flags.RD:
+            s += '+'
         else:
-            s += 'UDP_'
-        s += '%d_' % self.query.flags
-        if self.query.edns < 0:
-            s += 'NOEDNS'
-        else:
-            s += 'EDNS%d_%d_%d' % (self.query.edns, (self.query.edns_flags & 0xffff), self.query.edns_max_udp_payload)
-            for opt in self.query.edns_options:
-                s += '_%d' % opt.otype
-        if self.query.qname.to_text() != self.query.qname.to_text().lower():
-            s += '_0x20'
+            s += '-'
+        if edns >= 0:
+            s += 'E(%d)' % (edns)
+        if tcp:
+            s += 'T'
+        if edns >= 0 and edns_flags & dns.flags.DO:
+            s += 'D'
+        if flags & dns.flags.CD:
+            s += 'C'
+        # Flags other than the ones commonly seen in queries
+        if flags & dns.flags.AD:
+            s += 'A'
+        if flags & dns.flags.AA:
+            s += 'a'
+        if flags & dns.flags.TC:
+            s += 't'
+        if flags & dns.flags.RA:
+            s += 'r'
+        if edns >= 0:
+            # EDNS max UDP payload
+            s += 'P(%d)' % edns_max_udp_payload
+            # EDNS flags other than DO
+            if edns_flags & ~dns.flags.DO:
+                s += 'F(%d)' % edns_flags
+            # other options
+            for opt in edns_options:
+                if opt.otype == 3:
+                    # NSID
+                    s += 'N'
+                elif opt.otype == 8:
+                    # EDNS Client Subnet
+                    s += 's'
+                elif opt.otype == 10:
+                    # DNS cookies
+                    continue
+        if qname.to_text() != qname.to_text().lower():
+            s += 'X'
         return s
 
+    def initial_query_tag(self):
+        return self._query_tag(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname)
+
     def effective_query_tag(self):
-        s = ''
-        if self.effective_tcp:
-            s += 'TCP_'
-        else:
-            s += 'UDP_'
-        s += '%d_' % self.effective_flags
-        if self.effective_edns < 0:
-            s += 'NOEDNS'
-        else:
-            s += 'EDNS%d_%d_%d' % (self.effective_edns, (self.effective_edns_flags & 0xffff), self.effective_edns_max_udp_payload)
-            for opt in self.effective_edns_options:
-                s += '_%d' % opt.otype
-        if self.query.qname.to_text() != self.query.qname.to_text().lower():
-            s += '_0x20'
-        return s
+        return self._query_tag(self.effective_tcp, self.effective_flags, self.effective_edns, self.effective_edns_flags, self.query.edns_max_udp_payload, self.effective_edns_options, self.query.qname)
 
     def section_rr_count(self, section):
         if self.message is None:
