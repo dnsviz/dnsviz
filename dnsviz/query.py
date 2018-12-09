@@ -1177,22 +1177,23 @@ class DNSQuery(object):
 
         server_cookie = None
         server_cookie_status = DNS_COOKIE_NO_COOKIE
-        try:
-            cookie_opt = [o for o in edns_options if o.otype == 10][0]
-        except IndexError:
-            pass
-        else:
-            if len(cookie_opt.data) == 8:
-                server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
-            elif len(cookie_opt.data) >= 16:
-                if cookie_opt.data[8:] == cookie_standin:
-                    # initially assume that there is a cookie for the server;
-                    # change the value later if there isn't
-                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
-                else:
-                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+        if edns >= 0:
+            try:
+                cookie_opt = [o for o in edns_options if o.otype == 10][0]
+            except IndexError:
+                pass
             else:
-                server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
+                if len(cookie_opt.data) == 8:
+                    server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+                elif len(cookie_opt.data) >= 16 and len(cookie_opt.data) <= 40:
+                    if cookie_opt.data[8:] == cookie_standin:
+                        # initially assume that there is a cookie for the server;
+                        # change the value later if there isn't
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
+                    else:
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+                else:
+                    server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
 
         for server in d['responses']:
             server_ip = IPAddr(server)
@@ -1324,29 +1325,31 @@ class ExecutableDNSQuery(DNSQuery):
         edns_options = copy.deepcopy(self.edns_options)
         server_cookie = None
         server_cookie_status = DNS_COOKIE_NO_COOKIE
-        try:
-            cookie_opt = [o for o in edns_options if o.otype == 10][0]
-        except IndexError:
-            pass
-        else:
-            if len(cookie_opt.data) == 8:
-                server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
-            elif len(cookie_opt.data) >= 16:
-                if cookie_opt.data[8:] == self.cookie_standin:
-                    if server in self.cookie_jar:
-                        # if there is a cookie for this server,
-                        # then add it
-                        server_cookie = self.cookie_jar[server]
-                        cookie_opt.data = cookie_opt.data[:8] + server_cookie
-                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
-                    else:
-                        # otherwise, send just the client cookie.
-                        cookie_opt.data = cookie_opt.data[:8]
-                        server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
-                else:
-                    server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+
+        if self.edns >= 0:
+            try:
+                cookie_opt = [o for o in edns_options if o.otype == 10][0]
+            except IndexError:
+                pass
             else:
-                server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
+                if len(cookie_opt.data) == 8:
+                    server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+                elif len(cookie_opt.data) >= 16 and len(cookie_opt.data) <= 40:
+                    if cookie_opt.data[8:] == self.cookie_standin:
+                        if server in self.cookie_jar:
+                            # if there is a cookie for this server,
+                            # then add it
+                            server_cookie = self.cookie_jar[server]
+                            cookie_opt.data = cookie_opt.data[:8] + server_cookie
+                            server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
+                        else:
+                            # otherwise, send just the client cookie.
+                            cookie_opt.data = cookie_opt.data[:8]
+                            server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+                    else:
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
+                else:
+                    server_cookie_status = DNS_COOKIE_IMPROPER_LENGTH
 
         request = dns.message.Message()
         request.flags = self.flags
