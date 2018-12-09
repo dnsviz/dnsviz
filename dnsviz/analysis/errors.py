@@ -1256,6 +1256,70 @@ class EDNSUndefinedFlagsSet(EDNSError):
     references = ['RFC 6891, Sec. 6.1.4']
     required_params = ['flags']
 
+class DNSCookieError(ResponseError):
+    pass
+
+class GratuitousCookie(DNSCookieError):
+    '''
+    >>> e = GratuitousCookie()
+    >>> e.description
+    'The server sent a COOKIE option when none was sent by the client.'
+    '''
+
+    _abstract = False
+    code = 'GRATUITOUS_COOKIE'
+    description_template = 'The server sent a COOKIE option when none was sent by the client.'
+    references = ['RFC 7873, Sec. 5.2.1']
+
+class MalformedCookieWithoutFORMERR(DNSCookieError):
+    '''
+    >>> e = MalformedCookieWithoutFORMERR()
+    >>> e.description
+    'The server appears to support DNS cookies but did not return a FORMERR status when issued a COOKIE option.'
+    '''
+
+    _abstract = False
+    code = 'MALFORMED_COOKIE_WITHOUT_FORMERR'
+    description_template = 'The server appears to support DNS cookies but did not return a FORMERR status when issued a COOKIE option.'
+    references = ['RFC 7873, Sec. 5.2.2']
+
+class NoCookieOption(DNSCookieError):
+    '''
+    >>> e = NoCookieOption()
+    >>> e.description
+    'The server appears to support DNS cookies but did not return a COOKIE option.'
+    '''
+
+    _abstract = False
+    code = 'NO_COOKIE_OPTION'
+    description_template = 'The server appears to support DNS cookies but did not return a COOKIE option.'
+    references = ['RFC 7873, Sec. 5.2.3']
+
+class ClientCookieMismatch(DNSCookieError):
+    '''
+    >>> e = ClientCookieMismatch()
+    >>> e.description
+    'The client cookie returned by the server did not match what was sent.'
+    '''
+
+    _abstract = False
+    code = 'CLIENT_COOKIE_MISMATCH'
+    description_template = 'The client cookie returned by the server did not match what was sent.'
+    references = ['RFC 7873, Sec. 5.3']
+
+class CookieInvalidLength(DNSCookieError):
+    '''
+    >>> e = CookieInvalidLength(length=61)
+    >>> e.description
+    'The cookie returned by the server had an invalid length of 61 bytes.'
+    '''
+
+    _abstract = False
+    code = 'COOKIE_INVALID_LENGTH'
+    description_template = 'The cookie returned by the server had an invalid length of %(length)d bytes.'
+    references = ['RFC 7873, Sec. 5.3']
+    required_params = ['length']
+
 class UnableToRetrieveDNSSECRecords(ResponseError):
     '''
     >>> e = UnableToRetrieveDNSSECRecords()
