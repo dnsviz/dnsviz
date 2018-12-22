@@ -1386,6 +1386,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for response in rrset_info.servers_clients[(server,client)]:
                     self._populate_responsiveness_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+                    self._populate_edns_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_foreign_class_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_case_preservation_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
 
@@ -1437,6 +1438,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for response in truncated_info.servers_clients[(server, client)]:
                     self._populate_responsiveness_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
+                    self._populate_edns_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_case_preservation_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
@@ -2009,6 +2011,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 self._populate_responsiveness_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
+                self._populate_edns_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_foreign_class_warnings(qname_obj, response, server, client, warnings, errors)
                 self._populate_case_preservation_warnings(qname_obj, response, server, client, warnings, errors)
 
