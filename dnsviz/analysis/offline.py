@@ -36,7 +36,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-import dns.flags, dns.rdataclass, dns.rdatatype
+import dns.flags, dns.rcode, dns.rdataclass, dns.rdatatype
 
 from dnsviz import crypto
 import dnsviz.format as fmt
