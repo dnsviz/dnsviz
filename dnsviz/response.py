@@ -109,54 +109,54 @@ class DNSResponse:
 
     @classmethod
     def _query_tag(cls, tcp, flags, edns, edns_flags, edns_max_udp_payload, edns_options, qname):
-        s = ''
+        s = []
         if flags & dns.flags.RD:
-            s += '+'
+            s.append('+')
         else:
-            s += '-'
+            s.append('-')
         if edns >= 0:
-            s += 'E(%d)' % (edns)
+            s.append('E(%d)' % (edns))
         if tcp:
-            s += 'T'
+            s.append('T')
         if edns >= 0 and edns_flags & dns.flags.DO:
-            s += 'D'
+            s.append('D')
         if flags & dns.flags.CD:
-            s += 'C'
+            s.append('C')
         # Flags other than the ones commonly seen in queries
         if flags & dns.flags.AD:
-            s += 'A'
+            s.append('A')
         if flags & dns.flags.AA:
-            s += 'a'
+            s.append('a')
         if flags & dns.flags.TC:
-            s += 't'
+            s.append('t')
         if flags & dns.flags.RA:
-            s += 'r'
+            s.append('r')
         if edns >= 0:
             # EDNS max UDP payload
-            s += 'P(%d)' % edns_max_udp_payload
+            s.append('P(%d)' % edns_max_udp_payload)
             # EDNS flags other than DO
             if edns_flags & ~dns.flags.DO:
-                s += 'F(%d)' % edns_flags
+                s.append('F(0x%x)' % edns_flags)
             # other options
             for opt in edns_options:
                 if opt.otype == 3:
                     # NSID
-                    s += 'N'
+                    s.append('N')
                 elif opt.otype == 8:
                     # EDNS Client Subnet
-                    s += 's'
+                    s.append('s')
                 elif opt.otype == 10:
                     # DNS cookies
                     continue
         if qname.to_text() != qname.to_text().lower():
-            s += 'X'
+            s.append('X')
         return s
 
     def initial_query_tag(self):
-        return self._query_tag(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname)
+        return ''.join(self._query_tag(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname))
 
     def effective_query_tag(self):
-        return self._query_tag(self.effective_tcp, self.effective_flags, self.effective_edns, self.effective_edns_flags, self.query.edns_max_udp_payload, self.effective_edns_options, self.query.qname)
+        return ''.join(self._query_tag(self.effective_tcp, self.effective_flags, self.effective_edns, self.effective_edns_flags, self.query.edns_max_udp_payload, self.effective_edns_options, self.query.qname))
 
     def section_rr_count(self, section):
         if self.message is None:
