@@ -308,6 +308,10 @@ class DNSResponse:
                 filtered_options = [x for x in edns_options if retry.action_arg == x.otype]
                 if filtered_options:
                     edns_options.remove(filtered_options[0])
+                    # If COOKIE option was removed, then reset
+                    # server_cookie_status
+                    if filtered_options[0].otype == 10:
+                        server_cookie_status = Q.DNS_COOKIE_NO_COOKIE
             elif retry.action == Q.RETRY_ACTION_CHANGE_SPORT:
                 pass
             elif retry.action == Q.RETRY_ACTION_CHANGE_EDNS_VERSION:
@@ -338,6 +342,13 @@ class DNSResponse:
                         not udp_valid and prev_index is not None and self.history[prev_index].action != Q.RETRY_ACTION_USE_UDP:
                     responsive_cause_index = prev_index
                     responsive_cause_index_tcp = tcp
+
+        # If EDNS was effectively disabled, reset EDNS options
+        if edns < 0:
+            edns_max_udp_payload = None
+            edns_flags = 0
+            edns_options = []
+            server_cookie_status = Q.DNS_COOKIE_NO_COOKIE
 
         self.set_effective_request_options(flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp, server_cookie_status)
         self.set_responsiveness(udp_attempted, udp_responsive, tcp_attempted, tcp_responsive, responsive_cause_index, responsive_cause_index_tcp)
