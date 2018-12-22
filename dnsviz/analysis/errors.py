@@ -1275,12 +1275,12 @@ class MalformedCookieWithoutFORMERR(DNSCookieError):
     '''
     >>> e = MalformedCookieWithoutFORMERR()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a FORMERR status when issued a COOKIE option.'
+    'The server appears to support DNS cookies but did not return a FORMERR status when issued a malformed COOKIE option.'
     '''
 
     _abstract = False
     code = 'MALFORMED_COOKIE_WITHOUT_FORMERR'
-    description_template = 'The server appears to support DNS cookies but did not return a FORMERR status when issued a COOKIE option.'
+    description_template = 'The server appears to support DNS cookies but did not return a FORMERR status when issued a malformed COOKIE option.'
     references = ['RFC 7873, Sec. 5.2.2']
 
 class NoCookieOption(DNSCookieError):
@@ -1293,6 +1293,30 @@ class NoCookieOption(DNSCookieError):
     _abstract = False
     code = 'NO_COOKIE_OPTION'
     description_template = 'The server appears to support DNS cookies but did not return a COOKIE option.'
+    references = ['RFC 7873, Sec. 5.2.3']
+
+class InvalidCookieWithoutBADCOOKIE(DNSCookieError):
+    '''
+    >>> e = InvalidCookieWithoutBADCOOKIE()
+    >>> e.description
+    'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.'
+    '''
+
+    _abstract = False
+    code = 'INVALID_COOKIE_WITHOUT_BADCOOKIE'
+    description_template = 'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.'
+    references = ['RFC 7873, Sec. 5.2.4']
+
+class NoServerCookie(DNSCookieError):
+    '''
+    >>> e = NoServerCookie()
+    >>> e.description
+    'The server appears to support DNS cookies but did not return a server cookie with its COOKIE option.'
+    '''
+
+    _abstract = False
+    code = 'NO_SERVER_COOKIE'
+    description_template = 'The server appears to support DNS cookies but did not return a server cookie with its COOKIE option.'
     references = ['RFC 7873, Sec. 5.2.3']
 
 class ClientCookieMismatch(DNSCookieError):
