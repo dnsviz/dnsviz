@@ -968,6 +968,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         retry.action_arg == dns.flags.CD:
                     pass
 
+                # or if the RCODE was BADCOOKIE, and the COOKIE opt we sent
+                # contained only a client cookie or an invalid server cookie,
+                # then this was a reasonable response from a server that
+                # supports cookies
+                elif retry.cause_arg == 23 and \
+                        response.server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_BAD) and \
+                        retry.action == Q.RETRY_ACTION_UPDATE_DNS_COOKIE:
+                    pass
+
+
+                # or if the RCODE was FORMERR, and the COOKIE opt we sent
+                # contained a malformed cookie, then this was a reasonable
+                # response from a server that supports cookies
+                if retry.cause_arg == dns.rcode.FORMERR and \
+                        (retry.action == Q.RETRY_ACTION_DISABLE_EDNS or \
+                                (retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION and retry.action_arg == 10)):
+                    pass
+
                 # otherwise, set the error class and instantiation kwargs
                 # appropriately
                 else:
@@ -1132,6 +1150,118 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         for edns_err in edns_errs:
             Errors.DomainNameAnalysisError.insert_into_list(edns_err, warnings, server, client, response)
+
+    def _populate_cookie_errors(self, qname_obj, response, server, client, warnings, errors):
+
+        if response.message is None:
+            return
+
+        cookie_errs = []
+
+        try:
+            cookie_opt = [o for o in response.effective_edns_options if o.otype == 10][0]
+        except IndexError:
+            cookie_opt = None
+
+        try:
+            cookie_opt_from_server = [o for o in response.message.options if o.otype == 10][0]
+        except IndexError:
+            cookie_opt_from_server = None
+
+        # supports_cookies is a boolean value that indicates whether the server
+        # supports DNS cookies.  Note that we are not looking for the value of
+        # the server cookie itself, only whether the server supports cookies,
+        # so we don't need to use get_cookie_jar_mapping().
+        supports_cookies =  qname_obj is not None and server in qname_obj.cookie_jar
+
+        # RFC 7873: 5.2.1.  No OPT RR or No COOKIE Option
+        if response.query.edns < 0 or cookie_opt is None: # response.effective_server_cookie_status == Q.DNS_COOKIE_NO_COOKIE
+            if cookie_opt_from_server is not None:
+                cookie_errs.append(Errors.GratuitousCookie())
+
+        elif supports_cookies:
+            # The following are scenarios for DNS cookies.
+
+            # RFC 7873: 5.2.2.  Malformed COOKIE Option
+            if response.server_cookie_status == Q.DNS_COOKIE_IMPROPER_LENGTH:
+
+                issued_formerr = False
+                if response.effective_server_cookie_status == Q.DNS_COOKIE_IMPROPER_LENGTH:
+                    if response.message.rcode() == dns.rcode.FORMERR:
+                        # The query resulting in the response we got was sent
+                        # with a COOKIE option with improper length, and the
+                        # return code for the response was FORMERR.
+                        issued_formerr = True
+                elif response.responsive_cause_index is not None:
+                    retry = response.history[response.responsive_cause_index]
+                    if retry.cause == Q.RETRY_CAUSE_RCODE and \
+                            retry.cause_arg == dns.rcode.FORMERR and \
+                            (retry.action == Q.RETRY_ACTION_DISABLE_EDNS or \
+                                    (retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION and retry.action_arg == 10)):
+                        # We started with a COOKIE opt with improper length,
+                        # and, in response to FORMERR, from the server, we
+                        # changed EDNS behavior either by disabling EDNS or
+                        # removing the DNS COOKIE OPT, which resulted in us
+                        # getting a legitimate response.
+                        issued_formerr = True
+                if not issued_formerr:
+                    cookie_errs.append(Errors.MalformedCookieWithoutFORMERR())
+
+            # RFC 7873: 5.2.4.  A Client Cookie and an Invalid Server Cookie
+            if response.server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_BAD:
+
+                issued_badcookie = False
+                if response.effective_server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_BAD:
+                    # The query resulting in the response we got was sent with
+                    # a bad server cookie.
+                    if cookie_opt_from_server is None:
+                        cookie_errs.append(Errors.NoCookieOption())
+                    elif len(cookie_opt_from_server.data) == 8:
+                        cookie_errs.append(Errors.NoServerCookie())
+
+                    if response.message.rcode() == 23:
+                        # The query resulting in the response we got was sent
+                        # with an invalid server cookie, and the result was
+                        # BADCOOKIE.
+                        issued_badcookie = True
+
+                elif response.responsive_cause_index is not None:
+                    retry = response.history[response.responsive_cause_index]
+                    if retry.cause == Q.RETRY_CAUSE_RCODE and \
+                            retry.cause_arg == 23 and \
+                            retry.action == Q.RETRY_ACTION_UPDATE_DNS_COOKIE:
+                        # We started with a COOKIE opt with an invalid server
+                        # cookie, and, in response to a BADCOOKIE response from
+                        # the server, we updated to a fresh DNS server cookie,
+                        # which resulted in us getting a legitimate response.
+                        issued_badcookie = True
+
+                if not issued_badcookie:
+                    cookie_errs.append(Errors.InvalidCookieWithoutBADCOOKIE())
+
+            # RFC 7873: 5.2.3.  Only a Client Cookie
+            # RFC 7873: 5.2.5.  A Client Cookie and a Valid Server Cookie
+            if response.effective_server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_FRESH):
+                # The query resulting in the response we got was sent with only
+                # a client cookie.
+                if cookie_opt_from_server is None:
+                    cookie_errs.append(Errors.NoCookieOption())
+                elif len(cookie_opt_from_server.data) == 8:
+                    cookie_errs.append(Errors.NoServerCookie())
+
+        if cookie_opt is not None and cookie_opt_from_server is not None:
+            # RFC 7873: 5.3.  Client cookie does not match
+            if len(cookie_opt_from_server.data) >= 8 and \
+                    cookie_opt_from_server.data[:8] != cookie_opt.data[:8]:
+                cookie_errs.append(Errors.ClientCookieMismatch())
+
+            # RFC 7873: 5.3.  Client cookie has and invalid length
+            if len(cookie_opt_from_server.data) < 8 or \
+                    len(cookie_opt_from_server.data) > 40:
+                cookie_errs.append(Errors.CookieInvalidLength(length=len(cookie_opt_from_server.data)))
+
+        for cookie_err in cookie_errs:
+            Errors.DomainNameAnalysisError.insert_into_list(cookie_err, warnings, server, client, response)
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
         if qname_obj is not None:
@@ -1387,6 +1517,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_responsiveness_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_response_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_edns_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
+                    self._populate_cookie_errors(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_foreign_class_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
                     self._populate_case_preservation_warnings(qname_obj, response, server, client, self.rrset_warnings[rrset_info], self.rrset_errors[rrset_info])
 
@@ -1439,6 +1570,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_responsiveness_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_response_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_edns_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
+                    self._populate_cookie_errors(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_case_preservation_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
@@ -2012,6 +2144,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self._populate_responsiveness_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_response_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_edns_errors(qname_obj, response, server, client, warnings, errors)
+                self._populate_cookie_errors(qname_obj, response, server, client, warnings, errors)
                 self._populate_foreign_class_warnings(qname_obj, response, server, client, warnings, errors)
                 self._populate_case_preservation_warnings(qname_obj, response, server, client, warnings, errors)
 
