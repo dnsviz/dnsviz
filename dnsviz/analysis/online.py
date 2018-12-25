@@ -995,7 +995,7 @@ class OnlineDomainNameAnalysis(object):
             # don't re-import
             if (qname, rdtype) in self.queries:
                 continue
-            if rdtype in delegation_types:
+            if qname == self.name and rdtype in delegation_types:
                 continue
             if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
                 extra = ' (NXDOMAIN)'
