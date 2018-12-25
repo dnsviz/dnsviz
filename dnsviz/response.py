@@ -108,7 +108,7 @@ class DNSResponse:
         return '<%s: "%s">' % (self.__class__.__name__, str(self))
 
     @classmethod
-    def _query_tag(cls, tcp, flags, edns, edns_flags, edns_max_udp_payload, edns_options, qname):
+    def _query_tag_bind(cls, tcp, flags, edns, edns_flags, edns_max_udp_payload, edns_options, qname):
         s = []
         if flags & dns.flags.RD:
             s.append('+')
@@ -153,10 +153,10 @@ class DNSResponse:
         return s
 
     def initial_query_tag(self):
-        return ''.join(self._query_tag(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname))
+        return ''.join(self._query_tag_bind(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname))
 
     def effective_query_tag(self):
-        return ''.join(self._query_tag(self.effective_tcp, self.effective_flags, self.effective_edns, self.effective_edns_flags, self.query.edns_max_udp_payload, self.effective_edns_options, self.query.qname))
+        return ''.join(self._query_tag_bind(self.effective_tcp, self.effective_flags, self.effective_edns, self.effective_edns_flags, self.query.edns_max_udp_payload, self.effective_edns_options, self.query.qname))
 
     def section_rr_count(self, section):
         if self.message is None:
