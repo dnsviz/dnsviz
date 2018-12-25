@@ -147,7 +147,7 @@ class DNSResponse:
                     s.append('s')
                 elif opt.otype == 10:
                     # DNS cookies
-                    continue
+                    s.append('K')
         if qname.to_text() != qname.to_text().lower():
             s.append('X')
         return s
