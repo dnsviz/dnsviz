@@ -294,7 +294,7 @@ class FullResolver:
 
     default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
 
-    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.RobustDNSSECQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None, max_ttl=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.DiagnosticQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None, max_ttl=None):
 
         self._hints = hints
         self._query_cls = query_cls

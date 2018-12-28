@@ -1690,29 +1690,6 @@ class QuickDNSSECQuery(DNSSECQuery):
     max_attempts = 1
     lifetime = 3.0
 
-class RobustDNSSECQuery(DNSSECQuery):
-    '''A robust query with a number of handlers, designed to get a response,
-    in the midst of compatibility and connectivity issues.'''
-
-    response_handlers = DNSSECQuery.response_handlers + \
-            [
-                    DisableEDNSOnFormerrHandler(),
-                    DisableEDNSOnRcodeHandler(),
-                    ReduceUDPMaxPayloadOnTimeoutHandler(512, 3),
-                    DisableEDNSOnTimeoutHandler(4)
-            ]
-
-    # For timeouts:
-    #  1 - no change
-    #  2 - no change
-    #  3 - reduce udp max payload to 512; change timeout to 1 second
-    #  4 - disable EDNS
-    #  5 - return
-
-    query_timeout = 1.0
-    max_attempts = 5
-    lifetime = 7.0
-
 class DiagnosticQuery(DNSSECQuery):
     '''A robust query with a number of handlers, designed to detect common DNS
     compatibility and connectivity issues.'''
