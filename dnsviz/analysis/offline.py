@@ -2465,7 +2465,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         self.response_component_status = response_component_status
 
-    def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, loglevel=logging.DEBUG, html_format=False):
+    def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, show_server_meta=True, loglevel=logging.DEBUG, html_format=False):
         d = OrderedDict()
 
         rrsig_list = []
@@ -2531,17 +2531,29 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if loglevel <= logging.INFO and show_servers:
             servers = tuple_to_dict(rrset_info.servers_clients)
+            server_list = list(servers)
+            server_list.sort()
             if consolidate_clients:
-                servers = list(servers)
-                servers.sort()
+                servers = server_list
             d['servers'] = servers
 
-            tags = set()
-            for server,client in rrset_info.servers_clients:
-                for response in rrset_info.servers_clients[(server,client)]:
-                    tags.add(response.effective_query_tag())
-            d['query_options'] = list(tags)
-            d['query_options'].sort()
+            if show_server_meta:
+                tags = set()
+                cookie_tags = {}
+                for server,client in rrset_info.servers_clients:
+                    for response in rrset_info.servers_clients[(server,client)]:
+                        tags.add(response.effective_query_tag())
+                        cookie_tags[server] = OrderedDict((
+                            ('request', response.request_cookie_tag()),
+                            ('response', response.response_cookie_tag()),
+                        ))
+                d['query_options'] = list(tags)
+                d['query_options'].sort()
+
+                cookie_tag_mapping = OrderedDict()
+                for server in server_list:
+                    cookie_tag_mapping[server] = cookie_tags[server]
+                d['cookie_status'] = cookie_tag_mapping
 
         if self.rrset_warnings[rrset_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in self.rrset_warnings[rrset_info]]
@@ -2562,7 +2574,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         soa_list = []
         for soa_rrset_info in neg_response_info.soa_rrset_info:
-            rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+            rrset_serialized = self._serialize_rrset_info(soa_rrset_info, consolidate_clients=consolidate_clients, show_server_meta=False, loglevel=loglevel, html_format=html_format)
             if rrset_serialized:
                 soa_list.append(rrset_serialized)
 
@@ -2585,17 +2597,28 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if loglevel <= logging.INFO:
             servers = tuple_to_dict(neg_response_info.servers_clients)
+            server_list = list(servers)
+            server_list.sort()
             if consolidate_clients:
-                servers = list(servers)
-                servers.sort()
+                servers = server_list
             d['servers'] = servers
 
             tags = set()
+            cookie_tags = {}
             for server,client in neg_response_info.servers_clients:
                 for response in neg_response_info.servers_clients[(server,client)]:
                     tags.add(response.effective_query_tag())
+                    cookie_tags[server] = OrderedDict((
+                        ('request', response.request_cookie_tag()),
+                        ('response', response.response_cookie_tag()),
+                    ))
             d['query_options'] = list(tags)
             d['query_options'].sort()
+
+            cookie_tag_mapping = OrderedDict()
+            for server in server_list:
+                cookie_tag_mapping[server] = cookie_tags[server]
+            d['cookie_status'] = cookie_tag_mapping
 
         if warnings[neg_response_info] and loglevel <= logging.WARNING:
             d['warnings'] = [w.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for w in warnings[neg_response_info]]

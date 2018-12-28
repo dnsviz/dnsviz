@@ -211,6 +211,44 @@ class DNSResponse:
             s += '_0x20'
         return s
 
+    def request_cookie_tag(self):
+        from . import query as Q
+
+        if self.effective_server_cookie_status == Q.DNS_COOKIE_NO_COOKIE:
+            return 'NO_COOKIE'
+        elif self.effective_server_cookie_status == Q.DNS_COOKIE_IMPROPER_LENGTH:
+            return 'MALFORMED_COOKIE'
+        elif self.effective_server_cookie_status == Q.DNS_COOKIE_CLIENT_COOKIE_ONLY:
+            return 'CLIENT_COOKIE_ONLY'
+        elif self.effective_server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_FRESH:
+            return 'VALID_SERVER_COOKIE'
+        elif self.effective_server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_BAD:
+            return 'INVALID_SERVER_COOKIE'
+        else:
+            raise Exception('Unknown cookie status!')
+
+    def response_cookie_tag(self):
+
+        if self.message is None:
+            return 'ERROR'
+
+        if self.message.edns < 0:
+            return 'NO_EDNS'
+
+        try:
+            cookie_opt = [o for o in self.message.options if o.otype == 10][0]
+        except IndexError:
+            return 'NO_COOKIE_OPT'
+
+        if len(cookie_opt.data) < 8 or len(cookie_opt.data) > 40:
+            return 'MALFORMED_COOKIE'
+
+        elif len(cookie_opt.data) == 8:
+            return 'CLIENT_COOKIE_ONLY'
+
+        else:
+            return 'CLIENT_AND_SERVER_COOKIE'
+
     def initial_query_tag(self):
         return ''.join(self._query_tag_human(self.query.tcp, self.query.flags, self.query.edns, self.query.edns_flags, self.query.edns_max_udp_payload, self.query.edns_options, self.query.qname))
 
