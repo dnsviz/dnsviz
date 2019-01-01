@@ -82,6 +82,8 @@ PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 
 WILDCARD_EXPLICIT_DELEGATION = dns.name.from_text('*')
 
+COOKIE_STANDIN = binascii.unhexlify('cccccccccccccccc')
+
 ANALYSIS_TYPE_AUTHORITATIVE = 0
 ANALYSIS_TYPE_RECURSIVE = 1
 ANALYSIS_TYPE_CACHE = 2
@@ -110,6 +112,10 @@ class OnlineDomainNameAnalysis(object):
         self.name = name
         self.analysis_type = analysis_type
         self.stub = stub
+
+        # Attributes related to DNS cookie
+        if cookie_standin is None:
+            cookie_standin = COOKIE_STANDIN
         self.cookie_standin = cookie_standin
 
         # a class for constructing the queries
@@ -793,7 +799,7 @@ class OnlineDomainNameAnalysis(object):
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         if self.cookie_standin is not None:
-            d[name_str]['cookie_standin'] = binascii.hexlify(self.cookie_standin)
+            d[name_str]['cookie_standin'] = lb2s(binascii.hexlify(self.cookie_standin))
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -1047,13 +1053,11 @@ class Analyst(object):
     qname_only = True
     analysis_type = ANALYSIS_TYPE_AUTHORITATIVE
 
-    clone_attrnames = ['rdclass', 'dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'cookie_standin', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
+    clone_attrnames = ['rdclass', 'dlv_domain', 'try_ipv4', 'try_ipv6', 'client_ipv4', 'client_ipv6', 'query_class_mixin', 'logger', 'ceiling', 'edns_diagnostics', 'follow_ns', 'explicit_delegations', 'stop_at_explicit', 'odd_ports', 'analysis_cache', 'cache_level', 'analysis_cache_lock', 'transport_manager', 'th_factories', 'resolver']
 
-    def __init__(self, name, rdclass=dns.rdataclass.IN, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, query_class_mixin=None, logger=_logger, ceiling=None, edns_diagnostics=False, cookie_standin=None,
+    def __init__(self, name, rdclass=dns.rdataclass.IN, dlv_domain=None, try_ipv4=True, try_ipv6=True, client_ipv4=None, client_ipv6=None, query_class_mixin=None, logger=_logger, ceiling=None, edns_diagnostics=False,
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
              analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
-
-        self.cookie_standin = cookie_standin
 
         self.query_class_mixin = query_class_mixin
         self.simple_query = self._get_query_class(self._simple_query, None, None)
@@ -1175,12 +1179,10 @@ class Analyst(object):
             return None
 
     def _add_cookie_standin(self, cls):
-        if self.cookie_standin is None:
-            return
         cookie_opt = self._get_cookie_opt(cls)
         if cookie_opt is not None:
             assert len(cookie_opt.data) == 8, 'Only client cookies are supported.'
-            cookie_opt.data += self.cookie_standin
+            cookie_opt.data += COOKIE_STANDIN
 
     def _remove_cookie_option(self, cls):
         cookie_opt = self._get_cookie_opt(cls)
@@ -1462,7 +1464,7 @@ class Analyst(object):
                 name_obj = self.analysis_cache[name]
             except KeyError:
                 if lock:
-                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub, analysis_type=self.analysis_type, cookie_standin=self.cookie_standin)
+                    name_obj = self.analysis_cache[name] = self.analysis_model(name, stub=stub, analysis_type=self.analysis_type, cookie_standin=COOKIE_STANDIN)
                     return name_obj
                 # if not locking, then return None
                 else:
@@ -1748,34 +1750,34 @@ class Analyst(object):
                 if self.edns_diagnostics:
                     self.logger.debug('Preparing EDNS diagnostic queries %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                     queries[(name_obj.name, -(dns.rdatatype.SOA+100))] = self.edns_version_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+101))] = self.edns_opt_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+102))] = self.edns_flag_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # Query with a mixed-case name for 0x20, if possible
                 mixed_case_name = self._mix_case(name_obj.name)
                 if mixed_case_name is not None:
                     self.logger.debug('Preparing 0x20 queries %s/%s...' % (fmt.humanize_name(mixed_case_name, canonicalize=False), dns.rdatatype.to_text(dns.rdatatype.SOA)))
-                    queries[(name_obj.name, -(dns.rdatatype.SOA+103))] = self.diagnostic_query(mixed_case_name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+103))] = self.diagnostic_query(mixed_case_name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
                     self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
-                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                 if name_obj.nxrrset_name is not None:
                     self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # if the name is SLD or lower, then ask MX and TXT
                 if self._is_sld_or_lower(name_obj.name):
                     self.logger.debug('Preparing query %s/MX...' % fmt.humanize_name(name_obj.name))
                     # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, dns.rdatatype.MX)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.MX, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                     # we also do a query with small UDP payload to elicit and test a truncated response
-                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, -dns.rdatatype.MX)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.MX, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
@@ -1784,21 +1786,21 @@ class Analyst(object):
             if servers:
                 if self._ask_non_delegation_queries(name_obj.name) and not self.explicit_only:
                     self.logger.debug('Preparing query %s/SOA...' % fmt.humanize_name(name_obj.name))
-                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, dns.rdatatype.SOA)] = self.diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                     if name_obj.is_zone():
                         # for zones we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
-                        queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                        queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                     else:
                         # for non-zones we don't need to keey the (UDP) SOA query, if there is no positive response
                         exclude_no_answer.add((name_obj.name, dns.rdatatype.SOA))
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
                 # note that we use a PMTU diagnostic query here, to simultaneously test PMTU
-                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                queries[(name_obj.name, dns.rdatatype.DNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # we also do a query with small UDP payload to elicit and test a truncated response
-                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
             # query for DS/DLV
             if name_obj.parent is not None:
@@ -1820,7 +1822,7 @@ class Analyst(object):
                 parent_cookie_jar = name_obj.zone.parent.cookie_jar
 
                 self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
-                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=parent_odd_ports, cookie_jar=parent_cookie_jar, cookie_standin=self.cookie_standin)
+                queries[(name_obj.name, dns.rdatatype.DS)] = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, parent_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=parent_odd_ports, cookie_jar=parent_cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 if name_obj.dlv_parent is not None and self.dlv_domain != self.name:
                     dlv_servers = name_obj.dlv_parent.get_responsive_auth_or_designated_servers()
@@ -1831,7 +1833,7 @@ class Analyst(object):
                         dlv_cookie_jar = name_obj.dlv_parent.cookie_jar
 
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
-                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, self.rdclass, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=dlv_odd_ports, cookie_jar=dlv_cookie_jar, cookie_standin=self.cookie_standin)
+                        queries[(dlv_name, dns.rdatatype.DLV)] = self.diagnostic_query(dlv_name, dns.rdatatype.DLV, self.rdclass, dlv_servers, name_obj.dlv_parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=dlv_odd_ports, cookie_jar=dlv_cookie_jar, cookie_standin=COOKIE_STANDIN)
                         exclude_no_answer.add((dlv_name, dns.rdatatype.DLV))
 
         # get rid of any queries already asked
@@ -1844,14 +1846,14 @@ class Analyst(object):
             for rdtype in self._rdtypes_to_query(name_obj.name):
                 if (name_obj.name, rdtype) not in all_queries:
                     self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-                    queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
             # if no default queries were identified (e.g., empty non-terminal in
             # in-addr.arpa space), then add a backup.
             if not (queries or name_obj.queries):
                 rdtype = dns.rdatatype.A
                 self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-                queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                queries[(name_obj.name, rdtype)] = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
         # actually execute the queries, then store the results
         self.logger.debug('Executing queries...')
@@ -1900,7 +1902,7 @@ class Analyst(object):
             name_obj.referral_rdtype = rdtype
 
             self.logger.debug('Querying %s/%s (referral)...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(rdtype)))
-            query = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+            query = self.diagnostic_query(name_obj.name, rdtype, self.rdclass, parent_auth_servers, name_obj.parent_name(), self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
             query.execute(tm=self.transport_manager, th_factories=self.th_factories)
             referral_queries[rdtype] = query
 
@@ -2049,7 +2051,7 @@ class Analyst(object):
                 servers = self._filter_servers(servers, no_raise=True)
                 if servers:
                     self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(secondary_rdtype)))
-                    query = self.diagnostic_query(name_obj.name, secondary_rdtype, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                    query = self.diagnostic_query(name_obj.name, secondary_rdtype, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                     query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                     self._add_query(name_obj, query, True, False, True)
 
@@ -2461,7 +2463,7 @@ class RecursiveAnalyst(Analyst):
                 # make DS queries (these won't be included in the above mix
                 # because there is no parent on the name_obj)
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.DS)))
-                query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.DS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                 self._add_query(name_obj, query, False, False)
 
@@ -2470,7 +2472,7 @@ class RecursiveAnalyst(Analyst):
             # ensure these weren't already queried for (e.g., as part of extra_rdtypes)
             if (name_obj.name, dns.rdatatype.NS) not in name_obj.queries:
                 self.logger.debug('Querying %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NS)))
-                query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=self.cookie_standin)
+                query = self.diagnostic_query(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, None, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                 self._add_query(name_obj, query, True, False)
 

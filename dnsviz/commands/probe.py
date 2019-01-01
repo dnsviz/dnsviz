@@ -90,8 +90,6 @@ PORT_RE = re.compile(r'^(.*):(\d+)$')
 STOP_RE = re.compile(r'^(.*)\+$')
 NAME_VAL_DELIM_RE = re.compile(r'\s*=\s*')
 
-COOKIE_STANDIN = binascii.unhexlify('cccccccccccccccc')
-
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
 def _setattr_dummy(self, name, value):
@@ -139,14 +137,14 @@ def _init_subprocess(use_full):
     _init_interrupt_handler()
 
 def _analyze(args):
-    (cls, name, rdclass, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, \
+    (cls, name, rdclass, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, \
             stop_at_explicit, extra_rdtypes, explicit_only, cache, cache_level, cache_lock) = args
     if ceiling is not None and name.is_subdomain(ceiling):
         c = ceiling
     else:
         c = name
     try:
-        a = cls(name, rdclass=rdclass, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, cookie_standin=cookie_standin, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=resolver)
+        a = cls(name, rdclass=rdclass, dlv_domain=dlv_domain, try_ipv4=try_ipv4, try_ipv6=try_ipv6, client_ipv4=client_ipv4, client_ipv6=client_ipv6, query_class_mixin=query_class_mixin, ceiling=c, edns_diagnostics=edns_diagnostics, explicit_delegations=explicit_delegations, stop_at_explicit=stop_at_explicit, odd_ports=odd_ports, extra_rdtypes=extra_rdtypes, explicit_only=explicit_only, analysis_cache=cache, cache_level=cache_level, analysis_cache_lock=cache_lock, transport_manager=tm, th_factories=th_factories, resolver=resolver)
         return a.analyze()
     # re-raise a KeyboardInterrupt, as this means we've been interrupted
     except KeyboardInterrupt:
@@ -166,7 +164,7 @@ class BulkAnalyst(object):
     analyst_cls = PrivateAnalyst
     use_full_resolver = True
 
-    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain):
+    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain):
         self.rdclass = rdclass
         self.try_ipv4 = try_ipv4
         self.try_ipv6 = try_ipv6
@@ -175,7 +173,6 @@ class BulkAnalyst(object):
         self.query_class_mixin = query_class_mixin
         self.ceiling = ceiling
         self.edns_diagnostics = edns_diagnostics
-        self.cookie_standin = cookie_standin
         self.stop_at_explicit = stop_at_explicit
         self.cache_level = cache_level
         self.extra_rdtypes = extra_rdtypes
@@ -187,7 +184,7 @@ class BulkAnalyst(object):
 
     def _name_to_args_iter(self, names):
         for name in names:
-            yield (self.analyst_cls, name, self.rdclass, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.cookie_standin, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
+            yield (self.analyst_cls, name, self.rdclass, self.dlv_domain, self.try_ipv4, self.try_ipv6, self.client_ipv4, self.client_ipv6, self.query_class_mixin, self.ceiling, self.edns_diagnostics, self.stop_at_explicit, self.extra_rdtypes, self.explicit_only, self.cache, self.cache_level, self.cache_lock)
 
     def analyze(self, names, flush_func=None):
         name_objs = []
@@ -277,8 +274,8 @@ class ParallelAnalystMixin(object):
     analyst_cls = MultiProcessAnalyst
     use_full_resolver = None
 
-    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, processes):
-        super(ParallelAnalystMixin, self).__init__(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain)
+    def __init__(self, rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain, processes):
+        super(ParallelAnalystMixin, self).__init__(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, extra_rdtypes, explicit_only, dlv_domain)
         self.manager = multiprocessing.managers.SyncManager()
         self.manager.start()
 
@@ -983,7 +980,6 @@ def main(argv):
                 cls = BulkAnalyst
 
         edns_diagnostics = '-E' in opts
-        cookie_standin = '-c' not in opts or opts['-c']
 
         if '-u' in opts:
 
@@ -1173,15 +1169,9 @@ def main(argv):
             CustomQueryMixin.edns_options.append(_get_nsid_option())
         if '-c' in opts:
             if opts['-c']:
-                cookie_standin = COOKIE_STANDIN
                 CustomQueryMixin.edns_options.append(_get_dns_cookie_option(opts['-c']))
-            else:
-                # A blank cookie option was specified, so
-                # don't add a cookie at all
-                cookie_standin = None
         else:
             # No cookie option was specified, so generate one
-            cookie_standin = COOKIE_STANDIN
             CustomQueryMixin.edns_options.append(_get_dns_cookie_option())
 
         name_objs = []
@@ -1194,13 +1184,13 @@ def main(argv):
                 name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
         else:
             if '-t' in opts:
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
+                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
             else:
                 if cls.use_full_resolver:
                     _init_full_resolver()
                 else:
                     _init_stub_resolver()
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, cookie_standin, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
+                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
                 if flush:
                     fh.write('{')
                     a.analyze(names, _flush)
