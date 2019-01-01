@@ -83,6 +83,7 @@ PROTO_LABEL_RE = re.compile(r'^_(tcp|udp|sctp)$')
 WILDCARD_EXPLICIT_DELEGATION = dns.name.from_text('*')
 
 COOKIE_STANDIN = binascii.unhexlify('cccccccccccccccc')
+COOKIE_BAD = binascii.unhexlify('bbbbbbbbbbbbbbbb')
 
 ANALYSIS_TYPE_AUTHORITATIVE = 0
 ANALYSIS_TYPE_RECURSIVE = 1
@@ -102,7 +103,7 @@ analysis_type_codes = {
 class OnlineDomainNameAnalysis(object):
     QUERY_CLASS = Q.MultiQuery
 
-    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE, cookie_standin=None):
+    def __init__(self, name, stub=False, analysis_type=ANALYSIS_TYPE_AUTHORITATIVE, cookie_standin=None, cookie_bad=None):
 
         ##################################################
         # General attributes
@@ -117,6 +118,9 @@ class OnlineDomainNameAnalysis(object):
         if cookie_standin is None:
             cookie_standin = COOKIE_STANDIN
         self.cookie_standin = cookie_standin
+        if cookie_bad is None:
+            cookie_bad = COOKIE_BAD
+        self.cookie_bad = cookie_bad
 
         # a class for constructing the queries
         self._query_cls = self.QUERY_CLASS
@@ -800,6 +804,8 @@ class OnlineDomainNameAnalysis(object):
         d[name_str]['stub'] = self.stub
         if self.cookie_standin is not None:
             d[name_str]['cookie_standin'] = lb2s(binascii.hexlify(self.cookie_standin))
+        if self.cookie_bad is not None:
+            d[name_str]['cookie_bad'] = lb2s(binascii.hexlify(self.cookie_bad))
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -904,10 +910,14 @@ class OnlineDomainNameAnalysis(object):
             cookie_standin = binascii.unhexlify(d['cookie_standin'])
         else:
             cookie_standin = None
+        if 'cookie_bad' in d:
+            cookie_bad = binascii.unhexlify(d['cookie_bad'])
+        else:
+            cookie_bad = None
 
         _logger.info('Loading %s' % fmt.humanize_name(name))
 
-        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type, cookie_standin=cookie_standin)
+        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type, cookie_standin=cookie_standin, cookie_bad=cookie_bad)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
@@ -948,6 +958,7 @@ class OnlineDomainNameAnalysis(object):
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         cookie_jar_map, default_cookie_jar = self.get_cookie_jar_mapping()
         cookie_standin = self.cookie_standin
+        cookie_bad = self.cookie_bad
 
         query_map = {}
         #XXX backwards compatibility with previous version
@@ -990,7 +1001,7 @@ class OnlineDomainNameAnalysis(object):
                 for query in query_map[key]:
                     detect_ns = rdtype in (dns.rdatatype.NS, self.referral_rdtype, self.auth_rdtype)
                     detect_cookies = rdtype == self.cookie_rdtype
-                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin), detect_ns, detect_cookies)
+                    self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin, cookie_bad), detect_ns, detect_cookies)
 
         # set the NS dependencies for the name
         if self.is_zone():
@@ -1012,7 +1023,7 @@ class OnlineDomainNameAnalysis(object):
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
             for query in query_map[key]:
-                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin), False, False)
+                self.add_query(Q.DNSQuery.deserialize(query, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin, cookie_bad), False, False)
 
     def _deserialize_dependencies(self, d, cache):
         if self.stub:
@@ -1062,6 +1073,7 @@ class Analyst(object):
         self.query_class_mixin = query_class_mixin
         self.simple_query = self._get_query_class(self._simple_query, None, None)
         self.diagnostic_query_no_server_cookie = self._get_query_class(self._diagnostic_query, self.query_class_mixin, None)
+        self.diagnostic_query_bad_server_cookie = self._get_query_class(self._diagnostic_query, self.query_class_mixin, self._add_bad_server_cookie)
         self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
         self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin, self._remove_cookie_option)
         self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
@@ -1177,6 +1189,12 @@ class Analyst(object):
             return [o for o in cls.edns_options if o.otype == 10][0]
         except IndexError:
             return None
+
+    def _add_bad_server_cookie(self, cls):
+        cookie_opt = self._get_cookie_opt(cls)
+        if cookie_opt is not None:
+            assert len(cookie_opt.data) == 8, 'Only client cookies are supported.'
+            cookie_opt.data += COOKIE_BAD
 
     def _add_cookie_standin(self, cls):
         cookie_opt = self._get_cookie_opt(cls)
@@ -1758,6 +1776,11 @@ class Analyst(object):
                 if mixed_case_name is not None:
                     self.logger.debug('Preparing 0x20 queries %s/%s...' % (fmt.humanize_name(mixed_case_name, canonicalize=False), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                     queries[(name_obj.name, -(dns.rdatatype.SOA+103))] = self.diagnostic_query(mixed_case_name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+
+                # DNS cookies diagnostic queries
+                if self.dns_cookies:
+                    self.logger.debug('Preparing DNS cookie diagnostic query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
+                    queries[(name_obj.name, -(dns.rdatatype.SOA+104))] = self.diagnostic_query_bad_server_cookie(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_bad=COOKIE_BAD)
 
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)

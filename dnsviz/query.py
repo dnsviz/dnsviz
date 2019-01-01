@@ -1149,7 +1149,7 @@ class DNSQuery(object):
         return d
 
     @classmethod
-    def deserialize(self, d, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin):
+    def deserialize(self, d, bailiwick_map, default_bailiwick, cookie_jar_map, default_cookie_jar, cookie_standin, cookie_bad):
         qname = dns.name.from_text(d['qname'])
         rdclass = dns.rdataclass.from_text(d['qclass'])
         rdtype = dns.rdatatype.from_text(d['qtype'])
@@ -1190,6 +1190,8 @@ class DNSQuery(object):
                         # initially assume that there is a cookie for the server;
                         # change the value later if there isn't
                         server_cookie_status = DNS_COOKIE_SERVER_COOKIE_FRESH
+                    elif cookie_opt.data[8:] == cookie_bad:
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_BAD
                     else:
                         server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
                 else:
@@ -1283,7 +1285,7 @@ class ExecutableDNSQuery(DNSQuery):
     default_th_factory = transport.DNSQueryTransportHandlerDNSPrivateFactory()
 
     def __init__(self, qname, rdtype, rdclass, servers, bailiwick,
-            client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin,
+            client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin, cookie_bad,
             flags, edns, edns_max_udp_payload, edns_flags, edns_options, tcp,
             response_handlers, query_timeout, max_attempts, lifetime):
 
@@ -1310,6 +1312,7 @@ class ExecutableDNSQuery(DNSQuery):
             cookie_jar = {}
         self.cookie_jar = cookie_jar
         self.cookie_standin = cookie_standin
+        self.cookie_bad = cookie_bad
         self.response_handlers = response_handlers
 
         self.query_timeout = query_timeout
@@ -1346,6 +1349,8 @@ class ExecutableDNSQuery(DNSQuery):
                             # otherwise, send just the client cookie.
                             cookie_opt.data = cookie_opt.data[:8]
                             server_cookie_status = DNS_COOKIE_CLIENT_COOKIE_ONLY
+                    elif cookie_opt.data[8:] == self.cookie_bad:
+                        server_cookie_status = DNS_COOKIE_SERVER_COOKIE_BAD
                     else:
                         server_cookie_status = DNS_COOKIE_SERVER_COOKIE_STATIC
                 else:
@@ -1602,7 +1607,7 @@ class DNSQueryFactory(object):
     response_handlers = []
 
     def __new__(cls, qname, rdtype, rdclass, servers, bailiwick=None,
-            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None, cookie_jar=None, cookie_standin=None,
+            client_ipv4=None, client_ipv6=None, port=53, odd_ports=None, cookie_jar=None, cookie_standin=None, cookie_bad=None,
             query_timeout=None, max_attempts=None, lifetime=None,
             executable=True):
 
@@ -1615,7 +1620,7 @@ class DNSQueryFactory(object):
 
         if executable:
             return ExecutableDNSQuery(qname, rdtype, rdclass, servers, bailiwick,
-                client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin,
+                client_ipv4, client_ipv6, port, odd_ports, cookie_jar, cookie_standin, cookie_bad,
                 cls.flags, cls.edns, cls.edns_max_udp_payload, cls.edns_flags, cls.edns_options, cls.tcp,
                 cls.response_handlers, query_timeout, max_attempts, lifetime)
 
