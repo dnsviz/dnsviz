@@ -41,15 +41,15 @@ def usage(err=None):
         err = ''
     sys.stderr.write('''%sUsage: dnsviz [options] <command> [args]
 Options:
-    -p <path>      - add path to the python path
+    -p <path>      - Add path to the python path.
 Commands:
-    probe          - issue diagnostic DNS queries
-    grok           - assess diagnostic DNS queries
-    graph          - graph the assessment of diagnostic DNS queries
-    print          - process diagnostic DNS queries to textual output
-    query          - assess a DNS query
+    probe          - Issue diagnostic DNS queries.
+    grok           - Assess diagnostic DNS queries.
+    graph          - Graph the assessment of diagnostic DNS queries.
+    print          - Process diagnostic DNS queries to textual output.
+    query          - Assess a DNS query.
     help [<command>]
-                   - show usage for a command
+                   - Show usage for a command.
 ''' % (err))
 
 def main():
