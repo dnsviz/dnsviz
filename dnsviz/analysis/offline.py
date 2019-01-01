@@ -56,6 +56,15 @@ DNS_PROCESSED_VERSION = '1.0'
 # RFC 6891)
 EDNS_DEFINED_FLAGS = dns.flags.DO
 
+DNSSEC_KEY_LENGTHS_BY_ALGORITHM = {
+        12: 512, 13: 512, 14: 768, 15: 256, 16: 456,
+}
+DNSSEC_KEY_LENGTH_ERRORS = {
+        12: Errors.DNSKEYBadLengthGOST, 13: Errors.DNSKEYBadLengthECDSA256,
+        14: Errors.DNSKEYBadLengthECDSA384, 15: Errors.DNSKEYBadLengthEd25519,
+        16: Errors.DNSKEYBadLengthEd448,
+}
+
 _logger = logging.getLogger(__name__)
 
 class FoundYXDOMAIN(Exception):
@@ -2359,7 +2368,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
-            dnskey.validate_key_len()
+            if dnskey.rdata.algorithm in DNSSEC_KEY_LENGTHS_BY_ALGORITHM and \
+                    dnskey.key_len != DNSSEC_KEY_LENGTHS_BY_ALGORITHM[dnskey.rdata.algorithm]:
+                dnskey.errors.append(DNSSEC_KEY_LENGTH_ERRORS[dnskey.rdata.algorithm](length=dnskey.key_len))
 
         if trusted_keys_rdata and not trusted_keys_self_signing:
             self.zone_errors.append(Errors.NoTrustAnchorSigning(zone=fmt.humanize_name(self.zone.name)))
