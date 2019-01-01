@@ -28,6 +28,7 @@
 from __future__ import unicode_literals
 
 import base64
+import binascii
 import copy
 import errno
 import cgi
@@ -661,7 +662,7 @@ class DNSResponse:
             for o in self.effective_edns_options:
                 s = io.BytesIO()
                 o.to_wire(s)
-                d['effective_query_options']['edns_options'].append(base64.b64encode(s.getvalue()))
+                d['effective_query_options']['edns_options'].append((o.type, binascii.hexlify(s.getvalue())))
             d['effective_query_options']['tcp'] = self.effective_tcp
 
             if self.responsive_cause_index is not None:

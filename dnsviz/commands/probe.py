@@ -90,7 +90,7 @@ PORT_RE = re.compile(r'^(.*):(\d+)$')
 STOP_RE = re.compile(r'^(.*)\+$')
 NAME_VAL_DELIM_RE = re.compile(r'\s*=\s*')
 
-COOKIE_STANDIN = b'********'
+COOKIE_STANDIN = binascii.unhexlify('cccccccccccccccc')
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess

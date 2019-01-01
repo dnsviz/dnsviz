@@ -27,7 +27,7 @@
 
 from __future__ import unicode_literals
 
-import base64
+import binascii
 import bisect
 import copy
 import errno
@@ -1130,7 +1130,7 @@ class DNSQuery(object):
             for o in self.edns_options:
                 s = io.BytesIO()
                 o.to_wire(s)
-                d['options']['edns_options'].append((o.otype, lb2s(base64.b64encode(s.getvalue()))))
+                d['options']['edns_options'].append((o.otype, lb2s(binascii.hexlify(s.getvalue()))))
             d['options']['tcp'] = self.tcp
 
         d['responses'] = OrderedDict()
@@ -1163,7 +1163,7 @@ class DNSQuery(object):
             edns_flags = d1['edns_flags']
             edns_options = []
             for otype, data in d1['edns_options']:
-                edns_options.append(dns.edns.GenericOption(otype, base64.b64decode(data)))
+                edns_options.append(dns.edns.GenericOption(otype, binascii.unhexlify(data)))
         else:
             edns = None
             edns_max_udp_payload = None

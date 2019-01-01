@@ -27,6 +27,7 @@
 
 from __future__ import unicode_literals
 
+import binascii
 import copy
 import datetime
 import logging
@@ -792,7 +793,7 @@ class OnlineDomainNameAnalysis(object):
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         if self.cookie_standin is not None:
-            d[name_str]['cookie_standin'] = self.cookie_standin.decode('latin-1')
+            d[name_str]['cookie_standin'] = binascii.hexlify(self.cookie_standin)
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -894,7 +895,7 @@ class OnlineDomainNameAnalysis(object):
             nxdomain_ancestor = None
 
         if 'cookie_standin' in d:
-            cookie_standin = d['cookie_standin'].encode('latin-1')
+            cookie_standin = binascii.unhexlify(d['cookie_standin'])
         else:
             cookie_standin = None
 
