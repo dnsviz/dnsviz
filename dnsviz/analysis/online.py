@@ -28,7 +28,6 @@
 from __future__ import unicode_literals
 
 import binascii
-import copy
 import datetime
 import logging
 import random
@@ -1070,17 +1069,18 @@ class Analyst(object):
              follow_ns=False, follow_mx=False, trace=None, explicit_delegations=None, stop_at_explicit=None, odd_ports=None, extra_rdtypes=None, explicit_only=False,
              analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
 
+        self.simple_query = self._simple_query
+        self.diagnostic_query_no_server_cookie = self._diagnostic_query.add_mixin(query_class_mixin)
+        self.diagnostic_query_bad_server_cookie = self._diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_BAD)
+        self.diagnostic_query = self._diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
+        self.tcp_diagnostic_query = self._tcp_diagnostic_query.add_mixin(query_class_mixin).remove_cookie_option()
+        self.pmtu_diagnostic_query = self._pmtu_diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
+        self.truncation_diagnostic_query = self._truncation_diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
+        self.edns_version_diagnostic_query = self._edns_version_diagnostic_query
+        self.edns_flag_diagnostic_query = self._edns_flag_diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
+        self.edns_opt_diagnostic_query = self._edns_opt_diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
+
         self.query_class_mixin = query_class_mixin
-        self.simple_query = self._get_query_class(self._simple_query, None, None)
-        self.diagnostic_query_no_server_cookie = self._get_query_class(self._diagnostic_query, self.query_class_mixin, None)
-        self.diagnostic_query_bad_server_cookie = self._get_query_class(self._diagnostic_query, self.query_class_mixin, self._add_bad_server_cookie)
-        self.diagnostic_query = self._get_query_class(self._diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
-        self.tcp_diagnostic_query = self._get_query_class(self._tcp_diagnostic_query, self.query_class_mixin, self._remove_cookie_option)
-        self.pmtu_diagnostic_query = self._get_query_class(self._pmtu_diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
-        self.truncation_diagnostic_query = self._get_query_class(self._truncation_diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
-        self.edns_version_diagnostic_query = self._get_query_class(self._edns_version_diagnostic_query, None, None)
-        self.edns_flag_diagnostic_query = self._get_query_class(self._edns_flag_diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
-        self.edns_opt_diagnostic_query = self._get_query_class(self._edns_opt_diagnostic_query, self.query_class_mixin, self._add_cookie_standin)
 
         if transport_manager is None:
             self.transport_manager = transport.DNSQueryTransportManager()
@@ -1152,7 +1152,7 @@ class Analyst(object):
 
         self.edns_diagnostics = edns_diagnostics
 
-        cookie_opt = self._get_cookie_opt(self.diagnostic_query)
+        cookie_opt = self.diagnostic_query.get_cookie_opt()
         self.dns_cookies = cookie_opt is not None
 
         self.follow_ns = follow_ns
@@ -1183,42 +1183,6 @@ class Analyst(object):
         for key in self.explicit_delegations:
             hints[key] = self.explicit_delegations[key]
         return Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
-
-    def _get_cookie_opt(self, cls):
-        try:
-            return [o for o in cls.edns_options if o.otype == 10][0]
-        except IndexError:
-            return None
-
-    def _add_bad_server_cookie(self, cls):
-        cookie_opt = self._get_cookie_opt(cls)
-        if cookie_opt is not None:
-            assert len(cookie_opt.data) == 8, 'Only client cookies are supported.'
-            cookie_opt.data += COOKIE_BAD
-
-    def _add_cookie_standin(self, cls):
-        cookie_opt = self._get_cookie_opt(cls)
-        if cookie_opt is not None:
-            assert len(cookie_opt.data) == 8, 'Only client cookies are supported.'
-            cookie_opt.data += COOKIE_STANDIN
-
-    def _remove_cookie_option(self, cls):
-        cookie_opt = self._get_cookie_opt(cls)
-        if cookie_opt is not None:
-            cls.edns_options.remove(cookie_opt)
-
-    def _get_query_class(self, cls, mixin, mod_func):
-        if mixin is None:
-            ret = cls
-        else:
-            class _foo(cls):
-                flags = cls.flags | getattr(mixin, 'flags', 0)
-                edns_flags = cls.edns_flags | getattr(mixin, 'edns_flags', 0)
-                edns_options = cls.edns_options + copy.deepcopy(getattr(mixin, 'edns_options', []))
-            ret = _foo
-        if mod_func is not None:
-            mod_func(ret)
-        return ret
 
     def _detect_cname_chain(self):
         self._cname_chain = []

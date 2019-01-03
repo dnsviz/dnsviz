@@ -1631,6 +1631,38 @@ class DNSQueryFactory(object):
     def __init__(self, *args, **kwargs):
         raise NotImplemented()
 
+    @classmethod
+    def add_mixin(cls, mixin_cls):
+        class _foo(cls):
+            flags = cls.flags | getattr(mixin_cls, 'flags', 0)
+            edns_flags = cls.edns_flags | getattr(mixin_cls, 'edns_flags', 0)
+            edns_options = cls.edns_options + copy.deepcopy(getattr(mixin_cls, 'edns_options', []))
+        return _foo
+
+    @classmethod
+    def get_cookie_opt(cls):
+        try:
+            return [o for o in cls.edns_options if o.otype == 10][0]
+        except IndexError:
+            return None
+
+    @classmethod
+    def add_server_cookie(cls, server_cookie):
+        cookie_opt = cls.get_cookie_opt()
+        if cookie_opt is None:
+            raise TypeError('No COOKIE option.')
+        if len(cookie_opt.data) != 8:
+            raise TypeError('COOKIE option must have length of 8.')
+        cookie_opt.data += server_cookie
+        return cls
+
+    @classmethod
+    def remove_cookie_option(cls):
+        cookie_opt = cls.get_cookie_opt()
+        if cookie_opt is None:
+            raise TypeError('No COOKIE option.')
+        cls.edns_options.remove(cookie_opt)
+        return cls
 
 class SimpleDNSQuery(DNSQueryFactory):
     '''A simple query, no frills.'''
