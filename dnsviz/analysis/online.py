@@ -1715,9 +1715,9 @@ class Analyst(object):
         # if there are responsive servers to query...
         if servers:
 
-            # If 1) this is a zone, 2) DNS cookies are supported, 3) there is a
-            # standin option, and 4) cookies have not yet been elicited, then
-            # issue queries now to elicit DNS cookies.
+            # If 1) this is a zone, 2) DNS cookies are supported, and
+            # 3) cookies have not yet been elicited, then issue queries now to
+            # elicit DNS cookies.
             if name_obj.is_zone() and self.dns_cookies and name_obj.cookie_rdtype is None:
                 self.logger.debug('Querying for DNS server cookies %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                 query = self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
