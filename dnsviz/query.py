@@ -1719,6 +1719,7 @@ class QuickDNSSECQuery(DNSSECQuery):
 
     response_handlers = DNSSECQuery.response_handlers + \
             [
+                    AddServerCookieOnBADCOOKIE(),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler()
             ]

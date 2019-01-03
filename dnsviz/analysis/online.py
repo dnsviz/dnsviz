@@ -1050,6 +1050,7 @@ class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
 class Analyst(object):
     analysis_model = ActiveDomainNameAnalysis
     _simple_query = Q.SimpleDNSQuery
+    _quick_query = Q.QuickDNSSECQuery
     _diagnostic_query = Q.DiagnosticQuery
     _tcp_diagnostic_query = Q.TCPDiagnosticQuery
     _pmtu_diagnostic_query = Q.PMTUDiagnosticQuery
@@ -1070,6 +1071,7 @@ class Analyst(object):
              analysis_cache=None, cache_level=None, analysis_cache_lock=None, th_factories=None, transport_manager=None, resolver=None):
 
         self.simple_query = self._simple_query
+        self.quick_query = self._quick_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
         self.diagnostic_query_no_server_cookie = self._diagnostic_query.add_mixin(query_class_mixin)
         self.diagnostic_query_bad_server_cookie = self._diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_BAD)
         self.diagnostic_query = self._diagnostic_query.add_mixin(query_class_mixin).add_server_cookie(COOKIE_STANDIN)
@@ -1182,7 +1184,7 @@ class Analyst(object):
         hints = util.get_root_hints()
         for key in self.explicit_delegations:
             hints[key] = self.explicit_delegations[key]
-        return Resolver.FullResolver(hints, odd_ports=self.odd_ports, transport_manager=self.transport_manager)
+        return Resolver.FullResolver(hints, query_cls=(self.quick_query, self.diagnostic_query), odd_ports=self.odd_ports, cookie_standin=COOKIE_STANDIN, transport_manager=self.transport_manager)
 
     def _detect_cname_chain(self):
         self._cname_chain = []

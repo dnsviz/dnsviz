@@ -61,10 +61,10 @@ else:
 
 import dns.edns, dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
-from dnsviz.analysis import WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
+from dnsviz.analysis import COOKIE_STANDIN, WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
-from dnsviz.query import StandardRecursiveQueryCD
+from dnsviz.query import DiagnosticQuery, QuickDNSSECQuery, StandardRecursiveQueryCD
 from dnsviz.resolver import DNSAnswer, Resolver, PrivateFullResolver
 from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
@@ -119,11 +119,14 @@ def _init_stub_resolver():
 def _init_full_resolver():
     global resolver
 
+    quick_query = QuickDNSSECQuery.add_mixin(CustomQueryMixin).add_server_cookie(COOKIE_STANDIN)
+    diagnostic_query = DiagnosticQuery.add_mixin(CustomQueryMixin).add_server_cookie(COOKIE_STANDIN)
+
     # now that we have the hints, make resolver a full resolver instead of a stub
     hints = get_root_hints()
     for key in explicit_delegations:
         hints[key] = explicit_delegations[key]
-    resolver = PrivateFullResolver(hints, odd_ports=odd_ports, transport_manager=tm)
+    resolver = PrivateFullResolver(hints, query_cls=(quick_query, diagnostic_query), odd_ports=odd_ports, cookie_standin=COOKIE_STANDIN, transport_manager=tm)
 
 def _init_interrupt_handler():
     signal.signal(signal.SIGINT, _raise_eof)

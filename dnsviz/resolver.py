@@ -294,7 +294,7 @@ class FullResolver:
 
     default_th_factory = transport.DNSQueryTransportHandlerDNSFactory()
 
-    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.DiagnosticQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, transport_manager=None, th_factories=None, max_ttl=None):
+    def __init__(self, hints=util.get_root_hints(), query_cls=(query.QuickDNSSECQuery, query.DiagnosticQuery), client_ipv4=None, client_ipv6=None, odd_ports=None, cookie_standin=None, transport_manager=None, th_factories=None, max_ttl=None):
 
         self._hints = hints
         self._query_cls = query_cls
@@ -313,6 +313,8 @@ class FullResolver:
 
         self._max_ttl = max_ttl
 
+        self._cookie_standin = cookie_standin
+        self._cookie_jar = {}
         self._cache = {}
         self._expirations = []
         self._cache_lock = threading.Lock()
@@ -560,7 +562,7 @@ class FullResolver:
                         if not self._allow_server(server):
                             continue
 
-                        q = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53))
+                        q = query_cls(qname, rdtype, rdclass, (server,), bailiwick, self._client_ipv4, self._client_ipv6, self._odd_ports.get((bailiwick, server), 53), cookie_jar=self._cookie_jar, cookie_standin=self._cookie_standin)
                         q.execute(tm=self._transport_manager, th_factories=self._th_factories)
                         is_referral = False
 
@@ -570,6 +572,10 @@ class FullResolver:
 
                         server1, client_response = list(q.responses.items())[0]
                         client, response = list(client_response.items())[0]
+
+                        server_cookie = response.get_server_cookie()
+                        if server_cookie is not None:
+                            self._cookie_jar[server1] = server_cookie
 
                         if response.is_valid_response() and response.is_complete_response():
                             soa_rrset = None
