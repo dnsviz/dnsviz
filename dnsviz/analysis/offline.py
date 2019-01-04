@@ -94,6 +94,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     QUERY_CLASS = Q.TTLDistinguishingMultiQueryAggregateDNSResponse
 
     def __init__(self, *args, **kwargs):
+
+        self._strict_cookies = kwargs.pop('strict_cookies', False)
+
         super(OfflineDomainNameAnalysis, self).__init__(*args, **kwargs)
 
         if self.analysis_type != ANALYSIS_TYPE_AUTHORITATIVE:
@@ -1250,7 +1253,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # which resulted in us getting a legitimate response.
                         issued_badcookie = True
 
-                if not issued_badcookie:
+                if self._strict_cookies and not issued_badcookie:
                     cookie_errs.append(err_cls())
 
             # RFC 7873: 5.2.5.  A Client Cookie and a Valid Server Cookie
