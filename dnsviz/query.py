@@ -1649,19 +1649,17 @@ class DNSQueryFactory(object):
     @classmethod
     def add_server_cookie(cls, server_cookie):
         cookie_opt = cls.get_cookie_opt()
-        if cookie_opt is None:
-            raise TypeError('No COOKIE option.')
-        if len(cookie_opt.data) != 8:
-            raise TypeError('COOKIE option must have length of 8.')
-        cookie_opt.data += server_cookie
+        if cookie_opt is not None:
+            if len(cookie_opt.data) != 8:
+                raise TypeError('COOKIE option must have length of 8.')
+            cookie_opt.data += server_cookie
         return cls
 
     @classmethod
     def remove_cookie_option(cls):
         cookie_opt = cls.get_cookie_opt()
-        if cookie_opt is None:
-            raise TypeError('No COOKIE option.')
-        cls.edns_options.remove(cookie_opt)
+        if cookie_opt is not None:
+            cls.edns_options.remove(cookie_opt)
         return cls
 
 class SimpleDNSQuery(DNSQueryFactory):
