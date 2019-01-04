@@ -1017,7 +1017,7 @@ class OnlineDomainNameAnalysis(object):
             if (qname, rdtype) == (self.nxdomain_name, self.nxdomain_rdtype):
                 extra = ' (NXDOMAIN)'
             elif (qname, rdtype) == (self.nxrrset_name, self.nxrrset_rdtype):
-                extra = ' (No data)'
+                extra = ' (NODATA)'
             else:
                 extra = ''
             _logger.debug('Importing %s/%s%s...' % (fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype), extra))
@@ -1740,7 +1740,7 @@ class Analyst(object):
                 # Query with a mixed-case name for 0x20, if possible
                 mixed_case_name = self._mix_case(name_obj.name)
                 if mixed_case_name is not None:
-                    self.logger.debug('Preparing 0x20 queries %s/%s...' % (fmt.humanize_name(mixed_case_name, canonicalize=False), dns.rdatatype.to_text(dns.rdatatype.SOA)))
+                    self.logger.debug('Preparing 0x20 query %s/%s...' % (fmt.humanize_name(mixed_case_name, canonicalize=False), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                     queries[(name_obj.name, -(dns.rdatatype.SOA+103))] = self.diagnostic_query(mixed_case_name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # DNS cookies diagnostic queries
@@ -1754,7 +1754,7 @@ class Analyst(object):
                     self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
                     queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                 if name_obj.nxrrset_name is not None:
-                    self.logger.debug('Preparing query %s/%s (No data)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                    self.logger.debug('Preparing query %s/%s (NODATA)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
                     queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # if the name is SLD or lower, then ask MX and TXT
@@ -1976,9 +1976,11 @@ class Analyst(object):
             # elicit a server query.
             name_obj.cookie_rdtype = dns.rdatatype.NS
             cookie_jar = name_obj.cookie_jar
+            cookie_str = ', detecting cookies'
         else:
             name_obj.cookie_rdtype = None
             cookie_jar = None
+            cookie_str = ''
 
 
         # Add any queries made.  At this point, at least one of the queries is
@@ -2028,7 +2030,7 @@ class Analyst(object):
             servers_queried[dns.rdatatype.NS].update(servers)
             servers = self._filter_servers(servers, no_raise=True)
             if servers:
-                self.logger.debug('Querying %s/NS (auth)...' % fmt.humanize_name(name_obj.name))
+                self.logger.debug('Querying %s/NS (auth%s)...' % (fmt.humanize_name(name_obj.name), cookie_str))
                 query = self.diagnostic_query_no_server_cookie(name_obj.name, dns.rdatatype.NS, self.rdclass, servers, name_obj.name, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports)
                 query.execute(tm=self.transport_manager, th_factories=self.th_factories)
                 self._add_query(name_obj, query, True, True, True)
