@@ -1295,15 +1295,27 @@ class NoCookieOption(DNSCookieError):
     description_template = 'The server appears to support DNS cookies but did not return a COOKIE option.'
     references = ['RFC 7873, Sec. 5.2.3']
 
-class InvalidCookieWithoutBADCOOKIE(DNSCookieError):
+class NoServerCookieWithoutBADCOOKIE(DNSCookieError):
     '''
-    >>> e = InvalidCookieWithoutBADCOOKIE()
+    >>> e = NoServerCookieWithoutBADCOOKIE()
+    >>> e.description
+    'The server appears to support DNS cookies but did not return a BADCOOKIE status when no server cookie was sent.'
+    '''
+
+    _abstract = False
+    code = 'NO_SERVER_COOKIE_WITHOUT_BADCOOKIE'
+    description_template = 'The server appears to support DNS cookies but did not return a BADCOOKIE status when no server cookie was sent.'
+    references = ['RFC 7873, Sec. 5.2.3']
+
+class InvalidServerCookieWithoutBADCOOKIE(DNSCookieError):
+    '''
+    >>> e = InvalidServerCookieWithoutBADCOOKIE()
     >>> e.description
     'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.'
     '''
 
     _abstract = False
-    code = 'INVALID_COOKIE_WITHOUT_BADCOOKIE'
+    code = 'INVALID_SERVER_COOKIE_WITHOUT_BADCOOKIE'
     description_template = 'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.'
     references = ['RFC 7873, Sec. 5.2.4']
 

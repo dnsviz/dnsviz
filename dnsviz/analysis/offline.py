@@ -1216,11 +1216,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not issued_formerr:
                     cookie_errs.append(Errors.MalformedCookieWithoutFORMERR())
 
+            # RFC 7873: 5.2.3.  Only a Client Cookie
             # RFC 7873: 5.2.4.  A Client Cookie and an Invalid Server Cookie
-            if response.server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_BAD:
+            if response.server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_BAD):
+                if response.server_cookie_status == Q.DNS_COOKIE_CLIENT_COOKIE_ONLY:
+                    err_cls = Errors.NoServerCookieWithoutBADCOOKIE
+                else:
+                    err_cls = Errors.InvalidServerCookieWithoutBADCOOKIE
 
                 issued_badcookie = False
-                if response.effective_server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_BAD:
+                if response.effective_server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_BAD):
                     # The query resulting in the response we got was sent with
                     # a bad server cookie.
                     if cookie_opt_from_server is None:
@@ -1246,11 +1251,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         issued_badcookie = True
 
                 if not issued_badcookie:
-                    cookie_errs.append(Errors.InvalidCookieWithoutBADCOOKIE())
+                    cookie_errs.append(err_cls())
 
-            # RFC 7873: 5.2.3.  Only a Client Cookie
             # RFC 7873: 5.2.5.  A Client Cookie and a Valid Server Cookie
-            if response.effective_server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_FRESH):
+            if response.effective_server_cookie_status == Q.DNS_COOKIE_SERVER_COOKIE_FRESH:
                 # The query resulting in the response we got was sent with only
                 # a client cookie.
                 if cookie_opt_from_server is None:
