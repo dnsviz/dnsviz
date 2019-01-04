@@ -166,9 +166,8 @@ def test_pygraphviz():
 
 def main(argv):
     try:
-        #TODO remove -p option (it is now the default, and -c is used to change it)
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:cpl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:cl:h')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
