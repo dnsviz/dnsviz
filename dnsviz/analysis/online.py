@@ -872,7 +872,7 @@ class OnlineDomainNameAnalysis(object):
                 mx_obj.serialize(d, meta_only, trace=trace + [self])
 
     @classmethod
-    def deserialize(cls, name, d1, cache=None):
+    def deserialize(cls, name, d1, cache=None, **kwargs):
         if cache is None:
             cache = {}
 
@@ -887,20 +887,20 @@ class OnlineDomainNameAnalysis(object):
 
         if 'parent' in d:
             parent_name = dns.name.from_text(d['parent'])
-            parent = cls.deserialize(parent_name, d1, cache=cache)
+            parent = cls.deserialize(parent_name, d1, cache=cache, **kwargs)
         else:
             parent = None
 
         if name != dns.name.root and 'dlv_parent' in d:
             dlv_parent_name = dns.name.from_text(d['dlv_parent'])
-            dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache)
+            dlv_parent = cls.deserialize(dlv_parent_name, d1, cache=cache, **kwargs)
         else:
             dlv_parent_name = None
             dlv_parent = None
 
         if 'nxdomain_ancestor' in d:
             nxdomain_ancestor_name = dns.name.from_text(d['nxdomain_ancestor'])
-            nxdomain_ancestor = cls.deserialize(nxdomain_ancestor_name, d1, cache=cache)
+            nxdomain_ancestor = cls.deserialize(nxdomain_ancestor_name, d1, cache=cache, **kwargs)
         else:
             nxdomain_ancestor_name = None
             nxdomain_ancestor = None
@@ -916,7 +916,7 @@ class OnlineDomainNameAnalysis(object):
 
         _logger.info('Loading %s' % fmt.humanize_name(name))
 
-        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type, cookie_standin=cookie_standin, cookie_bad=cookie_bad)
+        cache[name] = a = cls(name, stub=stub, analysis_type=analysis_type, cookie_standin=cookie_standin, cookie_bad=cookie_bad, **kwargs)
         a.parent = parent
         if dlv_parent is not None:
             a.dlv_parent = dlv_parent
