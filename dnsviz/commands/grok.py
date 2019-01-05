@@ -105,6 +105,7 @@ Options:
     -f <filename>  - Read names from a file.
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
+    -C             - Enforce DNS cookies strictly.
     -o <filename>  - Save the output to the specified file.
     -c             - Format JSON output minimally, instead of "pretty".
     -l <loglevel>  - Log at the specified level: error, warning, info, debug.
@@ -167,7 +168,7 @@ def test_pygraphviz():
 def main(argv):
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:o:cl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:Co:cl:h')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -210,6 +211,8 @@ def main(argv):
                 sys.exit(1)
         else:
             loglevel = logging.DEBUG
+
+        strict_cookies = '-C' in opts
 
         if '-r' not in opts or opts['-r'] == '-':
             opt_r = sys.stdin.fileno()
@@ -313,7 +316,7 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache)
+            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies)
             name_objs.append(name_obj)
 
         if not name_objs:

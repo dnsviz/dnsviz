@@ -76,6 +76,11 @@ records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
 .TP
+.B -C
+Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
+when a query contains a COOKIE option with no server cookie or with an invalid
+server cookie.
+.TP
 .B -R \fItype\fR[,\fItype...\fI]
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.

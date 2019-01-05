@@ -75,6 +75,7 @@ Options:
     -f <filename>  - Read names from a file.
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
+    -C             - Enforce DNS cookies strictly.
     -R <type>[,<type>...]
                    - Process queries of only the specified type(s).
     -e             - Do not remove redundant RRSIG edges from the graph.
@@ -152,7 +153,7 @@ def main(argv):
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:R:et:Oo:T:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:R:et:COo:T:h')
         except getopt.GetoptError as e:
             usage(str(e))
             sys.exit(1)
@@ -194,6 +195,8 @@ def main(argv):
                 sys.exit(1)
         else:
             rdtypes = None
+
+        strict_cookies = '-C' in opts
 
         remove_edges = '-e' not in opts
 
@@ -297,7 +300,7 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache)
+            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies)
             name_objs.append(name_obj)
 
             if latest_analysis_date is None or latest_analysis_date > name_obj.analysis_end:
