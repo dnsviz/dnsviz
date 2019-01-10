@@ -343,7 +343,8 @@ def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, re
             if require_name:
                 mappings_from_file = []
                 try:
-                    s = io.open(mapping, 'r', encoding='utf-8').read()
+                    with io.open(mapping, 'r', encoding='utf-8') as fh:
+                        s = fh.read()
                 except IOError as e:
                     usage('%s: "%s"' % (e.strerror, mapping))
                     sys.exit(3)
@@ -508,7 +509,8 @@ def ds_from_string(domain, dss, delegation_mapping):
         # if the value is actually a path, then check it as a zone file
         if os.path.isfile(ds):
             try:
-                s = io.open(ds, 'r', encoding='utf-8').read()
+                with io.open(ds, 'r', encoding='utf-8') as fh:
+                    s = fh.read()
             except IOError as e:
                 usage('%s: "%s"' % (e.strerror, ds))
                 sys.exit(3)
@@ -608,7 +610,8 @@ logging {
     (stdout, stderr) = p.communicate()
     if p.returncode != 0:
         try:
-            log = io.open('%s/named.log' % tmpdir, 'r', encoding='utf-8').read()
+            with io.open('%s/named.log' % tmpdir, 'r', encoding='utf-8') as fh:
+                log = fh.read()
         except IOError as e:
             log = ''
         if not log:
@@ -618,7 +621,8 @@ logging {
         sys.exit(1)
 
     try:
-        pid = int(io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8').read())
+        with io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8') as fh:
+            pid = int(fh.read())
     except (IOError, ValueError) as e:
         usage('There was an error detecting the process ID for named: %s' % e)
         _cleanup_process(tmpdir, pid)
@@ -1065,7 +1069,8 @@ def main(argv):
             else:
                 opt_r = opts['-r']
             try:
-                analysis_str = io.open(opt_r, 'r', encoding='utf-8').read()
+                with io.open(opt_r, 'r', encoding='utf-8') as fh:
+                    analysis_str = fh.read()
             except IOError as e:
                 logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
                 sys.exit(3)

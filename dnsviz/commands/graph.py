@@ -99,7 +99,8 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, remove_edge
             sys.exit(3)
 
         try:
-            template_str = io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8').read()
+            with io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8') as fh:
+                template_str = fh.read()
         except IOError as e:
             logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
             sys.exit(3)
@@ -163,7 +164,8 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
+                    with io.open(arg, 'r', encoding='utf-8') as fh:
+                        tk_str = fh.read()
                 except IOError as e:
                     logger.error('%s: "%s"' % (e.strerror, arg))
                     sys.exit(3)
@@ -219,7 +221,8 @@ def main(argv):
         else:
             opt_r = opts['-r']
         try:
-            analysis_str = io.open(opt_r, 'r', encoding='utf-8').read()
+            with io.open(opt_r, 'r', encoding='utf-8') as fh:
+                analysis_str = fh.read()
         except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
             sys.exit(3)

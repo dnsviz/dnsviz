@@ -320,7 +320,8 @@ def main(argv):
         for opt, arg in opts:
             if opt == '-t':
                 try:
-                    tk_str = io.open(arg, 'r', encoding='utf-8').read()
+                    with io.open(arg, 'r', encoding='utf-8') as fh:
+                        tk_str = fh.read()
                 except IOError as e:
                     logger.error('%s: "%s"' % (e.strerror, arg))
                     sys.exit(3)
@@ -364,7 +365,8 @@ def main(argv):
         else:
             opt_r = opts['-r']
         try:
-            analysis_str = io.open(opt_r, 'r', encoding='utf-8').read()
+            with io.open(opt_r, 'r', encoding='utf-8') as fh:
+                analysis_str = fh.read()
         except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
             sys.exit(3)
