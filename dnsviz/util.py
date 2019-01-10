@@ -165,7 +165,8 @@ def get_hints(s):
 
 def get_root_hints():
     try:
-        return get_hints(io.open(ROOT_HINTS, 'r', encoding='utf-8').read())
+        with io.open(ROOT_HINTS, 'r', encoding='utf-8') as fh:
+            return get_hints(fh.read())
     except IOError:
         return get_hints(ROOT_HINTS_STR_DEFAULT)
 
