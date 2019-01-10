@@ -21,7 +21,6 @@
 
 from __future__ import unicode_literals
 
-import cgi
 import datetime
 
 # minimal support for python2.6
@@ -29,6 +28,12 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+
+# python3/python2 dual compatibility
+try:
+    from html import escape
+except ImportError:
+    from cgi import escape
 
 import dns.dnssec
 
@@ -84,16 +89,16 @@ class DomainNameAnalysisError(object):
 
     @property
     def html_description(self):
-        description_template_escaped = cgi.escape(self.description_template, True)
+        description_template_escaped = escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
             if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
                 if isinstance(v, str):
-                    template_kwargs_escaped[n] = cgi.escape(v)
+                    template_kwargs_escaped[n] = escape(v)
                 else:
-                    template_kwargs_escaped[n] = cgi.escape(str(v))
+                    template_kwargs_escaped[n] = escape(str(v))
         return description_template_escaped % template_kwargs_escaped
 
     def add_server_client(self, server, client, response):

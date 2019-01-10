@@ -31,7 +31,6 @@ import base64
 import binascii
 import copy
 import errno
-import cgi
 import codecs
 import datetime
 import hashlib
@@ -46,6 +45,12 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+
+# python3/python2 dual compatibility
+try:
+    from html import escape
+except ImportError:
+    from cgi import escape
 
 import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
@@ -917,7 +922,7 @@ class DNSKEYMeta(DNSResponseComponent):
         d = OrderedDict()
 
         if html_format:
-            formatter = lambda x: cgi.escape(x, True)
+            formatter = lambda x: escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -1097,7 +1102,7 @@ class RRsetInfo(DNSResponseComponent):
         d = OrderedDict()
 
         if html_format:
-            formatter = lambda x: cgi.escape(x, True)
+            formatter = lambda x: escape(x, True)
         else:
             formatter = lambda x: x
 

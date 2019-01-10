@@ -28,7 +28,6 @@
 from __future__ import unicode_literals
 
 import codecs
-import cgi
 import errno
 import io
 import json
@@ -42,6 +41,12 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+
+# python3/python2 dual compatibility
+try:
+    from html import escape
+except ImportError:
+    from cgi import escape
 
 import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 
@@ -109,7 +114,7 @@ class RRsetNonExistent(object):
         d = OrderedDict()
 
         if html_format:
-            formatter = lambda x: cgi.escape(x, True)
+            formatter = lambda x: escape(x, True)
         else:
             formatter = lambda x: x
 
