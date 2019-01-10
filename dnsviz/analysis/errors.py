@@ -56,6 +56,9 @@ class DomainNameAnalysisError(object):
             except KeyError:
                 raise TypeError('The "%s" keyword argument is required for instantiation.' % param)
 
+    def __hash__(self):
+        return id(self)
+
     def __str__(self):
         return self.code
 
