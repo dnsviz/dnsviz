@@ -16,4 +16,4 @@ addons:
 install:
   - pip install -r requirements.txt
   - pip install .
-script: python -m unittest tests/script_tests.py
+script: python tests/offline_tests.py
