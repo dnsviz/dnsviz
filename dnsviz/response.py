@@ -1034,7 +1034,7 @@ class RRsetInfo(DNSResponseComponent):
             rdata_wire = rdata.to_digestable()
             rdata_len = len(rdata_wire)
 
-            stuff = struct.pack("!HHIH", rrset.rdtype, rrset.rdclass,
+            stuff = struct.pack(b'!HHIH', rrset.rdtype, rrset.rdclass,
                                 ttl, rdata_len)
             s += name_wire + stuff + rdata_wire
 

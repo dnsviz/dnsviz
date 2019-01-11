@@ -667,9 +667,9 @@ def _get_ecs_option(s):
     if remainder:
         bytes_masked += 1
 
-    wire = struct.pack('!H', family)
-    wire += struct.pack('!B', prefix_len)
-    wire += struct.pack('!B', 0)
+    wire = struct.pack(b'!H', family)
+    wire += struct.pack(b'!B', prefix_len)
+    wire += struct.pack(b'!B', 0)
     wire += addr._ipaddr_bytes[:bytes_masked]
 
     return dns.edns.GenericOption(8, wire)
@@ -681,7 +681,7 @@ def _get_nsid_option():
 def _get_dns_cookie_option(cookie=None):
     if cookie is None:
         r = random.getrandbits(64)
-        cookie = struct.pack('Q', r)
+        cookie = struct.pack(b'Q', r)
     else:
         try:
             cookie = binascii.unhexlify(cookie)

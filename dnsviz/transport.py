@@ -1126,7 +1126,7 @@ class DNSQueryTransportHandlerWebSocketClient(DNSQueryTransportHandlerWebSocketS
 
         self.msg_send = header
         for i, b in enumerate(data):
-            self.msg_send += struct.pack('!B', mask[i % 4] ^ map_func(b))
+            self.msg_send += struct.pack(b'!B', mask[i % 4] ^ map_func(b))
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 
