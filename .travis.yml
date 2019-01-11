@@ -10,6 +10,8 @@ addons:
   apt:
     packages:
       - libsodium18
+      - graphviz
+      - bind9
 # command to install dependencies
 install:
   - pip install -r requirements.txt
