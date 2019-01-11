@@ -9,3 +9,4 @@ python:
 install:
   - pip install -r requirements.txt
   - pip install .
+script: python -m unittest tests/script_tests.py
