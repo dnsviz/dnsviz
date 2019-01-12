@@ -17,7 +17,7 @@ class DNSProbeTestCase(unittest.TestCase):
 
     def test_authoritative_probe_root(self):
         self.assertEqual(subprocess.call(
-            ['dnsviz', 'probe', '-d', '0', '-A', 
+            ['dnsviz', 'probe', '-d', '0', '-A',
                 '-x' 'example.com:%s' % EXAMPLE_COM_SIGNED,
                 '-N' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
                 '-D' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
