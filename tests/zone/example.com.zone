@@ -1,0 +1,15 @@
+$TTL	3600
+example.com. IN SOA example.com. root.example.com. 1 3600 3600 14400 3600
+	IN	NS	example.com.
+	IN	A	127.0.0.1
+	IN	AAAA	::1
+; This is a key-signing key, keyid 34983, for example.com.
+; Created: 20190111040554 (Thu Jan 10 21:05:54 2019)
+; Publish: 20190111040554 (Thu Jan 10 21:05:54 2019)
+; Activate: 20190111040554 (Thu Jan 10 21:05:54 2019)
+example.com. IN DNSKEY 257 3 10 AwEAAaLSZl7J7bJnFAcRrqWE7snJvJ1uzkS8p1iq3ciHnt6rZJq47HYo P5TCnKgCpje/HtZtL/7n8ixPjhgj8/GkfOwoWq5kU3JUN2uX6pBbFhSs VeNe2JgEFtloZSMHhSU52yS009WcjZJVO2QX2JXcLy0EMI2S4JIFLa5x tatXQ2/F
+; This is a zone-signing key, keyid 39026, for example.com.
+; Created: 20190111040602 (Thu Jan 10 21:06:02 2019)
+; Publish: 20190111040602 (Thu Jan 10 21:06:02 2019)
+; Activate: 20190111040602 (Thu Jan 10 21:06:02 2019)
+example.com. IN DNSKEY 256 3 10 AwEAAaqQ5dsqndLRH+9j/GbtUObxgAEvM7VH/y12xjouBFnqTkAL9Vvo nNwYkFjnCZnIriyljOkNDgE4G8pYzYlK13EtxBDJrUoHU11ZdL95ZQEp d8hWGqSG2KQiCYwAAhmG1qu+I+LtexBekNwT3jJ1BMgGB3xsCluUYHBe Slq9caU/
