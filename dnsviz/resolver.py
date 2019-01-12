@@ -504,8 +504,16 @@ class FullResolver:
                 except KeyError:
                     pass
                 else:
-                    for rdata in ns_rrset:
-                        ns_names[rdata.target] = None
+                    for ns_rdata in ns_rrset:
+                        addrs = []
+                        for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
+                            if (ns_rdata.target, a_rdtype) in self._hints:
+                                for a_rdata in self._hints[(ns_rdata.target, a_rdtype)]:
+                                    addrs.append(IPAddr(a_rdata.address))
+                        if addrs:
+                            ns_names[ns_rdata.target] = addrs
+                        else:
+                            ns_names[ns_rdata.target] = None
 
             # if there were NS records associated with the names, then
             # no need to continue
