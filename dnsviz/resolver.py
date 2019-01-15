@@ -447,13 +447,7 @@ class FullResolver:
             responses[query_tuple] = self.query(query_tuple[0], query_tuple[1], query_tuple[2])
         return responses
 
-    def _query(self, qname, rdtype, rdclass, level, max_source, starting_domain=None):
-        self.expire_cache()
-
-        # check for max chain length
-        if level > self.MAX_CHAIN:
-            raise ServFail('SERVFAIL - resolution chain too long')
-
+    def _get_answer(self, qname, rdtype, rdclass, max_source):
         # first check cache for answer
         entry = self.cache_get(qname, rdtype)
         if entry is not None and entry.source <= max_source:
@@ -463,10 +457,23 @@ class FullResolver:
         if self.SRC_ADDITIONAL <= max_source and (qname, rdtype) in self._hints:
             return [self._hints[(qname, rdtype)], dns.rcode.NOERROR]
 
+        return None
+
+    def _query(self, qname, rdtype, rdclass, level, max_source, starting_domain=None):
+        self.expire_cache()
+
+        # check for max chain length
+        if level > self.MAX_CHAIN:
+            raise ServFail('SERVFAIL - resolution chain too long')
+
+        ans = self._get_answer(qname, rdtype, rdclass, max_source)
+        if ans:
+            return ans
+
         # next check cache for alias
-        entry = self.cache_get(qname, dns.rdatatype.CNAME)
-        if entry is not None and entry.rrset is not None:
-            return [entry.rrset] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, max_source)
+        ans = self._get_answer(qname, dns.rdatatype.CNAME, rdclass, max_source)
+        if ans:
+            return [ans[0]] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, max_source)
 
         # now check for closest enclosing NS, DNAME, or hint
         closest_zone = qname
@@ -490,30 +497,20 @@ class FullResolver:
                     return [entry.rrset, cname_rrset] + self._query(cname_rrset[0].target, rdtype, rdclass, level + 1, max_source)
 
             # look for NS records in cache
-            entry = self.cache_get(closest_zone, dns.rdatatype.NS)
-            if entry is not None:
-                if entry.rrset is not None:
-                    ns_rrset = entry.rrset
-                    for rdata in entry.rrset:
-                        ns_names[rdata.target] = None
-
-            # look for NS records in hints
-            else:
-                try:
-                    ns_rrset = self._hints[(closest_zone, dns.rdatatype.NS)]
-                except KeyError:
-                    pass
-                else:
-                    for ns_rdata in ns_rrset:
-                        addrs = []
-                        for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
-                            if (ns_rdata.target, a_rdtype) in self._hints:
-                                for a_rdata in self._hints[(ns_rdata.target, a_rdtype)]:
-                                    addrs.append(IPAddr(a_rdata.address))
-                        if addrs:
-                            ns_names[ns_rdata.target] = addrs
-                        else:
-                            ns_names[ns_rdata.target] = None
+            ans = self._get_answer(closest_zone, dns.rdatatype.NS, rdclass, self.SRC_ADDITIONAL)
+            if ans and ans[0] is not None:
+                ns_rrset = ans[0]
+                for ns_rdata in ans[0]:
+                    addrs = []
+                    for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
+                        ans1 = self._get_answer(ns_rdata.target, a_rdtype, rdclass, self.SRC_ADDITIONAL)
+                        if ans1 and ans1[0]:
+                            for a_rdata in ans1[0]:
+                                addrs.append(IPAddr(a_rdata.address))
+                    if addrs:
+                        ns_names[ns_rdata.target] = addrs
+                    else:
+                        ns_names[ns_rdata.target] = None
 
             # if there were NS records associated with the names, then
             # no need to continue
