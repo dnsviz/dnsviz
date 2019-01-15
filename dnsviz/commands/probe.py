@@ -601,7 +601,7 @@ logging {
         sys.exit(1)
 
     try:
-        p = subprocess.Popen(['named', '-L', '%s/named.log' % tmpdir, '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     except OSError as e:
         usage('This option requires executing named.  Please ensure that it is installed and in PATH (%s).' % e)
         _cleanup_process(tmpdir, pid)
