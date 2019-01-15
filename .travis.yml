@@ -15,4 +15,6 @@ addons:
 install:
   - pip install -r requirements.txt
   - pip install .
-script: python tests/offline_tests.py
+script:
+  - python tests/offline_tests.py
+  - python tests/local_probe_tests.py
