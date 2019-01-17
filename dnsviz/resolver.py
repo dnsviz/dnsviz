@@ -501,12 +501,12 @@ class FullResolver:
             if ans and ans[0] is not None:
                 ns_rrset = ans[0]
                 for ns_rdata in ans[0]:
-                    addrs = []
+                    addrs = set()
                     for a_rdtype in dns.rdatatype.A, dns.rdatatype.AAAA:
                         ans1 = self._get_answer(ns_rdata.target, a_rdtype, rdclass, self.SRC_ADDITIONAL)
                         if ans1 and ans1[0]:
                             for a_rdata in ans1[0]:
-                                addrs.append(IPAddr(a_rdata.address))
+                                addrs.add(IPAddr(a_rdata.address))
                     if addrs:
                         ns_names[ns_rdata.target] = addrs
                     else:
@@ -538,6 +538,7 @@ class FullResolver:
             ns_names_without_addresses = list(set(ns_names).difference(ns_names_with_addresses))
             random.shuffle(ns_names_without_addresses)
             all_ns_names = ns_names_with_addresses + ns_names_without_addresses
+            previous_valid_answer = set()
 
             for query_cls in self._query_cls:
                 # query each server until we get a match
@@ -562,7 +563,7 @@ class FullResolver:
                                 for rdata in a_rrset:
                                     ns_names[ns_name].add(IPAddr(rdata.address))
 
-                    for server in ns_names[ns_name]:
+                    for server in ns_names[ns_name].difference(previous_valid_answer):
                         # server disallowed by policy
                         if not self._allow_server(server):
                             continue
@@ -582,46 +583,90 @@ class FullResolver:
                         if server_cookie is not None:
                             self._cookie_jar[server1] = server_cookie
 
-                        if response.is_valid_response() and response.is_complete_response():
-                            soa_rrset = None
-                            rcode = response.message.rcode()
+                        if not (response.is_valid_response() and response.is_complete_response()):
+                            continue
 
-                            # response is acceptable
+                        previous_valid_answer.add(server)
+
+                        soa_rrset = None
+                        rcode = response.message.rcode()
+
+                        # response is acceptable
+                        try:
+                            # first check for exact match
+                            ret = [[x for x in response.message.answer if x.name == qname and x.rdtype == rdtype and x.rdclass == rdclass][0]]
+                        except IndexError:
                             try:
-                                # first check for exact match
-                                ret = [[x for x in response.message.answer if x.name == qname and x.rdtype == rdtype and x.rdclass == rdclass][0]]
+                                # now look for DNAME
+                                dname_rrset = [x for x in response.message.answer if qname.is_subdomain(x.name) and qname != x.name and x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass][0]
                             except IndexError:
                                 try:
-                                    # now look for DNAME
-                                    dname_rrset = [x for x in response.message.answer if qname.is_subdomain(x.name) and qname != x.name and x.rdtype == dns.rdatatype.DNAME and x.rdclass == rdclass][0]
+                                    # now look for CNAME
+                                    cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
                                 except IndexError:
+                                    ret = [None]
+                                    # no answer
                                     try:
-                                        # now look for CNAME
-                                        cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
+                                        soa_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.SOA][0]
                                     except IndexError:
-                                        ret = [None]
-                                        # no answer
-                                        try:
-                                            soa_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.SOA][0]
-                                        except IndexError:
-                                            pass
-                                    # cache the NS RRset
-                                    else:
-                                        cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
-                                        ret = [cname_rrset]
+                                        pass
+                                # cache the NS RRset
                                 else:
-                                    # handle DNAME: return the DNAME, CNAME and (recursively) its chain
-                                    cname_rrset = Response.cname_from_dname(qname, dname_rrset)
-                                    ret = [dname_rrset, cname_rrset]
+                                    cname_rrset = [x for x in response.message.answer if x.name == qname and x.rdtype == dns.rdatatype.CNAME and x.rdclass == rdclass][0]
+                                    ret = [cname_rrset]
+                            else:
+                                # handle DNAME: return the DNAME, CNAME and (recursively) its chain
+                                cname_rrset = Response.cname_from_dname(qname, dname_rrset)
+                                ret = [dname_rrset, cname_rrset]
 
-                            if response.is_referral(qname, rdtype, rdclass, bailiwick):
-                                is_referral = True
-                                a_rrsets = {}
-                                min_ttl = None
-                                ret = None
+                        if response.is_referral(qname, rdtype, rdclass, bailiwick):
+                            is_referral = True
+                            a_rrsets = {}
+                            min_ttl = None
+                            ret = None
 
-                                # if response is referral, then we follow it
-                                ns_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
+                            # if response is referral, then we follow it
+                            ns_rrset = [x for x in response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
+                            ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
+                            for ns_name in ns_names:
+                                if not ns_names[ns_name]:
+                                    ns_names[ns_name] = None
+                                else: # name is in bailiwick
+                                    for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                        try:
+                                            a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
+                                        except KeyError:
+                                            pass
+                                        else:
+                                            if min_ttl is None or a_rrsets[a_rdtype].ttl < min_ttl:
+                                                min_ttl = a_rrsets[a_rdtype].ttl
+
+                                    for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
+                                        if a_rdtype in a_rrsets:
+                                            a_rrsets[a_rdtype].update_ttl(min_ttl)
+                                            self.cache_put(ns_name, a_rdtype, a_rrsets[a_rdtype], self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, None)
+                                        else:
+                                            self.cache_put(ns_name, a_rdtype, None, self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, min_ttl)
+
+                            if min_ttl is not None:
+                                ns_rrset.update_ttl(min_ttl)
+
+                            # cache the NS RRset
+                            self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_NONAUTH_AUTH, rcode, None, None)
+                            break
+
+                        elif response.is_authoritative():
+                            terminal = True
+                            a_rrsets = {}
+                            min_ttl = None
+
+                            # if response is authoritative (and not a referral), then we return it
+                            try:
+                                ns_rrset = [x for x in  response.message.answer + response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
+                            except IndexError:
+                                pass
+                            else:
+
                                 ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
                                 for ns_name in ns_names:
                                     if not ns_names[ns_name]:
@@ -646,62 +691,22 @@ class FullResolver:
                                 if min_ttl is not None:
                                     ns_rrset.update_ttl(min_ttl)
 
-                                # cache the NS RRset
-                                self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_NONAUTH_AUTH, rcode, None, None)
-                                break
+                                self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_AUTH_AUTH, rcode, None, None)
 
-                            elif response.is_authoritative():
-                                terminal = True
-                                a_rrsets = {}
-                                min_ttl = None
+                            if ret[-1] == None:
+                                self.cache_put(qname, rdtype, None, self.SRC_AUTH_ANS, rcode, soa_rrset, None)
 
-                                # if response is authoritative (and not a referral), then we return it
-                                try:
-                                    ns_rrset = [x for x in  response.message.answer + response.message.authority if qname.is_subdomain(x.name) and x.rdtype == dns.rdatatype.NS][0]
-                                except IndexError:
-                                    pass
-                                else:
+                            else:
+                                for rrset in ret:
+                                    self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_AUTH_ANS, rcode, None, None)
 
-                                    ns_names = response.ns_ip_mapping_from_additional(ns_rrset.name, bailiwick)
-                                    for ns_name in ns_names:
-                                        if not ns_names[ns_name]:
-                                            ns_names[ns_name] = None
-                                        else: # name is in bailiwick
-                                            for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
-                                                try:
-                                                    a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
-                                                except KeyError:
-                                                    pass
-                                                else:
-                                                    if min_ttl is None or a_rrsets[a_rdtype].ttl < min_ttl:
-                                                        min_ttl = a_rrsets[a_rdtype].ttl
+                                if ret[-1].rdtype == dns.rdatatype.CNAME:
+                                    ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, self.SRC_NONAUTH_ANS)
+                                    terminal = False
 
-                                            for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
-                                                if a_rdtype in a_rrsets:
-                                                    a_rrsets[a_rdtype].update_ttl(min_ttl)
-                                                    self.cache_put(ns_name, a_rdtype, a_rrsets[a_rdtype], self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, None)
-                                                else:
-                                                    self.cache_put(ns_name, a_rdtype, None, self.SRC_ADDITIONAL, dns.rcode.NOERROR, None, min_ttl)
-
-                                    if min_ttl is not None:
-                                        ns_rrset.update_ttl(min_ttl)
-
-                                    self.cache_put(ns_rrset.name, dns.rdatatype.NS, ns_rrset, self.SRC_AUTH_AUTH, rcode, None, None)
-
-                                if ret[-1] == None:
-                                    self.cache_put(qname, rdtype, None, self.SRC_AUTH_ANS, rcode, soa_rrset, None)
-
-                                else:
-                                    for rrset in ret:
-                                        self.cache_put(rrset.name, rrset.rdtype, rrset, self.SRC_AUTH_ANS, rcode, None, None)
-
-                                    if ret[-1].rdtype == dns.rdatatype.CNAME:
-                                        ret += self._query(ret[-1][0].target, rdtype, rdclass, level + 1, self.SRC_NONAUTH_ANS)
-                                        terminal = False
-
-                                if terminal:
-                                    ret.append(rcode)
-                                return ret
+                            if terminal:
+                                ret.append(rcode)
+                            return ret
 
                     # if referral, then break
                     if is_referral:
