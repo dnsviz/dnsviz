@@ -469,3 +469,55 @@ $ dnsviz probe -A \
       -D example.com:dsset-example.com. \
       example.com
 ```
+
+
+## Docker container
+
+Ready to use docker container is available for use.
+
+```
+docker pull dnsviz/dnsviz
+```
+
+This section only covers Docker-related examples, for more information see the
+Usage section.
+
+### Simple usage
+
+```
+$ docker run dnsviz/dnsviz help
+$ docker run dnsviz/dnsviz query example.com
+```
+
+### Working with files
+
+It might be useful to mount a local working directory into the container,
+especially when combining multiple commands or working with zone files.
+
+```
+$ docker run -v "$PWD:/data:rw" dnsviz/dnsviz probe dnsviz.net > probe.json
+$ docker run -v "$PWD:/data:rw" dnsviz/dnsviz graph -r probe.json -T png -O
+```
+
+### Using host network
+
+When running authoritative queries, a host network mode is recommended.
+
+```
+$ docker run --network host dnsviz/dnsviz probe -4 -A example.com > example.json
+```
+
+Otherwise, you're likely to encounter the
+`dnsviz.query.SourceAddressBindError: Unable to bind to local address (EADDRNOTAVAIL)`
+error.
+
+### Interactive mode
+
+When doing complex analysis, where you need to run multiple dnsviz commands,
+use bash redirection etc., it might be useful to run the container
+interactively.
+
+```
+$ docker run --network host -v "$PWD:/data:rw" --entrypoint /bin/sh -ti dnsviz/dnsviz
+/data # dnsviz --help
+```
