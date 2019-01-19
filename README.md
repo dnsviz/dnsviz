@@ -92,7 +92,7 @@ Install pygraphviz and M2Crypto, after installing their build dependencies.
 ```
 $ sudo yum install python-setuptools gcc python-devel graphviz-devel openssl-devel
 $ sudo easy_install pbr
-$ sudo easy_install m2crypto pygraphviz
+$ sudo easy_install m2crypto pygraphviz==1.2
 ```
 
 (RHEL6 only) Install the EPEL repository, and the necessary python libraries
