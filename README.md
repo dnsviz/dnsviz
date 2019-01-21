@@ -9,13 +9,23 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 ## Installation
 
+This section covers installation, including [dependencies](#dependencies),
+[generic build and install](#generic-build-and-install), and instructions for building
+[for RHEL6 and RHEL7](#rpm-build-and-install-rhel6-or-rhel7).
+
+Instructions for running in a Docker container are also available
+[later in this document](#docker-container).
+
+Please note that packages are also available in repositories for popular
+operating systems, such as Debian, Ubuntu, and FreeBSD.  DNSViz can also be
+installed on Mac OS X via Homebrew or MacPorts.
+
 
 ### Dependencies
 
-* python (2.6/2.7/3.4) - http://www.python.org/
+* python (2.6/2.7/3.x) - http://www.python.org/
 
-  python 2.6, 2.7, or 3.4 is required.  For python 3.4 the other third-party
-  dependencies must also support python 3.4.  Note that for python 2.6 the
+  python 2.6, 2.7, or 3.x is required.  Note that for python 2.6 the
   importlib (https://pypi.python.org/pypi/importlib) and ordereddict
   (https://pypi.python.org/pypi/ordereddict) packages are also required.
 
@@ -471,25 +481,27 @@ $ dnsviz probe -A \
 ```
 
 
-## Docker container
+## Docker Container
 
-Ready to use docker container is available for use.
+A ready-to-use docker container is available for use.
 
 ```
 docker pull dnsviz/dnsviz
 ```
 
 This section only covers Docker-related examples, for more information see the
-Usage section.
+[Usage](#usage) section.
 
-### Simple usage
+
+### Simple Usage
 
 ```
 $ docker run dnsviz/dnsviz help
 $ docker run dnsviz/dnsviz query example.com
 ```
 
-### Working with files
+
+### Working with Files
 
 It might be useful to mount a local working directory into the container,
 especially when combining multiple commands or working with zone files.
@@ -499,23 +511,24 @@ $ docker run -v "$PWD:/data:rw" dnsviz/dnsviz probe dnsviz.net > probe.json
 $ docker run -v "$PWD:/data:rw" dnsviz/dnsviz graph -r probe.json -T png -O
 ```
 
-### Using host network
 
-When running authoritative queries, a host network mode is recommended.
+### Using a Host Network
+
+When running authoritative queries, a host network is recommended.
 
 ```
 $ docker run --network host dnsviz/dnsviz probe -4 -A example.com > example.json
 ```
 
-Otherwise, you're likely to encounter the
+Otherwise, you're likely to encounter the following error:
 `dnsviz.query.SourceAddressBindError: Unable to bind to local address (EADDRNOTAVAIL)`
-error.
 
-### Interactive mode
 
-When doing complex analysis, where you need to run multiple dnsviz commands,
-use bash redirection etc., it might be useful to run the container
-interactively.
+### Interactive Mode
+
+When performing complex analyses, where you need to combine multiple DNSViz
+commands, use bash redirection, etc., it might be useful to run the container
+interactively:
 
 ```
 $ docker run --network host -v "$PWD:/data:rw" --entrypoint /bin/sh -ti dnsviz/dnsviz
