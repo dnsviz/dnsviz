@@ -563,6 +563,10 @@ def _cleanup_process(working_dir, pid):
     shutil.rmtree(working_dir)
 
 def _serve_zone(zone, zone_file, port):
+    try:
+        tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz', dir='/var/tmp/')
+    except OSError:
+        tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz')
     tmpdir = tempfile.mkdtemp(prefix='dnsviz')
     pid = None
 
