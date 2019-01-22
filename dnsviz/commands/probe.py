@@ -567,6 +567,7 @@ def _serve_zone(zone, zone_file, port):
         tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz', dir='/var/tmp/')
     except OSError:
         tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz')
+    env = { 'PATH': '%s:/sbin:/usr/sbin:/usr/local/sbin' % (os.environ.get('PATH', '')) }
     pid = None
 
     io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
@@ -591,7 +592,7 @@ logging {
 ''' % (tmpdir, port, port, lb2s(zone.to_text()), os.path.abspath(zone_file), tmpdir))
 
     try:
-        p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
     except OSError as e:
         usage('This option requires executing named-checkconf.  Please ensure that it is installed and in PATH (%s).' % e)
         _cleanup_process(tmpdir, pid)
@@ -604,7 +605,7 @@ logging {
         sys.exit(1)
 
     try:
-        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
     except OSError as e:
         usage('This option requires executing named.  Please ensure that it is installed and in PATH (%s).' % e)
         _cleanup_process(tmpdir, pid)
