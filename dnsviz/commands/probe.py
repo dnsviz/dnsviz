@@ -567,7 +567,6 @@ def _serve_zone(zone, zone_file, port):
         tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz', dir='/var/tmp/')
     except OSError:
         tmpdir = tempfile.mkdtemp(prefix='DNS_dnsviz')
-    tmpdir = tempfile.mkdtemp(prefix='dnsviz')
     pid = None
 
     io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
