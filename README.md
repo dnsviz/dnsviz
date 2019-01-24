@@ -9,90 +9,83 @@ powers the Web-based analysis available at http://dnsviz.net/
 
 ## Installation
 
-This section covers installation, including [dependencies](#dependencies),
-[generic build and install](#generic-build-and-install), and instructions for building
-[for RHEL6 and RHEL7](#rpm-build-and-install-rhel6-or-rhel7).
+DNSViz packages are available in repositories for popular operating systems,
+such as Debian, Ubuntu, and FreeBSD.  DNSViz can also be installed on Mac OS X
+via Homebrew or MacPorts.
+
+The remainer of this section covers other methods of installation, including a
+list of [dependencies](#dependencies), installation to a [virtual
+environment](#installation-in-a-virtual environment), and installation on
+[RHEL6 and RHEL7](#rpm-build-and-install-rhel6-or-rhel7).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
 
-Please note that packages are also available in repositories for popular
-operating systems, such as Debian, Ubuntu, and FreeBSD.  DNSViz can also be
-installed on Mac OS X via Homebrew or MacPorts.
-
 
 ### Dependencies
 
-* python (2.6/2.7/3.x) - http://www.python.org/
+* python (2.7/3.4/3.5/3.6) - http://www.python.org/
 
-  python 2.6, 2.7, or 3.x is required.  Note that for python 2.6 the
-  importlib (https://pypi.python.org/pypi/importlib) and ordereddict
-  (https://pypi.python.org/pypi/ordereddict) packages are also required.
+* dnspython (1.13.0 or later) - http://www.dnspython.org/
 
-* dnspython (1.11.0 or later) - http://www.dnspython.org/
+* pygraphviz (1.4 or later) - http://pygraphviz.github.io/
 
-  dnspython is required.  Version 1.10.0 is sufficient if you're not issuing
-  TLSA queries, but more generally version 1.11.0 or greater is required.
+* M2Crypto (0.28.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
-* pygraphviz (1.1 or later) - http://pygraphviz.github.io/
+* libnacl - https://github.com/saltstack/libnacl
 
-  pygraphviz is required for most functionality.   `dnsviz probe` and `dnsviz grok`
-  (without the -t option) can be used without pygraphviz installed.  Version 1.1
-  or greater is required because of the support for unicode names and HTML-like
-  labels, both of which are utilized in the visual output.
+Note that the software versions listed above are known to work with the current
+version of DNSViz.  Other versions might also work well together, but might
+have some caveats.  For example, while the current version of DNSViz works with
+python 2.6, the importlib (https://pypi.python.org/pypi/importlib) and
+ordereddict (https://pypi.python.org/pypi/ordereddict) packages are
+additionally required.  Also for python 2.6, pygraphviz version 1.1 or 1.2 is
+required (pygraphviz version 1.3 dropped support for python 2.6).
 
-* M2Crypto (0.24.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
-  M2Crypto is required if cryptographic validation of signatures and digests is
-  desired (and thus is highly recommended).  The current code will display
-  warnings if the cryptographic elements cannot be verified.
+### Optional Software
 
-  Note that M2Crypto version 0.21.1 or later can be used to validate some
-  DNSSEC algorithms, but support for the following DNSSEC algorithms is not
-  available in releases of M2Crypto prior to 0.24.0 without a patch:
-  3 (DSA-SHA1), 6 (DSA-NSEC3-SHA1), 12 (GOST R 34.10-2001),
-  13 (ECDSA Curve P-256 with SHA-256), 14 (ECDSA Curve P-384 with SHA-384).
-  There are two patches included in the `contrib` directory that can be
-  applied to pre-0.24.0 versions to get this functionality:
-  `contrib/m2crypto-pre0.23.patch` or `contrib/m2crypto-0.23.patch`.  For
-  example:
-
-  ```
-  $ patch -p1 < /path/to/dnsviz-source/contrib/m2crypto-pre0.23.patch
-  ```
-
-* (optional) libnacl - https://github.com/saltstack/libnacl
-
-  libnacl is necessary to validate DNSSEC signatures with algorithm 15
-  (Ed25519).
-
-* (optional) OpenSSL GOST Engine - https://github.com/gost-engine/engine
+* OpenSSL GOST Engine - https://github.com/gost-engine/engine
 
   With OpenSSL version 1.1.0 and later, the OpenSSL GOST Engine is necessary to
   validate DNSSEC signatures with algorithm 12 (GOST R 34.10-2001) and create
   digests of type 3 (GOST R 34.11-94).
 
-* (optional) ISC BIND - https://www.isc.org/downloads/bind/
+* ISC BIND - https://www.isc.org/downloads/bind/
 
-  When calling `dnsviz probe` if the `-N` option is used or if a zone file is
-  used in conjunction with the `-x` option, `named(8)` is looked for in PATH
-  and invoked to serve the zone file.  ISC BIND is only needed in this specific
-  case, and `named(8)` does not need to be running.
+  When using DNSViz for [pre-deployment testing](#pre-deployment-dns-testing)
+  by specifying zone files and/or alternate delegation information on the
+  command line (i.e., with `-N`, `-x`, or `-D`), `named(8)` is invoked to serve
+  one or more zones.  ISC BIND is only needed in this case, and `named(8)` does
+  not need to be running (i.e., as a server).
+
+  Note that default AppArmor policies for Debian are known to cause issues when
+  invoking `named(8)` from DNSViz for pre-deployment testing.  Two solutions to
+  this problem are to either: 1) create a local policy for AppArmor that allows
+  `named(8)` to run with fewer restrictions; or 2) disable AppArmor completely.
 
 
-### Generic Build and Install
+### Installation in a Virtual Environment
 
-A generic build and install is performed with the following commands:
-
+To install DNSViz to a virtual environment, first create and activate a virtual
+environment, and install the dependencies:
 ```
-$ python setup.py build
-$ sudo python setup.py install
+$ virtualenv ~/myenv
+$ source ~/myenv/bin/activate
+(myenv) $ pip install -r requirements.txt
 ```
+(Note that this installs the dependencies that are python packages, but some of
+these packages have non-python dependecies, such as Graphviz (required for
+pygraphviz) and libsodium (required for libnacl), that are not installed
+automatically.)
 
-To see all installation options, run the following:
-
+Next download and install DNSViz from the Python Package Index (PyPI):
 ```
-$ python setup.py --help
+(myenv) $ pip install dnsviz
+```
+or locally, from a downloaded copy of DNSViz:
+```
+(myenv) $ pip install .
 ```
 
 
