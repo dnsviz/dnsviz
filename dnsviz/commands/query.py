@@ -95,12 +95,12 @@ class DVCommandLineQuery:
                     if not arg:
                         raise ValueError()
                 except ValueError:
-                    usage('+trusted-key requires a filename argument.')
+                    sys.stderr.write('+trusted-key requires a filename argument.\n')
                     sys.exit(1)
                 else:
                     self.trusted_keys_file = arg
             else:
-                usage('Option "%s" not recognized.' % arg)
+                sys.stderr.write('Option "%s" not recognized.\n' % arg)
                 sys.exit(1)
 
     def process_nameservers(self, nameservers, use_ipv4, use_ipv6):
@@ -214,7 +214,7 @@ class DVCommandLine:
         try:
             if len(self.args[self.arg_index]) > 2:
                 if not has_arg:
-                    usage('"%s" option does not take arguments' % self.args[self.arg_index][:2])
+                    sys.stderr.write('"%s" option does not take arguments\n' % self.args[self.arg_index][:2])
                     sys.exit(1)
                 return self.args[self.arg_index][2:]
             else:
@@ -223,7 +223,7 @@ class DVCommandLine:
                 else:
                     self.arg_index += 1
                     if self.arg_index >= len(self.args):
-                        usage('"%s" option requires an argument' % self.args[self.arg_index - 1])
+                        sys.stderr.write('"%s" option requires an argument\n' % self.args[self.arg_index - 1])
                         sys.exit(1)
                     return self.args[self.arg_index]
         finally:
@@ -350,7 +350,7 @@ class DVCommandLine:
             self._get_arg(False)
             self.options['use_ipv4'] = True
         else:
-            usage('Option "%s" not recognized.' % self.args[self.arg_index][:2])
+            sys.stderr.write('Option "%s" not recognized.\n' % self.args[self.arg_index][:2])
             sys.exit(1)
 
     def _add_query_option(self, query):

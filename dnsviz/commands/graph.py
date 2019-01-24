@@ -156,7 +156,7 @@ def main(argv):
         try:
             opts, args = getopt.getopt(argv[1:], 'f:r:R:et:COo:T:h')
         except getopt.GetoptError as e:
-            usage(str(e))
+            sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
 
         # collect trusted keys
@@ -181,19 +181,19 @@ def main(argv):
             sys.exit(0)
 
         if '-f' in opts and args:
-            usage('If -f is used, then domain names may not supplied as command line arguments.')
+            sys.stderr.write('If -f is used, then domain names may not supplied as command line arguments.\n')
             sys.exit(1)
 
         if '-R' in opts:
             try:
                 rdtypes = opts['-R'].split(',')
             except ValueError:
-                usage('The list of types was invalid: "%s"' % opts['-R'])
+                sys.stderr.write('The list of types was invalid: "%s"\n' % opts['-R'])
                 sys.exit(1)
             try:
                 rdtypes = [dns.rdatatype.from_text(x) for x in rdtypes]
             except dns.rdatatype.UnknownRdatatype:
-                usage('The list of types was invalid: "%s"' % opts['-R'])
+                sys.stderr.write('The list of types was invalid: "%s"\n' % opts['-R'])
                 sys.exit(1)
         else:
             rdtypes = None
@@ -209,11 +209,11 @@ def main(argv):
         else:
             fmt = 'dot'
         if fmt not in ('dot','png','jpg','svg','html'):
-            usage('Image format unrecognized: "%s"' % fmt)
+            sys.stderr.write('Image format unrecognized: "%s"\n' % fmt)
             sys.exit(1)
 
         if '-o' in opts and '-O' in opts:
-            usage('The -o and -O options may not be used together.')
+            sys.stderr.write('The -o and -O options may not be used together.\n')
             sys.exit(1)
 
         if '-r' not in opts or opts['-r'] == '-':

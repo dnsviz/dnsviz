@@ -58,7 +58,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'p:')
     except getopt.GetoptError as e:
-        usage(str(e))
+        sys.stderr.write('%s\n' % str(e))
         sys.exit(1)
 
     opts = dict(opts)
@@ -94,7 +94,7 @@ def main():
         if exc_frame.tb_next.tb_next is not None:
             raise
 
-        usage('Invalid command: %s' % command)
+        sys.stderr.write('Invalid command: %s\n' % command)
         sys.exit(1)
 
     if args[0] == 'help':

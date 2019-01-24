@@ -170,7 +170,7 @@ def main(argv):
         try:
             opts, args = getopt.getopt(argv[1:], 'f:r:t:Co:cl:h')
         except getopt.GetoptError as e:
-            usage(str(e))
+            sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
 
         # collect trusted keys
@@ -195,7 +195,7 @@ def main(argv):
             sys.exit(0)
 
         if '-f' in opts and args:
-            usage('If -f is used, then domain names may not supplied as command line arguments.')
+            sys.stderr.write('If -f is used, then domain names may not supplied as command line arguments.\n')
             sys.exit(1)
 
         if '-l' in opts:
@@ -208,7 +208,7 @@ def main(argv):
             elif opts['-l'] == 'debug':
                 loglevel = logging.DEBUG
             else:
-                usage('Invalid log level: "%s"' % opts['-l'])
+                sys.stderr.write('Invalid log level: "%s"\n' % opts['-l'])
                 sys.exit(1)
         else:
             loglevel = logging.DEBUG
