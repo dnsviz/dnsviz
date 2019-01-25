@@ -15,7 +15,7 @@ via Homebrew or MacPorts.
 
 The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
-[virtual environment](#installation-in-a-virtual environment), and installation
+[virtual environment](#installation-in-a-virtual-environment), and installation
 on [Fedora](#fedora-rpm-build-and-install) and
 [RHEL6 or RHEL7](#rhel6-rhel7-rpm-build-and-install).
 
