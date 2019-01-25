@@ -1,8 +1,6 @@
 #
 # This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
-# analysis, and visualization.  This file (or some portion thereof) is a
-# derivative work authored by VeriSign, Inc., and created in 2014, based on
-# code originally developed at Sandia National Laboratories.
+# analysis, and visualization.
 # Created by Casey Deccio (casey@deccio.net)
 #
 # Copyright 2012-2014 Sandia Corporation. Under the terms of Contract
@@ -10,6 +8,8 @@
 # certain rights in this software.
 #
 # Copyright 2014-2016 VeriSign, Inc.
+#
+# Copyright 2016-2019 Casey Deccio
 #
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
