@@ -14,9 +14,10 @@ such as Debian, Ubuntu, and FreeBSD.  DNSViz can also be installed on Mac OS X
 via Homebrew or MacPorts.
 
 The remainer of this section covers other methods of installation, including a
-list of [dependencies](#dependencies), installation to a [virtual
-environment](#installation-in-a-virtual environment), and installation on
-[RHEL6 and RHEL7](#rpm-build-and-install-rhel6-or-rhel7).
+list of [dependencies](#dependencies), installation to a
+[virtual environment](#installation-in-a-virtual environment), and installation
+on [Fedora](#fedora-rpm-build-and-install) and
+[RHEL6 or RHEL7](#rhel6-rhel7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
@@ -89,7 +90,51 @@ or locally, from a downloaded copy of DNSViz:
 ```
 
 
-### RPM Build and Install (RHEL6 or RHEL7)
+### Fedora RPM Build and Install
+
+A Fedora RPM can be built for either python2 or python3.  For Fedora 29,
+building with python2 is preferred because the version of pygraphviz is buggy
+with python3.7.  For Fedora Rawhide, python2 packages are being removed, so
+python3 is preferred.
+
+The value of ${PY_VERS} is either 2 or 3, corresponding to python2 or python3.
+
+Install the tools for building an RPM, and set up the rpmbuild tree.
+```
+$ sudo dnf install rpm-build rpmdevtools python${PY_VERS}-devel
+$ rpmdev-setuptree
+```
+
+From within the DNSViz source directory, create a source distribution tarball
+and copy it and the DNSViz spec file to the appropriate rpmbuild
+subdirectories.
+```
+$ python setup.py sdist
+$ cp dist/dnsviz-*.tar.gz ~/rpmbuild/SOURCES/
+$ cp contrib/dnsviz-py${PY_VERS}.spec ~/rpmbuild/SPECS/dnsviz.spec
+```
+
+Install dnspython, pygraphviz, M2Crypto, and libnacl.
+```
+$ sudo dnf install python${PY_VERS}-dns python${PY_VERS}-pygraphviz python${PY_VERS}-libnacl
+```
+For python2:
+```
+$ sudo dnf install m2crypto
+```
+For python3:
+```
+$ sudo dnf install python3-m2crypto
+```
+
+Build and install the DNSViz RPM.
+```
+$ rpmbuild -ba rpmbuild/SPECS/dnsviz.spec
+$ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*-1.*.noarch.rpm
+```
+
+
+### RHEL6/RHEL7 RPM Build and Install
 
 Install pygraphviz and M2Crypto, after installing their build dependencies.
 ```
