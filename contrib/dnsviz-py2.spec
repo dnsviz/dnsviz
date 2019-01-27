@@ -60,5 +60,5 @@ rm -rf %{buildroot}
 %{_mandir}/man1/%{name}-query.1*
 
 %changelog
-* Thu Jan  25 2019 Casey Deccio
+* Fri Jan  25 2019 Casey Deccio
   0.7.0 release
