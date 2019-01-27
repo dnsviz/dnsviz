@@ -92,10 +92,9 @@ or locally, from a downloaded copy of DNSViz:
 
 ### Fedora RPM Build and Install
 
-A Fedora RPM can be built for either python2 or python3.  For Fedora 29,
-building with python2 is preferred because the version of pygraphviz is buggy
-with python3.7.  For Fedora Rawhide, python2 packages are being removed, so
-python3 is preferred.
+A Fedora RPM can be built for either python2 or python3.  However, note that
+with Fedora releases after 29, python2 packages are being removed, so python3
+is preferred.
 
 The value of ${PY_VERS} is either 2 or 3, corresponding to python2 or python3.
 
