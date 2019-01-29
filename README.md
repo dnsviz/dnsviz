@@ -1,5 +1,13 @@
 # ![DNSViz](doc/images/logo-220x100.png)
 
+
+## Table of Contents
+* [Installation](#installation)
+* [Usage](#usage)
+* [Pre-Deployment DNS Testing](#pre-deployment-dns-testing)
+* [Docker Container](#docker-container)
+
+
 ## Description
 
 DNSViz is a tool suite for analysis and visualization of Domain Name System
