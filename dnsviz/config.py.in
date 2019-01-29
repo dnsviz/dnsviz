@@ -26,10 +26,11 @@ from __future__ import unicode_literals
 import os
 import sys
 
-if hasattr(sys, 'real_prefix'):
+_prefix = '__DNSVIZ_INSTALL_PREFIX__'
+if hasattr(sys, 'real_prefix') and not _prefix:
     DNSVIZ_INSTALL_PREFIX = sys.prefix
 else:
-    DNSVIZ_INSTALL_PREFIX = '__DNSVIZ_INSTALL_PREFIX__'
+    DNSVIZ_INSTALL_PREFIX = _prefix
 DNSVIZ_SHARE_PATH = os.path.join(DNSVIZ_INSTALL_PREFIX, 'share', 'dnsviz')
 JQUERY_PATH = __JQUERY_PATH__
 JQUERY_UI_PATH = __JQUERY_UI_PATH__
