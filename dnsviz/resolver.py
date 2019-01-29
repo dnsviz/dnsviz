@@ -475,7 +475,7 @@ class FullResolver:
         # next check cache for alias
         ans = self._get_answer(qname, dns.rdatatype.CNAME, rdclass, max_source)
         if ans:
-            return [ans[0]] + self._query(entry.rrset[0].target, rdtype, rdclass, level + 1, max_source)
+            return [ans[0]] + self._query(ans[0][0].target, rdtype, rdclass, level + 1, max_source)
 
         # now check for closest enclosing NS, DNAME, or hint
         closest_zone = qname
