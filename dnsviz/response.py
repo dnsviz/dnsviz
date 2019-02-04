@@ -1063,7 +1063,7 @@ class RRsetInfo(DNSResponseComponent):
         self.set_wildcard_info(rrsig, server, client, response, rdclass, is_referral)
 
     def create_or_update_cname_from_dname_info(self, synthesized_cname_info, server, client, response, rdclass):
-        return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response, rdclass)
+        return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response)
 
     def is_wildcard(self, rrsig):
         if self.rrset.name[0] == '*':
