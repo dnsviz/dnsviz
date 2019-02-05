@@ -272,7 +272,7 @@ class DNSAuthGraph:
                     s += '.attr({%s})' % (','.join(attrs))
                 s += ';\n'
                 if node_id is not None and node_id in self.node_info:
-                    s += '\tthis.addNodeEvent(el, node_info[\'%s\']);\n' % node_id.replace('--', '\\-\\-')
+                    s += '\tthis.addNodeEvent(el, node_info[\'%s\']);\n' % node_id.replace('\\', '\\\\').replace('--', '\\-\\-')
 
         for i in range(node.childNodes.length):
             s += self._write_raphael_node(node.childNodes[i], node_id, transform)
