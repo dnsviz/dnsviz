@@ -1071,7 +1071,7 @@ class DNSAuthGraph:
                 rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
                 self.add_rrsig(rrsig_status, name_obj, signer_obj, signed_node, port=port)
 
-    def graph_rrset_auth(self, name_obj, name, rdtype):
+    def graph_rrset_auth(self, name_obj, name, rdtype, trace=None):
         if (name, rdtype) not in self.processed_rrsets:
             self.processed_rrsets[(name, rdtype)] = []
 
@@ -1100,14 +1100,19 @@ class DNSAuthGraph:
         if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS):
             return []
 
+        # trace is used just for CNAME chains
+        if trace is None:
+            trace = [name]
+
         cname_nodes = []
-        # if this name is a alias, then graph the CNAME, unless this is a
-        # recursive analysis
+        # if this name is an alias, then graph its target, i.e., the canonical
+        # name, unless this is a recursive analysis.
         if name_obj.analysis_type != ANALYSIS_TYPE_RECURSIVE:
             if name in name_obj.cname_targets:
                 for target, cname_obj in name_obj.cname_targets[name].items():
                     if cname_obj is not None:
-                        cname_nodes.extend(self.graph_rrset_auth(cname_obj, target, rdtype))
+                        if target not in trace:
+                            cname_nodes.extend(self.graph_rrset_auth(cname_obj, target, rdtype, trace + [target]))
 
         query = name_obj.queries[(name, rdtype)]
         node_to_cname_mapping = set()

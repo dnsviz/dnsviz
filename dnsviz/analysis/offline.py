@@ -230,12 +230,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             return active_ksks
         return self.ksks.difference(self.revoked_keys)
 
-    def _create_response_info_recursive(self, name, rdtype, name_to_info_mapping, rrset_to_cname_mapping):
+    def _create_response_info_recursive(self, name, rdtype, name_to_info_mapping, rrset_to_cname_mapping, trace=None):
         zone_obj = self.get_name(name).zone
         info_obj = AggregateResponseInfo(name, rdtype, self, zone_obj)
+
+        if trace is None:
+            trace = [name]
+
         for info in name_to_info_mapping[name]:
             if info in rrset_to_cname_mapping:
-                cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping)
+                target = info.rrset[0].target
+                if target not in trace:
+                    cname_info = self._create_response_info_recursive(rrset_to_cname_mapping[info], rdtype, name_to_info_mapping, rrset_to_cname_mapping, trace=trace + [target])
+                else:
+                    cname_info = None
             else:
                 cname_info = None
             info_obj.add_response_info(info, cname_info)
