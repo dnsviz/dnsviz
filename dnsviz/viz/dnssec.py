@@ -170,6 +170,8 @@ class DNSAuthGraph:
         self.next_nsec_id = 0
         self.next_rrset_id = 10
 
+        self._edge_keys = set()
+
     def _raphael_unit_mapping_expression(self, val, unit):
         #XXX doesn't work properly
         #if unit:
@@ -661,10 +663,9 @@ class DNSAuthGraph:
         if not signed_node_zone.endswith(dnskey_node_zone):
             attrs['constraint'] = 'false'
 
-        try:
-            edge = self.G.get_edge(signed_node, dnskey_node, edge_key)
-        except KeyError:
-            self.G.add_edge(signed_node, dnskey_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back', **attrs)
+        if (signed_node, dnskey_node, edge_key) not in self._edge_keys:
+            self._edge_keys.add((signed_node, dnskey_node, edge_key))
+            self.G.add_edge(signed_node, dnskey_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back', **attrs)
 
         consolidate_clients = name_obj.single_client()
         rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
@@ -889,16 +890,16 @@ class DNSAuthGraph:
 
         edge_id = 'dname-%s|%s|%s|%s' % (cname_node, dname_node, line_color.lstrip('#'), line_style)
         edge_key = '%s-%s' % (line_color, line_style)
-        try:
-            edge = self.G.get_edge(cname_node, dname_node, edge_key)
-        except KeyError:
+        if (cname_node, dname_node, edge_key) not in self._edge_keys:
+            self._edge_keys.add((cname_node, dname_node, edge_key))
+
             edge_label = ''
             if dname_status.errors:
                 edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % ERROR_ICON
             elif dname_status.warnings:
                 edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
-            self.G.add_edge(cname_node, dname_node, label=edge_label, key=edge_key, id=edge_id, color=line_color, style=line_style, dir='back')
+            self.G.add_edge(cname_node, dname_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
             self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
 
         if edge_id not in self.node_mapping:
