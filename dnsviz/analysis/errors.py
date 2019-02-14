@@ -465,6 +465,23 @@ class DSDigestAlgorithmIgnored(DSError):
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], str(self.template_kwargs['algorithm']))
         self.template_kwargs['new_algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['new_algorithm'], str(self.template_kwargs['algorithm']))
 
+class DSDigestAlgorithmMaybeIgnored(DSError):
+    '''
+    >>> e = DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=2)
+    >>> e.description
+    'In the spirit of RFC 4509, DS records with digest type 1 (SHA-1) might be ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.'
+    '''
+    _abstract = False
+    code = 'DS_DIGEST_ALGORITHM_MAYBE_IGNORED'
+    description_template = "In the spirit of RFC 4590, DS records with digest type %(algorithm)d (%(algorithm_text)s) might be ignored when DS records with digest type %(new_algorithm)d (%(new_algorithm_text)s) exist in the same RRset."
+    references = ['RFC 4509, Sec. 3']
+    required_params = ['algorithm', 'new_algorithm']
+
+    def __init__(self, **kwargs):
+        super(DSDigestAlgorithmMaybeIgnored, self).__init__(**kwargs)
+        self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], str(self.template_kwargs['algorithm']))
+        self.template_kwargs['new_algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['new_algorithm'], str(self.template_kwargs['algorithm']))
+
 class DSDigestError(DomainNameAnalysisError):
     pass
 
