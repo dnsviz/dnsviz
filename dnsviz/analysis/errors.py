@@ -1286,14 +1286,18 @@ class EDNSUndefinedFlagsSet(EDNSError):
     '''
     >>> e = EDNSUndefinedFlagsSet(flags=0x80)
     >>> e.description
-    'The server set EDNS flags that are undefined: 128.'
+    'The server set EDNS flags that are undefined: 0x80.'
     '''
 
     _abstract = False
     code = 'EDNS_UNDEFINED_FLAGS_SET'
-    description_template = 'The server set EDNS flags that are undefined: %(flags)d.'
+    description_template = 'The server set EDNS flags that are undefined: %(flags_text)s.'
     references = ['RFC 6891, Sec. 6.1.4']
     required_params = ['flags']
+
+    def __init__(self, **kwargs):
+        super(EDNSUndefinedFlagsSet, self).__init__(**kwargs)
+        self.template_kwargs['flags_text'] = '0x%x' % (self.template_kwargs['flags'])
 
 class DNSCookieError(ResponseError):
     pass
