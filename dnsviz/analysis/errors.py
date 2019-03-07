@@ -485,7 +485,7 @@ class DSDigestAlgorithmMaybeIgnored(DSError):
     '''
     _abstract = False
     code = 'DS_DIGEST_ALGORITHM_MAYBE_IGNORED'
-    description_template = "In the spirit of RFC 4590, DS records with digest type %(algorithm)d (%(algorithm_text)s) might be ignored when DS records with digest type %(new_algorithm)d (%(new_algorithm_text)s) exist in the same RRset."
+    description_template = "In the spirit of RFC 4509, DS records with digest type %(algorithm)d (%(algorithm_text)s) might be ignored when DS records with digest type %(new_algorithm)d (%(new_algorithm_text)s) exist in the same RRset."
     references = ['RFC 4509, Sec. 3']
     required_params = ['algorithm', 'new_algorithm']
 
