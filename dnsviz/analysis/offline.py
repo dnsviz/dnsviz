@@ -1288,6 +1288,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             Errors.DomainNameAnalysisError.insert_into_list(cookie_err, warnings, server, client, response)
 
     def _populate_response_errors(self, qname_obj, response, server, client, warnings, errors):
+        query = response.query
+
         if qname_obj is not None:
             # if the response was complete (not truncated), then mark any
             # response flag issues as errors.  Otherwise, mark them as
@@ -1298,7 +1300,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 group = warnings
             if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
                 if not response.is_authoritative():
-                    Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), group, server, client, response)
+                    ds_referral = False
+                    if query.rdtype == dns.rdatatype.DS:
+                        # handle DS as a special case
+                        if response.is_referral(query.qname, query.rdtype, query.rdclass, qname_obj.name):
+                            ds_referral = True
+
+                    if ds_referral:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.ReferralForDSQuery(parent=fmt.humanize_name(qname_obj.name)), group, server, client, response)
+                    else:
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), group, server, client, response)
+
             elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 if response.recursion_desired() and not response.recursion_available():
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.RecursionNotAvailable(), group, server, client, response)
@@ -2204,7 +2216,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if upward_referral_error_cls is not None and response.is_upward_referral(qname_obj.zone.name):
                     Errors.DomainNameAnalysisError.insert_into_list(upward_referral_error_cls(), errors, server, client, response)
                 else:
-                    Errors.DomainNameAnalysisError.insert_into_list(missing_soa_error_cls(), errors, server, client, response)
+                    ds_referral = False
+                    if query.rdtype == dns.rdatatype.DS:
+                        # handle DS as a special case
+                        if response.is_referral(query.qname, query.rdtype, query.rdclass, qname_obj.name):
+                            ds_referral = True
+
+                    if not ds_referral:
+                        Errors.DomainNameAnalysisError.insert_into_list(missing_soa_error_cls(), errors, server, client, response)
 
         if upward_referral_error_cls is not None:
             try:

@@ -448,6 +448,18 @@ class RRSIGBadLengthEd448(RRSIGBadLengthEdDSA):
 class DSError(DomainNameAnalysisError):
     pass
 
+class ReferralForDSQuery(DSError):
+    '''
+    >>> e = ReferralForDSQuery(parent='baz.')
+    >>> e.description
+    'The server(s) for the parent zone (baz.) responded with a referral instead of answering authoritatively for the DS RR type.'
+    '''
+    _abstract = False
+    code = 'REFERRAL_FOR_DS_QUERY'
+    description_template = 'The server(s) for the parent zone (%(parent)s) responded with a referral instead of answering authoritatively for the DS RR type.'
+    references = ['RFC 4034, Sec. 5']
+    required_params = ['parent']
+
 class DSDigestAlgorithmIgnored(DSError):
     '''
     >>> e = DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2)
