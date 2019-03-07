@@ -1844,6 +1844,31 @@ class NoAddressForNSName(NSNameError):
     code = 'NO_ADDRESS_FOR_NS_NAME'
     description_template = "The following NS name(s) did not resolve to address(es): %(names_text)s"
 
+class PrivateAddressNS(NSNameError):
+    pass
+
+class NSNameResolvesToPrivateIP(PrivateAddressNS):
+    '''
+    >>> e = NSNameResolvesToPrivateIP(names=('ns1.foo.baz.',))
+    >>> e.description
+    'The following NS name(s) resolved to IP address(es) in private IP address space: ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'NS_NAME_PRIVATE_IP'
+    description_template = "The following NS name(s) resolved to IP address(es) in private IP address space: %(names_text)s"
+
+class GlueReferencesPrivateIP(PrivateAddressNS):
+    '''
+    >>> e = GlueReferencesPrivateIP(names=('ns1.foo.baz.',))
+    >>> e.description
+    'Glue for the following NS name(s) referenced IP address(es) in private IP address space: ns1.foo.baz.'
+    '''
+
+    _abstract = False
+    code = 'GLUE_PRIVATE_IP'
+    description_template = "Glue for the following NS name(s) referenced IP address(es) in private IP address space: %(names_text)s"
+
 class GlueMismatchError(DelegationError):
     '''
     >>> e = GlueMismatchError(name='ns1.foo.baz.', glue_addresses=('192.0.2.1',), auth_addresses=('192.0.2.2',))

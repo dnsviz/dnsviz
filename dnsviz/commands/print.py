@@ -74,6 +74,7 @@ Options:
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
     -C             - Enforce DNS cookies strictly.
+    -P             - Allow private IP addresses for authoritative DNS servers.
     -R <type>[,<type>...]
                    - Process queries of only the specified type(s).
     -O             - Derive the filename(s) from domain name(s).
@@ -312,7 +313,7 @@ def main(argv):
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:R:t:COo:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:R:t:CPOo:h')
         except getopt.GetoptError as e:
             sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
@@ -357,6 +358,7 @@ def main(argv):
             rdtypes = None
 
         strict_cookies = '-C' in opts
+        allow_private = '-P' in opts
 
         if '-o' in opts and '-O' in opts:
             sys.stderr.write('The -o and -O options may not be used together.\n')
@@ -449,7 +451,7 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies)
+            name_obj = TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies, allow_private=allow_private)
             name_objs.append(name_obj)
 
             if latest_analysis_date is None or latest_analysis_date > name_obj.analysis_end:

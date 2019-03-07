@@ -40,6 +40,7 @@ import dns.flags, dns.rcode, dns.rdataclass, dns.rdatatype
 
 from dnsviz import crypto
 import dnsviz.format as fmt
+from dnsviz.ipaddr import *
 import dnsviz.query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
@@ -96,6 +97,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
     def __init__(self, *args, **kwargs):
 
         self._strict_cookies = kwargs.pop('strict_cookies', False)
+        self._allow_private = kwargs.pop('allow_private', False)
 
         super(OfflineDomainNameAnalysis, self).__init__(*args, **kwargs)
 
@@ -1686,6 +1688,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         names_missing_glue = []
         names_missing_auth = []
 
+        names_auth_private = set()
+        names_auth_zero = set()
+        names_glue_private = set()
+        names_glue_zero = set()
+
         for name in all_names:
             # if name resolution resulted in an error (other than NXDOMAIN)
             if name not in auth_mapping:
@@ -1698,6 +1705,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not auth_mapping[name]:
                     names_missing_auth.append(name)
 
+                for addr in auth_addrs:
+                    if LOOPBACK_IPV4_RE.match(addr) or addr == LOOPBACK_IPV6 or \
+                            RFC_1918_RE.match(addr) or LINK_LOCAL_RE.match(addr) or UNIQ_LOCAL_RE.match(addr):
+                        names_auth_private.add(name)
+                    if ZERO_SLASH8_RE.search(addr):
+                        names_auth_zero.add(name)
+
             if names_from_parent:
                 name_in_parent = name in names_from_parent
             elif self.delegation_status == Status.DELEGATION_STATUS_INCOMPLETE:
@@ -1709,6 +1723,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # if glue is required and not supplied
                 if name.is_subdomain(self.name) and not glue_mapping[name]:
                     names_missing_glue.append(name)
+
+                for addr in glue_mapping[name]:
+                    if LOOPBACK_IPV4_RE.match(addr) or addr == LOOPBACK_IPV6 or \
+                            RFC_1918_RE.match(addr) or LINK_LOCAL_RE.match(addr) or UNIQ_LOCAL_RE.match(addr):
+                        names_glue_private.add(name)
+                    if ZERO_SLASH8_RE.search(addr):
+                        names_glue_zero.add(name)
 
                 # if there are both glue and authoritative addresses supplied, check that it matches the authoritative response
                 if glue_mapping[name] and auth_addrs:
@@ -1763,6 +1784,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if names_error_resolving:
             names_error_resolving.sort()
             self.zone_errors.append(Errors.ErrorResolvingNSName(names=[fmt.humanize_name(x) for x in names_error_resolving]))
+
+        if not self._allow_private:
+            if names_auth_private:
+                names_auth_private = list(names_auth_private)
+                names_auth_private.sort()
+                self.zone_errors.append(Errors.NSNameResolvesToPrivateIP(names=[fmt.humanize_name(x) for x in names_auth_private]))
+
+            if names_glue_private:
+                names_glue_private = list(names_glue_private)
+                names_glue_private.sort()
+                self.delegation_errors[dns.rdatatype.DS].append(Errors.GlueReferencesPrivateIP(names=[fmt.humanize_name(x) for x in names_glue_private]))
 
         if names_with_no_glue_ipv4:
             names_with_no_glue_ipv4.sort()

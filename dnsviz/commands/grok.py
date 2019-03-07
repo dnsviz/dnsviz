@@ -108,6 +108,7 @@ Options:
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
     -C             - Enforce DNS cookies strictly.
+    -P             - Allow private IP addresses for authoritative DNS servers.
     -o <filename>  - Save the output to the specified file.
     -c             - Format JSON output minimally, instead of "pretty".
     -l <loglevel>  - Log at the specified level: error, warning, info, debug.
@@ -170,7 +171,7 @@ def test_pygraphviz():
 def main(argv):
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:Co:cl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:CPo:cl:h')
         except getopt.GetoptError as e:
             sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
@@ -216,6 +217,7 @@ def main(argv):
             loglevel = logging.DEBUG
 
         strict_cookies = '-C' in opts
+        allow_private = '-P' in opts
 
         if '-r' not in opts or opts['-r'] == '-':
             opt_r = sys.stdin.fileno()
@@ -320,7 +322,7 @@ def main(argv):
             if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies)
+            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies, allow_private=allow_private)
             name_objs.append(name_obj)
 
         if not name_objs:

@@ -81,6 +81,13 @@ Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
 when a query contains a COOKIE option with no server cookie or with an invalid
 server cookie.
 .TP
+.B -P
+Allow private IP addresses for authoritative DNS servers.  By default, if the
+IP address corresponding to an authoritative server is in IP address space
+designated as "private", it is flagged as an error.  However, there are some
+cases where this is allowed.  For example, if the diagnostic queries are issued
+to servers in an experimental environment, this might be permissible.
+.TP
 \fB-o\fR \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
