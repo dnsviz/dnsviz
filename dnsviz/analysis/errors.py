@@ -2195,3 +2195,14 @@ class CNAMEWithOtherData(ZoneDataError):
     code = 'CNAME_WITH_OTHER_DATA'
     required_params = ['name']
     references = ['RFC 2181, Sec. 10.1']
+
+class CNAMELoop(ZoneDataError):
+    '''
+    >>> e = CNAMELoop()
+    >>> e.description
+    'This record results in a CNAME loop.'
+    '''
+    _abstract = False
+    description_template = "This record results in a CNAME loop."
+    code = 'CNAME_LOOP'
+    references = ['RFC 1034, Sec. 3.6.2']

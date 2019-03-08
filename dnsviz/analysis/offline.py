@@ -71,6 +71,9 @@ _logger = logging.getLogger(__name__)
 class FoundYXDOMAIN(Exception):
     pass
 
+class CNAMELoopDetected(Exception):
+    pass
+
 class AggregateResponseInfo(object):
     def __init__(self, qname, rdtype, name_obj, zone_obj):
         self.qname = qname
@@ -1396,11 +1399,28 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # check for DO bit in request
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingNSECForWildcard(), self.rrset_errors[rrset_info], server, client, response)
 
+    def _detect_cname_loop(self, name, trace=None):
+        if name not in self.cname_targets:
+            return
+        if trace is None:
+            trace = []
+        if name in trace:
+            raise CNAMELoopDetected()
+
+        for target, cname_obj in self.cname_targets[name].items():
+            if cname_obj is not None:
+                cname_obj._detect_cname_loop(target, trace=trace + [name])
+
     def _populate_cname_status(self, rrset_info):
         if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
             rdtypes = [r for (n, r) in self.yxrrset_proper if n == rrset_info.rrset.name and r != dns.rdatatype.CNAME]
             if rdtypes:
                 Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMEWithOtherData(name=fmt.humanize_name(rrset_info.rrset.name)), self.rrset_warnings[rrset_info], None, None, None)
+
+            try:
+                self._detect_cname_loop(rrset_info.rrset.name)
+            except CNAMELoopDetected:
+                Errors.DomainNameAnalysisError.insert_into_list(Errors.CNAMELoop(), self.rrset_errors[rrset_info], None, None, None)
 
     def _initialize_rrset_status(self, rrset_info):
         self.rrset_warnings[rrset_info] = []
