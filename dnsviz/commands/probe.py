@@ -370,7 +370,7 @@ def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, re
                     else:
                         for a_rrset in a_rrsets:
                             for a_rdata in a_rrset:
-                                mappings_from_file.append('%s=%s' % (lb2s(rdata.target.canonicalize().to_text()), IPAddr(a_rdata.address)))
+                                mappings_from_file.append('%s=[%s]' % (lb2s(rdata.target.canonicalize().to_text()), IPAddr(a_rdata.address)))
 
                 name_addr_mappings_from_string(domain, ','.join(mappings_from_file), delegation_mapping, require_name)
                 continue
@@ -1176,14 +1176,14 @@ def main(argv):
         query_class_mixin = CustomQueryMixin
         if '-e' in opts:
             CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
-        if '-n' in opts:
-            CustomQueryMixin.edns_options.append(_get_nsid_option())
         if '-c' in opts:
             if opts['-c']:
                 CustomQueryMixin.edns_options.append(_get_dns_cookie_option(opts['-c']))
         else:
             # No cookie option was specified, so generate one
             CustomQueryMixin.edns_options.append(_get_dns_cookie_option())
+        if '-n' not in opts:
+            CustomQueryMixin.edns_options.append(_get_nsid_option())
 
         name_objs = []
         if '-r' in opts:
