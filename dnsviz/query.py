@@ -456,6 +456,22 @@ class DisableEDNSOnRcodeHandler(DNSResponseHandler):
             self._request.use_edns(False)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_DISABLE_EDNS, None)
 
+class RemoveEDNSOptionOnRcodeHandler(DNSResponseHandler):
+    '''Remove an EDNS option if the RCODE in the response indicates that the
+    server didn't handle the request properly.'''
+
+    def __init__(self, rcode):
+        self._rcode = rcode
+
+    def handle(self, response_wire, response, response_time):
+        try:
+            opt = self._request.options[0]
+        except IndexError:
+            opt = None
+        if isinstance(response, dns.message.Message) and response.rcode() == self._rcode and opt is not None:
+            self._request.options.remove(opt)
+            return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_REMOVE_EDNS_OPTION, opt.otype)
+
 class AddServerCookieOnBADCOOKIE(DNSResponseHandler):
     '''Update the DNS Cookie EDNS option with the server cookie when a
     BADCOOKIE rcode is received.'''
@@ -1718,6 +1734,7 @@ class QuickDNSSECQuery(DNSSECQuery):
     response_handlers = DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler()
             ]
@@ -1733,6 +1750,7 @@ class DiagnosticQuery(DNSSECQuery):
     response_handlers = DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler(),
                     ReduceUDPMaxPayloadOnTimeoutHandler(512, 4),
@@ -1769,6 +1787,7 @@ class RecursiveDiagnosticQuery(RecursiveDNSSECQuery):
     response_handlers = DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
                     DisableEDNSOnRcodeHandler(),
@@ -1810,6 +1829,7 @@ class TCPDiagnosticQuery(DNSSECQuery):
 
     response_handlers = \
             [
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler(),
                     ChangeTimeoutOnTimeoutHandler(4.0, 2)
@@ -1831,6 +1851,7 @@ class RecursiveTCPDiagnosticQuery(RecursiveDNSSECQuery):
 
     response_handlers = \
             [
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
                     DisableEDNSOnRcodeHandler(),
@@ -1854,6 +1875,7 @@ class PMTUDiagnosticQuery(DNSSECQuery):
             DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     DisableEDNSOnRcodeHandler(),
                     RemoveEDNSOptionOnTimeoutHandler(6),
@@ -1889,6 +1911,7 @@ class RecursivePMTUDiagnosticQuery(RecursiveDNSSECQuery):
             DNSSECQuery.response_handlers + \
             [
                     AddServerCookieOnBADCOOKIE(),
+                    RemoveEDNSOptionOnRcodeHandler(dns.rcode.FORMERR),
                     DisableEDNSOnFormerrHandler(),
                     SetFlagOnRcodeHandler(dns.flags.CD, dns.rcode.SERVFAIL),
                     DisableEDNSOnRcodeHandler(),
