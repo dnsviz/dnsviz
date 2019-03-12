@@ -1,5 +1,5 @@
 Name:           dnsviz
-Version:        0.8.1
+Version:        0.8.2
 Release:        1%{?dist}
 Summary:        Tools for analyzing and visualizing DNS and DNSSEC behavior
 
@@ -60,6 +60,8 @@ rm -rf %{buildroot}
 %{_mandir}/man1/%{name}-query.1*
 
 %changelog
+* Tue Mar  12 2019 Casey Deccio
+  0.8.2 release
 * Wed Feb  6 2019 Casey Deccio
   0.8.1 release
 * Fri Jan  25 2019 Casey Deccio
