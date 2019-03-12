@@ -1099,13 +1099,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
                 action_err_class = Errors.ResponseErrorWithoutEDNSOption
                 #TODO convert numeric option ID to text
-                action_err_kwargs['option'] = retry.action_arg
+                action_err_kwargs['option'] = fmt.EDNS_OPT_DESCRIPTIONS.get(retry.action_arg, retry.action_arg)
 
             # An EDNS option was removed to elicit a response; kwargs: option
             elif retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION:
                 action_err_class = Errors.ResponseErrorWithEDNSOption
                 #TODO convert numeric option ID to text
-                action_err_kwargs['option'] = retry.action_arg
+                action_err_kwargs['option'] = fmt.EDNS_OPT_DESCRIPTIONS.get(retry.action_arg, retry.action_arg)
 
             # The EDNS version was changed to elicit a response; kwargs:
             # edns_old, edns_new

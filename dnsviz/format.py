@@ -51,6 +51,8 @@ DNS_FLAG_DESCRIPTIONS = {
 
 EDNS_FLAG_DESCRIPTIONS = { 32768: 'DNSSEC answer OK' }
 
+EDNS_OPT_DESCRIPTIONS = { 3: 'NSID', 8: 'edns-client-subnet', 10: 'COOKIE' }
+
 FMT_MS = '%Y-%m-%d %H:%M:%S.%f %Z'
 FMT_NO_MS = '%Y-%m-%d %H:%M:%S %Z'
 
