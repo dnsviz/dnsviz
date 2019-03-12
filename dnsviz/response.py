@@ -186,7 +186,9 @@ class DNSResponse:
             # EDNS flags other than DO
             if edns_flags & ~dns.flags.DO:
                 s += '%d' % edns_flags
-            s += '_'
+
+            if edns_options:
+                s += '_'
 
             # other options
             for opt in edns_options:
