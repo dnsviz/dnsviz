@@ -1002,6 +1002,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # contained a malformed cookie, then this was a reasonable
                 # response from a server that supports cookies
                 if retry.cause_arg == dns.rcode.FORMERR and \
+                        response.server_cookie_status == Q.DNS_COOKIE_IMPROPER_LENGTH and \
                         (retry.action == Q.RETRY_ACTION_DISABLE_EDNS or \
                                 (retry.action == Q.RETRY_ACTION_REMOVE_EDNS_OPTION and retry.action_arg == 10)):
                     pass
