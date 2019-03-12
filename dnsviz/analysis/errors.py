@@ -1299,6 +1299,40 @@ class EDNSUndefinedFlagsSet(EDNSError):
         super(EDNSUndefinedFlagsSet, self).__init__(**kwargs)
         self.template_kwargs['flags_text'] = '0x%x' % (self.template_kwargs['flags'])
 
+class DNSSECDowngrade(EDNSError):
+    description_template = "DNSSEC was effectively downgraded because %(response_error_description)s with %(precondition)s."
+    required_params = ['response_error']
+    precondition = None
+
+    def __init__(self, *args, **kwargs):
+        super(DNSSECDowngrade, self).__init__(**kwargs)
+        self.template_kwargs['response_error_description'] = self.template_kwargs['response_error'].description[0].lower() + self.template_kwargs['response_error'].description[1:-1]
+        self.template_kwargs['precondition'] = self.precondition
+
+class DNSSECDowngradeDOBitCleared(DNSSECDowngrade):
+    '''
+    >>> e = DNSSECDowngradeDOBitCleared(response_error=Timeout(tcp=False, attempts=3))
+    >>> e.description
+    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with the DO bit set.'
+    '''
+
+    _abstract = False
+    code = 'DNSSEC_DOWNGRADE_DO_CLEARED'
+    precondition = 'the DO bit set'
+    references = ['RFC 4035, Sec. 3.2.1']
+
+class DNSSECDowngradeEDNSDisabled(DNSSECDowngrade):
+    '''
+    >>> e = DNSSECDowngradeEDNSDisabled(response_error=Timeout(tcp=False, attempts=3), query_specific=False)
+    >>> e.description
+    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with EDNS enabled.'
+    '''
+
+    _abstract = False
+    code = 'DNSSEC_DOWNGRADE_EDNS_DISABLED'
+    precondition = 'EDNS enabled'
+    references = ['RFC 6891, Sec. 7', 'RFC 2671, Sec. 5.3']
+
 class DNSCookieError(ResponseError):
     pass
 

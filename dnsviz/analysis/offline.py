@@ -943,7 +943,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             action_err_kwargs = {}
 
             require_valid = False
-            dnssec_downgrade = False
+            dnssec_downgrade_class = None
 
             #TODO - look for success ratio to servers due to timeout or network
             # error, for better determining if a problem is intermittent
@@ -971,11 +971,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # Invalid RCODE - kwargs: rcode; require a valid response
             elif retry.cause == Q.RETRY_CAUSE_RCODE:
+                # If the RCODE was FORMERR, SERVFAIL, or NOTIMP, then this is a
+                # signal to the client that the server doesn't support EDNS.
+                # Thus, *independent of action*, we mark this as a DNSSEC
+                # downgrade, if the zone is signed.
+                if retry.cause_arg in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP) and \
+                        qname_obj is not None and qname_obj.zone.signed:
+                    dnssec_downgrade_class = Errors.DNSSECDowngradeEDNSDisabled
+
                 # if the RCODE was FORMERR, SERVFAIL, or NOTIMP, and the
                 # corresponding action was to disable EDNS, then this was a
-                # reasonable response from a server that doesn't support EDNS
+                # reasonable response from a server that doesn't support EDNS,
+                # but it's only innocuous if the zone is not signed.
                 if retry.cause_arg in (dns.rcode.FORMERR, dns.rcode.SERVFAIL, dns.rcode.NOTIMP) and \
-                        retry.action == Q.RETRY_ACTION_DISABLE_EDNS:
+                        retry.action == Q.RETRY_ACTION_DISABLE_EDNS and \
+                        not (qname_obj is not None and qname_obj.zone.signed):
                     pass
 
                 # or if the RCODE was BADVERS, and the corresponding action was
@@ -1001,7 +1011,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         response.server_cookie_status in (Q.DNS_COOKIE_CLIENT_COOKIE_ONLY, Q.DNS_COOKIE_SERVER_COOKIE_BAD) and \
                         retry.action == Q.RETRY_ACTION_UPDATE_DNS_COOKIE:
                     pass
-
 
                 # or if the RCODE was FORMERR, and the COOKIE opt we sent
                 # contained a malformed cookie, then this was a reasonable
@@ -1058,7 +1067,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 action_err_class = Errors.ResponseErrorWithEDNS
 
                 # DNSSEC was downgraded because DO bit is no longer available
-                dnssec_downgrade = True
+                dnssec_downgrade_class = Errors.DNSSECDowngradeEDNSDisabled
 
             # The EDNS UDP max payload size was changed to elicit a response;
             # kwargs: pmtu_lower_bound, pmtu_upper_bound
@@ -1084,7 +1093,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # if this was the DO flag, then DNSSEC was downgraded
                 if retry.action_arg == dns.flags.DO:
-                    dnssec_downgrade = True
+                    dnssec_downgrade_class = Errors.DNSSECDowngradeDOBitCleared
 
             # An EDNS option was added to elicit a response; kwargs: option
             elif retry.action == Q.RETRY_ACTION_ADD_EDNS_OPTION:
@@ -1115,16 +1124,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     query_specific = True
                 else:
                     query_specific = False
-                change_err = action_err_class(response_error=cause_err_class(**cause_err_kwargs), query_specific=query_specific, **action_err_kwargs)
+                cause_err = cause_err_class(**cause_err_kwargs)
+                change_err = action_err_class(response_error=cause_err, query_specific=query_specific, **action_err_kwargs)
 
         if change_err is not None:
             # if the error really matters (e.g., due to DNSSEC), note an error
-            if dnssec_downgrade and qname_obj is not None and qname_obj.zone.signed:
-                group = errors
+            if dnssec_downgrade_class is not None and qname_obj is not None and qname_obj.zone.signed:
+                Errors.DomainNameAnalysisError.insert_into_list(change_err, errors, server, client, response)
+                Errors.DomainNameAnalysisError.insert_into_list(dnssec_downgrade_class(response_error=cause_err), errors, server, client, response)
             # otherwise, warn
             else:
-                group = warnings
-            Errors.DomainNameAnalysisError.insert_into_list(change_err, group, server, client, response)
+                Errors.DomainNameAnalysisError.insert_into_list(change_err, warnings, server, client, response)
 
     def _populate_edns_errors(self, qname_obj, response, server, client, warnings, errors):
 
