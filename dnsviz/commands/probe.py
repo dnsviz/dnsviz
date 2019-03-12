@@ -1176,14 +1176,14 @@ def main(argv):
         query_class_mixin = CustomQueryMixin
         if '-e' in opts:
             CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
+        if '-n' in opts:
+            CustomQueryMixin.edns_options.append(_get_nsid_option())
         if '-c' in opts:
             if opts['-c']:
                 CustomQueryMixin.edns_options.append(_get_dns_cookie_option(opts['-c']))
         else:
             # No cookie option was specified, so generate one
             CustomQueryMixin.edns_options.append(_get_dns_cookie_option())
-        if '-n' not in opts:
-            CustomQueryMixin.edns_options.append(_get_nsid_option())
 
         name_objs = []
         if '-r' in opts:
