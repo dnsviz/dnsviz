@@ -319,7 +319,7 @@ class DigCommandLineQuery:
 
         self.nameservers = nameservers + processed_nameservers
 
-    def process_looking_glass(self, looking_glass_cache):
+    def process_looking_glass(self, looking_glass_cache, insecure):
         if self.lg_url is None:
             return
 
@@ -333,7 +333,7 @@ class DigCommandLineQuery:
 
             url = urlparse.urlparse(self.lg_url)
             if url.scheme in ('http', 'https'):
-                fact = transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=options['insecure'])
+                fact = transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=insecure)
             elif url.scheme == 'ws':
                 if url.hostname is not None:
                     usage('WebSocket URL must designate a local UNIX domain socket.')
@@ -528,7 +528,7 @@ class DigCommandLine:
         for q in self.queries:
             q.process_nameservers(self.nameservers, self.options['use_ipv4'], self.options['use_ipv6'])
             q.process_query_options(self.global_query_options)
-            q.process_looking_glass(looking_glass_cache)
+            q.process_looking_glass(looking_glass_cache, self.options['insecure'])
 
             if not q.nameservers:
                 raise SemanticException('No nameservers to query')
