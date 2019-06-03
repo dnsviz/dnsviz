@@ -77,6 +77,10 @@ Options:
     -f <filename>  - Read names from a file.
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
+    -a <alg>[,<alg>...]
+                   - Support only the specified DNSSEC algorithm(s).
+    -d <digst_alg>[,<digst_alg>...]
+                   - Support only the specified DNSSEC digest algorithm(s).
     -C             - Enforce DNS cookies strictly.
     -P             - Allow private IP addresses for authoritative DNS servers.
     -R <type>[,<type>...]
@@ -88,8 +92,8 @@ Options:
     -h             - Display the usage and exit.
 ''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, filename, remove_edges):
-    G.add_trust(trusted_keys)
+def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filename, remove_edges):
+    G.add_trust(trusted_keys, supported_algs=supported_algs)
 
     if remove_edges:
         G.remove_extra_edges()
@@ -157,7 +161,7 @@ def main(argv):
         test_pygraphviz()
 
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:R:et:CPOo:T:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:R:et:a:d:CPOo:T:h')
         except getopt.GetoptError as e:
             sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
@@ -200,6 +204,34 @@ def main(argv):
                 sys.exit(1)
         else:
             rdtypes = None
+
+        if '-a' in opts:
+            try:
+                supported_algs = opts['-a'].split(',')
+            except ValueError:
+                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
+                sys.exit(1)
+            try:
+                supported_algs = set([int(x) for x in supported_algs])
+            except ValueError:
+                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
+                sys.exit(1)
+        else:
+            supported_algs = None
+
+        if '-d' in opts:
+            try:
+                supported_digest_algs = opts['-d'].split(',')
+            except ValueError:
+                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
+                sys.exit(1)
+            try:
+                supported_digest_algs = set([int(x) for x in supported_digest_algs])
+            except ValueError:
+                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
+                sys.exit(1)
+        else:
+            supported_digest_algs = None
 
         strict_cookies = '-C' in opts
         allow_private = '-P' in opts
@@ -321,7 +353,7 @@ def main(argv):
 
         G = DNSAuthGraph()
         for name_obj in name_objs:
-            name_obj.populate_status(trusted_keys)
+            name_obj.populate_status(trusted_keys, supported_algs=supported_algs, supported_digest_algs=supported_digest_algs)
             for qname, rdtype in name_obj.queries:
                 if rdtypes is None:
                     # if rdtypes was not specified, then graph all, with some
@@ -345,14 +377,14 @@ def main(argv):
                     name = 'root'
                 else:
                     name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
-                finish_graph(G, [name_obj], rdtypes, trusted_keys, fmt, '%s.%s' % (name, fmt), remove_edges)
+                finish_graph(G, [name_obj], rdtypes, trusted_keys, supported_algs, fmt, '%s.%s' % (name, fmt), remove_edges)
                 G = DNSAuthGraph()
 
         if '-O' not in opts:
             if '-o' not in opts or opts['-o'] == '-':
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, None, remove_edges)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, None, remove_edges)
             else:
-                finish_graph(G, name_objs, rdtypes, trusted_keys, fmt, opts['-o'], remove_edges)
+                finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, opts['-o'], remove_edges)
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')

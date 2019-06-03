@@ -107,6 +107,10 @@ Options:
     -f <filename>  - Read names from a file.
     -r <filename>  - Read diagnostic queries from a file.
     -t <filename>  - Use trusted keys from the designated file.
+    -a <alg>[,<alg>...]
+                   - Support only the specified DNSSEC algorithm(s).
+    -d <digst_alg>[,<digst_alg>...]
+                   - Support only the specified DNSSEC digest algorithm(s).
     -C             - Enforce DNS cookies strictly.
     -P             - Allow private IP addresses for authoritative DNS servers.
     -o <filename>  - Save the output to the specified file.
@@ -171,7 +175,7 @@ def test_pygraphviz():
 def main(argv):
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:CPo:cl:h')
+            opts, args = getopt.getopt(argv[1:], 'f:r:t:a:d:CPo:cl:h')
         except getopt.GetoptError as e:
             sys.stderr.write('%s\n' % str(e))
             sys.exit(1)
@@ -215,6 +219,34 @@ def main(argv):
                 sys.exit(1)
         else:
             loglevel = logging.DEBUG
+
+        if '-a' in opts:
+            try:
+                supported_algs = opts['-a'].split(',')
+            except ValueError:
+                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
+                sys.exit(1)
+            try:
+                supported_algs = set([int(x) for x in supported_algs])
+            except ValueError:
+                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
+                sys.exit(1)
+        else:
+            supported_algs = None
+
+        if '-d' in opts:
+            try:
+                supported_digest_algs = opts['-d'].split(',')
+            except ValueError:
+                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
+                sys.exit(1)
+            try:
+                supported_digest_algs = set([int(x) for x in supported_digest_algs])
+            except ValueError:
+                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
+                sys.exit(1)
+        else:
+            supported_digest_algs = None
 
         strict_cookies = '-C' in opts
         allow_private = '-P' in opts
@@ -330,7 +362,7 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.populate_status(trusted_keys)
+            name_obj.populate_status(trusted_keys, supported_algs=supported_algs, supported_digest_algs=supported_digest_algs)
 
             if trusted_keys:
                 G = DNSAuthGraph()
@@ -346,7 +378,7 @@ def main(argv):
                     if ns_obj is not None:
                         G.graph_rrset_auth(ns_obj, target, dns.rdatatype.A)
                         G.graph_rrset_auth(ns_obj, target, dns.rdatatype.AAAA)
-                G.add_trust(trusted_keys)
+                G.add_trust(trusted_keys, supported_algs=supported_algs)
                 name_obj.populate_response_component_status(G)
 
             name_obj.serialize_status(d, loglevel=loglevel)
