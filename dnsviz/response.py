@@ -860,8 +860,8 @@ class DNSKEYMeta(DNSResponseComponent):
 
             offset = 1
             if e_len == 0:
-                b1 = map_func(rdata.key[1])
-                b2 = map_func(rdata.key[2])
+                b1 = map_func(key_str, 1)
+                b2 = map_func(key_str, 2)
                 e_len = (b1 << 8) | b2
                 offset = 3
 
