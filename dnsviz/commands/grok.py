@@ -109,7 +109,7 @@ Options:
     -t <filename>  - Use trusted keys from the designated file.
     -a <alg>[,<alg>...]
                    - Support only the specified DNSSEC algorithm(s).
-    -d <digst_alg>[,<digst_alg>...]
+    -d <digest_alg>[,<digest_alg>...]
                    - Support only the specified DNSSEC digest algorithm(s).
     -C             - Enforce DNS cookies strictly.
     -P             - Allow private IP addresses for authoritative DNS servers.
@@ -222,12 +222,7 @@ def main(argv):
 
         if '-a' in opts:
             try:
-                supported_algs = opts['-a'].split(',')
-            except ValueError:
-                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
-                sys.exit(1)
-            try:
-                supported_algs = set([int(x) for x in supported_algs])
+                supported_algs = set([int(x) for x in opts['-a'].split(',')])
             except ValueError:
                 sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
                 sys.exit(1)
@@ -236,12 +231,7 @@ def main(argv):
 
         if '-d' in opts:
             try:
-                supported_digest_algs = opts['-d'].split(',')
-            except ValueError:
-                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
-                sys.exit(1)
-            try:
-                supported_digest_algs = set([int(x) for x in supported_digest_algs])
+                supported_digest_algs = set([int(x) for x in opts['-d'].split(',')])
             except ValueError:
                 sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
                 sys.exit(1)
