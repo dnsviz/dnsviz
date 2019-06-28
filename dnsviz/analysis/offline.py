@@ -776,6 +776,47 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         (not x.effective_tcp and x.udp_responsive)) and \
                         (not require_valid or x.is_valid_response()))
 
+    def _initialize_server_checklist(self):
+        self.server_checklist = OrderedDict()
+
+        if not self.is_zone():
+            return
+
+        for status in ('UDP_RESPONSIVE', 'TCP_RESPONSIVE'):
+            self.server_checklist[status] = {}
+
+        for query in self.queries.values():
+            for query1 in query.queries.values():
+                for server in query1.responses:
+                    for client in query1.responses[server]:
+                        response = query1.responses[server][client]
+                        if response.udp_attempted:
+                            if response.udp_responsive:
+                                if server not in self.server_checklist['UDP_RESPONSIVE']:
+                                    self.server_checklist['UDP_RESPONSIVE'][server] = Status.ServerStatusResponsive('UDP_RESPONSIVE', Status.SERVER_CHECKLIST_STATUS_OK)
+                                elif self.server_checklist['UDP_RESPONSIVE'][server].status == Status.SERVER_CHECKLIST_STATUS_ERROR:
+                                    self.server_checklist['UDP_RESPONSIVE'][server].status = Status.SERVER_CHECKLIST_STATUS_WARNING
+                                self.server_checklist['UDP_RESPONSIVE'][server].successes += 1
+                            else:
+                                if server not in self.server_checklist['UDP_RESPONSIVE']:
+                                    self.server_checklist['UDP_RESPONSIVE'][server] = Status.ServerStatusResponsive('UDP_RESPONSIVE', Status.SERVER_CHECKLIST_STATUS_ERROR)
+                                elif self.server_checklist['UDP_RESPONSIVE'][server].status == Status.SERVER_CHECKLIST_STATUS_OK:
+                                    self.server_checklist['UDP_RESPONSIVE'][server].status = Status.SERVER_CHECKLIST_STATUS_WARNING
+                                self.server_checklist['UDP_RESPONSIVE'][server].failures += 1
+                        if response.tcp_attempted:
+                            if response.tcp_responsive:
+                                if server not in self.server_checklist['TCP_RESPONSIVE']:
+                                    self.server_checklist['TCP_RESPONSIVE'][server] = Status.ServerStatusResponsive('TCP_RESPONSIVE', Status.SERVER_CHECKLIST_STATUS_OK)
+                                elif self.server_checklist['TCP_RESPONSIVE'][server].status == Status.SERVER_CHECKLIST_STATUS_ERROR:
+                                    self.server_checklist['TCP_RESPONSIVE'][server].status = Status.SERVER_CHECKLIST_STATUS_WARNING
+                                self.server_checklist['TCP_RESPONSIVE'][server].successes += 1
+                            else:
+                                if server not in self.server_checklist['TCP_RESPONSIVE']:
+                                    self.server_checklist['TCP_RESPONSIVE'][server] = Status.ServerStatusResponsive('TCP_RESPONSIVE', Status.SERVER_CHECKLIST_STATUS_ERROR)
+                                elif self.server_checklist['TCP_RESPONSIVE'][server].status == Status.SERVER_CHECKLIST_STATUS_OK:
+                                    self.server_checklist['TCP_RESPONSIVE'][server].status = Status.SERVER_CHECKLIST_STATUS_WARNING
+                                self.server_checklist['TCP_RESPONSIVE'][server].failures += 1
+
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True):
         if trace is None:
             trace = []
@@ -829,6 +870,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self])
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
+        self._initialize_server_checklist()
         self._populate_name_status()
         self._index_dnskeys()
         self._populate_rrsig_status_all(supported_algs)

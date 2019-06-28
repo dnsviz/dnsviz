@@ -169,6 +169,11 @@ RRSIG_SIG_LENGTH_ERRORS = {
 DS_DIGEST_ALGS_STRONGER_THAN_SHA1 = (2, 4)
 DS_DIGEST_ALGS_IGNORING_SHA1 = (2,)
 
+SERVER_CHECKLIST_STATUS_OK = 0
+SERVER_CHECKLIST_STATUS_INDETERMINATE = 1
+SERVER_CHECKLIST_STATUS_WARNING = 2
+SERVER_CHECKLIST_STATUS_ERROR = 3
+
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
@@ -1553,3 +1558,14 @@ class CNAMEFromDNAMEStatus(object):
             d['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=html_format) for e in self.errors]
 
         return d
+
+class ServerStatus(object):
+    def __init__(self, terse_description, status):
+        self.terse_description = terse_description
+        self.status = status
+
+class ServerStatusResponsive(ServerStatus):
+    def __init__(self, terse_description, status):
+        super(ServerStatusResponsive, self).__init__(terse_description, status)
+        self.successes = 0
+        self.failures = 0
