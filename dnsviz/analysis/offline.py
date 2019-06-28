@@ -659,7 +659,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 except KeyError:
                     continue
 
-                for c in clients:
+                for client in clients:
                     try:
                         response = query1.responses[server][client]
                     except KeyError:
