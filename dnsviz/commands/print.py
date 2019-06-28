@@ -115,7 +115,6 @@ TERM_COLOR_MAP = {
     'INSECURE': '\033[37m',
     'NOERROR': '\033[37m',
     'NXDOMAIN': '\033[37m',
-    'INDETERMINATE': '\033[31m',
     'NON_EXISTENT': '\033[37m',
     'VALID': '\033[36m',
     'INDETERMINATE': '\033[37m',
