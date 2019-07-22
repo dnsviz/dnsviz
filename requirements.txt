@@ -1,4 +1,4 @@
 dnspython
 pygraphviz
 m2crypto
-libnacl
+cryptography

@@ -55,7 +55,7 @@ _crypto_sources = {
         'M2Crypto >= 0.21.1': (set([1,5,7,8,10]), set([1,2,4]), set([1])),
         'M2Crypto >= 0.24.0': (set([3,6,13,14]), set(), set()),
         'M2Crypto >= 0.24.0 and either openssl < 1.1.0 or openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
-        'libnacl': (set([15]), set(), set()),
+        'cryptography': (set([15,16]), set(), set()),
 }
 _logged_modules = set()
 
@@ -72,11 +72,18 @@ else:
     _supported_digest_algs.update(set([1,2,4]))
 
 try:
-    from libnacl.sign import Verifier as ed25519Verifier
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 except ImportError:
     pass
 else:
     _supported_algs.add(15)
+
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
+except ImportError:
+    pass
+else:
+    _supported_algs.add(16)
 
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_ENGINE_NAME = b'gost'
@@ -386,10 +393,21 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
 def _validate_rrsig_ed25519(alg, sig, msg, key):
     try:
-        verifier = ed25519Verifier(binascii.hexlify(key))
-        return verifier.verify(sig + msg) == msg
-    except ValueError:
+        verifier = Ed25519PublicKey.from_public_bytes(key)
+        verifier.verify(sig, msg)
+    except:
         return False
+    else:
+        return True
+
+def _validate_rrsig_ed448(alg, sig, msg, key):
+    try:
+        verifier = Ed448PublicKey.from_public_bytes(key)
+        verifier.verify(sig, msg)
+    except:
+        return False
+    else:
+        return True
 
 def validate_rrsig(alg, sig, msg, key):
     if not alg_is_supported(alg):
@@ -407,6 +425,8 @@ def validate_rrsig(alg, sig, msg, key):
         return _validate_rrsig_ec(alg, sig, msg, key)
     elif alg in (15,):
         return _validate_rrsig_ed25519(alg, sig, msg, key)
+    elif alg in (16,):
+        return _validate_rrsig_ed448(alg, sig, msg, key)
 
 def get_digest_for_nsec3(val, salt, alg, iterations):
     if not nsec3_alg_is_supported(alg):
