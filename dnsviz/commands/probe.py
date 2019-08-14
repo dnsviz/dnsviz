@@ -304,7 +304,9 @@ class ParallelAnalystMixin(object):
             pool.terminate()
             raise
 
-        pool.close()
+        # pool.close() will hang here
+        # in some cases
+        pool.terminate()
         pool.join()
         return name_objs
 
