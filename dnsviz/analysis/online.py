@@ -2098,7 +2098,12 @@ class Analyst(object):
             # raise only the first exception, but log all the ones beyond
             for name, exc_info in errors[1:]:
                 self.logger.error('Error analyzing %s' % name, exc_info=exc_info)
-            raise errors[0][1][0].with_traceback(errors[0][1][2])
+            # python3/python2 dual compatibility
+            if hasattr(errors[0][1][0], 'with_traceback'):
+                raise errors[0][1][1].with_traceback(errors[0][1][2])
+            else:
+                # lesser python2 functionality
+                exec('raise errors[0][1][1], None, errors[0][1][2]')
 
     def _mix_case(self, name):
         name = name.to_text().lower()
