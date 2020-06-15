@@ -108,6 +108,11 @@ def _init_tm():
     global tm
     tm = transport.DNSQueryTransportManager()
 
+def _cleanup_tm():
+    global tm
+    if tm is not None:
+        tm.close()
+
 def _init_stub_resolver():
     global resolver
 
@@ -140,6 +145,7 @@ def _init_subprocess(use_full):
     else:
         _init_stub_resolver()
     _init_interrupt_handler()
+    multiprocessing.util.Finalize(None, _cleanup_tm, exitpriority=0)
 
 def _analyze(args):
     (cls, name, rdclass, dlv_domain, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, \
@@ -1233,8 +1239,7 @@ def main(argv):
     # tm is global (because of possible multiprocessing), so we need to
     # explicitly close it here
     finally:
-        if tm is not None:
-            tm.close()
+        _cleanup_tm()
 
 if __name__ == "__main__":
     main(sys.argv)
