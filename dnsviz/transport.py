@@ -1397,7 +1397,7 @@ class _DNSQueryTransportManager:
         query_meta = {}
         expirations = []
 
-        # initalize "in" fds for select
+        # initialize "in" fds for select
         rlist_in = [self._notify_read_fd]
         wlist_in = []
         xlist_in = []
