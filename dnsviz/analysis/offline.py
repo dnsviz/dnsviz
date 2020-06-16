@@ -1380,7 +1380,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if response.message is None:
             return
 
-        # if there was foriegn class data, then warn about it -- except for SIG
+        # if there was foreign class data, then warn about it -- except for SIG
         # records in the additional section
         ans_cls = [r.rdclass for r in response.message.answer if r.rdclass != cls]
         auth_cls = [r.rdclass for r in response.message.authority if r.rdclass != cls]
