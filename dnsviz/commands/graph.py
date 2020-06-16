@@ -367,6 +367,7 @@ def main(argv):
                     name = 'root'
                 else:
                     name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
+                    name = name.replace(os.sep, '--')
                 finish_graph(G, [name_obj], rdtypes, trusted_keys, supported_algs, fmt, '%s.%s' % (name, fmt), remove_edges)
                 G = DNSAuthGraph()
 

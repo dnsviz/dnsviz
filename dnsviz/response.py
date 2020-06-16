@@ -1068,7 +1068,7 @@ class RRsetInfo(DNSResponseComponent):
         return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response)
 
     def is_wildcard(self, rrsig):
-        if self.rrset.name[0] == '*':
+        if self.rrset.name[0] == b'*':
             return False
         return len(self.rrset.name) - 1 > rrsig.labels
 
@@ -1211,7 +1211,7 @@ class NSECSet(DNSResponseComponent):
         self.invalid_nsec3_hash = set()
         self.use_nsec3 = False
         for rrset in rrsets:
-            #XXX There shouldn't be multple NSEC(3) RRsets of the same owner
+            #XXX There shouldn't be multiple NSEC(3) RRsets of the same owner
             # name in the same response, but check for it and address it (if
             # necessary)
             assert rrset.name not in self.rrsets
