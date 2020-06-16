@@ -1781,7 +1781,7 @@ class Analyst(object):
                         # for zones we also use a TCP diagnostic query here, to simultaneously test TCP connectivity
                         queries[(name_obj.name, -dns.rdatatype.SOA)] = self.tcp_diagnostic_query(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
                     else:
-                        # for non-zones we don't need to keey the (UDP) SOA query, if there is no positive response
+                        # for non-zones we don't need to keep the (UDP) SOA query, if there is no positive response
                         exclude_no_answer.add((name_obj.name, dns.rdatatype.SOA))
 
                 self.logger.debug('Preparing query %s/DNSKEY...' % fmt.humanize_name(name_obj.name))
@@ -2143,7 +2143,7 @@ class Analyst(object):
 
     def _check_connectivity(self, name_obj):
         if self.local_ceiling is not None and (self.local_ceiling, dns.rdatatype.NS) in self.explicit_delegations:
-            # this check is only useful if not the desdendant of an explicit
+            # this check is only useful if not the descendant of an explicit
             # delegation
             return
         if name_obj.get_auth_or_designated_servers(4) and self._require_connectivity_ipv4(name_obj) and not name_obj.get_responsive_servers_udp(4):
