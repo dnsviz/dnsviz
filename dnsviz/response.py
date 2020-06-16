@@ -1068,7 +1068,7 @@ class RRsetInfo(DNSResponseComponent):
         return self.insert_into_list(synthesized_cname_info, self.cname_info_from_dname, server, client, response)
 
     def is_wildcard(self, rrsig):
-        if self.rrset.name[0] == '*':
+        if self.rrset.name[0] == b'*':
             return False
         return len(self.rrset.name) - 1 > rrsig.labels
 
