@@ -493,6 +493,11 @@ class DNSResponse:
 
         return self.message is not None and bool(self.message.flags & dns.flags.AA)
 
+    def is_dnssec_response(self):
+        '''Return True if the message has the DNSSEC OK (DO) bit set.'''
+
+        return self.message is not None and not bool(self.message.ednsflags & dns.flags.DO)
+
     def is_referral(self, qname, rdtype, rdclass, bailiwick, proper=False):
         '''Return True if this response yields a referral for the queried
         name.'''

@@ -1322,9 +1322,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         if response.is_referral(query.qname, query.rdtype, query.rdclass, qname_obj.name):
                             ds_referral = True
 
-                    if ds_referral:
+                    if ds_referral and response.is_dnssec_response():
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.ReferralForDSQuery(parent=fmt.humanize_name(qname_obj.name)), group, server, client, response)
-                    else:
+                    elif not ds_referral:
                         Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), group, server, client, response)
 
             elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
