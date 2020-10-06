@@ -2465,7 +2465,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
-            if dnskey.rdata.algorithm in DNSSEC_KEY_LENGTHS_BY_ALGORITHM and \
+            if not dnskey.rdata.key:
+                dnskey.errors.append(Errors.DNSKEYZeroLength())
+            elif dnskey.rdata.algorithm in DNSSEC_KEY_LENGTHS_BY_ALGORITHM and \
                     dnskey.key_len != DNSSEC_KEY_LENGTHS_BY_ALGORITHM[dnskey.rdata.algorithm]:
                 dnskey.errors.append(DNSSEC_KEY_LENGTH_ERRORS[dnskey.rdata.algorithm](length=dnskey.key_len))
 
