@@ -870,8 +870,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             for rrset_info in query.answer_info:
                 self.yxdomain.add(rrset_info.rrset.name)
+                # for ALL types, add the name and type to yxrrset
                 self.yxrrset.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
-                self.yxrrset_proper.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
+                # for all types EXCEPT where the record is a CNAME record
+                # synthesized from a DNAME record, add the name and type to
+                # yxrrset_proper
+                if not (rrset_info.rrset.rdtype == dns.rdatatype.CNAME and rrset_info.cname_info_from_dname):
+                    self.yxrrset_proper.add((rrset_info.rrset.name, rrset_info.rrset.rdtype))
                 if rrset_info.dname_info is not None:
                     self.yxrrset.add((rrset_info.dname_info.rrset.name, rrset_info.dname_info.rrset.rdtype))
                 for cname_rrset_info in rrset_info.cname_info_from_dname:
