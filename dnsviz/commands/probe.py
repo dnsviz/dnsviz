@@ -64,6 +64,7 @@ else:
 import dns.edns, dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
 from dnsviz.analysis import COOKIE_STANDIN, WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
+from dnsviz.config import RESOLV_CONF
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.query import DiagnosticQuery, QuickDNSSECQuery, StandardRecursiveQueryCD
@@ -769,7 +770,7 @@ def main(argv):
             sys.exit(1)
 
         _init_tm()
-        bootstrap_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
+        bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
 
         # get all the options for which there might be multiple values
         explicit_delegations = {}

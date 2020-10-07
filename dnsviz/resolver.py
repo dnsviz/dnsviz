@@ -30,6 +30,7 @@ import random
 import threading
 import time
 
+from .config import RESOLV_CONF
 from . import query
 from .ipaddr import *
 from . import response as Response
@@ -44,14 +45,14 @@ _r = None
 def get_standard_resolver():
     global _r
     if _r is None:
-        _r = Resolver.from_file('/etc/resolv.conf', query.StandardRecursiveQuery)
+        _r = Resolver.from_file(RESOLV_CONF, query.StandardRecursiveQuery)
     return _r
 
 _rd = None
 def get_dnssec_resolver():
     global _rd
     if _rd is None:
-        _rd = Resolver.from_file('/etc/resolv.conf', query.RecursiveDNSSECQuery)
+        _rd = Resolver.from_file(RESOLV_CONF, query.RecursiveDNSSECQuery)
     return _rd
 
 class DNSAnswer:
