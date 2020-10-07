@@ -68,7 +68,7 @@ from dnsviz.config import RESOLV_CONF
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.query import DiagnosticQuery, QuickDNSSECQuery, StandardRecursiveQueryCD
-from dnsviz.resolver import DNSAnswer, Resolver, PrivateFullResolver
+from dnsviz.resolver import DNSAnswer, Resolver, ResolvConfError, PrivateFullResolver
 from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
 lb2s = fmt.latin1_binary_to_string
@@ -770,7 +770,11 @@ def main(argv):
             sys.exit(1)
 
         _init_tm()
-        bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
+        try:
+            bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
+        except ResolvConfError:
+            sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
+            sys.exit(1)
 
         # get all the options for which there might be multiple values
         explicit_delegations = {}

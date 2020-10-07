@@ -41,6 +41,9 @@ import dns.rdataclass, dns.exception, dns.message, dns.rcode, dns.resolver
 
 MAX_CNAME_REDIRECTION = 20
 
+class ResolvConfError(Exception):
+    pass
+
 _r = None
 def get_standard_resolver():
     global _r
@@ -130,8 +133,10 @@ class Resolver:
                             servers.append(IPAddr(words[1]))
                         except ValueError:
                             pass
-        except IOError:
-            pass
+        except IOError as e:
+            raise ResolvConfError('Unable to open %s: %s' % (resolv_conf, str(e)))
+        if not servers:
+            raise ResolvConfError('No servers found in %s' % (resolv_conf))
         return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):
