@@ -676,7 +676,7 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         return d
 
 class NSECStatusNODATA(NSECStatus):
-    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info, sname_must_match=False):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
@@ -700,13 +700,14 @@ class NSECStatusNODATA(NSECStatus):
             self.has_ds = False
             self.has_soa = False
 
-            # If no NSEC exists for the name itself, then look for an NSEC with
-            # an (empty non-terminal) ancestor
-            for nsec_name in nsec_set_info.rrsets:
-                next_name = nsec_set_info.rrsets[nsec_name].rrset[0].next
-                if next_name.is_subdomain(self.qname) and next_name != self.qname:
-                    self.nsec_for_qname = nsec_set_info.rrsets[nsec_name]
-                    break
+            if not sname_must_match:
+                # If no NSEC exists for the name itself, then look for an NSEC with
+                # an (empty non-terminal) ancestor
+                for nsec_name in nsec_set_info.rrsets:
+                    next_name = nsec_set_info.rrsets[nsec_name].rrset[0].next
+                    if next_name.is_subdomain(self.qname) and next_name != self.qname:
+                        self.nsec_for_qname = nsec_set_info.rrsets[nsec_name]
+                        break
 
         self.nsec_names_covering_qname = {}
         covering_names = nsec_set_info.nsec_covering_name(self.qname)
