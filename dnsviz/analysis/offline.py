@@ -834,6 +834,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_rrsig_status_all(supported_algs)
         self._populate_nodata_status(supported_algs)
         self._populate_nxdomain_status(supported_algs)
+        self._populate_inconsistent_negative_dnssec_responses_all()
         self._finalize_key_roles()
         if not is_dlv:
             self._populate_delegation_status(supported_algs, supported_digest_algs)
@@ -2423,6 +2424,55 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 Errors.MissingNSECForNODATA, Status.NSECStatusNODATA, Status.NSEC3StatusNODATA, \
                                 self.nodata_warnings[neg_response_info], self.nodata_errors[neg_response_info], \
                                 supported_algs)
+
+    def _populate_inconsistent_negative_dnssec_responses(self, neg_response_info, neg_status):
+        for nsec_status in neg_status[neg_response_info]:
+            queries_by_error = {
+                    Errors.ExistingTypeNotInBitmapNSEC3: [],
+                    Errors.ExistingTypeNotInBitmapNSEC: [],
+                    Errors.ExistingCoveredNSEC3: [],
+                    Errors.ExistingCoveredNSEC: [],
+            }
+            nsec_set_info = nsec_status.nsec_set_info
+            for (qname, rdtype) in self.yxrrset_proper:
+                if rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                    continue
+                if nsec_set_info.use_nsec3:
+                    status = Status.NSEC3StatusNXDOMAIN(qname, rdtype, nsec_status.origin, nsec_status.is_zone, nsec_set_info)
+                    err_cls = Errors.ExistingCoveredNSEC3
+                else:
+                    status = Status.NSECStatusNXDOMAIN(qname, rdtype, nsec_status.origin, nsec_status.is_zone, nsec_set_info)
+                    err_cls = Errors.ExistingCoveredNSEC
+
+                if status.validation_status == Status.NSEC_STATUS_VALID and not status.opt_out:
+                    queries_by_error[err_cls].append((qname, rdtype))
+
+                if nsec_set_info.use_nsec3:
+                    status = Status.NSEC3StatusNODATA(qname, rdtype, nsec_status.origin, nsec_status.is_zone, nsec_set_info)
+                    err_cls = Errors.ExistingTypeNotInBitmapNSEC3
+                else:
+                    status = Status.NSECStatusNODATA(qname, rdtype, nsec_status.origin, nsec_status.is_zone, nsec_set_info, sname_must_match=True)
+                    err_cls = Errors.ExistingTypeNotInBitmapNSEC
+
+                if status.validation_status == Status.NSEC_STATUS_VALID and not status.opt_out:
+                    queries_by_error[err_cls].append((qname, rdtype))
+
+            for err_cls in queries_by_error:
+                if not queries_by_error[err_cls]:
+                    continue
+                queries = [(fmt.humanize_name(qname), dns.rdatatype.to_text(rdtype)) for qname, rdtype in queries_by_error[err_cls]]
+                err = Errors.DomainNameAnalysisError.insert_into_list(err_cls(queries=queries), nsec_status.errors, None, None, None)
+
+    def _populate_inconsistent_negative_dnssec_responses_all(self):
+
+        _logger.debug('Looking for negative responses that contradict positive responses (%s)...' % (fmt.humanize_name(self.name)))
+        for (qname, rdtype), query in self.queries.items():
+            if rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
+                continue
+            for neg_response_info in query.nodata_info:
+                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.nodata_status)
+            for neg_response_info in query.nxdomain_info:
+                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.nxdomain_status)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
