@@ -487,6 +487,8 @@ class NSECStatusNXDOMAIN(NSECStatus):
 
         self.nsec_names_covering_qname = {}
         covering_names = nsec_set_info.nsec_covering_name(self.qname)
+        self.opt_out = None
+
         if covering_names:
             self.nsec_names_covering_qname[self.qname] = covering_names
 
@@ -731,6 +733,8 @@ class NSECStatusNODATA(NSECStatus):
         covering_names = nsec_set_info.nsec_covering_name(self.origin)
         if covering_names:
             self.nsec_names_covering_origin[self.origin] = covering_names
+
+        self.opt_out = None
 
         self._set_validation_status(nsec_set_info)
 
