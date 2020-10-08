@@ -2103,6 +2103,19 @@ class DNSKEYNotAtZoneApex(DNSKEYError):
 class DNSKEYBadLength(DNSKEYError):
     pass
 
+class DNSKEYZeroLength(DNSKEYBadLength):
+    '''
+    >>> e = DNSKEYZeroLength()
+    >>> e.description
+    'The length of the key is 0 bits.'
+    '''
+    _abstract = False
+    description_template = 'The length of the key is 0 bits.'
+    code = 'DNSKEY_ZERO_LENGTH'
+    references = []
+    required_params = []
+
+
 class DNSKEYBadLengthGOST(DNSKEYBadLength):
     '''
     >>> e = DNSKEYBadLengthGOST(length=500)

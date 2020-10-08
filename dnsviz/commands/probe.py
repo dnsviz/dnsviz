@@ -65,10 +65,11 @@ else:
 import dns.edns, dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
 from dnsviz.analysis import COOKIE_STANDIN, WILDCARD_EXPLICIT_DELEGATION, PrivateAnalyst, PrivateRecursiveAnalyst, OnlineDomainNameAnalysis, NetworkConnectivityException, DNS_RAW_VERSION
+from dnsviz.config import RESOLV_CONF
 import dnsviz.format as fmt
 from dnsviz.ipaddr import IPAddr
 from dnsviz.query import DiagnosticQuery, QuickDNSSECQuery, StandardRecursiveQueryCD
-from dnsviz.resolver import DNSAnswer, Resolver, PrivateFullResolver
+from dnsviz.resolver import DNSAnswer, Resolver, ResolvConfError, PrivateFullResolver
 from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
 lb2s = fmt.latin1_binary_to_string
@@ -1394,7 +1395,12 @@ def main(argv):
 
     try:
         _init_tm()
-        bootstrap_resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=tm)
+        try:
+            bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
+        except ResolvConfError:
+            sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
+            sys.exit(1)
+
         arghelper = ArgHelper(bootstrap_resolver, logger)
         arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]), argv[1:])
         logger.setLevel(arghelper.get_log_level())

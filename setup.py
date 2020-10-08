@@ -24,6 +24,7 @@ JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
 JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
 JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
 RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
+RESOLV_CONF = "'/etc/resolv.conf'"
 
 def apply_substitutions(filename, install_prefix):
     assert filename.endswith('.in'), 'Filename supplied for customization must end with \'.in\': %s' % (filename)
@@ -41,6 +42,7 @@ def apply_substitutions(filename, install_prefix):
     s = s.replace('__JQUERY_UI_PATH__', JQUERY_UI_PATH)
     s = s.replace('__JQUERY_UI_CSS_PATH__', JQUERY_UI_CSS_PATH)
     s = s.replace('__RAPHAEL_PATH__', RAPHAEL_PATH)
+    s = s.replace('__RESOLV_CONF__', RESOLV_CONF)
 
     with open(filename_out, 'w') as out_fh:
         out_fh.write(s)

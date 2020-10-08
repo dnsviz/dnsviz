@@ -30,6 +30,7 @@ import random
 import threading
 import time
 
+from .config import RESOLV_CONF
 from . import query
 from .ipaddr import *
 from . import response as Response
@@ -40,18 +41,21 @@ import dns.rdataclass, dns.exception, dns.message, dns.rcode, dns.resolver
 
 MAX_CNAME_REDIRECTION = 20
 
+class ResolvConfError(Exception):
+    pass
+
 _r = None
 def get_standard_resolver():
     global _r
     if _r is None:
-        _r = Resolver.from_file('/etc/resolv.conf', query.StandardRecursiveQuery)
+        _r = Resolver.from_file(RESOLV_CONF, query.StandardRecursiveQuery)
     return _r
 
 _rd = None
 def get_dnssec_resolver():
     global _rd
     if _rd is None:
-        _rd = Resolver.from_file('/etc/resolv.conf', query.RecursiveDNSSECQuery)
+        _rd = Resolver.from_file(RESOLV_CONF, query.RecursiveDNSSECQuery)
     return _rd
 
 class DNSAnswer:
@@ -129,8 +133,10 @@ class Resolver:
                             servers.append(IPAddr(words[1]))
                         except ValueError:
                             pass
-        except IOError:
-            pass
+        except IOError as e:
+            raise ResolvConfError('Unable to open %s: %s' % (resolv_conf, str(e)))
+        if not servers:
+            raise ResolvConfError('No servers found in %s' % (resolv_conf))
         return Resolver(servers, query_cls, **kwargs)
 
     def query(self, qname, rdtype, rdclass=dns.rdataclass.IN, accept_first_response=False, continue_on_servfail=True):

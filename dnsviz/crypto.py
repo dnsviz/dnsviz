@@ -288,6 +288,10 @@ def _dnskey_to_ec(alg, key):
 def _validate_rrsig_rsa(alg, sig, msg, key):
     pubkey = _dnskey_to_rsa(key)
 
+    # if the key is invalid, then the signature is also invalid
+    if pubkey is None:
+        return False
+
     if alg in (1,):
         md='md5'
     elif alg in (5,7):
@@ -308,6 +312,10 @@ def _validate_rrsig_rsa(alg, sig, msg, key):
 
 def _validate_rrsig_dsa(alg, sig, msg, key):
     pubkey = _dnskey_to_dsa(key)
+
+    # if the key is invalid, then the signature is also invalid
+    if pubkey is None:
+        return False
 
     # get T
     t = sig[0]
@@ -337,6 +345,10 @@ def _validate_rrsig_gost(alg, sig, msg, key):
 
     try:
         pubkey = _dnskey_to_gost(key)
+
+        # if the key is invalid, then the signature is also invalid
+        if pubkey is None:
+            return False
 
         pubkey.md = m2.get_digestbyname(GOST_DIGEST_NAME)
         pubkey.verify_init()
