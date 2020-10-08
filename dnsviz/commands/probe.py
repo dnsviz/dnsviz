@@ -1063,6 +1063,9 @@ class ArgHelper:
     @classmethod
     def comma_separated_dns_types(cls, arg):
         rdtypes = []
+        arg = arg.strip()
+        if not arg:
+            return rdtypes
         for r in arg.split(','):
             try:
                 rdtypes.append(dns.rdatatype.from_text(r.strip()))
@@ -1245,7 +1248,7 @@ class ArgHelper:
         else:
             self.ceiling = dns.name.root
 
-        if self.args.rr_types:
+        if self.args.rr_types is not None:
             self.explicit_only = True
         else:
             self.explicit_only = False

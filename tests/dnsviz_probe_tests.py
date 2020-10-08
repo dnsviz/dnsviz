@@ -409,12 +409,17 @@ class CommandLineTestCase(unittest.TestCase):
         arg1_with_spaces = ' A , AAAA , MX , CNAME '
         arg2 = 'A'
         arg3 = 'A,BLAH'
+        arg4_empty = ''
+        arg4_empty_spaces = ' '
 
         type_list1 = [dns.rdatatype.A, dns.rdatatype.AAAA, dns.rdatatype.MX, dns.rdatatype.CNAME]
         type_list2 = [dns.rdatatype.A]
+        empty_list = []
 
         self.assertEqual(ArgHelper.comma_separated_dns_types(arg1), type_list1)
         self.assertEqual(ArgHelper.comma_separated_dns_types(arg1_with_spaces), type_list1)
+        self.assertEqual(ArgHelper.comma_separated_dns_types(arg4_empty), empty_list)
+        self.assertEqual(ArgHelper.comma_separated_dns_types(arg4_empty_spaces), empty_list)
 
         # invalid schema
         with self.assertRaises(argparse.ArgumentTypeError):
