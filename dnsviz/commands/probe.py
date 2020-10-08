@@ -902,7 +902,7 @@ class ArgHelper:
         self.names = None
         self.analysis_structured = None
 
-        self._args = None
+        self.args = None
         self._arg_mapping = None
 
         self._resolver = resolver
