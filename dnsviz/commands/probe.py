@@ -996,7 +996,7 @@ class ArgHelper:
         self.parser.add_argument('-o', '--output-file',
                 type=argparse.FileType('wb'), default=sys.stdout.buffer,
                 action='store', metavar='<filename>',
-                help='Write the analysis to the specified file')
+                help='Save the output to the specified file')
         self.parser.add_argument('-p', '--pretty-output',
                 const=True, default=False,
                 action='store_const',
@@ -1219,7 +1219,7 @@ class ArgHelper:
 
     def check_args(self):
         if not self.args.names_file and not self.args.domain_name and not self.args.input_file:
-            raise argparse.ArgumentTypeError('If domain names are not supplied as command-line arguments, then either %(input_file)s or %(names_file)s must be specified.' % \
+            raise argparse.ArgumentTypeError('If no domain names are supplied as command-line arguments, then either %(input_file)s or %(names_file)s must be used.' % \
                     self._arg_mapping)
         if self.args.names_file and self.args.domain_name:
             raise argparse.ArgumentTypeError('If %(names_file)s is used, then domain names may not supplied as command line arguments.' % \
