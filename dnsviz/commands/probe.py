@@ -994,7 +994,7 @@ class ArgHelper:
                 action='store_const',
                 help='Issue queries to check EDNS compatibility')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb', encoding='UTF-8'), default=sys.stdout.buffer,
+                type=argparse.FileType('wb'), default=sys.stdout.buffer,
                 action='store', metavar='<filename>',
                 help='Write the analysis to the specified file')
         self.parser.add_argument('-p', '--pretty-output',
