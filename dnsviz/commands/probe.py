@@ -914,18 +914,37 @@ class ArgHelper:
         self.parser = argparse.ArgumentParser(description='Issue diagnostic DNS queries', prog=prog)
         helper = DomainListArgHelper(self._resolver)
 
-        self.parser.add_argument('-f', '--names-file',
-                type=argparse.FileType('r', encoding='UTF-8'),
-                action='store', metavar='<filename>',
-                help='Read names from a file')
+        # python3/python2 dual compatibility
+        stdout_buffer = io.open(sys.stdout.fileno(), 'wb')
+
+        try:
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r', encoding='utf-8'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
         self.parser.add_argument('-d', '--debug',
                 type=int, choices=range(4), default=2,
                 action='store', metavar='<level>',
                 help='Set debug level')
-        self.parser.add_argument('-r', '--input-file',
-                type=argparse.FileType('r', encoding='UTF-8'),
-                action='store', metavar='<filename>',
-                help='Read diagnostic queries from a file')
+        try:
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r', encoding='utf-8'),
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
         self.parser.add_argument('-t', '--threads',
                 type=self.positive_int, default=1,
                 action='store', metavar='<threads>',
@@ -995,7 +1014,7 @@ class ArgHelper:
                 action='store_const',
                 help='Issue queries to check EDNS compatibility')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb'), default=sys.stdout.buffer,
+                type=argparse.FileType('wb'), default=stdout_buffer,
                 action='store', metavar='<filename>',
                 help='Save the output to the specified file')
         self.parser.add_argument('-p', '--pretty-output',
@@ -1309,6 +1328,31 @@ class ArgHelper:
         if self.args.cookie:
             CustomQueryMixin.edns_options.append(self.args.cookie)
 
+    def set_buffers(self):
+        # This entire method is for
+        # python3/python2 dual compatibility
+        if self.args.input_file is not None:
+            if self.args.input_file.fileno() == sys.stdin.fileno():
+                filename = self.args.input_file.fileno()
+            else:
+                filename = self.args.input_file.name
+                self.args.input_file.close()
+            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.names_file is not None:
+            if self.args.names_file.fileno() == sys.stdin.fileno():
+                filename = self.args.names_file.fileno()
+            else:
+                filename = self.args.names_file.name
+                self.args.names_file.close()
+            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.output_file is not None:
+            if self.args.output_file.fileno() == sys.stdout.fileno():
+                filename = self.args.output_file.fileno()
+            else:
+                filename = self.args.output_file.name
+                self.args.output_file.close()
+            self.args.output_file = io.open(filename, 'wb')
+
     def check_network_connectivity(self):
         if self.args.authoritative_analysis:
             if self.try_ipv4 and get_client_address(A_ROOT_IPV4) is None:
@@ -1408,6 +1452,7 @@ def main(argv):
         try:
             arghelper.check_args()
             arghelper.set_kwargs()
+            arghelper.set_buffers()
             arghelper.check_network_connectivity()
             arghelper.aggregate_delegation_info()
             arghelper.populate_recursive_servers()
