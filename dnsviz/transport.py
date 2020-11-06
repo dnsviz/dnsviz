@@ -324,6 +324,10 @@ QTH_MODE_WRITE_READ = 0
 QTH_MODE_WRITE = 1
 QTH_MODE_READ = 2
 
+QTH_SETUP_DONE = 0
+QTH_SETUP_NEED_WRITE = 1
+QTH_SETUP_NEED_READ = 2
+
 class DNSQueryTransportHandler(object):
     singleton = False
     allow_loopback_query = False
@@ -360,6 +364,8 @@ class DNSQueryTransportHandler(object):
         self.expiration = None
         self.start_time = None
         self.end_time = None
+
+        self.setup_state = QTH_SETUP_DONE
 
         self.qtms = []
 
@@ -530,6 +536,9 @@ class DNSQueryTransportHandler(object):
         # place in processed queue, if specified
         if self._processed_queue is not None:
             self._processed_queue.put(self)
+
+    def do_setup(self):
+        pass
 
     def do_write(self):
         try:
@@ -760,6 +769,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.password = parse_result.password
         self.insecure = insecure
 
+        if self.use_ssl:
+            self.setup_state = QTH_SETUP_NEED_WRITE
+        else:
+            self.setup_state = QTH_SETUP_DONE
+
         af = 0
         try:
             addrinfo = socket.getaddrinfo(self.host, self.dport, af, self.transport_type)
@@ -769,18 +783,19 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
         self.chunked_encoding = None
 
-    def _create_socket(self):
-        super(DNSQueryTransportHandlerHTTP, self)._create_socket()
+    def _upgrade_socket_to_ssl(self):
+        if isinstance(self.sock.sock, ssl.SSLSocket):
+            return
 
-        if self.use_ssl:
-            #XXX this is python >= 2.7.9 only
-            ctx = ssl.create_default_context()
-            if self.insecure:
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-            new_sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host))
-            new_sock.lock = self.sock.lock
-            self.sock = new_sock
+        #XXX this is python >= 2.7.9 only
+        ctx = ssl.create_default_context()
+        if self.insecure:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        new_sock = Socket(ctx.wrap_socket(self.sock.sock, server_hostname=self.host,
+                do_handshake_on_connect=False))
+        new_sock.lock = self.sock.lock
+        self.sock = new_sock
 
     def _post_data(self):
         return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
@@ -805,6 +820,20 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         super(DNSQueryTransportHandlerHTTP, self).prepare()
         if self.err is not None and not isinstance(self.err, SocketInUse):
             self.err = RemoteQueryTransportError('Error making HTTP connection: %s' % self.err)
+
+    def do_setup(self):
+        if self.use_ssl:
+            self._upgrade_socket_to_ssl()
+            try:
+                self.sock.sock.do_handshake()
+            except ssl.SSLWantReadError:
+                self.setup_state = QTH_SETUP_NEED_READ
+            except ssl.SSLWantWriteError:
+                self.setup_state = QTH_SETUP_NEED_WRITE
+            except ssl.SSLError as e:
+                self.err = RemoteQueryTransportError('SSL Error: %s' % e)
+            else:
+                self.setup_state = QTH_SETUP_DONE
 
     def do_write(self):
         val = super(DNSQueryTransportHandlerHTTP, self).do_write()
@@ -1421,11 +1450,21 @@ class _DNSQueryTransportManager:
             for fd in wlist_out:
                 qh = query_meta[fd]
 
-                if qh.do_write():
-                    if qh.err is not None or qh.mode == QTH_MODE_WRITE:
+                if qh.setup_state == QTH_SETUP_DONE:
+                    if qh.do_write():
+                        if qh.err is not None or qh.mode == QTH_MODE_WRITE:
+                            qh.cleanup()
+                            finished_fds.append(fd)
+                        else: # qh.mode == QTH_MODE_WRITE_READ
+                            wlist_in.remove(fd)
+                            rlist_in.append(qh.sock.reader_fd)
+
+                else:
+                    qh.do_setup()
+                    if qh.err is not None:
                         qh.cleanup()
                         finished_fds.append(fd)
-                    else: # qh.mode == QTH_MODE_WRITE_READ
+                    elif qh.setup_state == QTH_SETUP_NEED_READ:
                         wlist_in.remove(fd)
                         rlist_in.append(qh.sock.reader_fd)
 
@@ -1436,9 +1475,19 @@ class _DNSQueryTransportManager:
 
                 qh = query_meta[fd]
 
-                if qh.do_read(): # qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ)
-                    qh.cleanup()
-                    finished_fds.append(qh.sock.reader_fd)
+                if qh.setup_state == QTH_SETUP_DONE:
+                    if qh.do_read(): # qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_READ)
+                        qh.cleanup()
+                        finished_fds.append(qh.sock.reader_fd)
+
+                else:
+                    qh.do_setup()
+                    if qh.err is not None:
+                        qh.cleanup()
+                        finished_fds.append(fd)
+                    elif qh.setup_state in (QTH_SETUP_NEED_WRITE, QTH_SETUP_DONE):
+                        rlist_in.remove(fd)
+                        wlist_in.append(qh.sock.writer_fd)
 
             # handle the expired queries
             future_index = bisect.bisect_right(expirations, ((time.time(), DNSQueryTransportHandlerWrapper(None))))
@@ -1498,12 +1547,17 @@ class _DNSQueryTransportManager:
                             query_meta[qh.sock.reader_fd] = qh
                             query_meta[qh.sock.writer_fd] = qh
                             bisect.insort(expirations, (qh.expiration, DNSQueryTransportHandlerWrapper(qh)))
-                            if qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE):
+                            if qh.setup_state == QTH_SETUP_DONE:
+                                if qh.mode in (QTH_MODE_WRITE_READ, QTH_MODE_WRITE):
+                                    wlist_in.append(qh.sock.writer_fd)
+                                elif qh.mode == QTH_MODE_READ:
+                                    rlist_in.append(qh.sock.reader_fd)
+                                else:
+                                    raise Exception('Unexpected mode: %d' % qh.mode)
+                            elif qh.setup_state == QTH_SETUP_NEED_WRITE:
                                 wlist_in.append(qh.sock.writer_fd)
-                            elif qh.mode == QTH_MODE_READ:
+                            elif qh.setup_state == QTH_SETUP_NEED_READ:
                                 rlist_in.append(qh.sock.reader_fd)
-                            else:
-                                raise Exception('Unexpected mode: %d' % qh.mode)
                     except queue.Empty:
                         break
 
