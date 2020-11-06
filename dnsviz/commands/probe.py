@@ -478,7 +478,7 @@ $TTL 600
 
         atexit.register(self._cleanup_process)
 
-class NameServerMappingsForDomain:
+class NameServerMappingsForDomain(object):
     PORT_RE = re.compile(r'^(.*):(\d+)$')
     BRACKETS_RE = re.compile(r'^\[(.*)\]$')
 
@@ -915,7 +915,7 @@ class ArgHelper:
         helper = DomainListArgHelper(self._resolver)
 
         # python3/python2 dual compatibility
-        stdout_buffer = io.open(sys.stdout.fileno(), 'wb')
+        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
 
         try:
             self.parser.add_argument('-f', '--names-file',
@@ -1142,8 +1142,13 @@ class ArgHelper:
         wire += struct.pack(b'!B', 0)
         wire += addr._ipaddr_bytes[:bytes_masked]
         if remainder:
+            # python3/python2 dual compatibility
+            byte = addr._ipaddr_bytes[bytes_masked]
+            if isinstance(addr._ipaddr_bytes, str):
+                byte = ord(byte)
+
             mask = ~(2**(8 - remainder)-1)
-            wire += struct.pack('B', mask & addr._ipaddr_bytes[bytes_masked])
+            wire += struct.pack('B', mask & byte)
 
         return dns.edns.GenericOption(8, wire)
 
@@ -1202,7 +1207,7 @@ class ArgHelper:
                 self.explicit_delegations[(localhost, loopback_rdtype)].add(loopback_rdtype_cls(dns.rdataclass.IN, loopback_rdtype, loopback))
                 self.odd_ports[(zone_name, loopback)] = zone.port
 
-        delegation_info_by_zone = {}
+        delegation_info_by_zone = OrderedDict()
         for arg in self.args.ds + self.args.delegation_information:
             zone_name = arg.domain.parent()
             if (zone_name, dns.rdatatype.NS) in self.explicit_delegations:
