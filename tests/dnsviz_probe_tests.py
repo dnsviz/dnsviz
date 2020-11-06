@@ -594,7 +594,8 @@ ns1.example 0 IN A 192.0.2.1
         arghelper1.aggregate_delegation_info()
         zone_to_serve = arghelper1._zones_to_serve[0]
         zone_obj = dns.zone.from_file(zone_to_serve.filename, dns.name.from_text('com'))
-        self.assertEqual(zone_contents1, zone_obj.to_text())
+        zone_obj_other = dns.zone.from_text(zone_contents1, dns.name.from_text('com'))
+        self.assertEqual(zone_obj, zone_obj_other)
         self.assertEqual(arghelper1.explicit_delegations, explicit_delegations1)
         self.assertEqual(arghelper1.odd_ports, odd_ports1)
         
@@ -605,7 +606,8 @@ ns1.example 0 IN A 192.0.2.1
         arghelper2.aggregate_delegation_info()
         zone_to_serve = arghelper2._zones_to_serve[0]
         zone_obj = dns.zone.from_file(zone_to_serve.filename, dns.name.from_text('com'))
-        self.assertEqual(zone_contents2, zone_obj.to_text())
+        zone_obj_other = dns.zone.from_text(zone_contents2, dns.name.from_text('com'))
+        self.assertEqual(zone_obj, zone_obj_other)
         self.assertEqual(arghelper2.explicit_delegations, explicit_delegations2)
         self.assertEqual(arghelper2.odd_ports, odd_ports2)
         
@@ -933,7 +935,7 @@ ns1.example 0 IN A 192.0.2.1
         self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as names_file:
-            names_file.write(b'example.com\nexample.net\n')
+            names_file.write('example.com\nexample.net\n'.encode('utf-8'))
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_names_only:
             example_names_only.write(b'{ "_meta._dnsviz.": { "version": 1.2, "names": [ "example.com.", "example.net.", "example.org." ] } }') 
