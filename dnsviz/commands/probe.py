@@ -1095,6 +1095,9 @@ class ArgHelper:
 
     @classmethod
     def valid_domain_name(cls, arg):
+        # python3/python2 dual compatibility
+        if isinstance(arg, bytes):
+            arg = codecs.decode(arg, sys.getfilesystemencoding())
         try:
             return dns.name.from_text(arg)
         except dns.exception.DNSException:
@@ -1422,6 +1425,11 @@ class ArgHelper:
 
         for arg in args:
             name = arg.strip()
+
+            # python3/python2 dual compatibility
+            if hasattr(name, 'decode'):
+                name = name.decode('utf-8')
+
             try:
                 name = dns.name.from_text(name)
             except UnicodeDecodeError as e:

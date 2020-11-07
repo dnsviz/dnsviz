@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import argparse
 import binascii
 import gzip
@@ -934,8 +936,23 @@ ns1.example 0 IN A 192.0.2.1
         arghelper.ingest_names()
         self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
 
+        unicode_name = 'テスト'
+
+        args = [unicode_name]
+        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper.build_parser('probe', args)
+        arghelper.ingest_names()
+        self.assertEqual(list(arghelper.names), [dns.name.from_text('xn--zckzah.')])
+
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as names_file:
             names_file.write('example.com\nexample.net\n'.encode('utf-8'))
+
+        with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as names_file_unicode:
+            try:
+                names_file_unicode.write(('%s\n' % (unicode_name)).encode('utf-8'))
+            # python3/python2 dual compatibility
+            except UnicodeDecodeError:
+                names_file_unicode.write(('%s\n' % (unicode_name)))
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_names_only:
             example_names_only.write(b'{ "_meta._dnsviz.": { "version": 1.2, "names": [ "example.com.", "example.net.", "example.org." ] } }') 
@@ -946,6 +963,12 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.build_parser('probe', args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
+
+            args = ['-f', names_file_unicode.name]
+            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper.build_parser('probe', args)
+            arghelper.ingest_names()
+            self.assertEqual(list(arghelper.names), [dns.name.from_text('xn--zckzah.')])
 
             args = ['-r', example_names_only.name]
             arghelper = ArgHelper(self.resolver, self.logger)
@@ -961,7 +984,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com')])
         finally:
-            for tmpfile in (names_file, example_names_only):
+            for tmpfile in (names_file, names_file_unicode, example_names_only):
                 os.remove(tmpfile.name)
 
 if __name__ == '__main__':
