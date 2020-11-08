@@ -5,6 +5,7 @@ import binascii
 import gzip
 import logging
 import os
+import subprocess
 import tempfile
 import unittest
 
@@ -986,6 +987,10 @@ ns1.example 0 IN A 192.0.2.1
         finally:
             for tmpfile in (names_file, names_file_unicode, example_names_only):
                 os.remove(tmpfile.name)
+
+    def test_dnsviz_probe_run(self):
+        self.assertEqual(subprocess.call(['./bin/dnsviz', 'probe', '-d', '0', '-o', '/dev/null', 'example.com']), 0)
+        self.assertEqual(subprocess.call(['./bin/dnsviz', 'probe', '-d', '0', '-A', '-o', '/dev/null', 'example.com']), 0)
 
 if __name__ == '__main__':
     unittest.main()
