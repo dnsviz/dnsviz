@@ -68,7 +68,10 @@ class IPAddr(str):
     def __eq__(self, other):
         if other is None:
             return False
-        return self._ipaddr_bytes == other._ipaddr_bytes
+        if isinstance(other, IPAddr):
+            return self._ipaddr_bytes == other._ipaddr_bytes
+        else:
+            return super(IPAddr, self) == other
 
     def __hash__(self):
         return hash(self._ipaddr_bytes)
