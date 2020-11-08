@@ -2,8 +2,11 @@ import argparse
 import binascii
 import datetime
 import gzip
+import importlib
+import io
 import logging
 import os
+import subprocess
 import tempfile
 import unittest
 
@@ -11,13 +14,16 @@ import dns.name, dns.rdatatype, dns.rrset, dns.zone
 
 from dnsviz.format import utc
 from dnsviz.util import get_default_trusted_keys
-from dnsviz.commands.print import PrintArgHelper, AnalysisInputError
+
+mod = importlib.import_module('dnsviz.commands.print')
+PrintArgHelper = getattr(mod, 'PrintArgHelper')
+AnalysisInputError = getattr(mod, 'AnalysisInputError')
 
 DATA_DIR = os.path.dirname(__file__)
 EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.json.gz')
 
 
-class CommandLineTestCase(unittest.TestCase):
+class DNSVizPrintOptionsTestCase(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger()
         for handler in self.logger.handlers:
@@ -202,11 +208,11 @@ class CommandLineTestCase(unittest.TestCase):
         arghelper.update_trusted_key_info(now)
         self.assertEqual(arghelper.trusted_keys, tk_default)
 
-        with tempfile.NamedTemporaryFile('w', prefix='dnsviz', encoding='utf-8', delete=False) as tk1_file:
-            tk1_file.write(tk1)
+        with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as tk1_file:
+            tk1_file.write(tk1.encode('utf-8'))
 
-        with tempfile.NamedTemporaryFile('w', prefix='dnsviz', encoding='utf-8', delete=False) as tk2_file:
-            tk2_file.write(tk2)
+        with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as tk2_file:
+            tk2_file.write(tk2.encode('utf-8'))
 
         try:
             args = ['-t', tk1_file.name, '-t', tk2_file.name, 'example.com']
@@ -242,6 +248,18 @@ class CommandLineTestCase(unittest.TestCase):
         arghelper.build_parser('print', args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
+
+        # But this is allowed
+        args = ['-o', '/dev/null']
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print', args)
+        arghelper.check_args()
+
+        # So is this
+        args = ['-O']
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print', args)
+        arghelper.check_args()
 
 if __name__ == '__main__':
     unittest.main()
