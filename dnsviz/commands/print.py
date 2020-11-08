@@ -304,22 +304,50 @@ class PrintArgHelper:
     def build_parser(self, prog, args):
         self.parser = argparse.ArgumentParser(description='Print the assessment of diagnostic DNS queries', prog=prog)
 
-        self.parser.add_argument('-f', '--names-file',
-                type=argparse.FileType('r', encoding='UTF-8'),
-                action='store', metavar='<filename>',
-                help='Read names from a file')
+        # python3/python2 dual compatibility
+        stdin_buffer = io.open(sys.stdin.fileno(), 'rb', closefd=False)
+        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
+
+        try:
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r', encoding='UTF-8'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
         #self.parser.add_argument('-s', '--silent',
         #        const=True, default=False,
         #        action='store_const',
         #        help='Suppress error messages')
-        self.parser.add_argument('-r', '--input-file',
-                type=argparse.FileType('r', encoding='UTF-8'), default=sys.stdin.buffer,
-                action='store', metavar='<filename>',
-                help='Read diagnostic queries from a file')
-        self.parser.add_argument('-t', '--trusted-keys-file',
-                type=argparse.FileType('r', encoding='UTF-8'),
-                action='append', metavar='<filename>',
-                help='Use trusted keys from the designated file')
+        try:
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r', encoding='UTF-8'), default=stdin_buffer,
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r'), default=stdin_buffer,
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        try:
+            self.parser.add_argument('-t', '--trusted-keys-file',
+                    type=argparse.FileType('r', encoding='UTF-8'),
+                    action='append', metavar='<filename>',
+                    help='Use trusted keys from the designated file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-t', '--trusted-keys-file',
+                    type=argparse.FileType('r'),
+                    action='append', metavar='<filename>',
+                    help='Use trusted keys from the designated file')
         self.parser.add_argument('-a', '--algorithms',
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<alg>,[<alg>...]',
@@ -345,7 +373,7 @@ class PrintArgHelper:
                 action='store_const',
                 help='Derive the filename(s) from domain name(s)')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb'), default=sys.stdout.buffer,
+                type=argparse.FileType('wb'), default=stdout_buffer,
                 action='store', metavar='<filename>',
                 help='Save the output to the specified file')
         self.parser.add_argument('domain_name',
@@ -400,6 +428,38 @@ class PrintArgHelper:
         if self.args.derive_filename and self.args.output_file.fileno() != sys.stdout.fileno():
             raise argparse.ArgumentTypeError('The %(derive_filename)s and %(output_file)s options may not be used together.' % \
                     self._arg_mapping)
+
+    def set_buffers(self):
+        # This entire method is for
+        # python3/python2 dual compatibility
+        if self.args.input_file is not None:
+            if self.args.input_file.fileno() == sys.stdin.fileno():
+                filename = self.args.input_file.fileno()
+            else:
+                filename = self.args.input_file.name
+                self.args.input_file.close()
+            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.names_file is not None:
+            if self.args.names_file.fileno() == sys.stdin.fileno():
+                filename = self.args.names_file.fileno()
+            else:
+                filename = self.args.names_file.name
+                self.args.names_file.close()
+            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.trusted_keys_file is not None:
+            if self.args.trusted_keys_file.fileno() == sys.stdin.fileno():
+                filename = self.args.trusted_keys_file.fileno()
+            else:
+                filename = self.args.trusted_keys_file.name
+                self.args.trusted_keys_file.close()
+            self.args.trusted_keys_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.output_file is not None:
+            if self.args.output_file.fileno() == sys.stdout.fileno():
+                filename = self.args.output_file.fileno()
+            else:
+                filename = self.args.output_file.name
+                self.args.output_file.close()
+            self.args.output_file = io.open(filename, 'wb')
 
     def aggregate_trusted_key_info(self):
         if not self.args.trusted_keys_file:
@@ -462,6 +522,11 @@ class PrintArgHelper:
 
         for arg in args:
             name = arg.strip()
+
+            # python3/python2 dual compatibility
+            if hasattr(name, 'decode'):
+                name = name.decode('utf-8')
+
             try:
                 name = dns.name.from_text(name)
             except UnicodeDecodeError as e:
@@ -482,6 +547,7 @@ def main(argv):
 
         try:
             arghelper.check_args()
+            arghelper.set_buffers()
             arghelper.aggregate_trusted_key_info()
             arghelper.ingest_input()
             arghelper.ingest_names()
