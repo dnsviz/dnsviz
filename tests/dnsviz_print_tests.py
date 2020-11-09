@@ -261,5 +261,39 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         arghelper.build_parser('print', args)
         arghelper.check_args()
 
+    def test_dnsviz_probe_run(self):
+        with gzip.open(EXAMPLE_AUTHORITATIVE, 'rb') as example_auth_in:
+            with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_auth_out:
+                example_auth_out.write(example_auth_in.read())
+
+        output = tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False)
+        output.close()
+
+        current_cwd = os.getcwd()
+        dnsviz_bin = os.path.join(current_cwd, 'bin', 'dnsviz')
+
+        # if a file by this name already exists, then save it somewhere
+        run_cwd = tempfile.mkdtemp(prefix='dnsviz')
+        try:
+            with io.open(output.name, 'wb') as fh:
+                self.assertEqual(subprocess.call([dnsviz_bin, 'print', '-r', example_auth_out.name], cwd=run_cwd, stdout=fh), 0)
+
+            with io.open(output.name, 'wb') as fh:
+                self.assertEqual(subprocess.call([dnsviz_bin, 'print', '-r', example_auth_out.name, '-o', '-'], cwd=run_cwd, stdout=fh), 0)
+
+            self.assertEqual(subprocess.call([dnsviz_bin, 'print', '-r', example_auth_out.name, '-o', 'all.txt'], cwd=run_cwd), 0)
+            self.assertTrue(os.path.exists(os.path.join(run_cwd, 'all.txt')))
+            self.assertFalse(os.path.exists(os.path.join(run_cwd, 'example.com.txt')))
+            self.assertFalse(os.path.exists(os.path.join(run_cwd, 'example.net.txt')))
+
+            self.assertEqual(subprocess.call([dnsviz_bin, 'print', '-r', example_auth_out.name, '-O'], cwd=run_cwd), 0)
+            self.assertTrue(os.path.exists(os.path.join(run_cwd, 'example.com.txt')))
+            self.assertTrue(os.path.exists(os.path.join(run_cwd, 'example.net.txt')))
+
+        finally:
+            for tmpfile in (example_auth_out, output):
+                os.remove(tmpfile.name)
+            subprocess.check_call(['rm', '-rf', run_cwd])
+
 if __name__ == '__main__':
     unittest.main()
