@@ -16,5 +16,7 @@ install:
   - pip install -r requirements.txt
   - pip install .
 script:
-  - python tests/offline_tests.py
-  - python tests/local_probe_tests.py
+  - python tests/dnsviz_probe_options.py
+  - python tests/dnsviz_probe_run_offline.py
+  - python tests/dnsviz_print_options.py
+  - python tests/dnsviz_print_run.py
