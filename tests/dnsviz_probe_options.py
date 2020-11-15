@@ -369,7 +369,8 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
 
     def test_bindable_ip(self):
         self.assertEqual(ArgHelper.bindable_ip('127.0.0.1'), IPAddr('127.0.0.1'))
-        self.assertEqual(ArgHelper.bindable_ip('::1'), IPAddr('::1'))
+        if self.use_ipv6:
+            self.assertEqual(ArgHelper.bindable_ip('::1'), IPAddr('::1'))
 
         # invalid IPv4 address
         with self.assertRaises(argparse.ArgumentTypeError):
