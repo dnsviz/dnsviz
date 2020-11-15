@@ -1,5 +1,5 @@
 dnspython
 pygraphviz
+typing
 m2crypto
 libnacl
-typing
