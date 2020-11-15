@@ -18,6 +18,5 @@ install:
 script:
   - python tests/dnsviz_probe_options.py
   - python tests/dnsviz_probe_run_offline.py
-  - python tests/dnsviz_probe_run_online.py
   - python tests/dnsviz_print_options.py
   - python tests/dnsviz_print_run.py
