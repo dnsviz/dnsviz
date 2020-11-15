@@ -819,12 +819,15 @@ ns1.example 0 IN A 192.0.2.1
         self.assertIsNone(arghelper.client_ipv4)
         self.assertIsNone(arghelper.client_ipv6)
 
-        args = ['-b', '127.0.0.1', '-b', '::1']
+        args = ['-b', '127.0.0.1']
+        if self.use_ipv6:
+            args.extend(['-b', '::1'])
         arghelper = ArgHelper(self.resolver, self.logger)
         arghelper.build_parser('probe', args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.client_ipv4, IPAddr('127.0.0.1'))
-        self.assertEqual(arghelper.client_ipv6, IPAddr('::1'))
+        if self.use_ipv6:
+            self.assertEqual(arghelper.client_ipv6, IPAddr('::1'))
 
     def test_th_factories(self):
         args = ['example.com']
