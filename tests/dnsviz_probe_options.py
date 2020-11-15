@@ -32,7 +32,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         self.logger.addHandler(logging.NullHandler())
         try:
             ArgHelper.bindable_ip('::1')
-        except ValueError:
+        except argparse.ArgumentTypeError:
             self.use_ipv6 = False
         else:
             self.use_ipv6 = True
