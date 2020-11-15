@@ -569,9 +569,15 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
                 (dns.name.from_text('net'), loopback_ip): self.first_port + 1,
                 }
 
+        if self.use_ipv6:
+            rdata = b'AAAA ::1'
+        else:
+            rdata = b'A 127.0.0.1'
+
         zone_contents1 = b'''@ 600 IN SOA localhost. root.localhost. 1 1800 900 86400 600
 @ 600 IN NS @
-@ 600 IN AAAA ::1
+@ 600 IN ''' + rdata + \
+b'''
 example 0 IN NS ns1.example
 example 0 IN NS ns2.example
 example 0 IN NS ns3.example
@@ -583,7 +589,8 @@ ns3.example 0 IN A 192.0.2.3
 '''
         zone_contents2 = b'''@ 600 IN SOA localhost. root.localhost. 1 1800 900 86400 600
 @ 600 IN NS @
-@ 600 IN AAAA ::1
+@ 600 IN ''' + rdata + \
+b'''
 example 0 IN DS 34983 10 1 ec358cfaaec12266ef5acfc1feaf2caff083c418
 example 0 IN DS 34983 10 2 608d3b089d79d554a1947bd10bec0a5b1bdbe67b4e60e34b1432ed0033f24b49
 example 0 IN NS ns1.example
