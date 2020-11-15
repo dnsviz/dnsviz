@@ -10,6 +10,9 @@ EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.js
 EXAMPLE_RECURSIVE = os.path.join(DATA_DIR, 'data', 'example-recursive.json.gz')
 ROOT_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'root-authoritative.json.gz')
 ROOT_RECURSIVE = os.path.join(DATA_DIR, 'data', 'root-recursive.json.gz')
+EXAMPLE_COM_SIGNED = os.path.join(DATA_DIR, 'zone', 'example.com.zone.signed')
+EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zone', 'example.com.zone')
+EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zone', 'example.com.zone-delegation')
 
 class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def setUp(self):
@@ -70,7 +73,7 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
             self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', 'all.json', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.json')))
 
-    def test_dnsviz_probe_input_auth(self):
+    def test_dnsviz_probe_auth(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
                 p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
@@ -83,7 +86,7 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
-    def test_dnsviz_probe_input_rec(self):
+    def test_dnsviz_probe_rec(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_RECURSIVE) as fh_in:
                 p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
@@ -95,6 +98,15 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
                 p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
+
+    def test_dnsviz_probe_auth_local(self):
+        with io.open(self.output.name, 'wb') as fh:
+            self.assertEqual(subprocess.call(
+                [self.dnsviz_bin, 'probe', '-d', '0', '-A',
+                    '-x' 'example.com:%s' % EXAMPLE_COM_SIGNED,
+                    '-N' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
+                    '-D' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
+                    'example.com'], stdout=fh), 0)
 
 if __name__ == '__main__':
     unittest.main()
