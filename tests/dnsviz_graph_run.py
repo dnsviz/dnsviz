@@ -111,16 +111,31 @@ class DNSGraphRunTestCase(unittest.TestCase):
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_graph_output_format(self):
+        magic_codes_mapping = {
+                'dot': b'digraph',
+                'png': b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A',
+                'svg': b'<?xml ',
+                'html': b'<?xml ',
+            }
+
         for fmt in ('dot', 'png', 'svg', 'html'):
             with io.open(self.output.name, 'wb') as fh:
-                self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-T', fmt, '-o', 'all.'+fmt], cwd=self.run_cwd, stdout=fh), 0)
-                self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.dot')))
+                self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-o', 'all.'+fmt], cwd=self.run_cwd, stdout=fh), 0)
+                self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.'+fmt)))
                 self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.com.' + fmt)))
                 self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.net.' + fmt)))
+
+                with io.open(os.path.join(self.run_cwd, 'all.' + fmt), 'rb') as fh:
+                    first_bytes = fh.read(len(magic_codes_mapping[fmt]))
+                    self.assertEqual(first_bytes, magic_codes_mapping[fmt])
 
             self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-T', fmt, '-O'], cwd=self.run_cwd), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.com.' + fmt)))
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.net.' + fmt)))
+
+            with io.open(os.path.join(self.run_cwd, 'example.com.' + fmt), 'rb') as fh:
+                first_bytes = fh.read(len(magic_codes_mapping[fmt]))
+                self.assertEqual(first_bytes, magic_codes_mapping[fmt])
 
 if __name__ == '__main__':
     unittest.main()
