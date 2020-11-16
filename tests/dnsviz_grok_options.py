@@ -178,6 +178,8 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
         arghelper = GrokArgHelper(self.logger)
         arghelper.build_parser('grok', args)
         arghelper.aggregate_trusted_key_info()
+        self.assertEqual(arghelper.trusted_keys, None)
+        arghelper.update_trusted_key_info()
         self.assertEqual(arghelper.trusted_keys, [])
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as tk1_file:
@@ -191,12 +193,14 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
             arghelper = GrokArgHelper(self.logger)
             arghelper.build_parser('grok', args)
             arghelper.aggregate_trusted_key_info()
+            arghelper.update_trusted_key_info()
             self.assertEqual(arghelper.trusted_keys, tk_explicit)
 
             args = ['-t', '/dev/null', 'example.com']
             arghelper = GrokArgHelper(self.logger)
             arghelper.build_parser('grok', args)
             arghelper.aggregate_trusted_key_info()
+            arghelper.update_trusted_key_info()
             self.assertEqual(arghelper.trusted_keys, [])
 
         finally:
