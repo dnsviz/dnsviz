@@ -24,6 +24,7 @@
 
 from __future__ import unicode_literals
 
+import argparse
 import atexit
 import binascii
 import codecs
@@ -80,18 +81,23 @@ logger = logging.getLogger()
 tm = None
 th_factories = None
 resolver = None
-bootstrap_resolver = None
 explicit_delegations = None
 odd_ports = None
-next_port = 50053
 
 A_ROOT_IPV4 = IPAddr('198.41.0.4')
 A_ROOT_IPV6 = IPAddr('2001:503:ba3e::2:30')
 
-BRACKETS_RE = re.compile(r'^\[(.*)\]$')
-PORT_RE = re.compile(r'^(.*):(\d+)$')
-STOP_RE = re.compile(r'^(.*)\+$')
-NAME_VAL_DELIM_RE = re.compile(r'\s*=\s*')
+class MissingExecutablesError(Exception):
+    pass
+
+class ZoneFileServiceError(Exception):
+    pass
+
+class AnalysisInputError(Exception):
+    pass
+
+class CustomQueryMixin(object):
+    edns_options = []
 
 #XXX this is a hack required for inter-process sharing of dns.name.Name
 # instances using multiprocess
@@ -323,452 +329,1128 @@ class RecursiveParallelAnalyst(ParallelAnalystMixin, RecursiveBulkAnalyst):
     analyst_cls = RecursiveMultiProcessAnalyst
     use_full_resolver = False
 
-def name_addr_mappings_from_string(domain, addr_mappings, delegation_mapping, require_name):
-    global next_port
+class ZoneFileToServe:
+    _next_free_port = 50053
 
-    addr_mappings = addr_mappings.split(',')
-    i = 1
-    for mapping in addr_mappings:
-
-        # get rid of whitespace
-        mapping = mapping.strip()
-
-        # Determine whether there is a port stuck on there
-        match = PORT_RE.search(mapping)
-        if match is not None:
-            mapping = match.group(1)
-            port = int(match.group(2))
-            port_str = ':%d' % port
-        else:
-            port = 53
-            port_str = ''
-
-        num_replacements = None
-
-        # if the value is actually a path, then check it as a zone file
-        if os.path.isfile(mapping):
-            # if this is a file containing delegation records, then read the
-            # file, create a name=value string, and call name_addr_mappings_from_string()
-            if require_name:
-                mappings_from_file = []
-                try:
-                    with io.open(mapping, 'r', encoding='utf-8') as fh:
-                        s = fh.read()
-                except IOError as e:
-                    usage('%s: "%s"' % (e.strerror, mapping))
-                    sys.exit(3)
-
-                try:
-                    m = dns.message.from_text(str(';ANSWER\n'+s))
-                except dns.exception.DNSException as e:
-                    usage('Error reading delegation records from %s: "%s"' % (mapping, e))
-                    sys.exit(3)
-
-                try:
-                    ns_rrset = m.find_rrset(m.answer, domain, dns.rdataclass.IN, dns.rdatatype.NS)
-                except KeyError:
-                    usage('No NS records for %s found in %s' % (lb2s(domain.canonicalize().to_text()), mapping))
-                    sys.exit(3)
-
-                for rdata in ns_rrset:
-                    a_rrsets = [r for r in m.answer if r.name == rdata.target and r.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA)]
-                    if not a_rrsets or not rdata.target.is_subdomain(domain.parent()):
-                        mappings_from_file.append(lb2s(rdata.target.canonicalize().to_text()))
-                    else:
-                        for a_rrset in a_rrsets:
-                            for a_rdata in a_rrset:
-                                mappings_from_file.append('%s=[%s]' % (lb2s(rdata.target.canonicalize().to_text()), IPAddr(a_rdata.address)))
-
-                name_addr_mappings_from_string(domain, ','.join(mappings_from_file), delegation_mapping, require_name)
-                continue
-
-            # otherwise (it is the zone proper), just serve the file
-            else:
-                if port_str == '':
-                    #TODO assign random port here
-                    port = next_port
-                    next_port += 1
-                _serve_zone(domain, mapping, port)
-                name = 'localhost'
-                addr = '127.0.0.1'
-
-        else:
-            # First determine whether the argument is name=value or simply value
-            try:
-                name, addr = NAME_VAL_DELIM_RE.split(mapping, 1)
-            except ValueError:
-                # Argument is a single value.  Now determine whether that value is
-                # a name or an address.
-                try:
-                    IPAddr(BRACKETS_RE.sub(r'\1', mapping))
-                except ValueError:
-                    # see if this was an IPv6 address without a port
-                    try:
-                        IPAddr(mapping + port_str)
-                    except ValueError:
-                        pass
-                    else:
-                        usage('Brackets are required around IPv6 addresses.')
-                        sys.exit(1)
-
-                    # value is not an address
-                    name = mapping
-                    addr = None
-                else:
-                    if require_name:
-                        usage('A name is required to accompany the address for this option.')
-                        sys.exit(1)
-
-                    # value is an address
-                    name = 'ns%d' % i
-                    addr, num_replacements = BRACKETS_RE.subn(r'\1', mapping)
-                    i += 1
-            else:
-                # Argument is name=value
-                addr, num_replacements = BRACKETS_RE.subn(r'\1', addr)
-
-            if not name:
-                usage('The domain name was empty.')
-                sys.exit(1)
-
-        # At this point, name is defined, and addr may or may not be defined.
-        # Both are of type str.
-
-        # Check that the name is valid
-        try:
-            name = dns.name.from_text(name)
-        except dns.exception.DNSException:
-            usage('The domain name was invalid: "%s"' % name)
-            sys.exit(1)
-
-        # Add the name to the NS RRset
-        delegation_mapping[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
-
-        if addr is None:
-            if not require_name:
-                # If no address is provided, query A/AAAA records for the name
-                query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
-                answer_map = bootstrap_resolver.query_multiple_for_answer(*query_tuples)
-                found_answer = False
-                for (n, rdtype, rdclass) in answer_map:
-                    a = answer_map[(n, rdtype, rdclass)]
-                    if isinstance(a, DNSAnswer):
-                        found_answer = True
-                        delegation_mapping[(name, rdtype)] = dns.rrset.from_text_list(name, 0, dns.rdataclass.IN, rdtype, [IPAddr(r.address) for r in a.rrset])
-                        if port != 53:
-                            for r in a.rrset:
-                                odd_ports[(domain, IPAddr(r.address))] = port
-                    # negative responses
-                    elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
-                        pass
-                    # error responses
-                    elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
-                        usage('There was an error resolving "%s".  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
-                        sys.exit(1)
-
-                if not found_answer:
-                    usage('"%s" did not resolve to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
-                    sys.exit(1)
-
-        elif not addr:
-            if not require_name:
-                usage('The IP address was empty.')
-                sys.exit(1)
-
-        else:
-            try:
-                IPAddr(addr)
-            except ValueError:
-                # see if this was an IPv6 address without a port
-                try:
-                    IPAddr(addr + port_str)
-                except ValueError:
-                    usage('The IP address was invalid: "%s"' % addr)
-                    sys.exit(1)
-                else:
-                    usage('Brackets are required around IPv6 addresses.')
-                    sys.exit(1)
-
-            if IPAddr(addr).version == 6:
-                if num_replacements < 1:
-                    usage('Brackets are required around IPv6 addresses.')
-                    sys.exit(1)
-
-                a_rdtype = dns.rdatatype.AAAA
-                rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
-            else:
-                a_rdtype = dns.rdatatype.A
-                rdtype_cls = dns.rdtypes.IN.A.A
-            if (name, a_rdtype) not in delegation_mapping:
-                delegation_mapping[(name, a_rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, a_rdtype)
-            delegation_mapping[(name, a_rdtype)].add(rdtype_cls(dns.rdataclass.IN, a_rdtype, addr))
-            if port != 53:
-                odd_ports[(domain, IPAddr(addr))] = port
-
-def ds_from_string(domain, dss, delegation_mapping):
-    dss = dss.split(',')
-
-    if (domain, dns.rdatatype.DS) not in delegation_mapping:
-        delegation_mapping[(domain, dns.rdatatype.DS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.DS)
-
-    for ds in dss:
-        # get rid of whitespace
-        ds = ds.strip()
-
-        # if the value is actually a path, then check it as a zone file
-        if os.path.isfile(ds):
-            try:
-                with io.open(ds, 'r', encoding='utf-8') as fh:
-                    s = fh.read()
-            except IOError as e:
-                usage('%s: "%s"' % (e.strerror, ds))
-                sys.exit(3)
-
-            try:
-                m = dns.message.from_text(str(';ANSWER\n'+s))
-            except dns.exception.DNSException as e:
-                usage('Error reading DS records from %s: "%s"' % (ds, e))
-                sys.exit(3)
-
-            try:
-                rrset = m.find_rrset(m.answer, domain, dns.rdataclass.IN, dns.rdatatype.DS)
-            except KeyError:
-                usage('No DS records for %s found in %s' % (lb2s(domain.canonicalize().to_text()), ds))
-                sys.exit(3)
-
-            for rdata in rrset:
-                delegation_mapping[(domain, dns.rdatatype.DS)].add(rdata)
-
-        else:
-            try:
-                delegation_mapping[(domain, dns.rdatatype.DS)].add(dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.DS, ds))
-            except dns.exception.DNSException as e:
-                usage('Error parsing DS records: %s\n%s' % (e, ds))
-                sys.exit(3)
-
-def _create_and_serve_zone(zone, mappings, port):
-    zonefile = tempfile.NamedTemporaryFile('w', prefix='dnsviz', delete=False)
-    atexit.register(os.remove, zonefile.name)
-    zonefile.write('$ORIGIN %s\n@ IN SOA localhost. root.localhost. 1 1800 900 86400 600\n@ IN NS @\n@ IN A 127.0.0.1\n' % lb2s(zone.canonicalize().to_text()))
-    for name, rdtype in mappings:
-        if not name.is_subdomain(zone):
-            continue
-        zonefile.write(mappings[(name, rdtype)].to_text() + '\n')
-    zonefile.close()
-    _serve_zone(zone, zonefile.name, port)
-
-def _cleanup_process(working_dir, pid):
-    if pid is not None:
-        try:
-            os.kill(pid, signal.SIGINT)
-        except OSError:
-            return
-        while True:
-            try:
-                os.kill(pid, 0)
-                time.sleep(0.2)
-            except OSError:
-                break
-    shutil.rmtree(working_dir)
-
-def _serve_zone(zone, zone_file, port):
-    tmpdir = tempfile.mkdtemp(prefix='dnsviz')
-    env = { 'PATH': '%s:/sbin:/usr/sbin:/usr/local/sbin' % (os.environ.get('PATH', '')) }
-    pid = None
-
-    io.open('%s/named.conf' % tmpdir, 'w', encoding='utf-8').write('''
+    NAMED = 'named'
+    NAMED_CHECKCONF = 'named-checkconf'
+    NAMED_CONF = '%(dir)s/named.conf'
+    NAMED_PID = '%(dir)s/named.pid'
+    NAMED_LOG = '%(dir)s/named.log'
+    NAMED_CONF_TEMPLATE = '''
 options {
-	directory "%s";
-	pid-file "named.pid";
-	listen-on port %s { localhost; };
-	listen-on-v6 port %s { localhost; };
-	recursion no;
-	notify no;
+    directory "%(dir)s";
+    pid-file "%(named_pid)s";
+    listen-on port %(port)d { localhost; };
+    listen-on-v6 port %(port)d { localhost; };
+    recursion no;
+    notify no;
 };
 controls {};
-zone "%s" {
-	type master;
-	file "%s";
+zone "%(zone_name)s" {
+    type master;
+    file "%(zone_file)s";
 };
 logging {
-	channel info_file { file "%s/named.log"; severity info; };
+	channel info_file { file "%(named_log)s"; severity info; };
 	category default { info_file; };
 	category unmatched { null; };
 };
-''' % (tmpdir, port, port, lb2s(zone.to_text()), os.path.abspath(zone_file), tmpdir))
+'''
+    ZONEFILE_TEMPLATE_PRE = '''
+$ORIGIN %(zone_name)s
+$TTL 600
+@ IN SOA localhost. root.localhost. 1 1800 900 86400 600
+@ IN NS @
+'''
+    ZONEFILE_TEMPLATE_A = '@ IN A 127.0.0.1\n'
+    ZONEFILE_TEMPLATE_AAAA = '@ IN AAAA ::1\n'
+    USAGE_RE = re.compile(r'usage:', re.IGNORECASE)
 
-    try:
-        p = subprocess.Popen(['named-checkconf', '-z', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
-    except OSError as e:
-        usage('This option requires executing named-checkconf.  Please ensure that it is installed and in PATH (%s).' % e)
-        _cleanup_process(tmpdir, pid)
-        sys.exit(1)
+    def __init__(self, domain, filename):
+        self.domain = domain
+        self.filename = filename
 
-    (stdout, stderr) = p.communicate()
-    if p.returncode != 0:
-        usage('There was an problem with the zone file for "%s":\n%s' % (lb2s(zone.to_text()), stdout))
-        _cleanup_process(tmpdir, pid)
-        sys.exit(1)
+        self.port = self._next_free_port
+        self.__class__._next_free_port += 1
 
-    try:
-        p = subprocess.Popen(['named', '-c', '%s/named.conf' % tmpdir], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
-    except OSError as e:
-        usage('This option requires executing named.  Please ensure that it is installed and in PATH (%s).' % e)
-        _cleanup_process(tmpdir, pid)
-        sys.exit(1)
+        self.working_dir = None
+        self.pid = None
 
-    (stdout, stderr) = p.communicate()
-    if p.returncode != 0:
+    @classmethod
+    def from_mappings(cls, domain, mappings, use_ipv6_loopback):
+        zonefile = tempfile.NamedTemporaryFile('w', prefix='dnsviz', delete=False)
+        atexit.register(os.remove, zonefile.name)
+
+        args = { 'zone_name': lb2s(domain.to_text()) }
+        if use_ipv6_loopback:
+            zonefile_template = cls.ZONEFILE_TEMPLATE_PRE + cls.ZONEFILE_TEMPLATE_AAAA
+        else:
+            zonefile_template = cls.ZONEFILE_TEMPLATE_PRE + cls.ZONEFILE_TEMPLATE_A
+        zonefile_contents = zonefile_template % args
+        zonefile.write(zonefile_contents)
+
+        for name, rdtype in mappings:
+            if not name.is_subdomain(domain):
+                continue
+            zonefile.write(mappings[(name, rdtype)].to_text() + '\n')
+        zonefile.close()
+        return cls(domain, zonefile.name)
+
+    def _cleanup_process(self):
+        if self.pid is not None:
+            try:
+                os.kill(self.pid, signal.SIGTERM)
+            except OSError:
+                pass
+            else:
+                time.sleep(1.0)
+                try:
+                    os.kill(self.pid, signal.SIGKILL)
+                except OSError:
+                    pass
+
+        if self.working_dir is not None:
+            shutil.rmtree(self.working_dir)
+
+    def serve(self):
+        self.working_dir = tempfile.mkdtemp(prefix='dnsviz')
+        env = { 'PATH': '%s:/sbin:/usr/sbin:/usr/local/sbin' % (os.environ.get('PATH', '')) }
+
+        args = { 'dir': self.working_dir, 'port': self.port,
+                'zone_name': lb2s(self.domain.to_text()),
+                'zone_file': os.path.abspath(self.filename) }
+        args['named_conf'] = self.NAMED_CONF % args
+        args['named_pid'] = self.NAMED_PID % args
+        args['named_log'] = self.NAMED_LOG % args
+
+        named_conf_contents = self.NAMED_CONF_TEMPLATE % args
+        io.open(args['named_conf'], 'w', encoding='utf-8').write(named_conf_contents)
         try:
-            with io.open('%s/named.log' % tmpdir, 'r', encoding='utf-8') as fh:
-                log = fh.read()
-        except IOError as e:
-            log = ''
-        if not log:
-            log = stdout
-        usage('There was an problem executing named to serve the "%s" zone:\n%s' % (lb2s(zone.to_text()), log))
-        _cleanup_process(tmpdir, pid)
-        sys.exit(1)
+            p = subprocess.Popen([self.NAMED_CHECKCONF, '-z', args['named_conf']],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+        except OSError as e:
+            self._cleanup_process()
+            raise MissingExecutablesError('The options used require %s.  Please ensure that it is installed and in PATH (%s).' % (self.NAMED_CHECKCONF, e))
 
-    try:
-        with io.open('%s/named.pid' % tmpdir, 'r', encoding='utf-8') as fh:
-            pid = int(fh.read())
-    except (IOError, ValueError) as e:
-        usage('There was an error detecting the process ID for named: %s' % e)
-        _cleanup_process(tmpdir, pid)
-        sys.exit(1)
+        (stdout, stderr) = p.communicate()
+        if p.returncode != 0:
+            stdout = stdout.decode('utf-8')
+            self._cleanup_process()
+            raise ZoneFileServiceError('There was an problem with the zone file for "%s":\n%s' % (args['zone_name'], stdout))
 
-    atexit.register(_cleanup_process, tmpdir, pid)
+        named_cmd_without_log = [self.NAMED, '-c', args['named_conf']]
+        named_cmd_with_log = named_cmd_without_log + ['-L', args['named_log']]
+        checked_usage = False
+        for named_cmd in (named_cmd_with_log, named_cmd_without_log):
+            try:
+                p = subprocess.Popen(named_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+            except OSError as e:
+                self._cleanup_process()
+                raise MissingExecutablesError('The options used require %s.  Please ensure that it is installed and in PATH (%s).' % (self.NAMED, e))
 
-def _get_ecs_option(s):
-    try:
-        addr, prefix_len = s.split('/', 1)
-    except ValueError:
-        addr = s
-        prefix_len = None
+            (stdout, stderr) = p.communicate()
+            if p.returncode == 0:
+                break
 
-    try:
-        addr = IPAddr(addr)
-    except ValueError:
-        usage('The IP address was invalid: "%s"' % addr)
-        sys.exit(1)
+            stdout = stdout.decode('utf-8')
+            if not checked_usage and self.USAGE_RE.search(stdout):
+                # Versions of BIND pre 9.11 don't support -L, so fall back to without -L
+                checked_usage = True
+                continue
 
-    if addr.version == 4:
-        addrlen = 4
-        family = 1
-    else:
-        addrlen = 16
-        family = 2
+            try:
+                with io.open(args['named_log'], 'r', encoding='utf-8') as fh:
+                    log = fh.read()
+            except IOError as e:
+                log = ''
+            if not log:
+                log = stdout
+            self._cleanup_process()
+            raise ZoneFileServiceError('There was an problem executing %s to serve the "%s" zone:\n%s' % (self.NAMED, args['zone_name'], log))
 
-    if prefix_len is None:
-        prefix_len = addrlen << 3
-    else:
         try:
-            prefix_len = int(prefix_len)
+            with io.open(args['named_pid'], 'r', encoding='utf-8') as fh:
+                self.pid = int(fh.read())
+        except (IOError, ValueError) as e:
+            self._cleanup_process()
+            raise ZoneFileServiceError('There was an problem detecting the process ID for %s: %s' % (self.NAMED, e))
+
+        atexit.register(self._cleanup_process)
+
+class NameServerMappingsForDomain(object):
+    PORT_RE = re.compile(r'^(.*):(\d+)$')
+    BRACKETS_RE = re.compile(r'^\[(.*)\]$')
+
+    DEFAULT_PORT = 53
+    DYN_LABEL = '_dnsviz'
+
+    _allow_file = None
+    _allow_name_only = None
+    _allow_addr_only = None
+    _allow_stop_at = None
+    _handle_file_arg = None
+
+    def __init__(self, domain, stop_at, resolver):
+        if not (self._allow_file is not None and \
+                self._allow_name_only is not None and \
+                self._allow_addr_only is not None and \
+                self._allow_stop_at is not None and \
+                (not self._allow_file or self._handle_file_arg is not None)):
+            raise NotImplemented
+
+        if stop_at and not self._allow_stop_at:
+            raise argparse.ArgumentTypeError('The "+" may not be specified with this option')
+
+        self.domain = domain
+        self._resolver = resolver
+        self._nsi = 1
+
+        self.delegation_mapping = {}
+        self.stop_at = stop_at
+        self.odd_ports = {}
+        self.filename = None
+
+        self.delegation_mapping[(self.domain, dns.rdatatype.NS)] = dns.rrset.RRset(self.domain, dns.rdataclass.IN, dns.rdatatype.NS)
+
+    @classmethod
+    def _strip_port(cls, s):
+        # Determine whether there is a port attached to the end
+        match = cls.PORT_RE.search(s)
+        if match is not None:
+            s = match.group(1)
+            port = int(match.group(2))
+        else:
+            port = None
+        return s, port
+
+    def handle_list_arg(self, name_addr_arg):
+        name_addr_arg = name_addr_arg.strip()
+
+        # if the value is actually a path, then check it as a zone file
+        if os.path.isfile(name_addr_arg):
+            if not self._allow_file:
+                raise argparse.ArgumentTypeError('A filename may not be specified with this option')
+            self._handle_file_arg(name_addr_arg)
+        else:
+            self._handle_name_addr_list(name_addr_arg)
+
+    def _handle_name_addr_list(self, name_addr_list):
+        for name_addr in name_addr_list.split(','):
+            self._handle_name_addr_mapping(name_addr)
+
+    def _handle_name_no_addr(self, name, port):
+        query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
+        answer_map = self._resolver.query_multiple_for_answer(*query_tuples)
+        found_answer = False
+        for (n, rdtype, rdclass) in answer_map:
+            a = answer_map[(n, rdtype, rdclass)]
+            if isinstance(a, DNSAnswer):
+                found_answer = True
+                if (name, rdtype) not in self.delegation_mapping:
+                    self.delegation_mapping[(name, rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, rdtype)
+                if rdtype == dns.rdatatype.A:
+                    rdtype_cls = dns.rdtypes.IN.A.A
+                else:
+                    rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
+                for rdata in a.rrset:
+                    self.delegation_mapping[(name, rdtype)].add(rdtype_cls(dns.rdataclass.IN, rdtype, rdata.address))
+
+                    if port is not None and port != self.DEFAULT_PORT:
+                        self.odd_ports[(self.domain, IPAddr(rdata.address))] = port
+
+            # negative responses
+            elif isinstance(a, (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer)):
+                pass
+            # error responses
+            elif isinstance(a, (dns.exception.Timeout, dns.resolver.NoNameservers)):
+                pass
+
+        if not found_answer:
+            raise argparse.ArgumentTypeError('"%s" could not be resolved to an address.  Please specify an address or use a name that resolves properly.' % fmt.humanize_name(name))
+
+    def _handle_name_with_addr(self, name, addr, port):
+        if addr.version == 6:
+            rdtype = dns.rdatatype.AAAA
+            rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
+        else:
+            rdtype = dns.rdatatype.A
+            rdtype_cls = dns.rdtypes.IN.A.A
+        if (name, rdtype) not in self.delegation_mapping:
+            self.delegation_mapping[(name, rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, rdtype)
+        self.delegation_mapping[(name, rdtype)].add(rdtype_cls(dns.rdataclass.IN, rdtype, addr))
+
+        if port is not None and port != self.DEFAULT_PORT:
+            self.odd_ports[(self.domain, addr)] = port
+
+    def _handle_name_addr_mapping(self, name_addr):
+        name_addr = name_addr.strip()
+        name, addr, port = self._parse_name_addr(name_addr)
+
+        if not name and not self._allow_addr_only:
+            raise argparse.ArgumentTypeError('A domain name must accompany the address')
+        if not addr and not self._allow_name_only:
+            raise argparse.ArgumentTypeError('An address must accompany the domain name name')
+
+        name = self._format_name(name)
+        addr = self._format_addr(addr)
+
+        # Add the name to the NS RRset
+        self.delegation_mapping[(self.domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
+
+        if not addr:
+            self._handle_name_no_addr(name, port)
+        else:
+            self._handle_name_with_addr(name, addr, port)
+
+    def _create_name(self):
+        # value is an address
+        name = 'ns%d.%s.%s' % (self._nsi, self.DYN_LABEL, lb2s(self.domain.canonicalize().to_text()))
+        self._nsi += 1
+        return name
+
+    def _format_name(self, name):
+        if name is None:
+            name = self._create_name()
+        try:
+            name = dns.name.from_text(name)
+        except dns.exception.DNSException:
+            raise argparse.ArgumentTypeError('The domain name was invalid: "%s"' % name)
+        return name
+
+    def _format_addr(self, addr):
+        if addr is not None:
+            addr, num_sub = self.BRACKETS_RE.subn(r'\1', addr)
+            try:
+                addr = IPAddr(addr)
+            except ValueError:
+                raise argparse.ArgumentTypeError('The IP address was invalid: "%s"' % addr)
+
+            if addr.version == 6 and num_sub < 1:
+                raise argparse.ArgumentTypeError('Brackets are required around IPv6 addresses.')
+        return addr
+
+    def _parse_name_addr(self, name_addr):
+        # 1. Strip an optional port off the end
+        name_addr_orig = name_addr
+        name_addr, port = self._strip_port(name_addr)
+
+        # 2. Now determine whether the argument is a) a single value--either
+        #    name or addr--or b) a name-addr mapping
+        try:
+            name, addr = name_addr.split('=', 1)
         except ValueError:
-            usage('The mask length was invalid: "%s"' % prefix_len)
-            sys.exit(1)
+            # a) Argument is either a name or an address, not a mapping;
+            # Now, determine which it is.
+            try:
+                IPAddr(self.BRACKETS_RE.sub(r'\1', name_addr))
+            except ValueError:
+                # a1. It is not a valid address.  Maybe.  See if the address
+                #     was valid with the port re-appended.
+                try:
+                    IPAddr(self.BRACKETS_RE.sub(r'\1', name_addr_orig))
+                except ValueError:
+                    # a2. Even with the port, the address is not valid, so the
+                    #     must be a name instead of an address.  Validity of
+                    #     the name will be checked later.
+                    name = name_addr
+                    addr = None
+                else:
+                    # a3. When considering the address with the port, the
+                    #     address is valid, so it is in fact an address.
+                    #     Re-append the port to make the address valid, and 
+                    #     cancel the port.
+                    name = None
+                    addr = name_addr_orig
+                    port = None
+            else:
+                # a4. Value was a valid address.
+                name = None
+                addr = name_addr
 
-        if prefix_len < 0 or prefix_len > (addrlen << 3):
-            usage('The mask length was invalid: "%d"' % prefix_len)
-            sys.exit(1)
+        else:
+            # b) Argument is a name-addr mapping.  Now, determine whether
+            #    removing the port was the right thing.
+            name = name.strip()
+            addr = addr.strip()
 
-    bytes_masked, remainder = divmod(prefix_len, 8)
-    if remainder:
-        bytes_masked += 1
+            if port is None:
+                addr_orig = addr
+            else:
+                addr_orig = '%s:%d' % (addr, port)
 
-    wire = struct.pack(b'!H', family)
-    wire += struct.pack(b'!B', prefix_len)
-    wire += struct.pack(b'!B', 0)
-    wire += addr._ipaddr_bytes[:bytes_masked]
+            try:
+                IPAddr(self.BRACKETS_RE.sub(r'\1', addr))
+            except ValueError:
+                # b1. Without the port, addr is not a valid address.  See if
+                #     things change when we re-append the port.
+                try:
+                    IPAddr(self.BRACKETS_RE.sub(r'\1', addr_orig))
+                except ValueError:
+                    # b2. Even with the port, the address is not valid, so it
+                    #     doesn't matter if we leave the port on or off;
+                    #     address invalidity will be reported later.
+                    pass
+                else:
+                    # b3. When considering the address with the port, the
+                    #     address is valid, so re-append the port to make the
+                    #     address valid, and cancel the port.
+                    addr = addr_orig
+                    port = None
+            else:
+                # b4. Value was a valid address, so no need to do anything
+                pass
 
-    return dns.edns.GenericOption(8, wire)
+        return name, addr, port
 
-def _get_nsid_option():
+    def _set_filename(self, filename):
+        self.filename = filename
 
-    return dns.edns.GenericOption(dns.edns.NSID, b'')
-
-def _get_dns_cookie_option(cookie=None):
-    if cookie is None:
-        r = random.getrandbits(64)
-        cookie = struct.pack(b'Q', r)
-    else:
+    def _extract_delegation_info_from_file(self, filename):
+        # if this is a file containing delegation records, then read the
+        # file, create a name=value string, and call name_addrs_from_string()
         try:
-            cookie = binascii.unhexlify(cookie)
+            with io.open(filename, 'r', encoding='utf-8') as fh:
+                file_contents = fh.read()
+        except IOError as e:
+            raise argparse.ArgumentTypeError('%s: "%s"' % (e.strerror, filename))
+
+        try:
+            m = dns.message.from_text(str(';ANSWER\n' + file_contents))
+        except dns.exception.DNSException as e:
+            raise argparse.ArgumentTypeError('Error reading delegation records from %s: "%s"' % (filename, e))
+
+        try:
+            ns_rrset = m.find_rrset(m.answer, self.domain, dns.rdataclass.IN, dns.rdatatype.NS)
+        except KeyError:
+            raise argparse.ArgumentTypeError('No NS records for %s found in %s' % (lb2s(self.domain.canonicalize().to_text()), filename))
+
+        for rdata in ns_rrset:
+            a_rrsets = [r for r in m.answer if r.name == rdata.target and r.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA)]
+            if not a_rrsets or not rdata.target.is_subdomain(self.domain.parent()):
+                name_addr = lb2s(rdata.target.canonicalize().to_text())
+            else:
+                for a_rrset in a_rrsets:
+                    for a_rdata in a_rrset:
+                        name_addr = '%s=[%s]' % (lb2s(rdata.target.canonicalize().to_text()), a_rdata.address)
+            self._handle_name_addr_mapping(name_addr)
+
+class DelegationNameServerMappingsForDomain(NameServerMappingsForDomain):
+    _allow_file = True
+    _allow_name_only = False
+    _allow_addr_only = False
+    _allow_stop_at = False
+    _handle_file_arg = NameServerMappingsForDomain._extract_delegation_info_from_file
+
+    def __init__(self, *args, **kwargs):
+        super(DelegationNameServerMappingsForDomain, self).__init__(*args, **kwargs)
+        if self.domain == dns.name.root:
+            raise argparse.ArgumentTypeError('The root domain may not specified with this option.')
+
+class AuthoritativeNameServerMappingsForDomain(NameServerMappingsForDomain):
+    _allow_file = True
+    _allow_name_only = True
+    _allow_addr_only = True
+    _allow_stop_at = True
+    _handle_file_arg = NameServerMappingsForDomain._set_filename
+
+class RecursiveServersForDomain(NameServerMappingsForDomain):
+    _allow_file = False
+    _allow_name_only = True
+    _allow_addr_only = True
+    _allow_stop_at = False
+    _handle_file_arg = None
+
+class DSForDomain:
+    def __init__(self, domain, stop_at, resolver):
+        self.domain = domain
+
+        if stop_at and not self._allow_stop_at:
+            raise argparse.ArgumentTypeError('The "+" may not be specified with this option')
+
+        self.delegation_mapping = {}
+        self.delegation_mapping[(self.domain, dns.rdatatype.DS)] = dns.rrset.RRset(self.domain, dns.rdataclass.IN, dns.rdatatype.DS)
+
+    def _extract_ds_info_from_file(self, filename):
+        # if this is a file containing delegation records, then read the
+        # file, create a name=value string, and call name_addrs_from_string()
+        try:
+            with io.open(filename, 'r', encoding='utf-8') as fh:
+                file_contents = fh.read()
+        except IOError as e:
+            raise argparse.ArgumentTypeError('%s: "%s"' % (e.strerror, filename))
+
+        try:
+            m = dns.message.from_text(str(';ANSWER\n' + file_contents))
+        except dns.exception.DNSException as e:
+            raise argparse.ArgumentTypeError('Error reading DS records from %s: "%s"' % (filename, e))
+
+        try:
+            ds_rrset = m.find_rrset(m.answer, self.domain, dns.rdataclass.IN, dns.rdatatype.DS)
+        except KeyError:
+            raise argparse.ArgumentTypeError('No DS records for %s found in %s' % (lb2s(self.domain.canonicalize().to_text()), filename))
+
+        for rdata in ds_rrset:
+            self.delegation_mapping[(self.domain, dns.rdatatype.DS)].add(rdata)
+
+    def _handle_ds(self, ds):
+        ds = ds.strip()
+
+        try:
+            self.delegation_mapping[(self.domain, dns.rdatatype.DS)].add(dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.DS, ds))
+        except dns.exception.DNSException as e:
+            raise argparse.ArgumentTypeError('Error parsing DS records: %s\n%s' % (e, ds))
+
+    def _handle_ds_list(self, ds_list):
+        for ds in ds_list.split(','):
+            self._handle_ds(ds)
+
+    def handle_list_arg(self, ds_arg):
+        ds_arg = ds_arg.strip()
+
+        # if the value is actually a path, then check it as a zone file
+        if os.path.isfile(ds_arg):
+            self._extract_ds_info_from_file(ds_arg)
+        else:
+            self._handle_ds_list(ds_arg)
+
+class DomainListArgHelper:
+    STOP_RE = re.compile(r'^(.*)\+$')
+
+    def __init__(self, resolver):
+        self._resolver = resolver
+    
+    @classmethod
+    def _strip_stop_marker(cls, s):
+        match = cls.STOP_RE.search(s)
+        if match is not None:
+            s = match.group(1)
+            stop_at = True
+        else:
+            stop_at = False
+
+        return s, stop_at
+
+    def _parse_domain_list(self, domain_item_list):
+        try:
+            domain, item_list = domain_item_list.split(':', 1)
+        except ValueError:
+            raise argparse.ArgumentTypeError('Option expects both a domain and servers for that domain')
+
+        domain = domain.strip()
+        domain, stop_at = self._strip_stop_marker(domain)
+
+        return domain, item_list, stop_at
+
+    def _handle_domain_list_arg(self, cls, domain_list_arg):
+        domain, list_arg, stop_at = self._parse_domain_list(domain_list_arg)
+
+        if domain is not None:
+            domain = domain.strip()
+            try:
+                domain = dns.name.from_text(domain)
+            except dns.exception.DNSException:
+                raise argparse.ArgumentTypeError('The domain name was invalid: "%s"' % domain)
+
+        if list_arg is not None:
+            list_arg = list_arg.strip()
+
+        obj = cls(domain, stop_at, self._resolver)
+
+        if list_arg:
+            obj.handle_list_arg(list_arg)
+        return obj
+
+    def _handle_list_arg(self, cls, list_arg):
+        obj = cls(WILDCARD_EXPLICIT_DELEGATION, False, self._resolver)
+        obj.handle_list_arg(list_arg)
+        return obj
+
+    def delegation_name_server_mappings(self, arg):
+        return self._handle_domain_list_arg(DelegationNameServerMappingsForDomain, arg)
+
+    def authoritative_name_server_mappings(self, arg):
+        return self._handle_domain_list_arg(AuthoritativeNameServerMappingsForDomain, arg)
+
+    def recursive_servers_for_domain(self, arg):
+        return self._handle_list_arg(RecursiveServersForDomain, arg)
+
+    def ds_for_domain(self, arg):
+        return self._handle_domain_list_arg(DSForDomain, arg)
+
+class ArgHelper:
+    BRACKETS_RE = re.compile(r'^\[(.*)\]$')
+
+    def __init__(self, resolver, logger):
+        self._resolver = resolver
+        self.parser = None
+
+        self.odd_ports = {}
+        self.stop_at = {}
+        self.explicit_delegations = {}
+        self.ceiling = None
+        self.explicit_only = None
+        self.try_ipv4 = None
+        self.try_ipv6 = None
+        self.client_ipv4 = None
+        self.client_ipv6 = None
+        self.edns_diagnostics = None
+        self.th_factories = None
+        self.processes = None
+        self.dlv_domain = None
+        self.meta_only = None
+        self.cache_level = None
+        self.names = None
+        self.analysis_structured = None
+
+        self.args = None
+        self._arg_mapping = None
+
+        self._resolver = resolver
+        self._logger = logger
+        self._zones_to_serve = []
+
+    def build_parser(self, prog, args):
+        self.parser = argparse.ArgumentParser(description='Issue diagnostic DNS queries', prog=prog)
+        helper = DomainListArgHelper(self._resolver)
+
+        # python3/python2 dual compatibility
+        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
+
+        try:
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r', encoding='utf-8'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
         except TypeError:
-            usage('The DNS cookie provided was not valid hexadecimal: "%s"' % cookie)
-            sys.exit(1)
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
+        self.parser.add_argument('-d', '--debug',
+                type=int, choices=range(4), default=2,
+                action='store', metavar='<level>',
+                help='Set debug level')
+        try:
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r', encoding='utf-8'),
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        self.parser.add_argument('-t', '--threads',
+                type=self.positive_int, default=1,
+                action='store', metavar='<threads>',
+                help='Use the specified number of threads for parallel queries')
+        self.parser.add_argument('-4', '--ipv4',
+                const=True, default=False,
+                action='store_const',
+                help='Use IPv4 only')
+        self.parser.add_argument('-6', '--ipv6',
+                const=True, default=False,
+                action='store_const',
+                help='Use IPv6 only')
+        self.parser.add_argument('-b', '--source-ip',
+                type=self.bindable_ip, default=[],
+                action='append', metavar='<address>',
+                help='Use the specified source IPv4 or IPv6 address for queries')
+        self.parser.add_argument('-u', '--looking-glass-url',
+                type=self.valid_url,
+                action='append', metavar='<url>',
+                help='Issue queries through the DNS looking glass at the specified URL')
+        self.parser.add_argument('-k', '--insecure',
+                const=True, default=False,
+                action='store_const',
+                help='Do not verify the TLS certificate for a DNS looking glass using HTTPS')
+        self.parser.add_argument('-a', '--ancestor',
+                type=self.valid_domain_name, default=None,
+                action='store', metavar='<ancestor>',
+                help='Query the ancestry of each domain name through the specified ancestor')
+        self.parser.add_argument('-R', '--rr-types',
+                type=self.comma_separated_dns_types,
+                action='store', metavar='<type>,[<type>...]',
+                help='Issue queries for only the specified type(s) during analysis')
+        self.parser.add_argument('-s', '--recursive-servers',
+                type=helper.recursive_servers_for_domain, default=[],
+                action='append', metavar='<server>[,<server>...]',
+                help='Query the specified recursive server(s)')
+        self.parser.add_argument('-A', '--authoritative-analysis',
+                const=True, default=False,
+                action='store_const',
+                help='Query authoritative servers, instead of recursive servers')
+        self.parser.add_argument('-x', '--authoritative-servers',
+                type=helper.authoritative_name_server_mappings, default=[],
+                action='append', metavar='<domain>[+]:<server>[,<server>...]',
+                help='Query the specified authoritative servers for a domain')
+        self.parser.add_argument('-N', '--delegation-information',
+                type=helper.delegation_name_server_mappings, default=[],
+                action='append', metavar='<domain>:<server>[,<server>...]',
+                help='Use the specified delegation information for a domain')
+        self.parser.add_argument('-D', '--ds',
+                type=helper.ds_for_domain, default=[],
+                action='append', metavar='<domain>:"<ds>"[,"<ds>"...]',
+                help='Use the specified DS records for a domain')
+        self.parser.add_argument('-n', '--nsid',
+                const=self.nsid_option(),
+                action='store_const',
+                help='Use the NSID EDNS option in queries')
+        self.parser.add_argument('-e', '--client-subnet',
+                type=self.ecs_option,
+                action='store', metavar='<subnet>[:<prefix_len>]',
+                help='Use the DNS client subnet option with the specified subnet and prefix length in queries')
+        self.parser.add_argument('-c', '--cookie',
+                type=self.dns_cookie_option, default=self.dns_cookie_rand(),
+                action='store', metavar='<cookie>',
+                help='Use the specified DNS cookie value in queries')
+        self.parser.add_argument('-E', '--edns',
+                const=True, default=False,
+                action='store_const',
+                help='Issue queries to check EDNS compatibility')
+        self.parser.add_argument('-o', '--output-file',
+                type=argparse.FileType('wb'), default=stdout_buffer,
+                action='store', metavar='<filename>',
+                help='Save the output to the specified file')
+        self.parser.add_argument('-p', '--pretty-output',
+                const=True, default=False,
+                action='store_const',
+                help='Format JSON output with indentation and newlines')
+        self.parser.add_argument('domain_name',
+                type=self.valid_domain_name,
+                action='store', nargs='*', metavar='<domain_name>',
+                help='Domain names')
+
+        self._arg_mapping = dict([(a.dest, '/'.join(a.option_strings)) for a in self.parser._actions])
+        self.args = self.parser.parse_args(args)
+
+    @classmethod
+    def positive_int(cls, arg):
+        try:
+            val = int(arg)
+        except ValueError:
+            msg = "The argument must be a positive integer: %s" % val
+            raise argparse.ArgumentTypeError(msg)
+        else:
+            if val < 1:
+                msg = "The argument must be a positive integer: %d" % val
+                raise argparse.ArgumentTypeError(msg)
+        return val
+
+    @classmethod
+    def bindable_ip(cls, arg):
+        try:
+            addr = IPAddr(cls.BRACKETS_RE.sub(r'\1', arg))
+        except ValueError:
+            raise argparse.ArgumentTypeError('The IP address was invalid: "%s"' % arg)
+        if addr.version == 4:
+            fam = socket.AF_INET
+        else:
+            fam = socket.AF_INET6
+        try:
+            s = socket.socket(fam)
+            s.bind((addr, 0))
+        except socket.error as e:
+            if e.errno == errno.EADDRNOTAVAIL:
+                raise argparse.ArgumentTypeError('Cannot bind to specified IP address: "%s"' % addr)
+        finally:
+            s.close()
+        return addr
+
+    @classmethod
+    def valid_url(cls, arg):
+        url = urlparse.urlparse(arg)
+        if url.scheme not in ('http', 'https', 'ws', 'ssh'):
+            raise argparse.ArgumentTypeError('Unsupported URL scheme: "%s"' % url.scheme)
+
+        # check that version is >= 2.7.9 if HTTPS is requested
+        if url.scheme == 'https':
+            vers0, vers1, vers2 = sys.version_info[:3]
+            if (2, 7, 9) > (vers0, vers1, vers2):
+                raise argparse.ArgumentTypeError('Python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.')
+
+        elif url.scheme == 'ws':
+            if url.hostname is not None:
+                raise argparse.ArgumentTypeError('WebSocket URL must designate a local UNIX domain socket.')
+
+        return arg
+
+    @classmethod
+    def comma_separated_dns_types(cls, arg):
+        rdtypes = []
+        arg = arg.strip()
+        if not arg:
+            return rdtypes
+        for r in arg.split(','):
+            try:
+                rdtypes.append(dns.rdatatype.from_text(r.strip()))
+            except dns.rdatatype.UnknownRdatatype:
+                raise argparse.ArgumentTypeError('Invalid resource record type: %s' % (r))
+        return rdtypes
+
+    @classmethod
+    def valid_domain_name(cls, arg):
+        # python3/python2 dual compatibility
+        if isinstance(arg, bytes):
+            arg = codecs.decode(arg, sys.getfilesystemencoding())
+        try:
+            return dns.name.from_text(arg)
+        except dns.exception.DNSException:
+            raise argparse.ArgumentTypeError('Invalid domain name: "%s"' % arg)
+
+    @classmethod
+    def nsid_option(cls):
+        return dns.edns.GenericOption(dns.edns.NSID, b'')
+
+    @classmethod
+    def ecs_option(cls, arg):
+        try:
+            addr, prefix_len = arg.split('/', 1)
+        except ValueError:
+            addr = arg
+            prefix_len = None
+
+        try:
+            addr = IPAddr(addr)
+        except ValueError:
+            raise argparse.ArgumentTypeError('The IP address was invalid: "%s"' % addr)
+
+        if addr.version == 4:
+            addrlen = 4
+            family = 1
+        else:
+            addrlen = 16
+            family = 2
+
+        if prefix_len is None:
+            prefix_len = addrlen << 3
+        else:
+            try:
+                prefix_len = int(prefix_len)
+            except ValueError:
+                raise argparse.ArgumentTypeError('The prefix length was invalid: "%s"' % prefix_len)
+
+            if prefix_len < 0 or prefix_len > (addrlen << 3):
+                raise argparse.ArgumentTypeError('The prefix length was invalid: "%d"' % prefix_len)
+
+        bytes_masked, remainder = divmod(prefix_len, 8)
+
+        wire = struct.pack(b'!H', family)
+        wire += struct.pack(b'!B', prefix_len)
+        wire += struct.pack(b'!B', 0)
+        wire += addr._ipaddr_bytes[:bytes_masked]
+        if remainder:
+            # python3/python2 dual compatibility
+            byte = addr._ipaddr_bytes[bytes_masked]
+            if isinstance(addr._ipaddr_bytes, str):
+                byte = ord(byte)
+
+            mask = ~(2**(8 - remainder)-1)
+            wire += struct.pack('B', mask & byte)
+
+        return dns.edns.GenericOption(8, wire)
+
+    @classmethod
+    def dns_cookie_option(cls, arg):
+        if not arg:
+            return None
+
+        try:
+            cookie = binascii.unhexlify(arg)
+        except (binascii.Error, TypeError):
+            raise argparse.ArgumentTypeError('The DNS cookie provided was not valid hexadecimal: "%s"' % arg)
 
         if len(cookie) != 8:
-            usage('The DNS client cookie provided had a length of %d, but only a length of %d is valid .' % (len(cookie), 8))
-            sys.exit(1)
+            raise argparse.ArgumentTypeError('The DNS client cookie provided had a length of %d, but only a length of %d is valid .' % (len(cookie), 8))
 
-    return dns.edns.GenericOption(10, cookie)
+        return dns.edns.GenericOption(10, cookie)
 
-class CustomQueryMixin(object):
-    edns_options = []
+    @classmethod
+    def dns_cookie_rand(cls):
+        r = random.getrandbits(64)
+        cookie = struct.pack(b'Q', r)
+        return cls.dns_cookie_option(binascii.hexlify(cookie))
 
-def usage(err=None):
-    if err is not None:
-        err += '\n\n'
-    else:
-        err = ''
-    sys.stderr.write('''%sUsage: %s %s [options] [domain_name...]
+    def aggregate_delegation_info(self):
+        localhost = dns.name.from_text('localhost')
+        try:
+            self.bindable_ip('::1')
+        except argparse.ArgumentTypeError:
+            use_ipv6_loopback = False
+            loopback = IPAddr('127.0.0.1')
+            loopback_rdtype = dns.rdatatype.A
+            loopback_rdtype_cls = dns.rdtypes.IN.A.A
+        else:
+            use_ipv6_loopback = True
+            loopback = IPAddr('::1')
+            loopback_rdtype = dns.rdatatype.AAAA
+            loopback_rdtype_cls = dns.rdtypes.IN.AAAA.AAAA
 
-Issue diagnostic DNS queries.
+        self.rdclass = dns.rdataclass.IN
 
-Options:
-    -f <filename>  - Read names from a file.
-    -d <level>     - Set debug level.
-    -r <filename>  - Read diagnostic queries from a file.
-    -t <threads>   - Use the specified number of threads for parallel queries.
-    -4             - Use IPv4 only.
-    -6             - Use IPv6 only.
-    -b <addr>      - Use the specified source IPv4 or IPv6 address for queries.
-    -u <url>       - Issue queries through the DNS looking glass at the
-                     specified URL.
-    -k             - Do not verify the TLS certificate for a DNS looking glass
-                     using HTTPS.
-    -a <ancestor>  - Query the ancestry of each domain name through the
-                     specified ancestor.
-    -R <type>[,<type>...]
-                   - Issue queries for only the specified type(s) during analysis.
-    -s <server>[,<server>...]
-                   - Query the specified recursive server(s).
-    -A             - Query authoritative servers, instead of recursive servers.
-    -x <domain>[+]:<server>[,<server>...]
-                   - Query the specified authoritative servers for a domain.
-    -N <domain>:<server>[,<server>...]
-                   - Use the specified delegation information for a domain.
-    -D <domain>:"<ds>"[,"<ds>"...]
-                   - Use the specified DS records for a domain.
-    -n             - Use the NSID EDNS option in queries.
-    -e <subnet>[:<prefix_len>]
-                   - Use the DNS client subnet option with the specified subnet
-                     and prefix length in queries.
-    -c <cookie>    - Use the specified DNS cookie value in queries.
-    -E             - Issue queries to check EDNS compatibility.
-    -o <filename>  - Write the analysis to the specified file.
-    -p             - Format JSON output with indentation and newlines.
-    -h             - Display the usage and exit.
-''' % (err, sys.argv[0], __name__.split('.')[-1]))
+        for arg in self.args.recursive_servers + self.args.authoritative_servers:
+            zone_name = arg.domain
+            for name, rdtype in arg.delegation_mapping:
+                if (name, rdtype) not in self.explicit_delegations:
+                    self.explicit_delegations[(name, rdtype)] = arg.delegation_mapping[(name, rdtype)]
+                else:
+                    self.explicit_delegations[(name, rdtype)].update(arg.delegation_mapping[(name, rdtype)])
+            self.odd_ports.update(arg.odd_ports)
+            self.stop_at[arg.domain] = arg.stop_at
+            if arg.filename is not None:
+                zone = ZoneFileToServe(arg.domain, arg.filename)
+                self._zones_to_serve.append(zone)
+                self.explicit_delegations[(zone_name, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, localhost))
+                self.explicit_delegations[(localhost, loopback_rdtype)] = dns.rrset.RRset(localhost, dns.rdataclass.IN, loopback_rdtype)
+                self.explicit_delegations[(localhost, loopback_rdtype)].add(loopback_rdtype_cls(dns.rdataclass.IN, loopback_rdtype, loopback))
+                self.odd_ports[(zone_name, loopback)] = zone.port
+
+        delegation_info_by_zone = OrderedDict()
+        for arg in self.args.ds + self.args.delegation_information:
+            zone_name = arg.domain.parent()
+            if (zone_name, dns.rdatatype.NS) in self.explicit_delegations:
+                raise argparse.ArgumentTypeError('Cannot use "' + lb2s(zone_name.to_text()) + '" with %(authoritative_servers)s if a child zone is specified with %(delegation_information)s' % self._arg_mapping)
+            if zone_name not in delegation_info_by_zone:
+                delegation_info_by_zone[zone_name] = {}
+            for name, rdtype in arg.delegation_mapping:
+                if (name, rdtype) not in delegation_info_by_zone[zone_name]:
+                    delegation_info_by_zone[zone_name][(name, rdtype)] = arg.delegation_mapping[(name, rdtype)]
+                else:
+                    delegation_info_by_zone[zone_name][(name, rdtype)].update(arg.delegation_mapping[(name, rdtype)])
+
+        for zone_name in delegation_info_by_zone:
+            zone = ZoneFileToServe.from_mappings(zone_name, delegation_info_by_zone[zone_name], use_ipv6_loopback)
+            self._zones_to_serve.append(zone)
+            self.explicit_delegations[(zone_name, dns.rdatatype.NS)] = dns.rrset.RRset(zone_name, dns.rdataclass.IN, dns.rdatatype.NS)
+            self.explicit_delegations[(zone_name, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, localhost))
+            self.explicit_delegations[(localhost, loopback_rdtype)] = dns.rrset.RRset(localhost, dns.rdataclass.IN, loopback_rdtype)
+            self.explicit_delegations[(localhost, loopback_rdtype)].add(loopback_rdtype_cls(dns.rdataclass.IN, loopback_rdtype, loopback))
+            self.odd_ports[(zone_name, loopback)] = zone.port
+            self.stop_at[zone_name] = True
+
+    def populate_recursive_servers(self):
+        if not self.args.authoritative_analysis and not self.args.recursive_servers:
+            if (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) not in self.explicit_delegations:
+                self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
+            for i, server in enumerate(self._resolver._servers):
+                if IPAddr(server).version == 6:
+                    rdtype = dns.rdatatype.AAAA
+                else:
+                    rdtype = dns.rdatatype.A
+                name = dns.name.from_text('ns%d' % i)
+                self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
+                if (name, rdtype) not in self.explicit_delegations:
+                    self.explicit_delegations[(name, rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, rdtype)
+                self.explicit_delegations[(name, rdtype)].add(dns.rdata.from_text(dns.rdataclass.IN, rdtype, server))
+
+    def check_args(self):
+        if not self.args.names_file and not self.args.domain_name and not self.args.input_file:
+            raise argparse.ArgumentTypeError('If no domain names are supplied as command-line arguments, then either %(input_file)s or %(names_file)s must be used.' % \
+                    self._arg_mapping)
+        if self.args.names_file and self.args.domain_name:
+            raise argparse.ArgumentTypeError('If %(names_file)s is used, then domain names may not supplied as command line arguments.' % \
+                    self._arg_mapping)
+        if self.args.authoritative_analysis and self.args.recursive_servers:
+            raise argparse.ArgumentTypeError('If %(authoritative_analysis)s is used, then %(recursive_servers)s cannot be used.' % \
+                    self._arg_mapping)
+        if self.args.authoritative_servers and not self.args.authoritative_analysis:
+            raise argparse.ArgumentTypeError('%(authoritative_servers)s may only be used in conjunction with %(authoritative_analysis)s.' % \
+                    self._arg_mapping)
+        if self.args.delegation_information and not self.args.authoritative_analysis:
+            raise argparse.ArgumentTypeError('%(delegation_information)s may only be used in conjunction with %(authoritative_analysis)s.' % \
+                    self._arg_mapping)
+        if self.args.ds and not self.args.delegation_information:
+            raise argparse.ArgumentTypeError('%(ds)s may only be used in conjunction with %(delegation_information)s.' % \
+                    self._arg_mapping)
+
+    def set_kwargs(self):
+        if self.args.ancestor is not None:
+            self.ceiling = self.args.ancestor
+        elif self.args.authoritative_analysis:
+            self.ceiling = None
+        else:
+            self.ceiling = dns.name.root
+
+        if self.args.rr_types is not None:
+            self.explicit_only = True
+        else:
+            self.explicit_only = False
+
+        # if both are specified or neither is specified, then they're both tried
+        if (self.args.ipv4 and self.args.ipv6) or \
+                (not self.args.ipv4 and not self.args.ipv6):
+            self.try_ipv4 = True
+            self.try_ipv6 = True
+        # if one or the other is specified, then only the one specified is
+        # tried
+        else:
+            if self.args.ipv4:
+                self.try_ipv4 = True
+                self.try_ipv6 = False
+            else: # self.args.ipv6
+                self.try_ipv4 = False
+                self.try_ipv6 = True
+
+        for ip in self.args.source_ip:
+            if ip.version == 4:
+                self.client_ipv4 = ip
+            else:
+                self.client_ipv6 = ip
+
+        if self.args.looking_glass_url:
+            self.th_factories = []
+            for looking_glass_url in self.args.looking_glass_url:
+                url = urlparse.urlparse(looking_glass_url)
+                if url.scheme in ('http', 'https'):
+                    self.th_factories.append(transport.DNSQueryTransportHandlerHTTPFactory(looking_glass_url, insecure=self.args.insecure))
+                elif url.scheme == 'ws':
+                    self.th_factories.append(transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path))
+                elif url.scheme == 'ssh':
+                    self.th_factories.append(transport.DNSQueryTransportHandlerRemoteCmdFactory(looking_glass_url))
+        else:
+            self.th_factories = None
+
+        # the following options are not documented in usage, because they don't
+        # apply to most users
+        #if args.dlv is not None:
+        #    dlv_domain = args.dlv
+        #else:
+        #    dlv_domain = None
+        #try:
+        #    cache_level = int(opts['-C'])
+        #except (KeyError, ValueError):
+        #    cache_level = None
+        self.dlv_domain = None
+        self.cache_level = None
+        self.meta_only = None
+
+        if self.args.client_subnet:
+            CustomQueryMixin.edns_options.append(self.args.client_subnet)
+        if self.args.nsid:
+            CustomQueryMixin.edns_options.append(self.args.nsid)
+        if self.args.cookie:
+            CustomQueryMixin.edns_options.append(self.args.cookie)
+
+    def set_buffers(self):
+        # This entire method is for
+        # python3/python2 dual compatibility
+        if self.args.input_file is not None:
+            if self.args.input_file.fileno() == sys.stdin.fileno():
+                filename = self.args.input_file.fileno()
+            else:
+                filename = self.args.input_file.name
+                self.args.input_file.close()
+            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.names_file is not None:
+            if self.args.names_file.fileno() == sys.stdin.fileno():
+                filename = self.args.names_file.fileno()
+            else:
+                filename = self.args.names_file.name
+                self.args.names_file.close()
+            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.output_file is not None:
+            if self.args.output_file.fileno() == sys.stdout.fileno():
+                filename = self.args.output_file.fileno()
+            else:
+                filename = self.args.output_file.name
+                self.args.output_file.close()
+            self.args.output_file = io.open(filename, 'wb')
+
+    def check_network_connectivity(self):
+        if self.args.authoritative_analysis:
+            if self.try_ipv4 and get_client_address(A_ROOT_IPV4) is None:
+                self._logger.warning('No global IPv4 connectivity detected')
+            if self.try_ipv6 and get_client_address(A_ROOT_IPV6) is None:
+                self._logger.warning('No global IPv6 connectivity detected')
+
+    def get_log_level(self):
+        if self.args.debug > 2:
+            return logging.DEBUG
+        elif self.args.debug > 1:
+            return logging.INFO
+        elif self.args.debug > 0:
+            return logging.WARNING
+        else:
+            return logging.ERROR
+
+    def ingest_input(self):
+        if not self.args.input_file:
+            return
+
+        analysis_str = self.args.input_file.read()
+        if not analysis_str:
+            if self.args.input_file.fileno() != sys.stdin.fileno():
+                raise AnalysisInputError('No input')
+            else:
+                raise AnalysisInputError()
+        try:
+            self.analysis_structured = json.loads(analysis_str)
+        except ValueError:
+            raise AnalysisInputError('There was an error parsing the JSON input: "%s"' % self.args.input_file.name)
+
+        # check version
+        if '_meta._dnsviz.' not in self.analysis_structured or 'version' not in self.analysis_structured['_meta._dnsviz.']:
+            raise AnalysisInputError('No version information in JSON input: "%s"' % self.args.input_file.name)
+        try:
+            major_vers, minor_vers = [int(x) for x in str(self.analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
+        except ValueError:
+            raise AnalysisInputError('Version of JSON input is invalid: %s' % self.analysis_structured['_meta._dnsviz.']['version'])
+        # ensure major version is a match and minor version is no greater
+        # than the current minor version
+        curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
+        if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
+            raise AnalysisInputError('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
+
+    def ingest_names(self):
+        self.names = OrderedDict()
+
+        if self.args.domain_name:
+            for name in self.args.domain_name:
+                if name not in self.names:
+                    self.names[name] = None
+            return
+
+        if self.args.names_file:
+            args = self.args.names_file
+        else:
+            try:
+                args = self.analysis_structured['_meta._dnsviz.']['names']
+            except KeyError:
+                raise AnalysisInputError('No names found in JSON input!')
+
+        for arg in args:
+            name = arg.strip()
+
+            # python3/python2 dual compatibility
+            if hasattr(name, 'decode'):
+                name = name.decode('utf-8')
+
+            try:
+                name = dns.name.from_text(name)
+            except UnicodeDecodeError as e:
+                self._logger.error('%s: "%s"' % (e, name))
+            except dns.exception.DNSException:
+                self._logger.error('The domain name was invalid: "%s"' % name)
+            else:
+                if name not in self.names:
+                    self.names[name] = None
+
+    def serve_zones(self):
+        for zone in self._zones_to_serve:
+            zone.serve()
 
 def main(argv):
     global tm
     global th_factories
-    global resolver
-    global bootstrap_resolver
     global explicit_delegations
     global odd_ports
-    global next_port
 
     try:
-        try:
-            opts, args = getopt.getopt(argv[1:], 'f:d:l:C:r:t:64b:u:kmpo:a:R:x:N:D:ne:c:EAs:Fh')
-        except getopt.GetoptError as e:
-            usage(str(e))
-            sys.exit(1)
-
         _init_tm()
         try:
             bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
@@ -776,450 +1458,73 @@ def main(argv):
             sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
             sys.exit(1)
 
-        # get all the options for which there might be multiple values
-        explicit_delegations = {}
-        odd_ports = {}
-        stop_at_explicit = {}
-        rdclass = dns.rdataclass.IN
-        client_ipv4 = None
-        client_ipv6 = None
-        delegation_info = {}
-        for opt, arg in opts:
-            if opt in ('-x', '-N'):
-                try:
-                    domain, mappings = arg.split(':', 1)
-                except ValueError:
-                    usage('Incorrect usage of %s option: "%s"' % (opt, arg))
-                    sys.exit(1)
-                domain = domain.strip()
-                mappings = mappings.strip()
+        arghelper = ArgHelper(bootstrap_resolver, logger)
+        arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]), argv[1:])
+        logger.setLevel(arghelper.get_log_level())
 
-                match = STOP_RE.search(domain)
-                if match is not None:
-                    if opt == '-N':
-                        usage('Incorrect usage of %s option: "%s"' % (opt, arg))
-                        sys.exit(1)
-                    domain = match.group(1)
-
-                try:
-                    domain = dns.name.from_text(domain)
-                except dns.exception.DNSException:
-                    usage('The domain name was invalid: "%s"' % domain)
-                    sys.exit(1)
-
-                if opt == '-N' and domain == dns.name.root:
-                    usage('The root zone cannot be used with option -N.')
-                    sys.exit(1)
-
-                if match is not None:
-                    stop_at_explicit[domain] = True
-                else:
-                    stop_at_explicit[domain] = False
-
-                if opt == '-N':
-                    if domain == dns.name.root:
-                        usage('The root zone cannot be used with option -N.')
-                        sys.exit(1)
-
-                    parent = domain.parent()
-                    if parent not in delegation_info:
-                        delegation_info[parent] = {}
-                    delegation_mapping = delegation_info[parent]
-                else:
-                    delegation_mapping = explicit_delegations
-
-                if not mappings:
-                    usage('Incorrect usage of %s option: "%s"' % (arg, opt))
-                    sys.exit(1)
-                if (domain, dns.rdatatype.NS) not in delegation_mapping:
-                    delegation_mapping[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
-                name_addr_mappings_from_string(domain, mappings, delegation_mapping, opt == '-N')
-
-            elif opt == '-D':
-                try:
-                    domain, ds_str = arg.split(':', 1)
-                except ValueError:
-                    usage('Incorrect usage of %s option: "%s"' % (opt, arg))
-                    sys.exit(1)
-                domain = domain.strip()
-                ds_str = ds_str.strip()
-
-                try:
-                    domain = dns.name.from_text(domain)
-                except dns.exception.DNSException:
-                    usage('The domain name was invalid: "%s"' % domain)
-                    sys.exit(1)
-
-                parent = domain.parent()
-                if parent not in delegation_info:
-                    delegation_info[parent] = {}
-                delegation_mapping = delegation_info[parent]
-
-                if not ds_str:
-                    usage('Incorrect usage of %s option: "%s"' % (arg, opt))
-                    sys.exit(1)
-                if (domain, dns.rdatatype.DS) not in delegation_mapping:
-                    delegation_mapping[(domain, dns.rdatatype.DS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.DS)
-                ds_from_string(domain, ds_str.strip(), delegation_mapping)
-
-            elif opt == '-b':
-                try:
-                    addr = IPAddr(arg)
-                except ValueError:
-                    usage('The IP address was invalid: "%s"' % arg)
-                    sys.exit(1)
-
-                if addr.version == 4:
-                    client_ipv4 = addr
-                    fam = socket.AF_INET
-                else:
-                    client_ipv6 = addr
-                    fam = socket.AF_INET6
-                try:
-                    s = socket.socket(fam)
-                    s.bind((addr, 0))
-                    del s
-                except socket.error as e:
-                    if e.errno == errno.EADDRNOTAVAIL:
-                        usage('Cannot bind to specified IP address: "%s"' % addr)
-                        sys.exit(1)
-
-        opts = dict(opts)
-        if '-h' in opts:
-            usage()
-            sys.exit(0)
-
-        if not ('-f' in opts or args) and '-r' not in opts:
-            usage('When -r is not used, either -f must be used or domain names must be supplied as command line arguments.')
+        try:
+            arghelper.check_args()
+            arghelper.set_kwargs()
+            arghelper.set_buffers()
+            arghelper.check_network_connectivity()
+            arghelper.aggregate_delegation_info()
+            arghelper.populate_recursive_servers()
+            arghelper.ingest_input()
+            arghelper.ingest_names()
+            arghelper.serve_zones()
+        except argparse.ArgumentTypeError as e:
+            arghelper.parser.error(str(e))
+        except (ZoneFileServiceError, MissingExecutablesError) as e:
+            s = str(e)
+            if s:
+                logger.error(s)
             sys.exit(1)
-        if '-f' in opts and args:
-            usage('If -f is used, then domain names may not supplied as command line arguments.')
-            sys.exit(1)
+        except AnalysisInputError as e:
+            s = str(e)
+            if s:
+                logger.error(s)
+            sys.exit(3)
 
-        if '-A' in opts and '-s' in opts:
-            usage('If -A is used, then -s cannot be used.')
-            sys.exit(1)
+        th_factories = arghelper.th_factories
+        explicit_delegations = arghelper.explicit_delegations
+        odd_ports = arghelper.odd_ports
 
-        if '-x' in opts and '-A' not in opts:
-            usage('-x may only be used in conjunction with -A.')
-            sys.exit(1)
-
-        if '-N' in opts and '-A' not in opts:
-            usage('-N may only be used in conjunction with -A.')
-            sys.exit(1)
-
-        if '-D' in opts and '-N' not in opts:
-            #TODO retrieve NS/A/AAAA if -D is specified but -N is not
-            usage('-D may only be used in conjunction with -N.')
-            sys.exit(1)
-
-        if '-4' in opts and '-6' in opts:
-            usage('-4 and -6 may not be used together.')
-            sys.exit(1)
-
-        if '-a' in opts:
-            try:
-                ceiling = dns.name.from_text(opts['-a'])
-            except dns.exception.DNSException:
-                usage('The domain name was invalid: "%s"' % opts['-a'])
-                sys.exit(1)
-        elif '-A' in opts:
-            ceiling = None
-        else:
-            ceiling = dns.name.root
-
-        if '-R' in opts:
-            explicit_only = True
-            try:
-                rdtypes = opts['-R'].split(',')
-            except ValueError:
-                usage('The list of types was invalid: "%s"' % opts['-R'])
-                sys.exit(1)
-            try:
-                rdtypes = [dns.rdatatype.from_text(x) for x in rdtypes]
-            except dns.rdatatype.UnknownRdatatype:
-                usage('The list of types was invalid: "%s"' % opts['-R'])
-                sys.exit(1)
-        else:
-            rdtypes = None
-            explicit_only = False
-
-        # if neither is specified, then they're both tried
-        if '-4' not in opts and '-6' not in opts:
-            try_ipv4 = True
-            try_ipv6 = True
-        # if one or the other is specified, then only the one specified is
-        # tried
-        else:
-            if '-4' in opts:
-                try_ipv4 = True
-                try_ipv6 = False
-            else: # -6 in opts
-                try_ipv4 = False
-                try_ipv6 = True
-
-        for domain in delegation_info:
-            if (domain, dns.rdatatype.NS) in explicit_delegations:
-                usage('Cannot use "%s" with -x if its child is specified with -N' % lb2s(domain.canonicalize().to_text()))
-                sys.exit(1)
-
-            port = next_port
-            next_port += 1
-            _create_and_serve_zone(domain, delegation_info[domain], port)
-            localhost = dns.name.from_text('localhost')
-            loopback = IPAddr('127.0.0.1')
-            explicit_delegations[(domain, dns.rdatatype.NS)] = dns.rrset.RRset(domain, dns.rdataclass.IN, dns.rdatatype.NS)
-            explicit_delegations[(domain, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, localhost))
-            explicit_delegations[(localhost, dns.rdatatype.A)] = dns.rrset.RRset(localhost, dns.rdataclass.IN, dns.rdatatype.A)
-            explicit_delegations[(localhost, dns.rdatatype.A)].add(dns.rdtypes.IN.A.A(dns.rdataclass.IN, dns.rdatatype.A, loopback))
-            odd_ports[(domain, loopback)] = port
-            stop_at_explicit[domain] = True
-
-        if '-A' not in opts:
-            if '-t' in opts:
-                cls = RecursiveParallelAnalyst
-            else:
-                cls = RecursiveBulkAnalyst
-            explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
-            if '-s' in opts:
-                name_addr_mappings_from_string(WILDCARD_EXPLICIT_DELEGATION, opts['-s'], explicit_delegations, False)
-            else:
-                for i, server in enumerate(bootstrap_resolver._servers):
-                    if IPAddr(server).version == 6:
-                        rdtype = dns.rdatatype.AAAA
-                    else:
-                        rdtype = dns.rdatatype.A
-                    name = dns.name.from_text('ns%d' % i)
-                    explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)].add(dns.rdtypes.ANY.NS.NS(dns.rdataclass.IN, dns.rdatatype.NS, name))
-                    if (name, rdtype) not in explicit_delegations:
-                        explicit_delegations[(name, rdtype)] = dns.rrset.RRset(name, dns.rdataclass.IN, rdtype)
-                    explicit_delegations[(name, rdtype)].add(dns.rdata.from_text(dns.rdataclass.IN, rdtype, server))
-        else:
-            if '-t' in opts:
+        if arghelper.args.authoritative_analysis:
+            if arghelper.args.threads > 1:
                 cls = ParallelAnalyst
             else:
                 cls = BulkAnalyst
-
-        edns_diagnostics = '-E' in opts
-
-        if '-u' in opts:
-
-            # check that version is >= 2.7.9 if HTTPS is requested
-            if opts['-u'].startswith('https'):
-                vers0, vers1, vers2 = sys.version_info[:3]
-                if (2, 7, 9) > (vers0, vers1, vers2):
-                    logger.error('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.')
-                    sys.exit(1)
-
-            url = urlparse.urlparse(opts['-u'])
-            if url.scheme in ('http', 'https'):
-                th_factories = (transport.DNSQueryTransportHandlerHTTPFactory(opts['-u'], insecure='-k' in opts),)
-            elif url.scheme == 'ws':
-                if url.hostname is not None:
-                    usage('WebSocket URL must designate a local UNIX domain socket.')
-                    sys.exit(1)
-                th_factories = (transport.DNSQueryTransportHandlerWebSocketServerFactory(url.path),)
-            elif url.scheme == 'ssh':
-                th_factories = (transport.DNSQueryTransportHandlerRemoteCmdFactory(opts['-u']),)
+        else:
+            if arghelper.args.threads > 1:
+                cls = RecursiveParallelAnalyst
             else:
-                usage('Unsupported URL scheme: "%s"' % opts['-u'])
-                sys.exit(1)
-        else:
-            th_factories = None
+                cls = RecursiveBulkAnalyst
 
-        if '-l' in opts:
-            try:
-                dlv_domain = dns.name.from_text(opts['-l'])
-            except dns.exception.DNSException:
-                usage('The domain name was invalid: "%s"' % opts['-l'])
-                sys.exit(1)
-        else:
-            dlv_domain = None
-
-        # the following option is not documented in usage, as it doesn't
-        # apply to most users
-        try:
-            cache_level = int(opts['-C'])
-        except (KeyError, ValueError):
-            cache_level = None
-
-        try:
-            processes = int(opts.get('-t', 1))
-        except ValueError:
-            usage('The number of threads used must be greater than 0.')
-            sys.exit(1)
-        if processes < 1:
-            usage('The number of threads used must be greater than 0.')
-            sys.exit(1)
-
-        try:
-            val = int(opts.get('-d', 2))
-        except ValueError:
-            usage('The debug value must be an integer between 0 and 3.')
-            sys.exit(1)
-        if val < 0 or val > 3:
-            usage('The debug value must be an integer between 0 and 3.')
-            sys.exit(1)
-
-        if val > 2:
-            debug_level = logging.DEBUG
-        elif val > 1:
-            debug_level = logging.INFO
-        elif val > 0:
-            debug_level = logging.WARNING
-        else:
-            debug_level = logging.ERROR
-        logger.setLevel(debug_level)
-
-        if '-A' in opts:
-            if try_ipv4 and get_client_address(A_ROOT_IPV4) is None:
-                logger.warning('No global IPv4 connectivity detected')
-            if try_ipv6 and get_client_address(A_ROOT_IPV6) is None:
-                logger.warning('No global IPv6 connectivity detected')
-
-        if '-r' in opts:
-            if opts['-r'] == '-':
-                opt_r = sys.stdin.fileno()
-            else:
-                opt_r = opts['-r']
-            try:
-                with io.open(opt_r, 'r', encoding='utf-8') as fh:
-                    analysis_str = fh.read()
-            except IOError as e:
-                logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
-                sys.exit(3)
-            if not analysis_str:
-                if opt_r != sys.stdin.fileno():
-                    logger.error('No input.')
-                sys.exit(3)
-            try:
-                analysis_structured = json.loads(analysis_str)
-            except ValueError:
-                logger.error('There was an error parsing the JSON input: "%s"' % opts['-r'])
-                sys.exit(3)
-
-            # check version
-            if '_meta._dnsviz.' not in analysis_structured or 'version' not in analysis_structured['_meta._dnsviz.']:
-                logger.error('No version information in JSON input.')
-                sys.exit(3)
-            try:
-                major_vers, minor_vers = [int(x) for x in str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
-            except ValueError:
-                logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
-                sys.exit(3)
-            # ensure major version is a match and minor version is no greater
-            # than the current minor version
-            curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
-            if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-                logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
-                sys.exit(3)
-
-        names = OrderedDict()
-        if '-f' in opts:
-            if opts['-f'] == '-':
-                opts['-f'] = sys.stdin.fileno()
-            try:
-                f = io.open(opts['-f'], 'r', encoding='utf-8')
-            except IOError as e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-f']))
-                sys.exit(3)
-            for line in f:
-                name = line.strip()
-                try:
-                    name = dns.name.from_text(name)
-                except UnicodeDecodeError as e:
-                    logger.error('%s: "%s"' % (e, name))
-                except dns.exception.DNSException:
-                    logger.error('The domain name was invalid: "%s"' % name)
-                else:
-                    if name not in names:
-                        names[name] = None
-            f.close()
-        else:
-            if args:
-                # python3/python2 dual compatibility
-                if isinstance(args[0], bytes):
-                    args = [codecs.decode(x, sys.getfilesystemencoding()) for x in args]
-            else:
-                try:
-                    args = analysis_structured['_meta._dnsviz.']['names']
-                except KeyError:
-                    logger.error('No names found in JSON input!')
-                    sys.exit(3)
-            for name in args:
-                try:
-                    name = dns.name.from_text(name)
-                except UnicodeDecodeError as e:
-                    logger.error('%s: "%s"' % (e, name))
-                except dns.exception.DNSException:
-                    logger.error('The domain name was invalid: "%s"' % name)
-                else:
-                    if name not in names:
-                        names[name] = None
-
-        if '-p' in opts:
+        if arghelper.args.pretty_output:
             kwargs = { 'indent': 4, 'separators': (',', ': ') }
         else:
             kwargs = {}
-
-        meta_only = '-m' in opts
-
-        if '-o' not in opts or opts['-o'] == '-':
-            opts['-o'] = sys.stdout.fileno()
-        try:
-            fh = io.open(opts['-o'], 'wb')
-        except IOError as e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
-            sys.exit(3)
-
-        def _flush(name_obj):
-            d = OrderedDict()
-            name_obj.serialize(d)
-            s = json.dumps(d, **kwargs)
-            lindex = s.index('{')
-            rindex = s.rindex('}')
-            fh.write(s[lindex+1:rindex]+',')
-
-        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [lb2s(n.to_text()) for n in names] }
-
-        flush = '-F' in opts
-
-        query_class_mixin = CustomQueryMixin
-        if '-e' in opts:
-            CustomQueryMixin.edns_options.append(_get_ecs_option(opts['-e']))
-        if '-n' in opts:
-            CustomQueryMixin.edns_options.append(_get_nsid_option())
-        if '-c' in opts:
-            if opts['-c']:
-                CustomQueryMixin.edns_options.append(_get_dns_cookie_option(opts['-c']))
-        else:
-            # No cookie option was specified, so generate one
-            CustomQueryMixin.edns_options.append(_get_dns_cookie_option())
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [lb2s(n.to_text()) for n in arghelper.names] }
 
         name_objs = []
-        if '-r' in opts:
+        if arghelper.args.input_file:
             cache = {}
-            for name in names:
-                if name.canonicalize().to_text() not in analysis_structured:
+            for name in arghelper.names:
+                if name.canonicalize().to_text() not in arghelper.analysis_structured:
                     logger.error('The domain name was not found in the analysis input: "%s"' % name.to_text())
                     continue
-                name_objs.append(OnlineDomainNameAnalysis.deserialize(name, analysis_structured, cache))
+                name_objs.append(OnlineDomainNameAnalysis.deserialize(name, arghelper.analysis_structured, cache))
         else:
-            if '-t' in opts:
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain, processes)
+            if arghelper.args.threads > 1:
+                a = cls(arghelper.rdclass, arghelper.try_ipv4, arghelper.try_ipv6, arghelper.client_ipv4, arghelper.client_ipv6, CustomQueryMixin, arghelper.ceiling, arghelper.args.edns, arghelper.stop_at, arghelper.cache_level, arghelper.args.rr_types, arghelper.explicit_only, arghelper.dlv_domain, arghelper.args.threads)
             else:
                 if cls.use_full_resolver:
                     _init_full_resolver()
                 else:
                     _init_stub_resolver()
-                a = cls(rdclass, try_ipv4, try_ipv6, client_ipv4, client_ipv6, query_class_mixin, ceiling, edns_diagnostics, stop_at_explicit, cache_level, rdtypes, explicit_only, dlv_domain)
-                if flush:
-                    fh.write('{')
-                    a.analyze(names, _flush)
-                    fh.write('"_meta._dnsviz.":%s}' % json.dumps(dnsviz_meta, **kwargs))
-                    sys.exit(0)
+                a = cls(arghelper.rdclass, arghelper.try_ipv4, arghelper.try_ipv6, arghelper.client_ipv4, arghelper.client_ipv6, CustomQueryMixin, arghelper.ceiling, arghelper.args.edns, arghelper.stop_at, arghelper.cache_level, arghelper.args.rr_types, arghelper.explicit_only, arghelper.dlv_domain)
 
-            name_objs = a.analyze(names)
+            name_objs = a.analyze(arghelper.names)
 
         name_objs = [x for x in name_objs if x is not None]
 
@@ -1228,11 +1533,11 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.serialize(d, meta_only)
+            name_obj.serialize(d, arghelper.meta_only)
         d['_meta._dnsviz.'] = dnsviz_meta
 
         try:
-            fh.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
+            arghelper.args.output_file.write(json.dumps(d, ensure_ascii=False, **kwargs).encode('utf-8'))
         except IOError as e:
             logger.error('Error writing analysis: %s' % e)
             sys.exit(3)

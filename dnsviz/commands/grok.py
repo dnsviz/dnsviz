@@ -24,8 +24,8 @@
 
 from __future__ import unicode_literals
 
+import argparse
 import codecs
-import getopt
 import io
 import json
 import logging
@@ -59,6 +59,9 @@ except ImportError:
 
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
 logger = logging.getLogger()
+
+class AnalysisInputError(Exception):
+    pass
 
 TERM_COLOR_MAP = {
     'BOLD': '\033[1m',
@@ -94,30 +97,6 @@ ERRORS_CLOSE_RE = re.compile(r'^(?P<indent>\s+)],?$')
 DESCRIPTION_CODE_RE = re.compile(r'^((?P<indent>\s+)")(?P<name>description|code)(": ")(.+)(",?)$')
 STATUS_RE = re.compile(r'^(?P<indent>\s+)("status": ")(?P<status>.+)(",?)')
 
-def usage(err=None):
-    if err is not None:
-        err += '\n\n'
-    else:
-        err = ''
-    sys.stderr.write('''%sUsage: %s %s [options] [domain_name...]
-
-Assess diagnostic DNS queries.
-
-Options:
-    -f <filename>  - Read names from a file.
-    -r <filename>  - Read diagnostic queries from a file.
-    -t <filename>  - Use trusted keys from the designated file.
-    -a <alg>[,<alg>...]
-                   - Support only the specified DNSSEC algorithm(s).
-    -d <digest_alg>[,<digest_alg>...]
-                   - Support only the specified DNSSEC digest algorithm(s).
-    -C             - Enforce DNS cookies strictly.
-    -P             - Allow private IP addresses for authoritative DNS servers.
-    -o <filename>  - Save the output to the specified file.
-    -c             - Format JSON output minimally, instead of "pretty".
-    -l <loglevel>  - Log at the specified level: error, warning, info, debug.
-    -h             - Display the usage and exit.
-''' % (err, sys.argv[0], __name__.split('.')[-1]))
 
 def color_json(s):
     error = None
@@ -172,189 +151,305 @@ def test_pygraphviz():
         logger.error('''pygraphviz is required, but not installed.''')
         sys.exit(2)
 
-def main(argv):
-    try:
+class GrokArgHelper:
+
+    def __init__(self, logger):
+        self.parser = None
+
+        self.trusted_keys = None
+        self.names = None
+        self.analysis_structured = None
+        self.log_level = None
+
+        self.args = None
+        self._arg_mapping = None
+
+        self._logger = logger
+
+    def build_parser(self, prog, args):
+        self.parser = argparse.ArgumentParser(description='Assess diagnostic DNS queries', prog=prog)
+
+        # python3/python2 dual compatibility
+        stdin_buffer = io.open(sys.stdin.fileno(), 'rb', closefd=False)
+        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
+
         try:
-            opts, args = getopt.getopt(argv[1:], 'f:r:t:a:d:CPo:cl:h')
-        except getopt.GetoptError as e:
-            sys.stderr.write('%s\n' % str(e))
-            sys.exit(1)
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r', encoding='UTF-8'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-f', '--names-file',
+                    type=argparse.FileType('r'),
+                    action='store', metavar='<filename>',
+                    help='Read names from a file')
+        #self.parser.add_argument('-s', '--silent',
+        #        const=True, default=False,
+        #        action='store_const',
+        #        help='Suppress error messages')
+        try:
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r', encoding='UTF-8'), default=stdin_buffer,
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-r', '--input-file',
+                    type=argparse.FileType('r'), default=stdin_buffer,
+                    action='store', metavar='<filename>',
+                    help='Read diagnostic queries from a file')
+        try:
+            self.parser.add_argument('-t', '--trusted-keys-file',
+                    type=argparse.FileType('r', encoding='UTF-8'),
+                    action='append', metavar='<filename>',
+                    help='Use trusted keys from the designated file')
+        except TypeError:
+            # this try/except is for
+            # python3/python2 dual compatibility
+            self.parser.add_argument('-t', '--trusted-keys-file',
+                    type=argparse.FileType('r'),
+                    action='append', metavar='<filename>',
+                    help='Use trusted keys from the designated file')
+        self.parser.add_argument('-a', '--algorithms',
+                type=self.comma_separated_ints_set,
+                action='store', metavar='<alg>,[<alg>...]',
+                help='Support only the specified DNSSEC algorithm(s)')
+        self.parser.add_argument('-d', '--digest-algorithms',
+                type=self.comma_separated_ints_set,
+                action='store', metavar='<digest_alg>,[<digest_alg>...]',
+                help='Support only the specified DNSSEC digest algorithm(s)')
+        self.parser.add_argument('-C', '--enforce-cookies',
+                const=True, default=False,
+                action='store_const',
+                help='Enforce DNS cookies strictly')
+        self.parser.add_argument('-P', '--allow-private',
+                const=True, default=False,
+                action='store_const',
+                help='Allow private IP addresses for authoritative DNS servers')
+        self.parser.add_argument('-o', '--output-file',
+                type=argparse.FileType('wb'), default=stdout_buffer,
+                action='store', metavar='<filename>',
+                help='Save the output to the specified file')
+        self.parser.add_argument('-c', '--minimize-output',
+                const=True, default=False,
+                action='store_const',
+                help='Format JSON output minimally, instead of "pretty"')
+        self.parser.add_argument('-l', '--log-level',
+                type=str, choices=('error', 'warning', 'info', 'debug'), default='debug',
+                action='store', metavar='<loglevel>',
+                help='Save the output to the specified file')
+        self.parser.add_argument('domain_name',
+                type=self.valid_domain_name,
+                action='store', nargs='*', metavar='<domain_name>',
+                help='Domain names')
 
-        # collect trusted keys
-        trusted_keys = []
-        for opt, arg in opts:
-            if opt == '-t':
-                try:
-                    with io.open(arg, 'r', encoding='utf-8') as fh:
-                        tk_str = fh.read()
-                except IOError as e:
-                    logger.error('%s: "%s"' % (e.strerror, arg))
-                    sys.exit(3)
-                try:
-                    trusted_keys.extend(get_trusted_keys(tk_str))
-                except dns.exception.DNSException:
-                    logger.error('There was an error parsing the trusted keys file: "%s"' % arg)
-                    sys.exit(3)
+        self._arg_mapping = dict([(a.dest, '/'.join(a.option_strings)) for a in self.parser._actions])
+        self.args = self.parser.parse_args(args)
 
-        opts = dict(opts)
-        if '-h' in opts:
-            usage()
-            sys.exit(0)
+    @classmethod
+    def comma_separated_ints_set(cls, arg):
+        return set(cls.comma_separated_ints(arg))
 
-        if '-f' in opts and args:
-            sys.stderr.write('If -f is used, then domain names may not supplied as command line arguments.\n')
-            sys.exit(1)
+    @classmethod
+    def comma_separated_ints(cls, arg):
+        ints = []
+        arg = arg.strip()
+        if not arg:
+            return ints
+        for i in arg.split(','):
+            try:
+                ints.append(int(i.strip()))
+            except ValueError:
+                raise argparse.ArgumentTypeError('Invalid integer: %s' % (i))
+        return ints
 
-        if '-l' in opts:
-            if opts['-l'] == 'error':
-                loglevel = logging.ERROR
-            elif opts['-l'] == 'warning':
-                loglevel = logging.WARNING
-            elif opts['-l'] == 'info':
-                loglevel = logging.INFO
-            elif opts['-l'] == 'debug':
-                loglevel = logging.DEBUG
+    @classmethod
+    def valid_domain_name(cls, arg):
+        try:
+            return dns.name.from_text(arg)
+        except dns.exception.DNSException:
+            raise argparse.ArgumentTypeError('Invalid domain name: "%s"' % arg)
+
+    def check_args(self):
+        if self.args.names_file and self.args.domain_name:
+            raise argparse.ArgumentTypeError('If %(names_file)s is used, then domain names may not supplied as command line arguments.' % \
+                    self._arg_mapping)
+
+    def set_kwargs(self):
+        if self.args.log_level == 'error':
+            self.log_level = logging.ERROR
+        elif self.args.log_level == 'warning':
+            self.log_level = logging.WARNING
+        elif self.args.log_level == 'info':
+            self.log_level = logging.INFO
+        else: # self.args.log_level == 'debug':
+            self.log_level = logging.DEBUG
+
+    def set_buffers(self):
+        # This entire method is for
+        # python3/python2 dual compatibility
+        if self.args.input_file is not None:
+            if self.args.input_file.fileno() == sys.stdin.fileno():
+                filename = self.args.input_file.fileno()
             else:
-                sys.stderr.write('Invalid log level: "%s"\n' % opts['-l'])
-                sys.exit(1)
-        else:
-            loglevel = logging.DEBUG
+                filename = self.args.input_file.name
+                self.args.input_file.close()
+            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.names_file is not None:
+            if self.args.names_file.fileno() == sys.stdin.fileno():
+                filename = self.args.names_file.fileno()
+            else:
+                filename = self.args.names_file.name
+                self.args.names_file.close()
+            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
+        if self.args.trusted_keys_file is not None:
+            trusted_keys_files = []
+            for tk_file in self.args.trusted_keys_file:
+                if tk_file.fileno() == sys.stdin.fileno():
+                    filename = tk_file.fileno()
+                else:
+                    filename = tk_file.name
+                    tk_file.close()
+                trusted_keys_files.append(io.open(filename, 'r', encoding='utf-8'))
+            self.args.trusted_keys_file = trusted_keys_files
+        if self.args.output_file is not None:
+            if self.args.output_file.fileno() == sys.stdout.fileno():
+                filename = self.args.output_file.fileno()
+            else:
+                filename = self.args.output_file.name
+                self.args.output_file.close()
+            self.args.output_file = io.open(filename, 'wb')
 
-        if '-a' in opts:
+    def aggregate_trusted_key_info(self):
+        if not self.args.trusted_keys_file:
+            return
+
+        self.trusted_keys = []
+        for fh in self.args.trusted_keys_file:
+            tk_str = fh.read()
             try:
-                supported_algs = set([int(x) for x in opts['-a'].split(',')])
-            except ValueError:
-                sys.stderr.write('The list of algorithms was invalid: "%s"\n' % opts['-a'])
-                sys.exit(1)
-        else:
-            supported_algs = None
+                self.trusted_keys.extend(get_trusted_keys(tk_str))
+            except dns.exception.DNSException:
+                raise argparse.ArgumentTypeError('There was an error parsing the trusted keys file: "%s"' % \
+                        self._arg_mapping)
 
-        if '-d' in opts:
-            try:
-                supported_digest_algs = set([int(x) for x in opts['-d'].split(',')])
-            except ValueError:
-                sys.stderr.write('The list of digest algorithms was invalid: "%s"\n' % opts['-d'])
-                sys.exit(1)
-        else:
-            supported_digest_algs = None
+    def update_trusted_key_info(self):
+        if self.args.trusted_keys_file is None:
+            self.trusted_keys = []
 
-        strict_cookies = '-C' in opts
-        allow_private = '-P' in opts
-
-        if '-r' not in opts or opts['-r'] == '-':
-            opt_r = sys.stdin.fileno()
-        else:
-            opt_r = opts['-r']
-        try:
-            with io.open(opt_r, 'r', encoding='utf-8') as fh:
-                analysis_str = fh.read()
-        except IOError as e:
-            logger.error('%s: "%s"' % (e.strerror, opts.get('-r', '-')))
-            sys.exit(3)
+    def ingest_input(self):
+        analysis_str = self.args.input_file.read()
         if not analysis_str:
-            if opt_r != sys.stdin.fileno():
-                logger.error('No input.')
-            sys.exit(3)
+            if self.args.input_file.fileno() != sys.stdin.fileno():
+                raise AnalysisInputError('No input')
+            else:
+                raise AnalysisInputError()
         try:
-            analysis_structured = json.loads(analysis_str)
+            self.analysis_structured = json.loads(analysis_str)
         except ValueError:
-            logger.error('There was an error parsing the JSON input: "%s"' % opts.get('-r', '-'))
-            sys.exit(3)
+            raise AnalysisInputError('There was an error parsing the JSON input: "%s"' % self.args.input_file.name)
 
         # check version
-        if '_meta._dnsviz.' not in analysis_structured or 'version' not in analysis_structured['_meta._dnsviz.']:
-            logger.error('No version information in JSON input.')
-            sys.exit(3)
+        if '_meta._dnsviz.' not in self.analysis_structured or 'version' not in self.analysis_structured['_meta._dnsviz.']:
+            raise AnalysisInputError('No version information in JSON input: "%s"' % self.args.input_file.name)
         try:
-            major_vers, minor_vers = [int(x) for x in str(analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
+            major_vers, minor_vers = [int(x) for x in str(self.analysis_structured['_meta._dnsviz.']['version']).split('.', 1)]
         except ValueError:
-            logger.error('Version of JSON input is invalid: %s' % analysis_structured['_meta._dnsviz.']['version'])
-            sys.exit(3)
+            raise AnalysisInputError('Version of JSON input is invalid: %s' % self.analysis_structured['_meta._dnsviz.']['version'])
         # ensure major version is a match and minor version is no greater
         # than the current minor version
         curr_major_vers, curr_minor_vers = [int(x) for x in str(DNS_RAW_VERSION).split('.', 1)]
         if major_vers != curr_major_vers or minor_vers > curr_minor_vers:
-            logger.error('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
-            sys.exit(3)
+            raise AnalysisInputError('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
 
-        names = OrderedDict()
-        if '-f' in opts:
-            if opts['-f'] == '-':
-                opts['-f'] = sys.stdin.fileno()
+    def ingest_names(self):
+        self.names = OrderedDict()
+
+        if self.args.domain_name:
+            for name in self.args.domain_name:
+                if name not in self.names:
+                    self.names[name] = None
+            return
+
+        if self.args.names_file:
+            args = self.args.names_file
+        else:
             try:
-                f = io.open(opts['-f'], 'r', encoding='utf-8')
-            except IOError as e:
-                logger.error('%s: "%s"' % (e.strerror, opts['-f']))
-                sys.exit(3)
-            for line in f:
-                name = line.strip()
-                try:
-                    name = dns.name.from_text(name)
-                except UnicodeDecodeError as e:
-                    logger.error('%s: "%s"' % (e, name))
-                except dns.exception.DNSException:
-                    logger.error('The domain name was invalid: "%s"' % name)
-                else:
-                    if name not in names:
-                        names[name] = None
-            f.close()
-        else:
-            if args:
-                # python3/python2 dual compatibility
-                if isinstance(args[0], bytes):
-                    args = [codecs.decode(x, sys.getfilesystemencoding()) for x in args]
-            else:
-                try:
-                    args = analysis_structured['_meta._dnsviz.']['names']
-                except KeyError:
-                    logger.error('No names found in JSON input!')
-                    sys.exit(3)
-            for name in args:
-                try:
-                    name = dns.name.from_text(name)
-                except UnicodeDecodeError as e:
-                    logger.error('%s: "%s"' % (e, name))
-                except dns.exception.DNSException:
-                    logger.error('The domain name was invalid: "%s"' % name)
-                else:
-                    if name not in names:
-                        names[name] = None
+                args = self.analysis_structured['_meta._dnsviz.']['names']
+            except KeyError:
+                raise AnalysisInputError('No names found in JSON input!')
 
-        if '-o' not in opts or opts['-o'] == '-':
-            opts['-o'] = sys.stdout.fileno()
+        for arg in args:
+            name = arg.strip()
+
+            # python3/python2 dual compatibility
+            if hasattr(name, 'decode'):
+                name = name.decode('utf-8')
+
+            try:
+                name = dns.name.from_text(name)
+            except UnicodeDecodeError as e:
+                self._logger.error('%s: "%s"' % (e, name))
+            except dns.exception.DNSException:
+                self._logger.error('The domain name was invalid: "%s"' % name)
+            else:
+                if name not in self.names:
+                    self.names[name] = None
+
+def main(argv):
+    try:
+
+        arghelper = GrokArgHelper(logger)
+        arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]), argv[1:])
+        logger.setLevel(logging.WARNING)
+
         try:
-            fh = io.open(opts['-o'], 'wb')
-        except IOError as e:
-            logger.error('%s: "%s"' % (e.strerror, opts['-o']))
+            arghelper.check_args()
+            arghelper.set_kwargs()
+            arghelper.set_buffers()
+            arghelper.aggregate_trusted_key_info()
+            arghelper.ingest_input()
+            arghelper.ingest_names()
+        except argparse.ArgumentTypeError as e:
+            arghelper.parser.error(str(e))
+        except AnalysisInputError as e:
+            s = str(e)
+            if s:
+                logger.error(s)
             sys.exit(3)
 
-        if '-c' not in opts:
-            kwargs = { 'indent': 4, 'separators': (',', ': ') }
-        else:
+        if arghelper.args.minimize_output:
             kwargs = {}
+        else:
+            kwargs = { 'indent': 4, 'separators': (',', ': ') }
 
         # if trusted keys were supplied, check that pygraphviz is installed
-        if trusted_keys:
+        if arghelper.trusted_keys:
             test_pygraphviz()
 
         name_objs = []
         cache = {}
-        for name in names:
+        for name in arghelper.names:
             name_str = lb2s(name.canonicalize().to_text())
-            if name_str not in analysis_structured or analysis_structured[name_str].get('stub', True):
+            if name_str not in arghelper.analysis_structured or arghelper.analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = OfflineDomainNameAnalysis.deserialize(name, analysis_structured, cache, strict_cookies=strict_cookies, allow_private=allow_private)
+            name_obj = OfflineDomainNameAnalysis.deserialize(name, arghelper.analysis_structured, cache, strict_cookies=arghelper.args.enforce_cookies, allow_private=arghelper.args.allow_private)
             name_objs.append(name_obj)
 
         if not name_objs:
             sys.exit(4)
 
+        arghelper.update_trusted_key_info()
+
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.populate_status(trusted_keys, supported_algs=supported_algs, supported_digest_algs=supported_digest_algs)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms)
 
-            if trusted_keys:
+            if arghelper.trusted_keys:
                 G = DNSAuthGraph()
                 for qname, rdtype in name_obj.queries:
                     if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
@@ -368,16 +463,16 @@ def main(argv):
                     if ns_obj is not None:
                         G.graph_rrset_auth(ns_obj, target, dns.rdatatype.A)
                         G.graph_rrset_auth(ns_obj, target, dns.rdatatype.AAAA)
-                G.add_trust(trusted_keys, supported_algs=supported_algs)
+                G.add_trust(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms)
                 name_obj.populate_response_component_status(G)
 
-            name_obj.serialize_status(d, loglevel=loglevel)
+            name_obj.serialize_status(d, loglevel=arghelper.log_level)
 
         if d:
             s = json.dumps(d, ensure_ascii=False, **kwargs)
-            if '-c' not in opts and fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb':
+            if not arghelper.args.minimize_output and arghelper.args.output_file.isatty() and os.environ.get('TERM', 'dumb') != 'dumb':
                 s = color_json(s)
-            fh.write(s.encode('utf-8'))
+            arghelper.args.output_file.write(s.encode('utf-8'))
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')

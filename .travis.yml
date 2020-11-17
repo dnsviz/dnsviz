@@ -1,9 +1,9 @@
 language: python
 python:
   - "2.7"
-  - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 dist: xenial
 addons:
   apt:
@@ -16,5 +16,11 @@ install:
   - pip install -r requirements.txt
   - pip install .
 script:
-  - python tests/offline_tests.py
-  - python tests/local_probe_tests.py
+  - python tests/dnsviz_probe_options.py
+  - python tests/dnsviz_probe_run_offline.py
+  - python tests/dnsviz_print_options.py
+  - python tests/dnsviz_print_run.py
+  - python tests/dnsviz_graph_options.py
+  - python tests/dnsviz_graph_run.py
+  - python tests/dnsviz_grok_options.py
+  - python tests/dnsviz_grok_run.py

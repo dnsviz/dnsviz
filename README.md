@@ -33,7 +33,7 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7/3.4/3.5/3.6) - http://www.python.org/
+* python (2.7/3.5/3.6/3.7) - http://www.python.org/
 
 * dnspython (1.13.0 or later) - http://www.dnspython.org/
 

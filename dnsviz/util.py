@@ -179,5 +179,8 @@ def get_client_address(server):
     try:
         s.connect((server, 53))
     except socket.error:
-        return None
-    return IPAddr(s.getsockname()[0])
+        ip = None
+    else:
+        ip = IPAddr(s.getsockname()[0])
+    s.close()
+    return ip
