@@ -306,12 +306,15 @@ class GrokArgHelper:
                 self.args.names_file.close()
             self.args.names_file = io.open(filename, 'r', encoding='utf-8')
         if self.args.trusted_keys_file is not None:
-            if self.args.trusted_keys_file.fileno() == sys.stdin.fileno():
-                filename = self.args.trusted_keys_file.fileno()
-            else:
-                filename = self.args.trusted_keys_file.name
-                self.args.trusted_keys_file.close()
-            self.args.trusted_keys_file = io.open(filename, 'r', encoding='utf-8')
+            trusted_keys_files = []
+            for tk_file in self.args.trusted_keys_file:
+                if tk_file.fileno() == sys.stdin.fileno():
+                    filename = tk_file.fileno()
+                else:
+                    filename = tk_file.name
+                    tk_file.close()
+                trusted_keys_files.append(io.open(filename, 'r', encoding='utf-8'))
+            self.args.trusted_keys_file = trusted_keys_files
         if self.args.output_file is not None:
             if self.args.output_file.fileno() == sys.stdout.fileno():
                 filename = self.args.output_file.fileno()

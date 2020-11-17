@@ -17,6 +17,11 @@ class DNSGraphRunTestCase(unittest.TestCase):
         self.current_cwd = os.getcwd()
         self.dnsviz_bin = os.path.join(self.current_cwd, 'bin', 'dnsviz')
 
+        tk = 'example.com. IN DNSKEY 256 3 7 AwEAAZ2YEuBl4X58v1CezDfZjT1viYn5kY3MF3lSDjvHjMZ6gJlYt4Qq oIdpChifmeJldEX9/wPc04Tg7MlEfV3m0x2j80dMyObM0FZTxzMgbTFk Zs0AWrDXELieGkFZv1FB9YoxSX2XqvpFxwvPyyszUtCy/c5hrb6vfKRB Jh+qIO+NsNrl6O8NiYjWWNjdiFw+c2BxzpArQoaA+rcoyDYwH4xGpvTw YLnE9HmkwTSQuwASkgWgX3KgTmsDEw4I0P5Tk+wvmNnaqDhmFMHJK5Oh 92wUX+ppxxSgUx4UIJmftzi7sCg0qekIYUf99Dkn7OlC8X0rjj+xO4cD hbTjGkxmsD0='
+
+        with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as self.tk_file:
+            self.tk_file.write(tk.encode('utf-8'))
+
         with gzip.open(EXAMPLE_AUTHORITATIVE, 'rb') as example_auth_in:
             with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as self.example_auth_out:
                 self.example_auth_out.write(example_auth_in.read())
@@ -35,6 +40,7 @@ class DNSGraphRunTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.devnull.close()
+        os.remove(self.tk_file.name)
         os.remove(self.example_auth_out.name)
         os.remove(self.example_rec_out.name)
         os.remove(self.names_file.name)
@@ -64,6 +70,16 @@ class DNSGraphRunTestCase(unittest.TestCase):
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.names_file.name, 'rb') as fh_in:
                 p = subprocess.Popen([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p.communicate(fh_in.read())
+                self.assertEqual(p.returncode, 0)
+
+    def test_dnsviz_graph_tk_input(self):
+        with io.open(self.output.name, 'wb') as fh:
+            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-t', self.tk_file.name], stdout=fh), 0)
+
+        with io.open(self.output.name, 'wb') as fh_out:
+            with io.open(self.tk_file.name, 'rb') as fh_in:
+                p = subprocess.Popen([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
