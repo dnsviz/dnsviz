@@ -137,7 +137,6 @@ powers the Web-based analysis available at http://dnsviz.net/ .''',
                 'pygraphviz (>=1.1)',
                 'm2crypto (>=0.24.0)',
                 'dnspython (>=1.11)',
-                'libnacl',
         ],
         classifiers=[
                 'Development Status :: 5 - Production/Stable',
