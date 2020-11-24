@@ -401,11 +401,15 @@ class GrokArgHelper:
                 if name not in self.names:
                     self.names[name] = None
 
+def build_helper(logger, cmd, subcmd):
+    arghelper = GrokArgHelper(logger)
+    arghelper.build_parser('%s %s' % (cmd, subcmd))
+    return arghelper
+
 def main(argv):
     try:
 
-        arghelper = GrokArgHelper(logger)
-        arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]))
+        arghelper = build_helper(logger, sys.argv[0], argv[0])
         arghelper.parse_args(argv[1:])
         logger.setLevel(logging.WARNING)
 
