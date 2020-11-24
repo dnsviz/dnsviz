@@ -116,34 +116,39 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         try:
             args = ['-r', example_auth_out.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.ingest_input()
 
             # Bad json
             args = ['-r', example_bad_json.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
 
             # No version
             args = ['-r', example_no_version.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
 
@@ -155,7 +160,8 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
     def test_ingest_names(self):
         args = ['example.com', 'example.net']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         arghelper.ingest_names()
         self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
 
@@ -168,20 +174,23 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         try:
             args = ['-f', names_file.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
 
             args = ['-r', example_names_only.name]
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net'), dns.name.from_text('example.org')])
 
             args = ['-r', example_names_only.name, 'example.com']
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com')])
@@ -202,7 +211,8 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
 
         args = ['example.com']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         arghelper.aggregate_trusted_key_info()
         self.assertEqual(arghelper.trusted_keys, None)
         arghelper.update_trusted_key_info(now)
@@ -217,14 +227,16 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         try:
             args = ['-t', tk1_file.name, '-t', tk2_file.name, 'example.com']
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, tk_explicit)
 
             args = ['-t', '/dev/null', 'example.com']
             arghelper = PrintArgHelper(self.logger)
-            arghelper.build_parser('print', args)
+            arghelper.build_parser('print')
+            arghelper.parse_args(args)
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, [])
@@ -238,27 +250,31 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         # Names file and command-line domain names are mutually exclusive
         args = ['-f', '/dev/null', 'example.com']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
 
         # Names file and command-line domain names are mutually exclusive
         args = ['-O', '-o', '/dev/null']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
 
         # But this is allowed
         args = ['-o', '/dev/null']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         arghelper.check_args()
 
         # So is this
         args = ['-O']
         arghelper = PrintArgHelper(self.logger)
-        arghelper.build_parser('print', args)
+        arghelper.build_parser('print')
+        arghelper.parse_args(args)
         arghelper.check_args()
 
 if __name__ == '__main__':

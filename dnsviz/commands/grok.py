@@ -166,7 +166,7 @@ class GrokArgHelper:
 
         self._logger = logger
 
-    def build_parser(self, prog, args):
+    def build_parser(self, prog):
         self.parser = argparse.ArgumentParser(description='Assess diagnostic DNS queries', prog=prog)
 
         # python3/python2 dual compatibility
@@ -247,6 +247,8 @@ class GrokArgHelper:
                 help='Domain names')
 
         self._arg_mapping = dict([(a.dest, '/'.join(a.option_strings)) for a in self.parser._actions])
+
+    def parse_args(self, args):
         self.args = self.parser.parse_args(args)
 
     @classmethod
@@ -403,7 +405,8 @@ def main(argv):
     try:
 
         arghelper = GrokArgHelper(logger)
-        arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]), argv[1:])
+        arghelper.build_parser('%s %s' % (sys.argv[0], argv[0]))
+        arghelper.parse_args(argv[1:])
         logger.setLevel(logging.WARNING)
 
         try:
