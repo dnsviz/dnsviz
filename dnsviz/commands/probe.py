@@ -1446,7 +1446,13 @@ class ArgHelper:
         for zone in self._zones_to_serve:
             zone.serve()
 
-def build_helper(resolver, logger, cmd, subcmd):
+def build_helper(logger, cmd, subcmd):
+    try:
+        resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
+    except ResolvConfError:
+        sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
+        sys.exit(1)
+
     arghelper = ArgHelper(resolver, logger)
     arghelper.build_parser('%s %s' % (cmd, subcmd))
     return arghelper
@@ -1459,13 +1465,7 @@ def main(argv):
 
     try:
         _init_tm()
-        try:
-            bootstrap_resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
-        except ResolvConfError:
-            sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
-            sys.exit(1)
-
-        arghelper = build_helper(bootstrap_resolver, logger, sys.argv[0], argv[0])
+        arghelper = build_helper(logger, sys.argv[0], argv[0])
         arghelper.parse_args(argv[1:])
         logger.setLevel(arghelper.get_log_level())
 
