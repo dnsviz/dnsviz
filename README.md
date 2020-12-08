@@ -39,15 +39,25 @@ Instructions for running in a Docker container are also available
 
 * pygraphviz (1.4 or later) - http://pygraphviz.github.io/
 
-* M2Crypto (0.28.0 or later) - https://gitlab.com/m2crypto/m2crypto
+* M2Crypto (0.37.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
 Note that the software versions listed above are known to work with the current
-version of DNSViz.  Other versions might also work well together, but might
-have some caveats.  For example, while the current version of DNSViz works with
-python 2.6, the importlib (https://pypi.python.org/pypi/importlib) and
-ordereddict (https://pypi.python.org/pypi/ordereddict) packages are
-additionally required.  Also for python 2.6, pygraphviz version 1.1 or 1.2 is
-required (pygraphviz version 1.3 dropped support for python 2.6).
+version of DNSViz.  Other versions might also work, but with some caveats.  For
+example, M2Crypto 0.28.0 and later should work, but versions earlier than
+0.37.0 lack support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448).  Also,
+the current version of DNSViz should work with python 2.6, but only with the
+following requirements:
+
+* importlib (https://pypi.python.org/pypi/importlib)\*
+
+* ordereddict (https://pypi.python.org/pypi/ordereddict)\*
+
+* pygraphviz version 1.1 or 1.2\*\*
+
+* M2Crypto version 0.36 or earlier\*\*
+
+\* - python 2.6 does not include these packages natively.
+\*\* - these packages do not support python 2.6.
 
 
 ### Optional Software

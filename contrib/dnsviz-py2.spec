@@ -13,7 +13,7 @@ BuildRequires:  graphviz
 BuildRequires:  make
 # python2-pygraphviz should be >= 1.4
 Requires:       python2-pygraphviz >= 1.3
-Requires:       m2crypto >= 0.28.0
+Requires:       m2crypto >= 0.37.0
 Requires:       python2-dns >= 1.13
 
 %description

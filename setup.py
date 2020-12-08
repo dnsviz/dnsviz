@@ -134,9 +134,9 @@ powers the Web-based analysis available at http://dnsviz.net/ .''',
         data_files=DOC_FILES + DATA_FILES + MAN_FILES + \
                 DOC_EXTRA_FILES + JQUERY_UI_FILES + JQUERY_FILES + RAPHAEL_FILES,
         requires=[
-                'pygraphviz (>=1.1)',
-                'm2crypto (>=0.24.0)',
-                'dnspython (>=1.11)',
+                'pygraphviz (>=1.4)',
+                'm2crypto (>=0.37.0)',
+                'dnspython (>=1.13)',
         ],
         classifiers=[
                 'Development Status :: 5 - Production/Stable',
