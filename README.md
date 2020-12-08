@@ -25,7 +25,7 @@ The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
 [virtual environment](#installation-in-a-virtual-environment), and installation
 on [Fedora](#fedora-rpm-build-and-install) and
-[RHEL6 or RHEL7](#rhel6rhel7-rpm-build-and-install).
+[RHEL7](#rhel7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
