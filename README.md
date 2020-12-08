@@ -148,36 +148,22 @@ $ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*-1.*.noarch.rpm
 ```
 
 
-### RHEL6/RHEL7 RPM Build and Install
+### RHEL7 RPM Build and Install
 
-Install pygraphviz and M2Crypto, after installing their build dependencies.
+Install pygraphviz, M2Crypto, and dnspython, after installing their build dependencies.
 ```
-$ sudo yum install python-setuptools gcc python-devel graphviz-devel openssl-devel
-$ sudo easy_install pbr
-$ sudo easy_install m2crypto pygraphviz==1.2
-```
-
-(RHEL6 only) Install the EPEL repository, and the necessary python libraries
-from that repository.
-```
-$ sudo yum install epel-release
-$ sudo yum install python-importlib python-ordereddict
-```
-
-Install dnspython.
-```
-$ sudo yum install python-dns
-```
+$ sudo yum install python3 gcc python3-devel graphviz-devel openssl-devel swig
+$ pip3 install --user pbr m2crypto pygraphviz dnspython
 
 Install rpm-build tools, then build and install the DNSViz RPM.
 ```
 $ sudo yum install rpm-build
-$ python setup.py bdist_rpm --install-script contrib/rpm-install.sh --distribution-name el${RHEL_VERS}
+$ python3 setup.py bdist_rpm --install-script contrib/rpm-install.sh --distribution-name el7
 $ sudo rpm -iv dist/dnsviz-*-1.noarch.rpm
 ```
+
 Note that a custom install script is used to properly install the DNSViz man
-pages.  The value of ${RHEL_VERS} corresponds to the RHEL version (e.g., 6 or
-7).
+pages.
 
 
 ## Usage
