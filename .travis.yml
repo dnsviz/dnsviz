@@ -8,8 +8,8 @@ dist: xenial
 addons:
   apt:
     packages:
-      - libsodium18
       - graphviz
+      - swig
       - bind9
 # command to install dependencies
 install:
