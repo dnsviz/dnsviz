@@ -44,20 +44,7 @@ Instructions for running in a Docker container are also available
 Note that the software versions listed above are known to work with the current
 version of DNSViz.  Other versions might also work, but with some caveats.  For
 example, M2Crypto 0.28.0 and later should work, but versions earlier than
-0.37.0 lack support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448).  Also,
-the current version of DNSViz should work with python 2.6, but only with the
-following requirements:
-
-* importlib (https://pypi.python.org/pypi/importlib)\*
-
-* ordereddict (https://pypi.python.org/pypi/ordereddict)\*
-
-* pygraphviz version 1.1 or 1.2\*\*
-
-* M2Crypto version 0.36 or earlier\*\*
-
-\* - python 2.6 does not include these packages natively.
-\*\* - these packages do not support python 2.6.
+0.37.0 lack support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448).
 
 
 ### Optional Software
@@ -154,6 +141,7 @@ Install pygraphviz, M2Crypto, and dnspython, after installing their build depend
 ```
 $ sudo yum install python3 gcc python3-devel graphviz-devel openssl-devel swig
 $ pip3 install --user pbr m2crypto pygraphviz dnspython
+```
 
 Install rpm-build tools, then build and install the DNSViz RPM.
 ```
