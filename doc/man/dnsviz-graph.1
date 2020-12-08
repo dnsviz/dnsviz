@@ -59,16 +59,16 @@ libraries that are distributed with this software.
 
 .SH OPTIONS
 .TP
-.B -f \fIfilename\fR
+.B -f, --names-file \fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
 .TP
-.B -r \fIfilename\fR
+.B -r, --input-file \fIfilename\fR
 Read diagnostic query input from the specified file, instead of from standard
 input.
 .TP
-.B -t \fIfilename\fR
+.B -t, --trusted-keys-file \fIfilename\fR
 Use trusted keys from the specified file when processing diagnostic queries.
 This overrides the default behavior of using the installed keys for the root
 zone.
@@ -78,37 +78,52 @@ records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
 .TP
-.B -C
+.B -a, --algorithms \fIalg\fR[,\fIalg...\fI]
+Support only the DNSSEC algorithms specified.  If this option is used, any
+algorithms not specified will appear as "unsupported."  The status of any RRSIG
+records corresponding to unsupported algorithms will be unknown.  Additionally,
+when a zone has only DS records with unsupported algorithms, the zone is
+treated as "insecure", assuming the DS records are properly authenticated.
+.TP
+.B -d, --digest-algorithms \fIdigest_alg\fR[,\fIdigest_alg...\fI]
+Support only the DNSSEC digest algorithms specified.  If this option is used,
+any digest algorithms not specified will appear as "unsupported."  The status
+of any DS records corresponding to unsupported digest algorithms will be
+unknown.  Additionally, when a zone has only DS records with unsupported digest
+algorithms, the zone is treated as "insecure", assuming the DS records are
+properly authenticated.
+.TP
+.B -C, --enforce-cookies
 Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
 when a query contains a COOKIE option with no server cookie or with an invalid
 server cookie.
 .TP
-.B -P
+.B -P, --allow-private
 Allow private IP addresses for authoritative DNS servers.  By default, if the
 IP address corresponding to an authoritative server is in IP address space
 designated as "private", it is flagged as an error.  However, there are some
 cases where this is allowed.  For example, if the diagnostic queries are issued
 to servers in an experimental environment, this might be permissible.
 .TP
-.B -R \fItype\fR[,\fItype...\fI]
+.B -R, --rr-types \fItype\fR[,\fItype...\fI]
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.
 .TP
-.B -e
+.B -e, --redundant-edges
 Do not remove redundant RRSIG edges from the graph.
 
 As described in \fB"RRSIGs"\fR, some edges representing RRSIGs made by KSKs are
 removed from the graph to reduce visual complexity.  If this option is used,
 those edges are preserved.
 .TP
-.B -O
+.B -O, --derive-filename
 Save the output to a file, whose name is derived from the format (i.e.,
 provided to \fB-T\fR) and the domain name.
 
 If this option is used when the diagnostic queries of multiple domain names are
 being processed, a file will be created for each domain name processed.
 .TP
-.B -o \fIfilename\fR
+.B -o, --output-file \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
 
@@ -116,11 +131,11 @@ If this option is used when the diagnostic queries of multiple domain name are
 being processed, a single file (the one specified) will be created, which will
 contain the collective output for all domain names processed.
 .TP
-.B -T \fIformat\fR
+.B -T, --output-format \fIformat\fR
 Use the specified output format for the graph, selected from among the
 following: "dot", "png", "jpg", "svg", and "html".  The default is "dot".
 .TP
-.B -h
+.B -h, --help
 Display the usage and exit.
 
 .SH OUTPUT

@@ -50,31 +50,31 @@ are fully qualified, no trailing dot is necessary.
 
 .SH OPTIONS
 .TP
-.B -f \fIfilename\fR
+.B -f, --names-file \fIfilename\fR
 Read names from a file (one name per line), instead of from command line.
 
 If this option is used, then names may not be specified on the command line.
 .TP
-.B -d \fIlevel\fR
+.B -d, --debug \fIlevel\fR
 Set debug level to a value from 0 to 3, with increasing verbosity.  The default
 is "2" (informational-level output).
 .TP
-.B -r \fIfilename\fR
+.B -r, --input-file \fIfilename\fR
 Read diagnostic query input from the specified file, instead of querying
 servers.  Specify "-" to read from standard input.
 .TP
-.B -t \fIthreads\fR
+.B -t, --threads \fIthreads\fR
 Issue diagnostic queries for different names in parallel using the specified
 number of threads.  The default is to execute diagnostic queries of names
 serially.
 .TP
-.B -4
+.B -4, --ipv4
 Use IPv4 only.
 .TP
-.B -6
+.B -6, --ipv6
 Use IPv6 only.
 .TP
-.B -b \fIaddress\fR
+.B -b, --source-ip \fIaddress\fR
 Use the specified source IPv4 or IPv6 address for queries, rather than
 detecting it.
 
@@ -84,7 +84,7 @@ address.
 The use of this option is sometimes necessary when using a dual-homed machine,
 and it is desirable to use the non-default interface for queries.
 .TP
-.B -u \fIurl\fR
+.B -u, --looking-glass-url \fIurl\fR
 Issue queries through the DNS looking glass at the specified URL (HTTP(S) or
 SSH).  The queries will appear to come from the looking glass rather than from
 the local machine.
@@ -119,24 +119,24 @@ version 2.7.9 or greater.
 .RE
 
 .TP
-.B -k
+.B -k, --insecure
 Do not verify the server-side TLS certificate for a HTTPS-based DNS looking
 glass that was specified using \fB-u\fR.
 .TP
-.B -a \fIancestor\fR
+.B -a, --ancestor \fIancestor\fR
 Issue diagnostic queries of each domain name through the specified ancestor.  The
 default for recursive mode is "." (i.e., issue queries all the way to the
 root).   The default for authoritative mode (i.e., with \fB-A\fR) is the domain
 name itself.
 .TP
-.B -R \fItype\fR[,\fItype...\fR]
+.B -R, --rr-types \fItype\fR[,\fItype...\fR]
 Issue diagnostic queries for only the specified type(s) (e.g., A, AAAA).  The
 default is to pick query types based on the nature of the name (e.g., the number of
 labels, whether it is a subdomain of .arpa, labels indicating association to
 TLSA or SRV records, etc.) and whether there are NS records detected (i.e., it
 is a zone).
 .TP
-.B -s \fIserver\fR[,\fIserver...\fR]
+.B -s, --recursive-servers \fIserver\fR[,\fIserver...\fR]
 Query the specified recursive resolver(s), rather than using those specified in
 \fI/etc/resolv.conf\fR.
 
@@ -176,10 +176,10 @@ This option cannot be used in conjunction with \fB-A\fR.
 .RE
 
 .TP
-.B -A
+.B -A, --authoritative-analysis
 Query authoritative servers, rather than (the default) recursive servers.
 .TP
-.B -x \fIdomain\fR[\fB+\fR]\fB:\fR\fIserver\fR[,\fIserver...\fR]
+.B -x, --authoritative-servers \fIdomain\fR[\fB+\fR]\fB:\fR\fIserver\fR[,\fIserver...\fR]
 Treat the specified servers as authoritative for a domain, rather than learning
 authoritative servers by following delegations.  This option dictates which
 servers will be queried for a domain, but the servers specified will not be
@@ -223,7 +223,7 @@ This option may be used multiple times on the command line.
 This option can only be used in conjunction with \fB-A\fR.
 .RE
 .TP
-.B -N \fIdomain\fR\fB:\fR\fIserver\fR[,\fIserver...\fR]
+.B -N, --delegation-information \fIdomain\fR\fB:\fR\fIserver\fR[,\fIserver...\fR]
 Use the specified delegation information for a domain, i.e., the NS and glue
 records for the domain, which would be served by the domain's parent.  This is
 used for testing new delegations or testing a potential change to a delegation.
@@ -238,7 +238,7 @@ subsequently assessed, e.g., using \fBdnsviz-grok(1)\fR.
 In lieu of specifying the record data itself on the command line, a file may be
 specified, which contains the delegation NS and glue records for the domain.
 .TP
-.B -D \fIdomain\fR\fB:\fR\fIds\fR[,\fIds...\fR]
+.B -D, --ds \fIdomain\fR\fB:\fR\fIds\fR[,\fIds...\fR]
 Use the specified delegation signer (DS) records for a domain.  This is used
 in conjunction with the \fB-N\fR option for testing the introduction or change
 of DS records.
@@ -277,15 +277,15 @@ dnsviz probe -D example.com:dsset-example.com.
 This option must be used in conjunction with the \fB-N\fR option.
 .RE
 .TP
-.B -n
+.B -n, --nsid
 Use the NSID EDNS option with every DNS query issued.
 .TP
-.B -e \fIsubnet\fR[\fB:\fR\fIprefix_len\fR]
+.B -e, --client-subnet \fIsubnet\fR[\fB:\fR\fIprefix_len\fR]
 Use the EDNS Client Subnet option with every DNS query issued, using the
 specified \fIsubnet\fR and \fIprefix_len\fR as values.  If \fIprefix\fR is not
 specified, the prefix is the length of the entire address.
 .TP
-.B -c \fIcookie\fR
+.B -c, --cookie \fIcookie\fR
 Send the specified DNS client cookie with every DNS query issued.  The value
 specified is for a client cookie only and thus should be exactly 64 bits long.
 The value for the cookie is specified using hexadecimal representation, e.g.,
@@ -295,7 +295,7 @@ If the \fB-c\fR option is not used, the default behavior is for a DNS client
 cookie to be generated randomly to be sent with queries.  If an empty string is
 specified, then DNS cookies are disabled.
 .TP
-.B -E
+.B -E, --edns
 Issue queries to check EDNS compatibility of servers.
 
 If this option is used, each server probed will be queried with "future" EDNS
@@ -303,11 +303,11 @@ settings, the respective responses can later be assessed for proper behavior.
 These settings include future EDNS versions (i.e., > 0), unknown options, and
 unknown flags.
 .TP
-.B -o \fIfilename\fR
+.B -o, --output-file \fIfilename\fR
 Write the output to the specified file instead of to standard output, which
 is the default.
 .TP
-.B -p
+.B -p, --pretty-output
 Output "pretty" instead of minimal JSON output, i.e., using indentation and
 newlines.  Note that this is the default when the output is a TTY.
 .TP
