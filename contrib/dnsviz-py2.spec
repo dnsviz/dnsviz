@@ -15,7 +15,6 @@ BuildRequires:  make
 Requires:       python2-pygraphviz >= 1.3
 Requires:       m2crypto >= 0.28.0
 Requires:       python2-dns >= 1.13
-Requires:       python2-libnacl
 
 %description
 DNSViz is a tool suite for analysis and visualization of Domain Name System

@@ -41,8 +41,6 @@ Instructions for running in a Docker container are also available
 
 * M2Crypto (0.28.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
-* libnacl - https://github.com/saltstack/libnacl
-
 Note that the software versions listed above are known to work with the current
 version of DNSViz.  Other versions might also work well together, but might
 have some caveats.  For example, while the current version of DNSViz works with
@@ -85,8 +83,7 @@ $ source ~/myenv/bin/activate
 ```
 (Note that this installs the dependencies that are python packages, but some of
 these packages have non-python dependecies, such as Graphviz (required for
-pygraphviz) and libsodium (required for libnacl), that are not installed
-automatically.)
+pygraphviz) that are not installed automatically.)
 
 Next download and install DNSViz from the Python Package Index (PyPI):
 ```
@@ -121,9 +118,9 @@ $ cp dist/dnsviz-*.tar.gz ~/rpmbuild/SOURCES/
 $ cp contrib/dnsviz-py${PY_VERS}.spec ~/rpmbuild/SPECS/dnsviz.spec
 ```
 
-Install dnspython, pygraphviz, M2Crypto, and libnacl.
+Install dnspython, pygraphviz, and M2Crypto.
 ```
-$ sudo dnf install python${PY_VERS}-dns python${PY_VERS}-pygraphviz python${PY_VERS}-libnacl
+$ sudo dnf install python${PY_VERS}-dns python${PY_VERS}-pygraphviz
 ```
 For python2:
 ```

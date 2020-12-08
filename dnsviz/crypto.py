@@ -55,7 +55,7 @@ _crypto_sources = {
         'M2Crypto >= 0.21.1': (set([1,5,7,8,10]), set([1,2,4]), set([1])),
         'M2Crypto >= 0.24.0': (set([3,6,13,14]), set(), set()),
         'M2Crypto >= 0.24.0 and either openssl < 1.1.0 or openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
-        'libnacl': (set([15]), set(), set()),
+        'M2Crypto >= 0.37.0 and openssl >= 1.1.1': (set([15,16]), set(), set()),
 }
 _logged_modules = set()
 
@@ -71,16 +71,12 @@ else:
     _supported_algs.update(set([1,5,7,8,10]))
     _supported_digest_algs.update(set([1,2,4]))
 
-try:
-    from libnacl.sign import Verifier as ed25519Verifier
-except ImportError:
-    pass
-else:
-    _supported_algs.add(15)
-
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
+
+ED25519_PREFIX = b'\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'
+ED448_PREFIX = b'\x30\x2a\x30\x05\x06\x03\x2b\x65\x71\x03\x21\x00'
 
 # python3/python2 dual compatibility
 if not isinstance(GOST_ENGINE_NAME, str):
@@ -123,6 +119,10 @@ def _check_ec_support():
         _supported_algs.update((13,14))
     except AttributeError:
         pass
+
+def _check_ed_support():
+    if m2.OPENSSL_VERSION_NUMBER >= 0x10101000:
+        _supported_algs.update((15,16))
 
 def alg_is_supported(alg):
     return alg in _supported_algs
@@ -179,6 +179,13 @@ except:
     pass
 else:
     _check_ec_support()
+
+try:
+    from M2Crypto.m2 import digest_verify_init
+except:
+    pass
+else:
+    _check_ed_support()
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
     if not digest_alg_is_supported(digest_alg):
@@ -270,6 +277,17 @@ def _dnskey_to_gost(key):
     der = GOST_PREFIX + key
     pem = b'-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+b'-----END PUBLIC KEY-----'
 
+    return EVP.load_key_string_pubkey(pem)
+
+def _dnskey_to_ed(alg, key):
+    if alg == 15:
+        der = ED25519_PREFIX + key
+    elif alg == 16:
+        der = ED448_PREFIX + key
+    else:
+        raise ValueError('Algorithm not supported')
+
+    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+b'-----END PUBLIC KEY-----'
     return EVP.load_key_string_pubkey(pem)
 
 def _dnskey_to_ec(alg, key):
@@ -396,12 +414,16 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     return pubkey.verify_dsa(digest, r, s) == 1
 
-def _validate_rrsig_ed25519(alg, sig, msg, key):
-    try:
-        verifier = ed25519Verifier(binascii.hexlify(key))
-        return verifier.verify(sig + msg) == msg
-    except ValueError:
+def _validate_rrsig_ed(alg, sig, msg, key):
+    pubkey = _dnskey_to_ed(alg, key)
+
+    # if the key is invalid, then the signature is also invalid
+    if pubkey is None:
         return False
+
+    pubkey.reset_context(None)
+    pubkey.digest_verify_init()
+    return pubkey.digest_verify(sig, msg) == 1
 
 def validate_rrsig(alg, sig, msg, key):
     if not alg_is_supported(alg):
@@ -417,8 +439,8 @@ def validate_rrsig(alg, sig, msg, key):
         return _validate_rrsig_gost(alg, sig, msg, key)
     elif alg in (13,14):
         return _validate_rrsig_ec(alg, sig, msg, key)
-    elif alg in (15,):
-        return _validate_rrsig_ed25519(alg, sig, msg, key)
+    elif alg in (15,16):
+        return _validate_rrsig_ed(alg, sig, msg, key)
 
 def get_digest_for_nsec3(val, salt, alg, iterations):
     if not nsec3_alg_is_supported(alg):
