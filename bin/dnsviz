@@ -26,12 +26,15 @@ from __future__ import unicode_literals
 
 import getopt
 import importlib
+import logging
 import os
 import sys
 
 CMD_DIR1 = 'dnsviz'
 CMD_DIR2 = 'commands'
 
+logging.basicConfig(level=logging.WARNING, format='%(message)s')
+logger = logging.getLogger()
 
 def check_deps():
     # check dnspython dependency
@@ -65,7 +68,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'p:')
     except getopt.GetoptError as e:
-        sys.stderr.write('%s\n' % str(e))
+        usage(str(e) + '\n')
         sys.exit(1)
 
     opts = dict(opts)
@@ -124,7 +127,8 @@ def main():
             sys.exit(1)
 
     if args[0] == 'help':
-        mod.usage()
+        helper = mod.build_helper(logger, sys.argv[0], command)
+        helper.parser.print_help()
     else:
         mod.main(args)
 
