@@ -33,7 +33,7 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7/3.5/3.6/3.7) - http://www.python.org/
+* python (2.7/3.5/3.6/3.7/3.8/3.9) - http://www.python.org/
 
 * dnspython (1.13.0 or later) - http://www.dnspython.org/
 
@@ -41,10 +41,10 @@ Instructions for running in a Docker container are also available
 
 * M2Crypto (0.37.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
-Note that the software versions listed above are known to work with the current
-version of DNSViz.  Other versions might also work, but with some caveats.  For
-example, M2Crypto 0.28.0 and later should work, but versions earlier than
-0.37.0 lack support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448).
+Note that earlier versions of the softwarre listed above might also work with
+DNSViz, but with some caveats.  For example, M2Crypto 0.28.0 and later will
+work, but versions earlier than 0.37.0 lack support for DNSSEC algorithms 15
+(Ed25519) and 16 (Ed448).
 
 
 ### Optional Software
@@ -81,6 +81,7 @@ $ source ~/myenv/bin/activate
 (Note that this installs the dependencies that are python packages, but some of
 these packages have non-python dependecies, such as Graphviz (required for
 pygraphviz) that are not installed automatically.)
+[virtual environment](#installation-in-a-virtual-environment), and installation
 
 Next download and install DNSViz from the Python Package Index (PyPI):
 ```
@@ -94,15 +95,9 @@ or locally, from a downloaded copy of DNSViz:
 
 ### Fedora RPM Build and Install
 
-A Fedora RPM can be built for either python2 or python3.  However, note that
-with Fedora releases after 29, python2 packages are being removed, so python3
-is preferred.
-
-The value of ${PY_VERS} is either 2 or 3, corresponding to python2 or python3.
-
 Install the tools for building an RPM, and set up the rpmbuild tree.
 ```
-$ sudo dnf install rpm-build rpmdevtools python${PY_VERS}-devel
+$ sudo dnf install rpm-build rpmdevtools python3-devel
 $ rpmdev-setuptree
 ```
 
@@ -110,23 +105,19 @@ From within the DNSViz source directory, create a source distribution tarball
 and copy it and the DNSViz spec file to the appropriate rpmbuild
 subdirectories.
 ```
-$ python setup.py sdist
+$ python3 setup.py sdist
 $ cp dist/dnsviz-*.tar.gz ~/rpmbuild/SOURCES/
-$ cp contrib/dnsviz-py${PY_VERS}.spec ~/rpmbuild/SPECS/dnsviz.spec
+$ cp contrib/dnsviz.spec ~/rpmbuild/SPECS/
 ```
 
 Install dnspython, pygraphviz, and M2Crypto.
 ```
-$ sudo dnf install python${PY_VERS}-dns python${PY_VERS}-pygraphviz
+$ sudo dnf install python3-dns python3-pygraphviz python3-m2crypto
 ```
-For python2:
-```
-$ sudo dnf install m2crypto
-```
-For python3:
-```
-$ sudo dnf install python3-m2crypto
-```
+(Note that as of Fedora 33, the latest version of M2Crypto is 0.35.2.  If you
+would like support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448), you will
+need to install M2Crypto using `pip3`.  For example, see [installation to a
+virtual environment](#installation-in-a-virtual-environment).)
 
 Build and install the DNSViz RPM.
 ```

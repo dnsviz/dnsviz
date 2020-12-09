@@ -1,5 +1,5 @@
 Name:           dnsviz
-Version:        0.8.0
+Version:        0.8.1
 Release:        1%{?dist}
 Summary:        Tools for analyzing and visualizing DNS and DNSSEC behavior
 
@@ -11,9 +11,8 @@ BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  graphviz
 BuildRequires:  make
-# python3-pygraphviz should be >= 1.4
-Requires:       python3-pygraphviz >= 1.3
-Requires:       python3-m2crypto >= 0.37.0
+Requires:       python3-pygraphviz >= 1.4
+Requires:       python3-m2crypto >= 0.28.0
 Requires:       python3-dns >= 1.13
 
 %description
@@ -46,7 +45,7 @@ rm -rf %{buildroot}
 %license LICENSE
 %doc README.md
 %{python3_sitelib}/%{name}/*
-%{python3_sitelib}/%{name}-%{version}-py3.7.egg-info/*
+%{python3_sitelib}/%{name}-%{version}-*.egg-info/*
 %{_bindir}/%{name}
 %{_datadir}/%{name}/*
 %{_defaultdocdir}/%{name}/dnsviz-graph.html
