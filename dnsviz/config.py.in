@@ -27,7 +27,8 @@ import os
 import sys
 
 _prefix = '__DNSVIZ_INSTALL_PREFIX__'
-if hasattr(sys, 'real_prefix') and not _prefix:
+if (hasattr(sys, 'real_prefix') or hasattr(sys, 'base_prefix')) and \
+        not _prefix:
     DNSVIZ_INSTALL_PREFIX = sys.prefix
 else:
     DNSVIZ_INSTALL_PREFIX = _prefix
