@@ -83,13 +83,12 @@ $ source ~/myenv/bin/activate
 (Note that this installs the dependencies that are python packages, but some of
 these packages have non-python dependecies, such as Graphviz (required for
 pygraphviz) that are not installed automatically.)
-[virtual environment](#installation-in-a-virtual-environment), and installation
 
 Next download and install DNSViz from the Python Package Index (PyPI):
 ```
 (myenv) $ pip install dnsviz
 ```
-or locally, from a downloaded copy of DNSViz:
+or locally, from a downloaded or cloned copy of DNSViz:
 ```
 (myenv) $ pip install .
 ```
