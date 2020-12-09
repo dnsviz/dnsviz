@@ -33,18 +33,20 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7/3.5/3.6/3.7/3.8/3.9) - http://www.python.org/
+* python (2.7, 3.5 - 3.9) - http://www.python.org/
 
 * dnspython (1.13.0 or later) - http://www.dnspython.org/
 
-* pygraphviz (1.4 or later) - http://pygraphviz.github.io/
+* pygraphviz (1.3 or later) - http://pygraphviz.github.io/
 
 * M2Crypto (0.37.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
-Note that earlier versions of the softwarre listed above might also work with
+Note that earlier versions of the software listed above might also work with
 DNSViz, but with some caveats.  For example, M2Crypto 0.28.0 and later will
-work, but versions earlier than 0.37.0 lack support for DNSSEC algorithms 15
-(Ed25519) and 16 (Ed448).
+work, but versions of M2Crypto earlier than 0.37.0 lack support for DNSSEC
+algorithms 15 (Ed25519) and 16 (Ed448).  Also, while DNSViz itself still works
+with python 2.7, some versions of its software dependencies have moved on:
+pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
 
 
 ### Optional Software

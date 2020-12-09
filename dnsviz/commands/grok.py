@@ -141,11 +141,11 @@ def test_pygraphviz():
             major, minor = release.version.split('.')[:2]
             major = int(major)
             minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
-            if (major, minor) < (1,1):
-                logger.error('''pygraphviz version >= 1.1 is required, but version %s is installed.''' % release.version)
+            if (major, minor) < (1,3):
+                logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % release.version)
                 sys.exit(2)
         except ValueError:
-            logger.error('''pygraphviz version >= 1.1 is required, but version %s is installed.''' % release.version)
+            logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % release.version)
             sys.exit(2)
     except ImportError:
         logger.error('''pygraphviz is required, but not installed.''')
