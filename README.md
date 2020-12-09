@@ -12,7 +12,7 @@
 
 DNSViz is a tool suite for analysis and visualization of Domain Name System
 (DNS) behavior, including its security extensions (DNSSEC).  This tool suite
-powers the Web-based analysis available at http://dnsviz.net/
+powers the Web-based analysis available at https://dnsviz.net/
 
 
 ## Installation
@@ -33,11 +33,11 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7, 3.5 - 3.9) - http://www.python.org/
+* python (2.7, 3.5 - 3.9) - https://www.python.org/
 
-* dnspython (1.13.0 or later) - http://www.dnspython.org/
+* dnspython (1.13.0 or later) - https://www.dnspython.org/
 
-* pygraphviz (1.3 or later) - http://pygraphviz.github.io/
+* pygraphviz (1.3 or later) - https://pygraphviz.github.io/
 
 * M2Crypto (0.37.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
@@ -57,7 +57,7 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
   validate DNSSEC signatures with algorithm 12 (GOST R 34.10-2001) and create
   digests of type 3 (GOST R 34.11-94).
 
-* ISC BIND - https://www.isc.org/downloads/bind/
+* ISC BIND - https://www.isc.org/bind/
 
   When using DNSViz for [pre-deployment testing](#pre-deployment-dns-testing)
   by specifying zone files and/or alternate delegation information on the
