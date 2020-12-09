@@ -859,6 +859,66 @@ class WildcardCoveredNODATANSEC3(WildcardCoveredNODATA):
     references = ['RFC 5155, Sec. 8.7']
     nsec_type = 'NSEC3'
 
+class ExistingNSECError(NSECError):
+    required_params = ['queries']
+
+    def __init__(self, **kwargs):
+        super(ExistingNSECError, self).__init__(**kwargs)
+        queries_text = ['%s/%s' % (name, rdtype) for name, rdtype in self.template_kwargs['queries']]
+        self.template_kwargs['queries_text'] = ', '.join(queries_text)
+
+class ExistingCovered(ExistingNSECError):
+    description_template = 'The following queries resulted in an answer response, even though the %(nsec_type)s records indicate that the queried names don\'t exist: %(queries_text)s'
+    code = 'EXISTING_NAME_COVERED'
+
+class ExistingCoveredNSEC(ExistingCovered):
+    '''
+    >>> e = ExistingCoveredNSEC(queries=[('www.foo.baz.', 'A'), ('www1.foo.baz.', 'TXT')])
+    >>> e.description
+    "The following queries resulted in an answer response, even though the NSEC records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT"
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.2']
+    nsec_type = 'NSEC'
+
+class ExistingCoveredNSEC3(ExistingCovered):
+    '''
+    >>> e = ExistingCoveredNSEC3(queries=[('www.foo.baz.', 'A'), ('www1.foo.baz.', 'TXT')])
+    >>> e.description
+    "The following queries resulted in an answer response, even though the NSEC3 records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT"
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.4']
+    nsec_type = 'NSEC3'
+
+class ExistingTypeNotInBitmap(ExistingNSECError):
+    description_template = 'The following queries resulted in an answer response, even though the bitmap in the %(nsec_type)s RR indicates that the queried records don\'t exist: %(queries_text)s'
+    code = 'EXISTING_TYPE_NOT_IN_BITMAP'
+
+class ExistingTypeNotInBitmapNSEC(ExistingTypeNotInBitmap):
+    '''
+    >>> e = ExistingTypeNotInBitmapNSEC(queries=[('www.foo.baz.', 'A'), ('www.foo.baz.', 'TXT')])
+    >>> e.description
+    "The following queries resulted in an answer response, even though the bitmap in the NSEC RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT"
+    '''
+
+    _abstract = False
+    references = ['RFC 4035, Sec. 3.1.3.1']
+    nsec_type = 'NSEC'
+
+class ExistingTypeNotInBitmapNSEC3(ExistingTypeNotInBitmap):
+    '''
+    >>> e = ExistingTypeNotInBitmapNSEC3(queries=[('www.foo.baz.', 'A'), ('www.foo.baz.', 'TXT')])
+    >>> e.description
+    "The following queries resulted in an answer response, even though the bitmap in the NSEC3 RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT"
+    '''
+
+    _abstract = False
+    references = ['RFC 5155, Sec. 8.5']
+    nsec_type = 'NSEC3'
+
 class SnameCoveredNODATANSEC(NSECError):
     '''
     >>> e = SnameCoveredNODATANSEC(sname='foo.baz.')
@@ -2114,7 +2174,6 @@ class DNSKEYZeroLength(DNSKEYBadLength):
     code = 'DNSKEY_ZERO_LENGTH'
     references = []
     required_params = []
-
 
 class DNSKEYBadLengthGOST(DNSKEYBadLength):
     '''
