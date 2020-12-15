@@ -843,7 +843,11 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def do_read(self):
         try:
-            buf = self.sock.recv(65536)
+            try:
+                buf = self.sock.recv(65536)
+            except ssl.SSLWantReadError:
+                return False
+
             if buf == b'':
                 raise EOFError
             self.msg_recv_buf += buf
