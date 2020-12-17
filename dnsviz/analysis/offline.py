@@ -2642,14 +2642,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 dnskeys.sort()
                 for dnskey in dnskeys:
                     rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
-                    rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                    rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
                     if rrsig_serialized:
                         rrsig_list.append(rrsig_serialized)
 
         dname_list = []
         if rrset_info in self.dname_status:
             for dname_status in self.dname_status[rrset_info]:
-                dname_serialized = dname_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                dname_serialized = dname_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
                 if dname_serialized:
                     dname_list.append(dname_serialized)
 
@@ -2661,7 +2661,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 wildcard_name_str = lb2s(wildcard_name.canonicalize().to_text())
                 wildcard_proof_list[wildcard_name_str] = []
                 for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
-                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                    nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
                     if nsec_serialized:
                         wildcard_proof_list[wildcard_name_str].append(nsec_serialized)
                 if not wildcard_proof_list[wildcard_name_str]:
@@ -2680,7 +2680,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         if loglevel <= logging.DEBUG:
             d['description'] = str(rrset_info)
-            d.update(rrset_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format))
+            d.update(rrset_info.serialize(consolidate_clients=consolidate_clients, show_servers=False, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip))
 
         if rrsig_list:
             d['rrsig'] = rrsig_list
@@ -2702,16 +2702,29 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers = server_list
             d['servers'] = servers
 
+            ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            ns_names.sort()
+            d['ns_names'] = ns_names
+
             if show_server_meta:
                 tags = set()
+                nsids = set()
                 cookie_tags = {}
                 for server,client in rrset_info.servers_clients:
                     for response in rrset_info.servers_clients[(server,client)]:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
                         cookie_tags[server] = OrderedDict((
                             ('request', response.request_cookie_tag()),
                             ('response', response.response_cookie_tag()),
                         ))
+
+                if nsids:
+                    d['nsid_values'] = list(nsids)
+                    d['nsid_values'].sort()
+
                 d['query_options'] = list(tags)
                 d['query_options'].sort()
 
@@ -2733,7 +2746,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         proof_list = []
         for nsec_status in neg_status[neg_response_info]:
-            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+            nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
             if nsec_serialized:
                 proof_list.append(nsec_serialized)
 
@@ -2768,15 +2781,28 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers = server_list
             d['servers'] = servers
 
+            ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            ns_names.sort()
+            d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             cookie_tags = {}
             for server,client in neg_response_info.servers_clients:
                 for response in neg_response_info.servers_clients[(server,client)]:
                     tags.add(response.effective_query_tag())
+                    nsid = response.nsid_val()
+                    if nsid is not None:
+                        nsids.add(nsid)
                     cookie_tags[server] = OrderedDict((
                         ('request', response.request_cookie_tag()),
                         ('response', response.response_cookie_tag()),
                     ))
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -2848,7 +2874,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         d = []
 
         for dnskey in self.get_dnskeys():
-            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
             if dnskey_serialized:
                 if loglevel <= logging.INFO and self.response_component_status is not None:
                     dnskey_serialized['status'] = Status.rrset_status_mapping[self.response_component_status[dnskey]]
@@ -2867,7 +2893,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             dnskeys.sort()
             for dnskey in dnskeys:
                 ds_status = self.ds_status_by_ds[rdtype][ds][dnskey]
-                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                ds_serialized = ds_status.serialize(consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
                 if ds_serialized:
                     d['ds'].append(ds_serialized)
         if not d['ds']:
@@ -2886,7 +2912,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if neg_response_info is not None:
             d['insecurity_proof'] = []
             for nsec_status in status[neg_response_info]:
-                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
                 if nsec_serialized:
                     d['insecurity_proof'].append(nsec_serialized)
             if not d['insecurity_proof']:

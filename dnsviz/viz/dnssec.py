@@ -110,7 +110,7 @@ class RRsetNonExistent(object):
         self.nxdomain = nxdomain
         self.servers_clients = servers_clients
 
-    def serialize(self, consolidate_clients, html_format=False):
+    def serialize(self, consolidate_clients, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         if html_format:
@@ -135,10 +135,24 @@ class RRsetNonExistent(object):
             servers.sort()
         d['servers'] = servers
 
+        if map_ip_to_ns_name is not None:
+            ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+            ns_names.sort()
+            d['ns_names'] = ns_names
+
         tags = set()
+        nsids = []
         for server,client in self.servers_clients:
             for response in self.servers_clients[(server,client)]:
                 tags.add(response.effective_query_tag())
+                nsid = response.nsid_val()
+                if nsid is not None:
+                    nsids.append(nsid)
+
+        if nsids:
+            d['nsid_values'] = nsids
+            d['nsid_values'].sort()
+
         d['query_options'] = list(tags)
         d['query_options'].sort()
 
@@ -385,7 +399,7 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
-            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, html_format=True)
+            dnskey_serialized = dnskey.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)
 
             all_warnings = []
             if rrset_info_with_warnings:
@@ -484,7 +498,7 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = parent_top_name
 
             consolidate_clients = zone_obj.single_client()
-            ds_serialized = [d.serialize(consolidate_clients=consolidate_clients, html_format=True) for d in ds_statuses]
+            ds_serialized = [d.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=zone_obj.get_ns_name_for_ip) for d in ds_statuses]
 
             digest_algs = []
             digests = []
@@ -668,7 +682,7 @@ class DNSAuthGraph:
             self.G.add_edge(signed_node, dnskey_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back', **attrs)
 
         consolidate_clients = name_obj.single_client()
-        rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
+        rrsig_serialized = rrsig_status.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)
 
         if edge_id not in self.node_info:
             self.node_info[edge_id] = []
@@ -732,7 +746,7 @@ class DNSAuthGraph:
             self.node_subgraph_name[node_str] = zone_top_name
 
             consolidate_clients = name_obj.single_client()
-            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True)
+            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)
 
             if name_obj.rrset_warnings[rrset_info]:
                 if 'warnings' not in rrset_serialized:
@@ -804,7 +818,7 @@ class DNSAuthGraph:
             rrset_info = RRsetNonExistent(neg_response_info.qname, neg_response_info.rdtype, nxdomain, neg_response_info.servers_clients)
 
             consolidate_clients = name_obj.single_client()
-            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True)
+            rrset_serialized = rrset_info.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)
 
             if warnings_list:
                 if 'warnings' not in rrset_serialized:
@@ -900,7 +914,7 @@ class DNSAuthGraph:
                 edge_label = '<<TABLE BORDER="0"><TR><TD><IMG SCALE="TRUE" SRC="%s"/></TD></TR></TABLE>>' % WARNING_ICON
 
             self.G.add_edge(cname_node, dname_node, label=edge_label, id=edge_id, color=line_color, style=line_style, dir='back')
-            self.node_info[edge_id] = [dname_status.serialize(html_format=True)]
+            self.node_info[edge_id] = [dname_status.serialize(html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)]
 
         if edge_id not in self.node_mapping:
             self.node_mapping[edge_id] = set()
@@ -974,7 +988,7 @@ class DNSAuthGraph:
 
             consolidate_clients = name_obj.single_client()
 
-            nsec_serialized = nsec_status.serialize(consolidate_clients=consolidate_clients, html_format=True)
+            nsec_serialized = nsec_status.serialize(consolidate_clients=consolidate_clients, html_format=True, map_ip_to_ns_name=name_obj.zone.get_ns_name_for_ip)
 
             nsec_serialized_edge = nsec_serialized.copy()
             nsec_serialized_edge['description'] = 'Non-existence proof provided by %s' % (nsec_serialized['description'])

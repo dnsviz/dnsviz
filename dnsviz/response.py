@@ -52,7 +52,7 @@ try:
 except ImportError:
     from cgi import escape
 
-import dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
+import dns.edns, dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
 from . import base32
 from . import crypto
@@ -208,6 +208,24 @@ class DNSResponse:
         if qname.to_text() != qname.to_text().lower():
             s += '_0x20'
         return s
+
+    def nsid_val(self):
+        if self.message is None:
+            return None
+
+        if self.message.edns < 0:
+            return None
+
+        try:
+            nsid_opt = [o for o in self.message.options if o.otype == dns.edns.NSID][0]
+        except IndexError:
+            return None
+
+        try:
+            nsid_val = nsid_opt.data.decode('ascii')
+        except UnicodeDecodeError:
+            nsid_val = '0x' + lb2s(binascii.hexlify(nsid_opt.data))
+        return nsid_val
 
     def request_cookie_tag(self):
         from . import query as Q
@@ -914,7 +932,7 @@ class DNSKEYMeta(DNSResponseComponent):
 
         return name_wire + rdata_wire + self.rdata.key
 
-    def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         from .analysis import status as Status
 
         show_id = loglevel <= logging.INFO or \
@@ -962,10 +980,24 @@ class DNSKEYMeta(DNSResponseComponent):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.servers_clients:
                 for response in self.servers_clients[(server,client)]:
                     tags.add(response.effective_query_tag())
+                    nsid = response.nsid_val()
+                    if nsid is not None:
+                        nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -1100,7 +1132,7 @@ class RRsetInfo(DNSResponseComponent):
 
         return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
-    def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         if html_format:
@@ -1135,10 +1167,24 @@ class RRsetInfo(DNSResponseComponent):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.servers_clients:
                 for response in self.servers_clients[(server,client)]:
                     tags.add(response.effective_query_tag())
+                    nsid = response.nsid_val()
+                    if nsid is not None:
+                        nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 

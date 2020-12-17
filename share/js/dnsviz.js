@@ -43,6 +43,8 @@ function AuthGraph(anchorElement, maxPaperWidth, imageScale) {
 		'ttl': 'TTL',
 		'rrset': 'RRset',
 		'rdata': 'Record data',
+		'nsid': 'NSID',
+		'ns': 'NS',
 	}
 	this._dnssec_algorithms = {
 		1: 'RSA/MD5',
@@ -114,7 +116,7 @@ AuthGraph.prototype.infoToHtmlTableComponents = function (obj) {
 				}
 				s += '</ul>';
 			} else if (typeof val[0] in {'string':null,'number':null}) {
-				if (key.toLowerCase() in {'servers':null,'digest_type':null}) {
+				if (key.toLowerCase() in {'servers':null,'nsid_values':null,'ns_names':null,'digest_type':null}) {
 					s += val.join(", ");
 				} else {
 					s += val.join("<br />");

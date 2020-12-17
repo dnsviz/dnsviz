@@ -253,7 +253,7 @@ class RRSIGStatus(object):
     def __str__(self):
         return 'RRSIG covering %s/%s' % (fmt.humanize_name(self.rrset.rrset.name), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         erroneous_status = self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
@@ -306,11 +306,25 @@ class RRSIGStatus(object):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.rrset.rrsig_info[self.rrsig].servers_clients:
                 for response in self.rrset.rrsig_info[self.rrsig].servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -397,7 +411,7 @@ class DSStatus(object):
     def __str__(self):
         return '%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
-    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=True):
         d = OrderedDict()
 
         erroneous_status = self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
@@ -442,11 +456,25 @@ class DSStatus(object):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.ds_meta.servers_clients:
                 for response in self.ds_meta.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -543,7 +571,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
     def __str__(self):
         return 'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         nsec_list = []
@@ -606,11 +634,25 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -669,8 +711,8 @@ class NSECStatusWildcard(NSECStatusNXDOMAIN):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
-        d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
+        d = super(NSECStatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=map_ip_to_ns_name)
         try:
             del d['wildcard']
         except KeyError:
@@ -797,7 +839,7 @@ class NSECStatusNODATA(NSECStatus):
         else:
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         nsec_list = []
@@ -857,11 +899,25 @@ class NSECStatusNODATA(NSECStatus):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -1010,7 +1066,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         nsec3_list = []
@@ -1107,11 +1163,25 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -1178,8 +1248,8 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
-        d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
+        d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=map_ip_to_ns_name)
         try:
             del d['wildcard']
         except KeyError:
@@ -1361,7 +1431,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         for name in self.nsec_set_info.invalid_nsec3_hash:
             self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
 
         nsec3_list = []
@@ -1457,11 +1527,25 @@ class NSEC3StatusNODATA(NSEC3Status):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.nsec_set_info.servers_clients:
                 for response in self.nsec_set_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
@@ -1497,7 +1581,7 @@ class CNAMEFromDNAMEStatus(object):
     def __str__(self):
         return 'CNAME synthesis for %s from %s/%s' % (fmt.humanize_name(self.synthesized_cname.rrset.name), fmt.humanize_name(self.synthesized_cname.dname_info.rrset.name), dns.rdatatype.to_text(self.synthesized_cname.dname_info.rrset.rdtype))
 
-    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False):
+    def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         values = []
         d = OrderedDict()
 
@@ -1543,11 +1627,25 @@ class CNAMEFromDNAMEStatus(object):
                 servers.sort()
             d['servers'] = servers
 
+            if map_ip_to_ns_name is not None:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names.sort()
+                d['ns_names'] = ns_names
+
             tags = set()
+            nsids = set()
             for server,client in self.synthesized_cname.dname_info.servers_clients:
                 for response in self.synthesized_cname.dname_info.servers_clients[(server, client)]:
                     if response is not None:
                         tags.add(response.effective_query_tag())
+                        nsid = response.nsid_val()
+                        if nsid is not None:
+                            nsids.add(nsid)
+
+            if nsids:
+                d['nsid_values'] = list(nsids)
+                d['nsid_values'].sort()
+
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
