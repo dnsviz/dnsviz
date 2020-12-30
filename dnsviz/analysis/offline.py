@@ -463,8 +463,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             warnings = [w.terse_description for w in response_info.name_obj.nodata_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nodata_errors[info]]
 
+            # never show the negative response if show_neg_response is False
             if show_neg_response is False:
                 return None
+            # only show the negative response if there is a corresponding
+            # status or show_neg_response is True
             if not self.nodata_status[info] and not show_neg_response:
                 return None
             rdata_tup.append((None, [], [], 'NODATA'))
@@ -476,8 +479,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             warnings = [w.terse_description for w in response_info.name_obj.nxdomain_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nxdomain_errors[info]]
 
+            # never show the negative response if show_neg_response is False
             if show_neg_response is False:
                 return None
+            # only show the negative response if there is a corresponding
+            # status or show_neg_response is True
             if not self.nxdomain_status[info] and not show_neg_response:
                 return None
             rdata_tup.append((None, [], [], 'NXDOMAIN'))
