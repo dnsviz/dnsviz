@@ -458,7 +458,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             warnings = []
             errors = []
             rdata_tup.append((None, [], [], '%s' % (info.terse_description)))
+
         elif info in self.nodata_status:
+            if rdtype == dns.rdatatype.DNSKEY:
+                return ()
             warnings = [w.terse_description for w in response_info.name_obj.nodata_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nodata_errors[info]]
 
@@ -470,6 +473,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             children.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
 
         elif info in self.nxdomain_status:
+            if rdtype == dns.rdatatype.DNSKEY:
+                return ()
             warnings = [w.terse_description for w in response_info.name_obj.nxdomain_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nxdomain_errors[info]]
 
@@ -2562,21 +2567,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             if status == Status.RRSET_STATUS_INSECURE:
                                 if G.secure_nsec_nodes_covering_node(node_str):
                                     response_component_status[obj] = Status.RRSET_STATUS_SECURE
-
-                        # A negative response to a DNSKEY query is a special case.
-                        elif obj.rdtype == dns.rdatatype.DNSKEY:
-                            # If the "node" was found to be secure, then there must be
-                            # a secure entry point into the zone, indicating that there
-                            # were other, positive responses to the query (i.e., from
-                            # other servers).  That makes this negative response bogus.
-                            if status == Status.RRSET_STATUS_SECURE:
-                                response_component_status[obj] = Status.RRSET_STATUS_BOGUS
-
-                            # Since the accompanying SOA is not drawn on the graph, we
-                            # simply apply the same status to the SOA as is associated
-                            # with the negative response.
-                            for soa_rrset in obj.soa_rrset_info:
-                                response_component_status[soa_rrset] = response_component_status[obj]
 
                     # for non-DNSKEY responses, verify that the negative
                     # response is secure by checking that the SOA is also
