@@ -460,11 +460,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             rdata_tup.append((None, [], [], '%s' % (info.terse_description)))
 
         elif info in self.nodata_status:
-            if rdtype == dns.rdatatype.DNSKEY:
-                return ()
             warnings = [w.terse_description for w in response_info.name_obj.nodata_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nodata_errors[info]]
 
+            if show_neg_response is False:
+                return None
             if not self.nodata_status[info] and not show_neg_response:
                 return None
             rdata_tup.append((None, [], [], 'NODATA'))
@@ -473,11 +473,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             children.extend(self._serialize_nsec_set_simple(info, response_info.name_obj.nodata_status, response_info))
 
         elif info in self.nxdomain_status:
-            if rdtype == dns.rdatatype.DNSKEY:
-                return ()
             warnings = [w.terse_description for w in response_info.name_obj.nxdomain_warnings[info]]
             errors = [e.terse_description for e in response_info.name_obj.nxdomain_errors[info]]
 
+            if show_neg_response is False:
+                return None
             if not self.nxdomain_status[info] and not show_neg_response:
                 return None
             rdata_tup.append((None, [], [], 'NXDOMAIN'))
@@ -550,7 +550,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             tup.append(name_tup)
 
             if ds_response_info is not None:
-                name_tup[7].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DS, ds_response_info, False))
+                name_tup[7].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DS, ds_response_info, None))
 
             # if we only care about DS for the name itself, then don't
             # serialize the DNSKEY response
