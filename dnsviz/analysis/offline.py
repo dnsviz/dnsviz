@@ -843,7 +843,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
         self._populate_dnskey_status(trusted_keys)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, validate_prohibited_algs=False):
         # identify supported algorithms as intersection of explicitly supported
         # and software supported
         if supported_algs is not None:
@@ -854,6 +854,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             supported_digest_algs.intersection_update(crypto._supported_digest_algs)
         else:
             supported_digest_algs = copy.copy(crypto._supported_digest_algs)
+
+        # unless we are overriding, mark prohibited algorithms as not supported
+        if not validate_prohibited_algs:
+            supported_algs.difference_update(Status.DNSKEY_ALGS_MUST_NOT_VALIDATE)
+            supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_MUST_NOT_VALIDATE)
 
         self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx)
 
