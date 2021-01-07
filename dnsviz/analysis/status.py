@@ -169,6 +169,16 @@ RRSIG_SIG_LENGTH_ERRORS = {
 DS_DIGEST_ALGS_STRONGER_THAN_SHA1 = (2, 4)
 DS_DIGEST_ALGS_IGNORING_SHA1 = (2,)
 
+# RFC 8624 Section 3.1
+DNSKEY_ALGS_NOT_RECOMMENDED = (5, 7, 10)
+DNSKEY_ALGS_MUST_NOT_SIGN = (1, 3, 6, 12)
+DNSKEY_ALGS_MUST_NOT_VALIDATE = (1, 3, 6)
+
+# RFC 8624 Section 3.2
+DS_DIGEST_ALGS_NOT_RECOMMENDED = ()
+DS_DIGEST_ALGS_MUST_NOT_SIGN = (0, 1, 3)
+DS_DIGEST_ALGS_MUST_NOT_VALIDATE = ()
+
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
@@ -186,13 +196,37 @@ class RRSIGStatus(object):
 
         self.validation_status = RRSIG_STATUS_VALID
         if self.signature_valid is None or self.dnskey.rdata.algorithm not in supported_algs:
+            # Either we can't validate the cryptographic signature, or we are
+            # explicitly directed to ignore the algorithm.
             if self.dnskey is None:
+                # In this case, there is no corresponding DNSKEY, so we make
+                # the status "INDETERMINATE".
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_NO_DNSKEY
+
             else:
-                if self.validation_status == RRSIG_STATUS_VALID:
-                    self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
+                # If there is a DNSKEY, then we look at *why* we are ignoring
+                # the cryptographic signature.
+                if self.dnskey.rdata.algorithm in DNSKEY_ALGS_MUST_NOT_VALIDATE:
+                    # In this case, specification dictates that the algorithm
+                    # MUST NOT be validated, so we mark it as ignored.
+                    if self.validation_status == RRSIG_STATUS_VALID:
+                        self.validation_status = RRSIG_STATUS_ALGORITHM_IGNORED
+                else:
+                    # In this case, we can't validate this particular
+                    # algorithm, either because the code doesn't support it,
+                    # or because we have been explicitly directed to ignore it.
+                    # In either case, mark it as "UNKNOWN", and warn that it is
+                    # not supported.
+                    if self.validation_status == RRSIG_STATUS_VALID:
+                        self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
+                    self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
+
+        # Independent of whether or not we considered the cryptographic
+        # validation, issue a warning if we are using an algorithm for which
+        # validation has been prohibited.
+        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_MUST_NOT_VALIDATE:
+            self.warnings.append(Errors.AlgorithmMustNotValidate(algorithm=self.rrsig.algorithm))
 
         if self.rrset.ttl_cmp:
             if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
@@ -351,13 +385,36 @@ class DSStatus(object):
 
         self.validation_status = DS_STATUS_VALID
         if self.digest_valid is None or self.ds.digest_type not in supported_digest_algs:
+            # Either we cannot reproduce a digest with this type, or we are
+            # explicitly directed to ignore the digest type.
             if self.dnskey is None:
+                # In this case, there is no corresponding DNSKEY, so we make
+                # the status "INDETERMINATE".
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INDETERMINATE_NO_DNSKEY
             else:
-                if self.validation_status == DS_STATUS_VALID:
-                    self.validation_status = DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(Errors.DigestAlgorithmNotSupported(algorithm=ds.digest_type))
+                # If there is a DNSKEY, then we look at *why* we are ignoring
+                # the digest of the DNSKEY.
+                if self.ds.digest_type in DS_DIGEST_ALGS_MUST_NOT_VALIDATE:
+                    # In this case, specification dictates that the algorithm
+                    # MUST NOT be validated, so we mark it as ignored.
+                    if self.validation_status == DS_STATUS_VALID:
+                        self.validation_status = DS_STATUS_ALGORITHM_IGNORED
+                else:
+                    # In this case, we can't validate this particular
+                    # digest type, either because the code doesn't support it,
+                    # or because we have been explicitly directed to ignore it.
+                    # In either case, mark it as "UNKNOWN", and warn that it is
+                    # not supported.
+                    if self.validation_status == DS_STATUS_VALID:
+                        self.validation_status = DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
+                    self.warnings.append(Errors.DigestAlgorithmNotSupported(algorithm=self.ds.digest_type))
+
+        # Independent of whether or not we considered the digest for
+        # validation, issue a warning if we are using a digest type for which
+        # validation has been prohibited.
+        if self.ds.digest_type in DS_DIGEST_ALGS_MUST_NOT_VALIDATE:
+            self.warnings.append(Errors.DigestAlgorithmMustNotValidate(algorithm=self.ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
