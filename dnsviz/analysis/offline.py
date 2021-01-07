@@ -2112,7 +2112,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # is bogus because there should have been matching KSK.
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
                     else:
-                        # If no algorithsm are supported, then this is a
+                        # If no algorithms are supported, then this is a
                         # provably insecure delegation.
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                 else:
