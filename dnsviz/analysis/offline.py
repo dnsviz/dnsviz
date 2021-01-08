@@ -857,8 +857,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         # unless we are overriding, mark prohibited algorithms as not supported
         if not validate_prohibited_algs:
-            supported_algs.difference_update(Status.DNSKEY_ALGS_MUST_NOT_VALIDATE)
-            supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_MUST_NOT_VALIDATE)
+            supported_algs.difference_update(Status.DNSKEY_ALGS_VALIDATION_PROHIBITED)
+            supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_VALIDATION_PROHIBITED)
 
         self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx)
 

@@ -252,9 +252,9 @@ class AlgorithmNotSupported(RRSIGError):
         super(AlgorithmNotSupported, self).__init__(**kwargs)
         self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
 
-class AlgorithmMustNotValidate(RRSIGError):
+class AlgorithmValidationProhibited(RRSIGError):
     '''
-    >>> e = AlgorithmMustNotValidate(algorithm=5)
+    >>> e = AlgorithmValidationProhibited(algorithm=5)
     >>> e.args
     [5]
     >>> e.description
@@ -262,13 +262,13 @@ class AlgorithmMustNotValidate(RRSIGError):
     '''
 
     _abstract = False
-    code = 'ALGORITHM_MUST_NOT_VALIDATE'
+    code = 'ALGORITHM_VALIDATION_PROHIBITED'
     description_template = "DNSSEC specification prohibits validation of RRSIGs with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.1']
     required_params = ['algorithm']
 
     def __init__(self, **kwargs):
-        super(AlgorithmMustNotValidate, self).__init__(**kwargs)
+        super(AlgorithmValidationProhibited, self).__init__(**kwargs)
         self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
 
 class DNSKEYRevokedRRSIG(RRSIGError):
@@ -533,21 +533,21 @@ class DigestAlgorithmNotSupported(DSDigestError):
         super(DigestAlgorithmNotSupported, self).__init__(**kwargs)
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
 
-class DigestAlgorithmMustNotValidate(DSDigestError):
+class DigestAlgorithmValidationProhibited(DSDigestError):
     '''
-    >>> e = DigestAlgorithmMustNotValidate(algorithm=5)
+    >>> e = DigestAlgorithmValidationProhibited(algorithm=5)
     >>> e.description
     'DNSSEC specification prohibits validation of DS records that use digest algorithm 5 (5).'
     '''
 
     _abstract = False
-    code = 'DIGEST_ALGORITHM_MUST_NOT_VALIDATE'
+    code = 'DIGEST_ALGORITHM_VALIDATION_PROHIBITED'
     description_template = "DNSSEC specification prohibits validation of DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
     def __init__(self, **kwargs):
-        super(DigestAlgorithmMustNotValidate, self).__init__(**kwargs)
+        super(DigestAlgorithmValidationProhibited, self).__init__(**kwargs)
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], self.template_kwargs['algorithm'])
 
 class DNSKEYRevokedDS(DSDigestError):

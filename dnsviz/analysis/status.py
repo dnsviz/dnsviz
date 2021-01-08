@@ -171,13 +171,13 @@ DS_DIGEST_ALGS_IGNORING_SHA1 = (2,)
 
 # RFC 8624 Section 3.1
 DNSKEY_ALGS_NOT_RECOMMENDED = (5, 7, 10)
-DNSKEY_ALGS_MUST_NOT_SIGN = (1, 3, 6, 12)
-DNSKEY_ALGS_MUST_NOT_VALIDATE = (1, 3, 6)
+DNSKEY_ALGS_PROHIBITED = (1, 3, 6, 12)
+DNSKEY_ALGS_VALIDATION_PROHIBITED = (1, 3, 6)
 
 # RFC 8624 Section 3.2
 DS_DIGEST_ALGS_NOT_RECOMMENDED = ()
-DS_DIGEST_ALGS_MUST_NOT_SIGN = (0, 1, 3)
-DS_DIGEST_ALGS_MUST_NOT_VALIDATE = ()
+DS_DIGEST_ALGS_PROHIBITED = (0, 1, 3)
+DS_DIGEST_ALGS_VALIDATION_PROHIBITED = ()
 
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
@@ -207,7 +207,7 @@ class RRSIGStatus(object):
             else:
                 # If there is a DNSKEY, then we look at *why* we are ignoring
                 # the cryptographic signature.
-                if self.dnskey.rdata.algorithm in DNSKEY_ALGS_MUST_NOT_VALIDATE:
+                if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
                     # In this case, specification dictates that the algorithm
                     # MUST NOT be validated, so we mark it as ignored.
                     if self.validation_status == RRSIG_STATUS_VALID:
@@ -225,8 +225,8 @@ class RRSIGStatus(object):
         # Independent of whether or not we considered the cryptographic
         # validation, issue a warning if we are using an algorithm for which
         # validation has been prohibited.
-        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_MUST_NOT_VALIDATE:
-            self.warnings.append(Errors.AlgorithmMustNotValidate(algorithm=self.rrsig.algorithm))
+        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
+            self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
 
         if self.rrset.ttl_cmp:
             if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
@@ -395,7 +395,7 @@ class DSStatus(object):
             else:
                 # If there is a DNSKEY, then we look at *why* we are ignoring
                 # the digest of the DNSKEY.
-                if self.ds.digest_type in DS_DIGEST_ALGS_MUST_NOT_VALIDATE:
+                if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
                     # In this case, specification dictates that the algorithm
                     # MUST NOT be validated, so we mark it as ignored.
                     if self.validation_status == DS_STATUS_VALID:
@@ -413,8 +413,8 @@ class DSStatus(object):
         # Independent of whether or not we considered the digest for
         # validation, issue a warning if we are using a digest type for which
         # validation has been prohibited.
-        if self.ds.digest_type in DS_DIGEST_ALGS_MUST_NOT_VALIDATE:
-            self.warnings.append(Errors.DigestAlgorithmMustNotValidate(algorithm=self.ds.digest_type))
+        if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
+            self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
