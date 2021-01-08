@@ -592,12 +592,12 @@ class DigestAlgorithmProhibited(DSDigestError):
     '''
     >>> e = DigestAlgorithmProhibited(algorithm=5)
     >>> e.description
-    'DNSSEC specification prohibits publishing DS records that use digest algorithm 5 (5).'
+    'DNSSEC specification prohibits signing with DS records that use digest algorithm 5 (5).'
     '''
 
     _abstract = False
     code = 'DIGEST_ALGORITHM_PROHIBITED'
-    description_template = "DNSSEC specification prohibits publishing DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC specification prohibits signing with DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
@@ -609,12 +609,12 @@ class DigestAlgorithmNotRecommended(DSDigestError):
     '''
     >>> e = DigestAlgorithmNotRecommended(algorithm=5)
     >>> e.description
-    'DNSSEC specification recommends not publishing DS records that use digest algorithm 5 (5).'
+    'DNSSEC specification recommends not signing with DS records that use digest algorithm 5 (5).'
     '''
 
     _abstract = False
     code = 'DIGEST_ALGORITHM_NOT_RECOMMENDED'
-    description_template = "DNSSEC specification recommends not publishing DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC specification recommends not signing with DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
