@@ -416,9 +416,13 @@ class DSStatus(object):
 
         # Independent of whether or not we considered the digest for
         # validation, issue a warning if we are using a digest type for which
-        # validation has been prohibited.
+        # validation or publishing has been prohibited.
         if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
             self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
+        elif self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
+            self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
+        elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
+            self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
@@ -494,12 +498,6 @@ class DSStatus(object):
                             self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=digest_alg))
                         else:
                             self.warnings.append(Errors.DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=digest_alg))
-
-        # For all other digest types, just add a warning here
-        elif self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
-            self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
-        elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
-            self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
 
 
     def __str__(self):
