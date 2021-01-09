@@ -93,6 +93,14 @@ unknown.  Additionally, when a zone has only DS records with unsupported digest
 algorithms, the zone is treated as "insecure", assuming the DS records are
 properly authenticated.
 .TP
+.B -b, --validate-prohibited-algs
+Validate algorithms for which validation is otherwise prohibited.  Current
+DNSSEC specification prohibits validators from validating older, weaker
+algorithms associated with DNSKEY and DS records (see RFC 8624).  If this
+option is used, then a warning will be still be issued for DNSSEC records that
+use these older algorithms, but the code will still assess their cryptographic
+status, rather than ignoring them.
+.TP
 .B -C, --enforce-cookies
 Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
 when a query contains a COOKIE option with no server cookie or with an invalid

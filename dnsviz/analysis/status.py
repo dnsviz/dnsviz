@@ -169,6 +169,16 @@ RRSIG_SIG_LENGTH_ERRORS = {
 DS_DIGEST_ALGS_STRONGER_THAN_SHA1 = (2, 4)
 DS_DIGEST_ALGS_IGNORING_SHA1 = (2,)
 
+# RFC 8624 Section 3.1
+DNSKEY_ALGS_NOT_RECOMMENDED = (5, 7, 10)
+DNSKEY_ALGS_PROHIBITED = (1, 3, 6, 12)
+DNSKEY_ALGS_VALIDATION_PROHIBITED = (1, 3, 6)
+
+# RFC 8624 Section 3.2
+DS_DIGEST_ALGS_NOT_RECOMMENDED = ()
+DS_DIGEST_ALGS_PROHIBITED = (0, 1, 3)
+DS_DIGEST_ALGS_VALIDATION_PROHIBITED = ()
+
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
@@ -186,13 +196,44 @@ class RRSIGStatus(object):
 
         self.validation_status = RRSIG_STATUS_VALID
         if self.signature_valid is None or self.dnskey.rdata.algorithm not in supported_algs:
+            # Either we can't validate the cryptographic signature, or we are
+            # explicitly directed to ignore the algorithm.
             if self.dnskey is None:
+                # In this case, there is no corresponding DNSKEY, so we make
+                # the status "INDETERMINATE".
                 if self.validation_status == RRSIG_STATUS_VALID:
                     self.validation_status = RRSIG_STATUS_INDETERMINATE_NO_DNSKEY
+
             else:
-                if self.validation_status == RRSIG_STATUS_VALID:
-                    self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
+                # If there is a DNSKEY, then we look at *why* we are ignoring
+                # the cryptographic signature.
+                if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
+                    # In this case, specification dictates that the algorithm
+                    # MUST NOT be validated, so we mark it as ignored.
+                    if self.validation_status == RRSIG_STATUS_VALID:
+                        self.validation_status = RRSIG_STATUS_ALGORITHM_IGNORED
+                else:
+                    # In this case, we can't validate this particular
+                    # algorithm, either because the code doesn't support it,
+                    # or because we have been explicitly directed to ignore it.
+                    # In either case, mark it as "UNKNOWN", and warn that it is
+                    # not supported.
+                    if self.validation_status == RRSIG_STATUS_VALID:
+                        self.validation_status = RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
+                    self.warnings.append(Errors.AlgorithmNotSupported(algorithm=self.rrsig.algorithm))
+
+        # Independent of whether or not we considered the cryptographic
+        # validation, issue a warning if we are using an algorithm for which
+        # validation or signing has been prohibited.
+        #
+        # Signing is prohibited
+        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
+            self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
+        # Validation is prohibited or, at least, not recommended
+        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_PROHIBITED:
+            self.warnings.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
+        elif self.dnskey.rdata.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
+            self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
         if self.rrset.ttl_cmp:
             if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
@@ -351,13 +392,43 @@ class DSStatus(object):
 
         self.validation_status = DS_STATUS_VALID
         if self.digest_valid is None or self.ds.digest_type not in supported_digest_algs:
+            # Either we cannot reproduce a digest with this type, or we are
+            # explicitly directed to ignore the digest type.
             if self.dnskey is None:
+                # In this case, there is no corresponding DNSKEY, so we make
+                # the status "INDETERMINATE".
                 if self.validation_status == DS_STATUS_VALID:
                     self.validation_status = DS_STATUS_INDETERMINATE_NO_DNSKEY
             else:
-                if self.validation_status == DS_STATUS_VALID:
-                    self.validation_status = DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
-                self.warnings.append(Errors.DigestAlgorithmNotSupported(algorithm=ds.digest_type))
+                # If there is a DNSKEY, then we look at *why* we are ignoring
+                # the digest of the DNSKEY.
+                if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
+                    # In this case, specification dictates that the algorithm
+                    # MUST NOT be validated, so we mark it as ignored.
+                    if self.validation_status == DS_STATUS_VALID:
+                        self.validation_status = DS_STATUS_ALGORITHM_IGNORED
+                else:
+                    # In this case, we can't validate this particular
+                    # digest type, either because the code doesn't support it,
+                    # or because we have been explicitly directed to ignore it.
+                    # In either case, mark it as "UNKNOWN", and warn that it is
+                    # not supported.
+                    if self.validation_status == DS_STATUS_VALID:
+                        self.validation_status = DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM
+                    self.warnings.append(Errors.DigestAlgorithmNotSupported(algorithm=self.ds.digest_type))
+
+        # Independent of whether or not we considered the digest for
+        # validation, issue a warning if we are using a digest type for which
+        # validation or signing has been prohibited.
+        #
+        # Signing is prohibited
+        if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
+            self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
+        # Validation is prohibited or, at least, not recommended
+        if self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
+            self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
+        elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
+            self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:
@@ -378,33 +449,26 @@ class DSStatus(object):
 
         # RFC 4509
         if self.ds.digest_type == 1:
-            digest_algs = set()
-            my_digest_algs = {}
+            stronger_algs_all_ds = set()
+            # Cycle through all other DS records in the DS RRset, and
+            # create a list of digest types that are stronger than SHA1
+            # and are being used by DS records across the *entire* DS.
             for ds_rdata in self.ds_meta.rrset:
-                digest_algs.add(ds_rdata.digest_type)
-                if (ds_rdata.algorithm, ds_rdata.key_tag) == (self.ds.algorithm, self.ds.key_tag):
-                    # Here we produce a status of the DS with algorithm 2 with
-                    # respect to the DNSKEY for comparison with the current DS
-                    # with algorithm 1.  It is possible that the DS with the
-                    # different digest type matches a different DNSKEY than the
-                    # present DNSKEY.  If it does, there will be a warning, but
-                    # it should be both rare and innocuous.
-                    if ds_rdata.digest_type == self.ds.digest_type:
-                        continue
-                    elif ds_rdata.digest_type not in my_digest_algs or \
-                            my_digest_algs[ds_rdata.digest_type].validation_status != DS_STATUS_VALID:
-                        my_digest_algs[ds_rdata.digest_type] = \
-                                DSStatus(ds_rdata, self.ds_meta, self.dnskey, supported_digest_algs)
+                if ds_rdata.digest_type in DS_DIGEST_ALGS_STRONGER_THAN_SHA1:
+                    stronger_algs_all_ds.add(ds_rdata.digest_type)
 
-            for digest_alg in DS_DIGEST_ALGS_STRONGER_THAN_SHA1:
-                if digest_alg in supported_digest_algs and digest_alg in digest_algs and \
-                        (digest_alg not in my_digest_algs or my_digest_algs[digest_alg].validation_status not in \
-                        (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM, DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE)):
+            # Consider only digest types that we actually support
+            stronger_algs_all_ds.intersection_update(supported_digest_algs)
 
+            if stronger_algs_all_ds:
+                # If there are DS records in the DS RRset with digest type
+                # stronger than SHA1, then this one MUST be ignored by
+                # validators (RFC 4509).
+                for digest_alg in stronger_algs_all_ds:
                     if digest_alg in DS_DIGEST_ALGS_IGNORING_SHA1:
-                        self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=digest_alg))
                         if self.validation_status == DS_STATUS_VALID:
                             self.validation_status = DS_STATUS_ALGORITHM_IGNORED
+                        self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=digest_alg))
                     else:
                         self.warnings.append(Errors.DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=digest_alg))
 

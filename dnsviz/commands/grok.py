@@ -221,6 +221,10 @@ class GrokArgHelper:
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<digest_alg>,[<digest_alg>...]',
                 help='Support only the specified DNSSEC digest algorithm(s)')
+        self.parser.add_argument('-b', '--validate-prohibited-algs',
+                const=True, default=False,
+                action='store_const',
+                help='Validate algorithms for which validation is otherwise prohibited')
         self.parser.add_argument('-C', '--enforce-cookies',
                 const=True, default=False,
                 action='store_const',
@@ -454,7 +458,7 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, validate_prohibited_algs=arghelper.args.validate_prohibited_algs)
 
             if arghelper.trusted_keys:
                 G = DNSAuthGraph()

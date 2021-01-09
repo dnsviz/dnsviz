@@ -27,6 +27,7 @@
 
 from __future__ import unicode_literals
 
+import copy
 import errno
 import logging
 
@@ -787,7 +788,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         (not x.effective_tcp and x.udp_responsive)) and \
                         (not require_valid or x.is_valid_response()))
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True):
+    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True):
         if trace is None:
             trace = []
 
@@ -804,40 +805,29 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.stub:
             return
 
-        # identify supported algorithms as intersection of explicitly supported
-        # and software supported
-        if supported_algs is not None:
-            supported_algs.intersection_update(crypto._supported_algs)
-        else:
-            supported_algs = crypto._supported_algs
-        if supported_digest_algs is not None:
-            supported_digest_algs.intersection_update(crypto._supported_digest_algs)
-        else:
-            supported_digest_algs = crypto._supported_digest_algs
-
         # populate status of dependencies
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
-                    mx_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False)
+                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False)
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
 
         # populate status of ancestry
         if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.parent is not None:
-            self.parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
         if self.dlv_parent is not None:
-            self.dlv_parent.populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self])
+            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self])
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
@@ -852,6 +842,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
         self._populate_dnskey_status(trusted_keys)
+
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, validate_prohibited_algs=False):
+        # identify supported algorithms as intersection of explicitly supported
+        # and software supported
+        if supported_algs is not None:
+            supported_algs.intersection_update(crypto._supported_algs)
+        else:
+            supported_algs = copy.copy(crypto._supported_algs)
+        if supported_digest_algs is not None:
+            supported_digest_algs.intersection_update(crypto._supported_digest_algs)
+        else:
+            supported_digest_algs = copy.copy(crypto._supported_digest_algs)
+
+        # unless we are overriding, mark prohibited algorithms as not supported
+        if not validate_prohibited_algs:
+            supported_algs.difference_update(Status.DNSKEY_ALGS_VALIDATION_PROHIBITED)
+            supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_VALIDATION_PROHIBITED)
+
+        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx)
 
     def _populate_name_status(self, trace=None):
         # using trace allows _populate_name_status to be called independent of
@@ -2112,7 +2121,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # is bogus because there should have been matching KSK.
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_BOGUS
                     else:
-                        # If no algorithsm are supported, then this is a
+                        # If no algorithms are supported, then this is a
                         # provably insecure delegation.
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INSECURE
                 else:
