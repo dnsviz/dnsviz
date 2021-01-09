@@ -225,11 +225,14 @@ class RRSIGStatus(object):
         # Independent of whether or not we considered the cryptographic
         # validation, issue a warning if we are using an algorithm for which
         # validation or signing has been prohibited.
+        #
+        # Signing is prohibited
         if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
             self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
+        # Validation is prohibited or, at least, not recommended
         if self.dnskey.rdata.algorithm in DNSKEY_ALGS_PROHIBITED:
             self.warnings.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
-        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
+        elif self.dnskey.rdata.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
         if self.rrset.ttl_cmp:
@@ -416,10 +419,13 @@ class DSStatus(object):
 
         # Independent of whether or not we considered the digest for
         # validation, issue a warning if we are using a digest type for which
-        # validation or publishing has been prohibited.
+        # validation or signing has been prohibited.
+        #
+        # Signing is prohibited
         if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
             self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
-        elif self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
+        # Validation is prohibited or, at least, not recommended
+        if self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
             self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
         elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
