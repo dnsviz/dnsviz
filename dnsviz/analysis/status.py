@@ -444,61 +444,27 @@ class DSStatus(object):
         # RFC 4509
         if self.ds.digest_type == 1:
             stronger_algs_all_ds = set()
-            stronger_algs_this_dnskey = set()
-            # Cycle through all other DS records in the DS RRset:
-            #   1. Create a list of digest types that are stronger than SHA1
-            #      and are being used by DS records across the *entire* DS
-            #      RRset.  Store them in digest_algs_all_ds.
-            #   2. Create a list of digest types that are stronger than SHA1,
-            #      correspond to DS records go with the same DNSKEY as *this*
-            #      DS record, and have valid or indeterminate status (i.e., not
-            #      invalid).  These are DS records with the same DNSSEC
-            #      algorithm and key tag, but different digest types.  Store
-            #      them in stronger_algs_this_dnskey.
-            #
-            #      Note: It is possible that a DS with a different digest
-            #      type matches a different DNSKEY than the present DNSKEY--due
-            #      to key tag collisions.  If it does, there will be a warning,
-            #      but it should be both rare and innocuous.
+            # Cycle through all other DS records in the DS RRset, and
+            # create a list of digest types that are stronger than SHA1
+            # and are being used by DS records across the *entire* DS.
             for ds_rdata in self.ds_meta.rrset:
-
-                if ds_rdata.digest_type not in DS_DIGEST_ALGS_STRONGER_THAN_SHA1:
-                    continue
-
-                stronger_algs_all_ds.add(ds_rdata.digest_type)
-                if (ds_rdata.algorithm, ds_rdata.key_tag) == (self.ds.algorithm, self.ds.key_tag):
-                    if ds_rdata.digest_type == self.ds.digest_type:
-                        continue
-                    else:
-                        status = DSStatus(ds_rdata, self.ds_meta, self.dnskey, supported_digest_algs)
-                        if status.validation_status in \
-                                (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM, DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
-                            stronger_algs_this_dnskey.add(ds_rdata.digest_type)
+                if ds_rdata.digest_type in DS_DIGEST_ALGS_STRONGER_THAN_SHA1:
+                    stronger_algs_all_ds.add(ds_rdata.digest_type)
 
             # Consider only digest types that we actually support
             stronger_algs_all_ds.intersection_update(supported_digest_algs)
-            stronger_algs_this_dnskey.intersection_update(supported_digest_algs)
 
             if stronger_algs_all_ds:
                 # If there are DS records in the DS RRset with digest type
                 # stronger than SHA1, then this one MUST be ignored by
-                # validators (RFC 4509).  We don't actually issue a warning,
-                # however, unless a DS with stronger digest type is not being
-                # used to validate the current DNSKEY; if there is such a DS,
-                # then there is no reason to complain.
-
-                if not stronger_algs_this_dnskey:
-                    # If there are any DS records in the DS RRset with digest type
-                    # stronger than SHA1, and none of them can properly validate
-                    # the current DNSKEY, then this one stands alone.
-                    for digest_alg in stronger_algs_all_ds:
-                        if digest_alg in DS_DIGEST_ALGS_IGNORING_SHA1:
-                            if self.validation_status == DS_STATUS_VALID:
-                                self.validation_status = DS_STATUS_ALGORITHM_IGNORED
-                            self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=digest_alg))
-                        else:
-                            self.warnings.append(Errors.DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=digest_alg))
-
+                # validators (RFC 4509).
+                for digest_alg in stronger_algs_all_ds:
+                    if digest_alg in DS_DIGEST_ALGS_IGNORING_SHA1:
+                        if self.validation_status == DS_STATUS_VALID:
+                            self.validation_status = DS_STATUS_ALGORITHM_IGNORED
+                        self.warnings.append(Errors.DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=digest_alg))
+                    else:
+                        self.warnings.append(Errors.DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=digest_alg))
 
     def __str__(self):
         return '%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
