@@ -494,7 +494,7 @@ class DSDigestAlgorithmMaybeIgnored(DSError):
         self.template_kwargs['algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['algorithm'], str(self.template_kwargs['algorithm']))
         self.template_kwargs['new_algorithm_text'] = fmt.DS_DIGEST_TYPES.get(self.template_kwargs['new_algorithm'], str(self.template_kwargs['algorithm']))
 
-class DSDigestError(DomainNameAnalysisError):
+class DSDigestError(DSError):
     pass
 
 class DigestAlgorithmNotSupported(DSDigestError):
