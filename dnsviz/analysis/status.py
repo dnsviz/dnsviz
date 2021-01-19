@@ -195,7 +195,7 @@ class RRSIGStatus(object):
             self.signature_valid = crypto.validate_rrsig(dnskey.rdata.algorithm, rrsig.signature, rrset.message_for_rrsig(rrsig), dnskey.rdata.key)
 
         self.validation_status = RRSIG_STATUS_VALID
-        if self.signature_valid is None or self.dnskey.rdata.algorithm not in supported_algs:
+        if self.signature_valid is None or self.rrsig.algorithm not in supported_algs:
             # Either we can't validate the cryptographic signature, or we are
             # explicitly directed to ignore the algorithm.
             if self.dnskey is None:
@@ -227,12 +227,12 @@ class RRSIGStatus(object):
         # validation or signing has been prohibited.
         #
         # Signing is prohibited
-        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
+        if self.rrsig.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
             self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
         # Validation is prohibited or, at least, not recommended
-        if self.dnskey.rdata.algorithm in DNSKEY_ALGS_PROHIBITED:
+        if self.rrsig.algorithm in DNSKEY_ALGS_PROHIBITED:
             self.warnings.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
-        elif self.dnskey.rdata.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
+        elif self.rrsig.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
         if self.rrset.ttl_cmp:
