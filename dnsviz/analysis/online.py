@@ -1705,7 +1705,7 @@ class Analyst(object):
         else:
             servers = name_obj.zone.get_responsive_auth_or_designated_servers()
 
-        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n in (name_obj.zone.name, WILDCARD_EXPLICIT_DELEGATION)])
         cookie_jar = name_obj.zone.cookie_jar
 
         servers = self._filter_servers(servers)
@@ -1807,7 +1807,7 @@ class Analyst(object):
                         parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()
                 parent_servers = self._filter_servers(parent_servers)
 
-                parent_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.parent.name])
+                parent_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n in (name_obj.zone.parent.name, WILDCARD_EXPLICIT_DELEGATION)])
                 parent_cookie_jar = name_obj.zone.parent.cookie_jar
 
                 self.logger.debug('Preparing query %s/DS...' % fmt.humanize_name(name_obj.name))
@@ -1818,7 +1818,7 @@ class Analyst(object):
                     dlv_servers = self._filter_servers(dlv_servers)
                     dlv_name = name_obj.dlv_name
                     if dlv_servers:
-                        dlv_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.dlv_parent.name])
+                        dlv_odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n in (name_obj.dlv_parent.name, WILDCARD_EXPLICIT_DELEGATION)])
                         dlv_cookie_jar = name_obj.dlv_parent.cookie_jar
 
                         self.logger.debug('Preparing query %s/DLV...' % fmt.humanize_name(dlv_name))
@@ -1864,7 +1864,7 @@ class Analyst(object):
                 parent_auth_servers = name_obj.parent.get_auth_or_designated_servers()
         parent_auth_servers = set(self._filter_servers(parent_auth_servers))
 
-        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n in (name_obj.zone.name, WILDCARD_EXPLICIT_DELEGATION)])
         cookie_jar = name_obj.zone.cookie_jar
 
         if not parent_auth_servers:
@@ -2412,7 +2412,7 @@ class RecursiveAnalyst(Analyst):
         if not servers:
             raise NoNameservers('No resolvers available to query!')
 
-        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n == name_obj.zone.name])
+        odd_ports = dict([(s, self.odd_ports[(n, s)]) for n, s in self.odd_ports if n in (name_obj.zone.name, WILDCARD_EXPLICIT_DELEGATION)])
         cookie_jar = name_obj.zone.cookie_jar
 
         # make common query first to prime the cache
