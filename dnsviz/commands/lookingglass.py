@@ -4,7 +4,7 @@
 # analysis, and visualization.
 # Created by Casey Deccio (casey@deccio.net)
 #
-# Copyright 2016-2019 Casey Deccio
+# Copyright 2016-2021 Casey Deccio
 #
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
