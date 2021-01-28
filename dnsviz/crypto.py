@@ -76,7 +76,7 @@ GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
 
 ED25519_PREFIX = b'\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'
-ED448_PREFIX = b'\x30\x2a\x30\x05\x06\x03\x2b\x65\x71\x03\x21\x00'
+ED448_PREFIX = b'\x30\x43\x30\x05\x06\x03\x2b\x65\x71\x03\x3a\x00'
 
 # python3/python2 dual compatibility
 if not isinstance(GOST_ENGINE_NAME, str):
