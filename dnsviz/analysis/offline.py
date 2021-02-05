@@ -256,6 +256,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         return info_obj
 
     def _get_response_info(self, name, rdtype):
+        #XXX there are reasons for this (e.g., NXDOMAIN, after which no further
+        # queries are made), but it would be good to have a sanity check, so
+        # we don't simply produce an incomplete output.
+        # see also: dnsviz.viz.dnssec.graph_rrset_auth()
+        if (name, rdtype) not in self.queries:
+            return None
+
         query = self.queries[(name, rdtype)]
         name_to_info_mapping = {}
         rrset_to_cname_mapping = {}
