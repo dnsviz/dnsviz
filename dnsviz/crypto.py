@@ -83,6 +83,13 @@ if not isinstance(GOST_ENGINE_NAME, str):
     GOST_ENGINE_NAME = lb2s(GOST_ENGINE_NAME)
     GOST_DIGEST_NAME = lb2s(GOST_DIGEST_NAME)
 
+try:
+    # available from python 3.1
+    base64encodebytes = base64.encodebytes
+except AttributeError:
+    # available until python 3.8
+    base64encodebytes = base64.encodestring
+
 EC_NOCOMPRESSION = b'\x04'
 
 
@@ -275,7 +282,7 @@ def _dnskey_to_rsa(key):
 
 def _dnskey_to_gost(key):
     der = GOST_PREFIX + key
-    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+b'-----END PUBLIC KEY-----'
+    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64encodebytes(der)+b'-----END PUBLIC KEY-----'
 
     return EVP.load_key_string_pubkey(pem)
 
@@ -287,7 +294,7 @@ def _dnskey_to_ed(alg, key):
     else:
         raise ValueError('Algorithm not supported')
 
-    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64.encodestring(der)+b'-----END PUBLIC KEY-----'
+    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64encodebytes(der)+b'-----END PUBLIC KEY-----'
     return EVP.load_key_string_pubkey(pem)
 
 def _dnskey_to_ec(alg, key):
