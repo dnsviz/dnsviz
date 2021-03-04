@@ -375,7 +375,8 @@ class ReduceUDPMaxPayloadOnTimeoutHandler(DNSResponseHandler):
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
         if not self._params['tcp'] and timeouts >= self._timeouts and self._request.payload > self._reduced_payload:
-            self._request.payload = self._reduced_payload
+            self._request.use_edns(self._request.edns, self._request.ednsflags,
+                    self._reduced_payload, options=self._request.options)
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
 class ClearEDNSFlagOnTimeoutHandler(DNSResponseHandler):
@@ -412,12 +413,10 @@ class RemoveEDNSOptionOnTimeoutHandler(DNSResponseHandler):
 
     def handle(self, response_wire, response, response_time):
         timeouts = self._get_num_timeouts(response)
-        try:
+        if not self._params['tcp'] and timeouts >= self._timeouts and self._request.options:
             opt = self._request.options[0]
-        except IndexError:
-            opt = None
-        if not self._params['tcp'] and timeouts >= self._timeouts and opt is not None:
-            self._request.options.remove(opt)
+            self._request.use_edns(self._request.edns, self._request.ednsflags,
+                    self._request.payload, options=self._request.options[1:])
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_REMOVE_EDNS_OPTION, opt.otype)
 
 class DisableEDNSOnTimeoutHandler(DNSResponseHandler):
@@ -464,12 +463,10 @@ class RemoveEDNSOptionOnRcodeHandler(DNSResponseHandler):
         self._rcode = rcode
 
     def handle(self, response_wire, response, response_time):
-        try:
+        if isinstance(response, dns.message.Message) and response.rcode() == self._rcode and self._request.options:
             opt = self._request.options[0]
-        except IndexError:
-            opt = None
-        if isinstance(response, dns.message.Message) and response.rcode() == self._rcode and opt is not None:
-            self._request.options.remove(opt)
+            self._request.use_edns(self._request.edns, self._request.ednsflags,
+                    self._request.payload, options=self._request.options[1:])
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_RCODE, response.rcode(), RETRY_ACTION_REMOVE_EDNS_OPTION, opt.otype)
 
 class AddServerCookieOnBADCOOKIE(DNSResponseHandler):
@@ -608,7 +605,8 @@ class PMTUBoundingHandler(DNSResponseHandler):
             if timeouts >= self._initial_timeouts:
                 self._lower_bound = self._reduced_payload
                 self._upper_bound = self._request.payload - 1
-                self._request.payload = self._reduced_payload
+                self._request.use_edns(self._request.edns, self._request.ednsflags,
+                        self._reduced_payload, options=self._request.options)
                 self._state = self.REDUCED_PAYLOAD
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, self._reduced_payload)
 
@@ -633,7 +631,8 @@ class PMTUBoundingHandler(DNSResponseHandler):
                 #XXX this is cheating because we're not reporting the change to UDP
                 self._params['tcp'] = False
                 payload = response_len - 1
-                self._request.payload = payload
+                self._request.use_edns(self._request.edns, self._request.ednsflags,
+                        payload, options=self._request.options)
                 self._state = self.TCP_MINUS_ONE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, response_len, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
@@ -641,7 +640,8 @@ class PMTUBoundingHandler(DNSResponseHandler):
             if is_timeout:
                 self._upper_bound = self._request.payload - 1
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
-                self._request.payload = payload
+                self._request.use_edns(self._request.edns, self._request.ednsflags,
+                        payload, options=self._request.options)
                 self._state = self.PICKLE
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
@@ -675,7 +675,8 @@ class PMTUBoundingHandler(DNSResponseHandler):
             elif is_timeout:
                 self._upper_bound = self._request.payload - 1
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
-                self._request.payload = payload
+                self._request.use_edns(self._request.edns, self._request.ednsflags,
+                        payload, options=self._request.options)
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TIMEOUT, None, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
             # if the size of the message is less than the watermark, then perhaps we were rate limited
             elif response_len < self._water_mark:
@@ -691,7 +692,8 @@ class PMTUBoundingHandler(DNSResponseHandler):
             elif is_valid:
                 self._lower_bound = self._request.payload
                 payload = self._lower_bound + (self._upper_bound + 1 - self._lower_bound)//2
-                self._request.payload = payload
+                self._request.use_edns(self._request.edns, self._request.ednsflags,
+                        payload, options=self._request.options)
                 return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_DIAGNOSTIC, response_len, RETRY_ACTION_CHANGE_UDP_MAX_PAYLOAD, payload)
 
         elif self._state == self.TCP_FINAL:
