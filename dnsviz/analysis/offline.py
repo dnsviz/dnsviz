@@ -1685,7 +1685,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.response_errors = {}
         self.response_warnings = {}
 
-        if self.is_zone():
+        if (self.name, dns.rdatatype.DNSKEY) in self.queries:
             self.zsks = set()
             self.ksks = set()
 
@@ -1714,7 +1714,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             self._populate_invalid_response_status(query)
 
     def _finalize_key_roles(self):
-        if self.is_zone():
+        if (self.name, dns.rdatatype.DNSKEY) in self.queries:
             self.published_keys = set(self.get_dnskeys()).difference(self.zsks.union(self.ksks))
             self.revoked_keys = set([x for x in self.get_dnskeys() if x.rdata.flags & fmt.DNSKEY_FLAGS['revoke']])
 
