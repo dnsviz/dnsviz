@@ -101,7 +101,7 @@ def main():
         # import was found in the stack.  If so, then the error is with
         # importing something from inside that file.  Otherwise, it was that we
         # couldn't find the file corresponding to the command, so it was thus
-        # an illegitmate command.
+        # an illegitimate command.
         exc_frame = sys.exc_info()[2]
         frame1 = exc_frame.tb_next.tb_next
 
