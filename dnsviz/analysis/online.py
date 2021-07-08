@@ -1748,6 +1748,10 @@ class Analyst(object):
                     self.logger.debug('Preparing DNS cookie diagnostic query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.SOA)))
                     queries[(name_obj.name, -(dns.rdatatype.SOA+104))] = self.diagnostic_query_bad_server_cookie(name_obj.name, dns.rdatatype.SOA, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_bad=COOKIE_BAD)
 
+                # NSEC3PARAM
+                self.logger.debug('Preparing query %s/%s...' % (fmt.humanize_name(name_obj.name), dns.rdatatype.to_text(dns.rdatatype.NSEC3PARAM)))
+                queries[(name_obj.name, dns.rdatatype.NSEC3PARAM)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NSEC3PARAM, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_bad=COOKIE_STANDIN)
+
                 # negative queries for all zones
                 self._set_negative_queries(name_obj)
                 if name_obj.nxdomain_name is not None:
