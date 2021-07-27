@@ -24,8 +24,8 @@ via Homebrew or MacPorts.
 The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
 [virtual environment](#installation-in-a-virtual-environment), and installation
-on [Fedora](#fedora-rpm-build-and-install) and
-[RHEL7](#rhel7-rpm-build-and-install).
+on [Fedora, RHEL 8, CentOS 8,](#fedora-rhel-8-centos-8-rpm-build-and-install) and
+[RHEL 7](#rhel-7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
@@ -94,7 +94,15 @@ or locally, from a downloaded or cloned copy of DNSViz:
 ```
 
 
-### Fedora RPM Build and Install
+### Fedora / RHEL 8 / CentOS 8 RPM Build and Install
+
+*RHEL 8 only*: Enable CodeReady Linux Builder by following the instructions [here](https://access.redhat.com/articles/4348511).
+
+*CentOS 8 only*: Enable PowerTools and EPEL:
+```
+sudo dnf config-manager --set-enabled powertools
+sudo dnf install epel-release
+```
 
 Install the tools for building an RPM, and set up the rpmbuild tree.
 ```
@@ -115,7 +123,7 @@ Install dnspython, pygraphviz, and M2Crypto.
 ```
 $ sudo dnf install python3-dns python3-pygraphviz python3-m2crypto
 ```
-(Note that as of Fedora 33, the latest version of M2Crypto is 0.35.2.  If you
+(Note that as of Fedora 33 / RHEL 8 / CentOS 8, the latest version of M2Crypto is 0.35.2.  If you
 would like support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448), you will
 need to install M2Crypto using `pip3`.  For example, see [installation to a
 virtual environment](#installation-in-a-virtual-environment).)
@@ -127,7 +135,7 @@ $ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*-1.*.noarch.rpm
 ```
 
 
-### RHEL7 RPM Build and Install
+### RHEL 7 RPM Build and Install
 
 Install pygraphviz, M2Crypto, and dnspython, after installing their build dependencies.
 ```
