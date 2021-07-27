@@ -882,7 +882,6 @@ class ArgHelper:
     BRACKETS_RE = re.compile(r'^\[(.*)\]$')
 
     def __init__(self, resolver, logger):
-        self._resolver = resolver
         self.parser = None
 
         self.odd_ports = {}
