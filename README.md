@@ -24,7 +24,7 @@ via Homebrew or MacPorts.
 The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
 [virtual environment](#installation-in-a-virtual-environment), and installation
-on [Fedora, RHEL 8, CentOS 8,](#fedora-rhel-8-centos-8-rpm-build-and-install) and
+on [Fedora, RHEL 8, CentOS 8,](#fedora--rhel-8--centos-8-rpm-build-and-install) and
 [RHEL 7](#rhel-7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
