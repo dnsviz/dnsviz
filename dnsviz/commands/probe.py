@@ -540,6 +540,8 @@ class NameServerMappingsForDomain(object):
             self._handle_name_addr_mapping(name_addr)
 
     def _handle_name_no_addr(self, name, port):
+        if self._resolver is None:
+            raise argparse.ArgumentTypeError('If addresses are not provided for names, then %s must have valid nameserver entries.\n' % RESOLV_CONF)
         query_tuples = ((name, dns.rdatatype.A, dns.rdataclass.IN), (name, dns.rdatatype.AAAA, dns.rdataclass.IN))
         answer_map = self._resolver.query_multiple_for_answer(*query_tuples)
         found_answer = False
@@ -1236,6 +1238,9 @@ class ArgHelper:
 
     def populate_recursive_servers(self):
         if not self.args.authoritative_analysis and not self.args.recursive_servers:
+            if self._resolver is None:
+                raise argparse.ArgumentTypeError('If servers are not specified with the %s option, then %s must have valid nameserver entries.\n' % \
+                        (self._arg_mapping['recursive_servers'], RESOLV_CONF))
             if (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) not in self.explicit_delegations:
                 self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
             for i, server in enumerate(self._resolver._servers):
@@ -1449,8 +1454,7 @@ def build_helper(logger, cmd, subcmd):
     try:
         resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
     except ResolvConfError:
-        sys.stderr.write('File %s not found or contains no nameserver entries.\n' % RESOLV_CONF)
-        sys.exit(1)
+        resolver = None
 
     arghelper = ArgHelper(resolver, logger)
     arghelper.build_parser('%s %s' % (cmd, subcmd))
