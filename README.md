@@ -98,11 +98,13 @@ or locally, from a downloaded or cloned copy of DNSViz:
 
 *RHEL 8 only*: Enable CodeReady Linux Builder by following the instructions [here](https://access.redhat.com/articles/4348511).
 
-*CentOS 8 only*: Enable PowerTools and EPEL:
+*CentOS 8 only*: Enable PowerTools and EPEL with the following two commands:
 ```
-sudo dnf config-manager --set-enabled powertools
-sudo dnf install epel-release
+$ sudo dnf config-manager --set-enabled powertools
+$ sudo dnf install epel-release
 ```
+
+The remaining instructions are for Fedora, RHEL 8, and CentOS 8.
 
 Install the tools for building an RPM, and set up the rpmbuild tree.
 ```
