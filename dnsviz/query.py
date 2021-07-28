@@ -1542,12 +1542,8 @@ class ExecutableDNSQuery(DNSQuery):
                 # If this was a network error, determine if it was a binding
                 # error
                 if err == RESPONSE_ERROR_NETWORK_ERROR:
-                    if errno1 == errno.EADDRNOTAVAIL:
-                        # Address not unavailable
-                        if qh._client is not None:
-                            raise SourceAddressBindError('Unable to bind to local address %s (%s)' % (qh._client, errno.errorcode[errno1]))
-                        else:
-                            raise SourceAddressBindError('Unable to bind to local address (%s)' % (errno.errorcode[errno1]))
+                    if errno1 == errno.EADDRNOTAVAIL and qh._client is not None:
+                        raise SourceAddressBindError('Unable to bind to local address %s (%s)' % (qh._client, errno.errorcode[errno1]))
                     elif errno1 == errno.EADDRINUSE or \
                             (errno1 == errno.EACCES and qtm.src is None):
                         # Address/port in use (EADDRINUSE) or insufficient
@@ -1556,14 +1552,17 @@ class ExecutableDNSQuery(DNSQuery):
                             raise PortBindError('Unable to bind to local port %d (%s)' % (qh.params['sport'], errno.errorcode[errno1]))
                         else:
                             raise PortBindError('Unable to bind to local port (%s)' % (errno.errorcode[errno1]))
-                    elif qtm.src is None and errno1 not in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EAFNOSUPPORT):
-                        # If source is None it didn't bind properly.  If the
-                        # errno1 value after bind() is EHOSTUNREACH or
-                        # ENETUNREACH, it is because there was no proper IPv4
-                        # or IPv6 connectivity (which is handled elsewhere).
-                        # If socket() failed and resulted in an errno value of
-                        # EAFNOSUPPORT, then likewise there is not IPv6
-                        # support. In other cases, it was something unknown, so
+                    elif qtm.src is None and errno1 not in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL):
+                        # If source is None it didn't bind properly.  There are several sub-cases:
+                        # 1. If the bind() failed and resulted in an errno
+                        #    value of EHOSTUNREACH, it is because there was no
+                        #    proper IPv4 or IPv6 connectivity; the error for
+                        #    this is handled elsewhere).
+                        # 2. If socket() failed and resulted in an errno value
+                        #    of EAFNOSUPPORT, then there is no IPv6 support.
+                        # 3. If connect() failed and resulted in an errno value
+                        #    of EADDRNOTAVAIL, then there is no IPv6 support.
+                        # In other cases, it was something unknown, so
                         # raise an error.
                         raise BindError('Unable to bind to local address (%s)' % (errno.errorcode.get(errno1, "unknown")))
 
