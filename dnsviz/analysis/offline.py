@@ -1575,9 +1575,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         rrset_info.rrset.rdtype != dns.rdatatype.DS and \
                                         rrsig_status.dnskey is not None:
                                     if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
-                                        self.ksks.add(rrsig_status.dnskey)
+                                        if self.ksks is not None:
+                                            self.ksks.add(rrsig_status.dnskey)
                                     else:
-                                        self.zsks.add(rrsig_status.dnskey)
+                                        if self.zsks is not None:
+                                            self.zsks.add(rrsig_status.dnskey)
 
                                 key = rrsig_status.rrset, rrsig_status.rrsig
                             break
