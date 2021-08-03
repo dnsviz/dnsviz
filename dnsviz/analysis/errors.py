@@ -1629,7 +1629,7 @@ class MissingRRSIG(ResponseError):
     required_params = []
 
 class MissingRRSIGForAlg(ResponseError):
-    description_template = 'The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no RRSIG with algorithm %(algorithm)d covering the RRset was returned in the response.'
+    description_template = 'The %(source)s RRset for the zone included algorithm %(algorithm)d (%(algorithm_text)s), but no RRSIG with algorithm %(algorithm)d covering the RRset was returned in the response.'
     references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
     required_params = ['algorithm']
     source = None
@@ -1903,7 +1903,7 @@ class MissingSEPForAlg(DelegationError):
 
     _abstract = False
     code = 'MISSING_SEP_FOR_ALG'
-    description_template = "The %(source)s RRset for the zone included algorithm %(algorithm)s (%(algorithm_text)s), but no %(source)s RR matched a DNSKEY with algorithm %(algorithm)d that signs the zone's DNSKEY RRset."
+    description_template = "The %(source)s RRset for the zone included algorithm %(algorithm)d (%(algorithm_text)s), but no %(source)s RR matched a DNSKEY with algorithm %(algorithm)d that signs the zone's DNSKEY RRset."
     references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
     required_params = ['algorithm']
 
