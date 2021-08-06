@@ -1403,7 +1403,14 @@ class _DNSQueryTransportManager:
         self._event_map = {}
 
         self._close = threading.Event()
-        t = threading.Thread(target=self._loop, daemon=True)
+        # python3/python2 dual compatibility
+        try:
+            # python 3
+            t = threading.Thread(target=self._loop, daemon=True)
+        except TypeError:
+            # python 2
+            t = threading.Thread(target=self._loop)
+            t.daemon = True
         t.start()
 
     def close(self):
