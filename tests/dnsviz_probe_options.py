@@ -12,9 +12,8 @@ import unittest
 import dns.name, dns.rdatatype, dns.rrset, dns.zone
 
 from dnsviz.commands.probe import ZoneFileToServe, ArgHelper, DomainListArgHelper, StandardRecursiveQueryCD, WILDCARD_EXPLICIT_DELEGATION, AnalysisInputError, CustomQueryMixin
-from dnsviz import transport
-from dnsviz.resolver import Resolver
 from dnsviz.ipaddr import IPAddr
+from dnsviz import transport
 
 DATA_DIR = os.path.dirname(__file__)
 EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zone', 'example.com.zone')
@@ -23,9 +22,7 @@ EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.js
 
 class DNSVizProbeOptionsTestCase(unittest.TestCase):
     def setUp(self):
-        self.tm = transport.DNSQueryTransportManager()
-        self.resolver = Resolver.from_file('/etc/resolv.conf', StandardRecursiveQueryCD, transport_manager=self.tm)
-        self.helper = DomainListArgHelper(self.resolver)
+        self.helper = DomainListArgHelper()
         self.logger = logging.getLogger()
         for handler in self.logger.handlers:
             self.logger.removeHandler(handler)
@@ -41,8 +38,6 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
 
     def tearDown(self):
         CustomQueryMixin.edns_options = self.custom_query_mixin_edns_options_orig[:]
-        if self.tm is not None:
-            self.tm.close()
 
     def test_authoritative_option(self):
         arg1 = 'example.com+:ns1.example.com=192.0.2.1:1234,ns1.example.com=[2001:db8::1],' + \
@@ -599,7 +594,7 @@ ns1.example 0 IN A 192.0.2.1
 
         ZoneFileToServe._next_free_port = self.first_port
 
-        arghelper1 = ArgHelper(self.resolver, self.logger)
+        arghelper1 = ArgHelper(self.logger)
         arghelper1.build_parser('probe')
         arghelper1.parse_args(args1)
         arghelper1.aggregate_delegation_info()
@@ -612,7 +607,7 @@ ns1.example 0 IN A 192.0.2.1
         
         ZoneFileToServe._next_free_port = self.first_port
 
-        arghelper2 = ArgHelper(self.resolver, self.logger)
+        arghelper2 = ArgHelper(self.logger)
         arghelper2.build_parser('probe')
         arghelper2.parse_args(args2)
         arghelper2.aggregate_delegation_info()
@@ -625,7 +620,7 @@ ns1.example 0 IN A 192.0.2.1
         
         ZoneFileToServe._next_free_port = self.first_port
 
-        arghelper3 = ArgHelper(self.resolver, self.logger)
+        arghelper3 = ArgHelper(self.logger)
         arghelper3.build_parser('probe')
         arghelper3.parse_args(args3)
         arghelper3.aggregate_delegation_info()
@@ -634,7 +629,7 @@ ns1.example 0 IN A 192.0.2.1
         
         ZoneFileToServe._next_free_port = self.first_port
 
-        arghelper4 = ArgHelper(self.resolver, self.logger)
+        arghelper4 = ArgHelper(self.logger)
         arghelper4.build_parser('probe')
         arghelper4.parse_args(args4)
         arghelper4.aggregate_delegation_info()
@@ -675,7 +670,7 @@ ns1.example 0 IN A 192.0.2.1
 
         ZoneFileToServe._next_free_port = self.first_port
 
-        arghelper1 = ArgHelper(self.resolver, self.logger)
+        arghelper1 = ArgHelper(self.logger)
         arghelper1.build_parser('probe')
         arghelper1.parse_args(args1)
         arghelper1.aggregate_delegation_info()
@@ -686,7 +681,7 @@ ns1.example 0 IN A 192.0.2.1
         args1 = ['-A', '-N', 'example.com:ns1.example.com=192.0.2.1,ns1.example.com=[2001:db8::1]',
                 '-x', 'com:ns1.foo.com=192.0.2.3']
 
-        arghelper1 = ArgHelper(self.resolver, self.logger)
+        arghelper1 = ArgHelper(self.logger)
         arghelper1.build_parser('probe')
         arghelper1.parse_args(args1)
 
@@ -718,7 +713,7 @@ ns1.example 0 IN A 192.0.2.1
 
         odd_ports1 = {}
 
-        arghelper1 = ArgHelper(self.resolver, self.logger)
+        arghelper1 = ArgHelper(self.logger)
         arghelper1.build_parser('probe')
         arghelper1.parse_args(args1)
         arghelper1.aggregate_delegation_info()
@@ -729,7 +724,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Names, input file, or names file required
         args = []
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -737,7 +732,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Names file and command-line domain names are mutually exclusive
         args = ['-f', '/dev/null', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -746,7 +741,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Authoritative analysis and recursive servers
         args = ['-A', '-s', '192.0.2.1', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -754,7 +749,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Authoritative servers with recursive analysis
         args = ['-x', 'example.com:ns1.example.com=192.0.2.1', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -762,7 +757,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Delegation information with recursive analysis
         args = ['-N', 'example.com:ns1.example.com=192.0.2.1', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -770,7 +765,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Delegation information with recursive analysis
         args = [ '-D', 'example.com:34983 10 1 EC358CFAAEC12266EF5ACFC1FEAF2CAFF083C418', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
@@ -778,21 +773,21 @@ ns1.example 0 IN A 192.0.2.1
 
     def test_ceiling(self):
         args = ['-a', 'com', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.ceiling, dns.name.from_text('com'))
 
         args = ['example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.ceiling, dns.name.root)
 
         args = ['-A', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -800,7 +795,7 @@ ns1.example 0 IN A 192.0.2.1
 
     def test_ip4_ipv6(self):
         args = []
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -808,7 +803,7 @@ ns1.example 0 IN A 192.0.2.1
         self.assertEqual(arghelper.try_ipv6, True)
 
         args = ['-4', '-6']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -816,7 +811,7 @@ ns1.example 0 IN A 192.0.2.1
         self.assertEqual(arghelper.try_ipv6, True)
 
         args = ['-4']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -824,7 +819,7 @@ ns1.example 0 IN A 192.0.2.1
         self.assertEqual(arghelper.try_ipv6, False)
 
         args = ['-6']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -833,7 +828,7 @@ ns1.example 0 IN A 192.0.2.1
 
     def test_client_ip(self):
         args = []
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -843,7 +838,7 @@ ns1.example 0 IN A 192.0.2.1
         args = ['-b', '127.0.0.1']
         if self.use_ipv6:
             args.extend(['-b', '::1'])
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -853,28 +848,28 @@ ns1.example 0 IN A 192.0.2.1
 
     def test_th_factories(self):
         args = ['example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertIsNone(arghelper.th_factories)
 
         args = ['-u', 'http://example.com/', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertIsInstance(arghelper.th_factories[0], transport.DNSQueryTransportHandlerHTTPFactory)
 
         args = ['-u', 'ws:///dev/null', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertIsInstance(arghelper.th_factories[0], transport.DNSQueryTransportHandlerWebSocketServerFactory)
 
         args = ['-u', 'ssh://example.com/', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -885,7 +880,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # None
         args = ['-c', '', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -895,7 +890,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # Only DNS cookie 
         args = ['example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -905,7 +900,7 @@ ns1.example 0 IN A 192.0.2.1
 
         # All EDNS options
         args = ['-n', '-e', '192.0.2.0/24', 'example.com']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
@@ -932,14 +927,14 @@ ns1.example 0 IN A 192.0.2.1
 
         try:
             args = ['-r', example_auth_out.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_input()
 
             # Bad json
             args = ['-r', example_bad_json.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
@@ -947,7 +942,7 @@ ns1.example 0 IN A 192.0.2.1
 
             # No version
             args = ['-r', example_no_version.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
@@ -955,7 +950,7 @@ ns1.example 0 IN A 192.0.2.1
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
@@ -963,7 +958,7 @@ ns1.example 0 IN A 192.0.2.1
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
@@ -976,7 +971,7 @@ ns1.example 0 IN A 192.0.2.1
 
     def test_ingest_names(self):
         args = ['example.com', 'example.net']
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.ingest_names()
@@ -985,7 +980,7 @@ ns1.example 0 IN A 192.0.2.1
         unicode_name = 'テスト'
 
         args = [unicode_name]
-        arghelper = ArgHelper(self.resolver, self.logger)
+        arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.ingest_names()
@@ -1006,21 +1001,21 @@ ns1.example 0 IN A 192.0.2.1
 
         try:
             args = ['-f', names_file.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
 
             args = ['-f', names_file_unicode.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('xn--zckzah.')])
 
             args = ['-r', example_names_only.name]
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_input()
@@ -1028,7 +1023,7 @@ ns1.example 0 IN A 192.0.2.1
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net'), dns.name.from_text('example.org')])
 
             args = ['-r', example_names_only.name, 'example.com']
-            arghelper = ArgHelper(self.resolver, self.logger)
+            arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_input()
