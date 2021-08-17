@@ -1296,8 +1296,12 @@ class DNSAuthGraph:
         for signed_keys, rrset_info in name_obj.get_dnskey_sets():
             for rrsig in name_obj.rrsig_status[rrset_info]:
                 signer_obj = name_obj.get_name(rrsig.signer)
-                if rrsig.signer != name_obj.name and not is_dlv:
-                    self.graph_zone_auth(signer_obj, False)
+                if signer_obj is not None:
+                    # if we have the analysis corresponding to the signer, then
+                    # graph it too, if it was different from what we were
+                    # expecting
+                    if rrsig.signer != name_obj.name and not is_dlv:
+                        self.graph_zone_auth(signer_obj, False)
                 for dnskey in name_obj.rrsig_status[rrset_info][rrsig]:
                     rrsig_status = name_obj.rrsig_status[rrset_info][rrsig][dnskey]
                     if dnskey is None:
