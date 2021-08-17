@@ -1031,10 +1031,10 @@ class OnlineDomainNameAnalysis(object):
         for cname in self.cname_targets:
             for target in self.cname_targets[cname]:
                 self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
+        # these are optional
         for signer in self.external_signers:
-            self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
-
-        # these two are optional
+            if lb2s(signer.canonicalize().to_text()) in d:
+                self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
         for target in self.ns_dependencies:
             if lb2s(target.canonicalize().to_text()) in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
