@@ -184,3 +184,13 @@ def get_client_address(server):
         ip = IPAddr(s.getsockname()[0])
     s.close()
     return ip
+
+def io_try_buffered(f, mode, closefd=True):
+    """Try opening buffered reader, but allow unbuffered on failure.
+
+    Required to pass tests under pytest."""
+    try:
+        return io.open(f.fileno(), mode, closefd=closefd)
+    except io.UnsupportedOperation:
+        # raised by f.fileno()
+        return f

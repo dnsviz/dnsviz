@@ -44,7 +44,7 @@ import dns.exception, dns.name
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
 from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
 from dnsviz.format import latin1_binary_to_string as lb2s
-from dnsviz.util import get_trusted_keys, get_default_trusted_keys
+from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -154,8 +154,8 @@ class GraphArgHelper:
         self.parser = argparse.ArgumentParser(description='Graph the assessment of diagnostic DNS queries', prog=prog)
 
         # python3/python2 dual compatibility
-        stdin_buffer = io.open(sys.stdin.fileno(), 'rb', closefd=False)
-        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
+        stdin_buffer = io_try_buffered(sys.stdin, 'rb', closefd=False)
+        stdout_buffer = io_try_buffered(sys.stdout, 'wb', closefd=False)
 
         try:
             self.parser.add_argument('-f', '--names-file',
