@@ -1262,7 +1262,7 @@ class ArgHelper:
             try:
                 resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
             except ResolvConfError:
-                raise argparse.ArgumentTypeError('If servers are not specified with the %s option, then %s must have valid nameserver entries.\n' % \
+                raise ResolvConfError('If servers are not specified with the %s option, then %s must have valid nameserver entries.\n' % \
                         (self._arg_mapping['recursive_servers'], RESOLV_CONF))
             if (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) not in self.explicit_delegations:
                 self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
@@ -1500,6 +1500,11 @@ def main(argv):
             arghelper.serve_zones()
         except argparse.ArgumentTypeError as e:
             arghelper.parser.error(str(e))
+        except ResolvConfError as e:
+            arghelper.parser.print_usage(sys.stderr)
+            sys.stderr.write("%(prog)s: error: %(errmsg)s\n" % {
+                             'prog': arghelper.parser.prog, 'errmsg': str(e) })
+            sys.exit(5)
         except (ZoneFileServiceError, MissingExecutablesError) as e:
             s = str(e)
             if s:
