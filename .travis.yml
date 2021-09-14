@@ -18,11 +18,11 @@ install:
   - pip install -r requirements.txt
   - pip install .
 script:
-  - python tests/dnsviz_probe_options.py
-  - python tests/dnsviz_probe_run_offline.py
-  - python tests/dnsviz_print_options.py
-  - python tests/dnsviz_print_run.py
-  - python tests/dnsviz_graph_options.py
-  - python tests/dnsviz_graph_run.py
-  - python tests/dnsviz_grok_options.py
-  - python tests/dnsviz_grok_run.py
+  - python tests/test_dnsviz_probe_options.py
+  - python tests/test_dnsviz_probe_run_offline.py
+  - python tests/test_dnsviz_print_options.py
+  - python tests/test_dnsviz_print_run.py
+  - python tests/test_dnsviz_graph_options.py
+  - python tests/test_dnsviz_graph_run.py
+  - python tests/test_dnsviz_grok_options.py
+  - python tests/test_dnsviz_grok_run.py
