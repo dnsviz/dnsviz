@@ -854,8 +854,14 @@ class NSECStatusNODATA(NSECStatus):
             try:
                 self.nsec_for_wildcard_name = nsec_set_info.rrsets[self.wildcard_name]
                 self.wildcard_has_rdtype = nsec_set_info.rdtype_exists_in_bitmap(self.wildcard_name, self.rdtype)
+                self.wildcard_has_ns = nsec_set_info.rdtype_exists_in_bitmap(self.wildcard_name, dns.rdatatype.NS)
+                self.wildcard_has_ds = nsec_set_info.rdtype_exists_in_bitmap(self.wildcard_name, dns.rdatatype.DS)
+                self.wildcard_has_soa = nsec_set_info.rdtype_exists_in_bitmap(self.wildcard_name, dns.rdatatype.SOA)
             except KeyError:
-                pass
+                self.wildcard_has_rdtype = False
+                self.wildcard_has_ns = False
+                self.wildcard_has_ds = False
+                self.wildcard_has_soa = False
 
         # check for covering of the origin
         self.nsec_names_covering_origin = {}
@@ -899,6 +905,20 @@ class NSECStatusNODATA(NSECStatus):
                 self.errors.append(Errors.SnameCoveredNODATANSEC(sname=fmt.humanize_name(self.qname)))
                 self.validation_status = NSEC_STATUS_INVALID
         elif self.nsec_for_wildcard_name: # implies wildcard_name, which implies nsec_names_covering_qname
+            if self.rdtype == dns.rdatatype.DS or self.referral:
+                if self.is_zone and not self.wildcard_has_ns:
+                    self.errors.append(Errors.ReferralWithoutNSBitNSEC(sname=fmt.humanize_name(self.wildcard_name)))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.wildcard_has_ds:
+                    self.errors.append(Errors.ReferralWithDSBitNSEC(sname=fmt.humanize_name(self.wildcard_name)))
+                    self.validation_status = NSEC_STATUS_INVALID
+                if self.wildcard_has_soa:
+                    self.errors.append(Errors.ReferralWithSOABitNSEC(sname=fmt.humanize_name(self.wildcard_name)))
+                    self.validation_status = NSEC_STATUS_INVALID
+            else:
+                if self.has_rdtype:
+                    self.errors.append(Errors.StypeInBitmapNODATANSEC(sname=fmt.humanize_name(self.qname), stype=dns.rdatatype.to_text(self.rdtype)))
+                    self.validation_status = NSEC_STATUS_INVALID
             if self.wildcard_has_rdtype:
                 self.validation_status = NSEC_STATUS_INVALID
                 self.errors.append(Errors.StypeInBitmapNODATANSEC(sname=fmt.humanize_name(self.wildcard_name), stype=dns.rdatatype.to_text(self.rdtype)))
