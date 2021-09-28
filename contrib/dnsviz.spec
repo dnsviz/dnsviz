@@ -58,6 +58,8 @@ rm -rf %{buildroot}
 %{_mandir}/man1/%{name}-query.1*
 
 %changelog
+* Mon Sep  27 2021 Casey Deccio
+  0.9.4 release
 * Thu Mar  11 2021 Casey Deccio
   0.9.3 release
 * Fri Feb  5 2021 Casey Deccio
