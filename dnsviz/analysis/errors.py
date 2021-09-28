@@ -199,8 +199,11 @@ class RRsetTTLMismatch(RRSIGError):
     required_params = ['rrset_ttl', 'rrsig_ttl']
 
 class OriginalTTLExceeded(RRSIGError):
+    references = ['RFC 4035, Sec. 2.2']
+
+class OriginalTTLExceededRRset(OriginalTTLExceeded):
     '''
-    >>> e = OriginalTTLExceeded(original_ttl=10, rrset_ttl=50)
+    >>> e = OriginalTTLExceededRRset(original_ttl=10, rrset_ttl=50)
     >>> e.args
     [10, 50]
     >>> e.description
@@ -208,10 +211,23 @@ class OriginalTTLExceeded(RRSIGError):
     '''
 
     _abstract = False
-    code = 'ORIGINAL_TTL_EXCEEDED'
+    code = 'ORIGINAL_TTL_EXCEEDED_RRSET'
     description_template = 'The TTL of the RRset (%(rrset_ttl)d) exceeds the value of the Original TTL field of the RRSIG RR covering it (%(original_ttl)d).'
-    references = ['RFC 4035, Sec. 2.2']
     required_params = ['original_ttl', 'rrset_ttl']
+
+class OriginalTTLExceededRRSIG(OriginalTTLExceeded):
+    '''
+    >>> e = OriginalTTLExceededRRSIG(original_ttl=10, rrsig_ttl=50)
+    >>> e.args
+    [10, 50]
+    >>> e.description
+    'The TTL of the RRSIG (50) exceeds the value of its Original TTL field (10).'
+    '''
+
+    _abstract = False
+    code = 'ORIGINAL_TTL_EXCEEDED_RRSIG'
+    description_template = 'The TTL of the RRSIG (%(rrsig_ttl)d) exceeds the value of its Original TTL field (%(original_ttl)d).'
+    required_params = ['original_ttl', 'rrsig_ttl']
 
 class TTLBeyondExpiration(RRSIGError):
     '''
