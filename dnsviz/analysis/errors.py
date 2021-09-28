@@ -183,6 +183,21 @@ class SignerNotZone(RRSIGError):
     references = ['RFC 4035, Sec. 5.3.1']
     required_params = ['zone_name', 'signer_name']
 
+class RRSIGLabelsExceedRRsetOwnerLabels(RRSIGError):
+    '''
+    >>> e = RRSIGLabelsExceedRRsetOwnerLabels(rrsig_labels=2, rrset_owner_labels=1)
+    >>> e.args
+    [2, 1]
+    >>> e.description
+    'The value of the labels field of the RRSIG RR (2) exceeds the number of labels in the RRset owner name (1).'
+    '''
+
+    _abstract = False
+    code = 'RRSIG_LABELS_EXCEED_RRSET_OWNER_LABELS'
+    description_template = 'The value of the labels field of the RRSIG RR (%(rrsig_labels)d) exceeds the number of labels in the RRset owner name (%(rrset_owner_labels)d).'
+    references = ['RFC 4035, Sec. 5.3.1']
+    required_params = ['rrsig_labels', 'rrset_owner_labels']
+
 class RRsetTTLMismatch(RRSIGError):
     '''
     >>> e = RRsetTTLMismatch(rrset_ttl=50, rrsig_ttl=10)

@@ -262,6 +262,11 @@ class RRSIGStatus(object):
                 zn = zone_name
             self.errors.append(Errors.SignerNotZone(zone_name=fmt.humanize_name(zn), signer_name=fmt.humanize_name(self.rrsig.signer)))
 
+        if self.rrsig.labels > len(self.rrset.rrset.name) - 1:
+            self.errors.append(Errors.RRSIGLabelsExceedRRsetOwnerLabels(rrsig_labels=self.rrsig.labels, rrset_owner_labels=len(self.rrset.rrset.name) - 1))
+            if self.validation_status == RRSIG_STATUS_VALID:
+                self.validation_status = RRSIG_STATUS_INVALID
+
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke'] and self.rrsig.covers() != dns.rdatatype.DNSKEY:
             if self.rrsig.key_tag != self.dnskey.key_tag:
