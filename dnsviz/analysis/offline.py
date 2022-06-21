@@ -154,7 +154,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.revoked_keys = None
         self.zsks = None
         self.ksks = None
-        self.dnskey_with_ds = None
 
         self._dnskey_sets = None
         self._dnskeys = None
@@ -1943,7 +1942,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.delegation_errors = {}
         self.delegation_warnings = {}
         self.delegation_status = {}
-        self.dnskey_with_ds = set()
 
         self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs)
         if self.dlv_parent is not None:
@@ -2051,11 +2049,6 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         # check if the digest is a match
                         ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
-
-                        # if dnskey exists, then add to dnskey_with_ds
-                        if ds_status.validation_status not in \
-                                (Status.DS_STATUS_INDETERMINATE_NO_DNSKEY, Status.DS_STATUS_INDETERMINATE_MATCH_PRE_REVOKE):
-                            self.dnskey_with_ds.add(dnskey)
 
                         for rrsig in dnskey_info.rrsig_info:
                             # move along if DNSKEY is not self-signing
@@ -2539,13 +2532,21 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             servers_clients_without = servers_responsive.difference(servers_with_dnskey)
             if servers_clients_without:
                 err = Errors.DNSKEYMissingFromServers()
-                # if the key is shown to be signing anything other than the
-                # DNSKEY RRset, or if it associated with a DS or trust anchor,
-                # then mark it as an error; otherwise, mark it as a warning.
-                if dnskey in self.zsks or dnskey in self.dnskey_with_ds or dnskey.rdata in trusted_keys_rdata:
+
+                if dnskey in self.zsks:
+                    # An active ZSK must be included in all answers as the validator needs to be able
+                    # to validate a response form one server against a DNSKEY response from a second
+                    # server.
                     dnskey.errors.append(err)
+                elif dnskey in self.ksks:
+                    # The DNSKEY record will be always validated against the RRSIG that came in the
+                    # same DNS message. DNSKEY can therefore include only the KSK used by that particular
+                    # server.
+                    pass
                 else:
+                    # Unused keys has to be yet determined.
                     dnskey.warnings.append(err)
+
                 for (server,client,response) in servers_clients_without:
                     err.add_server_client(server, client, response)
 
