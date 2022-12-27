@@ -266,9 +266,15 @@ def _dnskey_to_rsa(key):
         e_len, = struct.unpack(b'!H',key[1:3])
         offset = 3
 
+    if len(key) < offset + e_len:
+        return None
+
     # get the exponent
     e = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:offset+e_len])))
     offset += e_len
+
+    if len(key) <= offset:
+        return None
 
     # get the modulus
     n = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:])))
