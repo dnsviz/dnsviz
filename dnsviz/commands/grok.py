@@ -136,16 +136,23 @@ def color_json(s):
 
 def test_pygraphviz():
     try:
-        from pygraphviz import release
         try:
-            major, minor = release.version.split('.')[:2]
+            # pygraphviz < 1.7 used pygraphviz.release.version
+            from pygraphviz import release
+            version = release.version
+        except ImportError:
+            # pygraphviz 1.7 changed to pygraphviz.__version__
+            from pygraphviz import __version__
+            version = __version__
+        try:
+            major, minor = version.split('.')[:2]
             major = int(major)
             minor = int(re.sub(r'(\d+)[^\d].*', r'\1', minor))
             if (major, minor) < (1,3):
-                logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % release.version)
+                logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % version)
                 sys.exit(2)
         except ValueError:
-            logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % release.version)
+            logger.error('''pygraphviz version >= 1.3 is required, but version %s is installed.''' % version)
             sys.exit(2)
     except ImportError:
         logger.error('''pygraphviz is required, but not installed.''')
