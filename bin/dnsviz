@@ -127,8 +127,13 @@ def main():
             sys.exit(1)
 
     if args[0] == 'help':
-        helper = mod.build_helper(logger, sys.argv[0], command)
-        helper.parser.print_help()
+        if hasattr(mod, 'build_helper'):
+            helper = mod.build_helper(logger, sys.argv[0], command)
+            helper.parser.print_help()
+        elif hasattr(mod, 'usage'):
+            mod.usage()
+        else:
+            sys.stderr.write('No help available for command: %s\n' % command)
     else:
         mod.main(args)
 
