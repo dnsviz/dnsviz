@@ -2716,7 +2716,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers = server_list
             d['servers'] = servers
 
-            ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            try:
+                ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            except IndexError:
+                ns_names = []
             ns_names.sort()
             d['ns_names'] = ns_names
 
@@ -2795,7 +2798,10 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 servers = server_list
             d['servers'] = servers
 
-            ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            try:
+                ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+            except IndexError:
+                ns_names = []
             ns_names.sort()
             d['ns_names'] = ns_names
 

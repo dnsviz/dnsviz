@@ -136,7 +136,10 @@ class RRsetNonExistent(object):
         d['servers'] = servers
 
         if map_ip_to_ns_name is not None:
-            ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+            try:
+                ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+            except IndexError:
+                ns_names = []
             ns_names.sort()
             d['ns_names'] = ns_names
 
