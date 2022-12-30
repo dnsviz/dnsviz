@@ -1350,15 +1350,20 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if qname_obj.analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
                 if not response.is_authoritative():
                     ds_referral = False
+                    mygrp = group
                     if query.rdtype == dns.rdatatype.DS:
+                        # if the parent zone is not signed, then only warn
+                        if not qname_obj.zone.signed:
+                            mygrp = warnings
+
                         # handle DS as a special case
                         if response.is_referral(query.qname, query.rdtype, query.rdclass, qname_obj.name):
                             ds_referral = True
 
                     if ds_referral:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.ReferralForDSQuery(parent=fmt.humanize_name(qname_obj.name)), group, server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.ReferralForDSQuery(parent=fmt.humanize_name(qname_obj.name)), mygrp, server, client, response)
                     else:
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), group, server, client, response)
+                        Errors.DomainNameAnalysisError.insert_into_list(Errors.NotAuthoritative(), mygrp, server, client, response)
 
             elif qname_obj.analysis_type == ANALYSIS_TYPE_RECURSIVE:
                 if response.recursion_desired() and not response.recursion_available():
