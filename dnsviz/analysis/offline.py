@@ -2197,13 +2197,33 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # if there were any remaining NXDOMAIN responses, then add the
                 # error
                 if servers_clients:
-                    err = Errors.NoNSInParent(parent=fmt.humanize_name(self.parent_name()))
+                    err = Errors.NoNSInParentNXDOMAIN(parent=fmt.humanize_name(self.parent_name()))
                     for server, client in servers_clients:
                         for response in ds_nxdomain_info.servers_clients[(server, client)]:
                             err.add_server_client(server, client, response)
                     self.delegation_errors[rdtype].append(err)
                     if self.delegation_status[rdtype] == Status.DELEGATION_STATUS_INSECURE:
                         self.delegation_status[rdtype] = Status.DELEGATION_STATUS_INCOMPLETE
+
+            try:
+                ds_nodata_info = [x for x in self.queries[(name, rdtype)].nodata_info if x.qname == name and x.rdtype == dns.rdatatype.DS][0]
+            except IndexError:
+                pass
+            else:
+                ns_bit_error = None
+                for status in self.nodata_status[ds_nodata_info]:
+                    try:
+                        ns_bit_error = [x for x in status.errors if isinstance(x, Errors.ReferralWithoutNSBitNSEC)][0]
+                    except IndexError:
+                        pass
+                    else:
+                        break
+                if ns_bit_error is not None:
+                    err = Errors.NoNSInParentNoData(parent=fmt.humanize_name(self.parent_name()))
+                    for server, client in status.nsec_set_info.servers_clients:
+                        for response in status.nsec_set_info.servers_clients[(server, client)]:
+                            err.add_server_client(server, client, response)
+                    self.delegation_errors[rdtype].append(err)
 
     def _populate_server_status(self):
         if not self.is_zone():

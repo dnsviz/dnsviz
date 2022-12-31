@@ -1967,15 +1967,31 @@ class NoSEP(DelegationError):
             raise TypeError('The "source" keyword argument is required for instantiation.')
 
 class NoNSInParent(DelegationError):
+    pass
+
+class NoNSInParentNXDOMAIN(NoNSInParent):
     '''
-    >>> e = NoNSInParent(parent='baz.')
+    >>> e = NoNSInParentNXDOMAIN(parent='baz.')
     >>> e.description
     'No delegation NS records were detected in the parent zone (baz.).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
     '''
 
     _abstract = False
-    code = 'NO_NS_IN_PARENT'
+    code = 'NO_NS_IN_PARENT_NXDOMAIN'
     description_template = "No delegation NS records were detected in the parent zone (%(parent)s).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child."
+    references = ['RFC 1034, Sec. 4.2.2']
+    required_params = ['parent']
+
+class NoNSInParentNoData(NoNSInParent):
+    '''
+    >>> e = NoNSInParentNoData(parent='baz.')
+    >>> e.description
+    'No delegation NS records were detected in the parent zone (baz.).  This results in a NODATA response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
+    '''
+
+    _abstract = False
+    code = 'NO_NS_IN_PARENT_NODATA'
+    description_template = "No delegation NS records were detected in the parent zone (%(parent)s).  This results in a NODATA response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child."
     references = ['RFC 1034, Sec. 4.2.2']
     required_params = ['parent']
 
