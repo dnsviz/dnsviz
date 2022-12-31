@@ -179,6 +179,8 @@ DS_DIGEST_ALGS_NOT_RECOMMENDED = ()
 DS_DIGEST_ALGS_PROHIBITED = (0, 1, 3)
 DS_DIGEST_ALGS_VALIDATION_PROHIBITED = ()
 
+RDTYPES_TTL_EXEMPT = (dns.rdatatype.NSEC3PARAM,)
+
 class RRSIGStatus(object):
     def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
         self.rrset = rrset
@@ -235,20 +237,22 @@ class RRSIGStatus(object):
         elif self.rrsig.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
-        # If we are comparing TTLs (i.e., for authoritative server responses),
-        # then check that the TTL of the RRset matches the TTL of the RRSIG
-        if self.rrset.ttl_cmp:
-            if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
-                self.warnings.append(Errors.RRsetTTLMismatch(rrset_ttl=self.rrset.rrset.ttl, rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl))
+        if self.rrset.rrset.rdtype not in RDTYPES_TTL_EXEMPT:
+            # If we are comparing TTLs (i.e., for authoritative server responses),
+            # then check that the TTL of the RRset matches the TTL of the RRSIG
+            if self.rrset.ttl_cmp:
+                if self.rrset.rrset.ttl != self.rrset.rrsig_info[self.rrsig].ttl:
+                    self.warnings.append(Errors.RRsetTTLMismatch(rrset_ttl=self.rrset.rrset.ttl, rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl))
 
-        # Check that the TTL of the RRset does not exceed the value in the
-        # original TTL field of the RRSIG
-        if self.rrset.rrset.ttl > self.rrsig.original_ttl:
-            self.errors.append(Errors.OriginalTTLExceededRRset(rrset_ttl=self.rrset.rrset.ttl, original_ttl=self.rrsig.original_ttl))
-        # Check that the TTL of the RRSIG does not exceed the value in the
-        # original TTL field of the RRSIG
-        if self.rrset.rrsig_info[self.rrsig].ttl > self.rrsig.original_ttl:
-            self.errors.append(Errors.OriginalTTLExceededRRSIG(rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl, original_ttl=self.rrsig.original_ttl))
+            # Check that the TTL of the RRset does not exceed the value in the
+            # original TTL field of the RRSIG
+            if self.rrset.rrset.ttl > self.rrsig.original_ttl:
+                self.errors.append(Errors.OriginalTTLExceededRRset(rrset_ttl=self.rrset.rrset.ttl, original_ttl=self.rrsig.original_ttl))
+
+            # Check that the TTL of the RRSIG does not exceed the value in the
+            # original TTL field of the RRSIG
+            if self.rrset.rrsig_info[self.rrsig].ttl > self.rrsig.original_ttl:
+                self.errors.append(Errors.OriginalTTLExceededRRSIG(rrsig_ttl=self.rrset.rrsig_info[self.rrsig].ttl, original_ttl=self.rrsig.original_ttl))
 
         min_ttl = min(self.rrset.rrset.ttl, self.rrset.rrsig_info[self.rrsig].ttl, self.rrsig.original_ttl)
 
