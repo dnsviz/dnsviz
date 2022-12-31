@@ -83,6 +83,13 @@ class DomainNameAnalysisError(object):
 
     @property
     def description(self):
+        desc = self.description_template % self.template_kwargs
+        if self.references:
+            desc += '  See %s.' % (', '.join(self.references))
+        return desc
+
+    @property
+    def description_without_references(self):
         return self.description_template % self.template_kwargs
 
     @property
@@ -101,7 +108,10 @@ class DomainNameAnalysisError(object):
                     template_kwargs_escaped[n] = escape(v)
                 else:
                     template_kwargs_escaped[n] = escape(str(v))
-        return description_template_escaped % template_kwargs_escaped
+        desc = description_template_escaped % template_kwargs_escaped
+        if self.references:
+            desc += '  See %s.' % (', '.join(self.references))
+        return desc
 
     def add_server_client(self, server, client, response):
         if (server, client) not in self.servers_clients:
@@ -174,7 +184,7 @@ class SignerNotZone(RRSIGError):
     >>> e.args
     ['foo.', 'bar.']
     >>> e.description
-    "The Signer's Name field of the RRSIG RR (bar.) does not match the name of the zone containing the RRset (foo.)."
+    "The Signer's Name field of the RRSIG RR (bar.) does not match the name of the zone containing the RRset (foo.).  See ..."
     '''
 
     _abstract = False
@@ -189,7 +199,7 @@ class RRSIGLabelsExceedRRsetOwnerLabels(RRSIGError):
     >>> e.args
     [2, 1]
     >>> e.description
-    'The value of the labels field of the RRSIG RR (2) exceeds the number of labels in the RRset owner name (1).'
+    'The value of the labels field of the RRSIG RR (2) exceeds the number of labels in the RRset owner name (1).  See ...'
     '''
 
     _abstract = False
@@ -204,7 +214,7 @@ class RRsetTTLMismatch(RRSIGError):
     >>> e.args
     [50, 10]
     >>> e.description
-    'The TTL of the RRSIG RR (10) does not match the TTL of the RRset it covers (50).'
+    'The TTL of the RRSIG RR (10) does not match the TTL of the RRset it covers (50).  See ...'
     '''
 
     _abstract = False
@@ -222,7 +232,7 @@ class OriginalTTLExceededRRset(OriginalTTLExceeded):
     >>> e.args
     [10, 50]
     >>> e.description
-    'The TTL of the RRset (50) exceeds the value of the Original TTL field of the RRSIG RR covering it (10).'
+    'The TTL of the RRset (50) exceeds the value of the Original TTL field of the RRSIG RR covering it (10).  See ...'
     '''
 
     _abstract = False
@@ -236,7 +246,7 @@ class OriginalTTLExceededRRSIG(OriginalTTLExceeded):
     >>> e.args
     [10, 50]
     >>> e.description
-    'The TTL of the RRSIG (50) exceeds the value of its Original TTL field (10).'
+    'The TTL of the RRSIG (50) exceeds the value of its Original TTL field (10).  See ...'
     '''
 
     _abstract = False
@@ -250,7 +260,7 @@ class TTLBeyondExpiration(RRSIGError):
     >>> e.args
     [datetime.datetime(2015, 1, 10, 0, 0), 86401, datetime.datetime(2015, 1, 9, 0, 0)]
     >>> e.description
-    'With a TTL of 86401 the RRSIG RR can be in the cache of a non-validating resolver until 1 second after it expires at 2015-01-10 00:00:00.'
+    'With a TTL of 86401 the RRSIG RR can be in the cache of a non-validating resolver until 1 second after it expires at 2015-01-10 00:00:00.  See ...'
     '''
 
     _abstract = False
@@ -270,7 +280,7 @@ class AlgorithmNotSupported(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'Validation of DNSSEC algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of this RRSIG is unknown.'
+    'Validation of DNSSEC algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of this RRSIG is unknown.  See ...'
     '''
 
     _abstract = False
@@ -289,7 +299,7 @@ class AlgorithmValidationProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification prohibits validation of RRSIGs with DNSSEC algorithm 5 (RSASHA1).'
+    'DNSSEC specification prohibits validation of RRSIGs with DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
@@ -308,7 +318,7 @@ class AlgorithmProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification prohibits signing with DNSSEC algorithm 5 (RSASHA1).'
+    'DNSSEC specification prohibits signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
@@ -327,7 +337,7 @@ class AlgorithmNotRecommended(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification recommends not signing with DNSSEC algorithm 5 (RSASHA1).'
+    'DNSSEC specification recommends not signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
@@ -344,7 +354,7 @@ class DNSKEYRevokedRRSIG(RRSIGError):
     '''
     >>> e = DNSKEYRevokedRRSIG()
     >>> e.description
-    'The DNSKEY RR corresponding to the RRSIG RR has the REVOKE bit set.  A revoked key cannot be used to validate RRSIGs.'
+    'The DNSKEY RR corresponding to the RRSIG RR has the REVOKE bit set.  A revoked key cannot be used to validate RRSIGs.  See ...'
     '''
 
     _abstract = False
@@ -359,7 +369,7 @@ class InceptionInFuture(RRSIGError):
     >>> e.args
     [datetime.datetime(2015, 1, 10, 0, 0), datetime.datetime(2015, 1, 9, 0, 0)]
     >>> e.description
-    'The Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the future.'
+    'The Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the future.  See ...'
     '''
 
     _abstract = False
@@ -379,7 +389,7 @@ class ExpirationInPast(RRSIGError):
     >>> e.args
     [datetime.datetime(2015, 1, 10, 0, 0), datetime.datetime(2015, 1, 11, 0, 0)]
     >>> e.description
-    'The Signature Expiration field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the past.'
+    'The Signature Expiration field of the RRSIG RR (2015-01-10 00:00:00) is 1 day in the past.  See ...'
     '''
 
     _abstract = False
@@ -397,7 +407,7 @@ class InceptionWithinClockSkew(RRSIGError):
     '''
     >>> e = InceptionWithinClockSkew(inception=datetime.datetime(2015,1,10,0,0,0), reference_time=datetime.datetime(2015,1,10,0,0,1))
     >>> e.description
-    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:01).'
+    'The value of the Signature Inception field of the RRSIG RR (2015-01-10 00:00:00) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:01).  See ...'
     '''
 
     _abstract = False
@@ -415,7 +425,7 @@ class ExpirationWithinClockSkew(RRSIGError):
     '''
     >>> e = ExpirationWithinClockSkew(expiration=datetime.datetime(2015,1,10,0,0,1), reference_time=datetime.datetime(2015,1,10,0,0,0))
     >>> e.description
-    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:00).'
+    'The value of the Signature Expiration field of the RRSIG RR (2015-01-10 00:00:01) is within possible clock skew range (1 second) of the current time (2015-01-10 00:00:00).  See ...'
     '''
 
     _abstract = False
@@ -433,7 +443,7 @@ class SignatureInvalid(RRSIGError):
     '''
     >>> e = SignatureInvalid()
     >>> e.description
-    'The cryptographic signature of the RRSIG RR does not properly validate.'
+    'The cryptographic signature of the RRSIG RR does not properly validate.  See ...'
     '''
 
     _abstract = False
@@ -449,7 +459,7 @@ class RRSIGBadLengthGOST(RRSIGBadLength):
     '''
     >>> e = RRSIGBadLengthGOST(length=500)
     >>> e.description
-    'The length of the signature is 500 bits, but a GOST signature (DNSSEC algorithm 12) must be 512 bits long.'
+    'The length of the signature is 500 bits, but a GOST signature (DNSSEC algorithm 12) must be 512 bits long.  See ...'
     '''
     _abstract = False
     description_template = 'The length of the signature is %(length)d bits, but a GOST signature (DNSSEC algorithm 12) must be 512 bits long.'
@@ -475,7 +485,7 @@ class RRSIGBadLengthECDSA256(RRSIGBadLengthECDSA):
     '''
     >>> e = RRSIGBadLengthECDSA256(length=500)
     >>> e.description
-    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.'
+    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.  See ...'
     '''
     curve = 'P-256'
     algorithm = 13
@@ -487,7 +497,7 @@ class RRSIGBadLengthECDSA384(RRSIGBadLengthECDSA):
     '''
     >>> e = RRSIGBadLengthECDSA384(length=500)
     >>> e.description
-    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.'
+    'The length of the signature is 500 bits, but an ECDSA signature made with Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.  See ...'
     '''
     curve = 'P-384'
     algorithm = 14
@@ -513,7 +523,7 @@ class RRSIGBadLengthEd25519(RRSIGBadLengthEdDSA):
     '''
     >>> e = RRSIGBadLengthEd25519(length=500)
     >>> e.description
-    'The length of the signature is 500 bits, but an Ed25519 signature (DNSSEC algorithm 15) must be 512 bits long.'
+    'The length of the signature is 500 bits, but an Ed25519 signature (DNSSEC algorithm 15) must be 512 bits long.  See ...'
     '''
     curve = 'Ed25519'
     algorithm = 15
@@ -525,7 +535,7 @@ class RRSIGBadLengthEd448(RRSIGBadLengthEdDSA):
     '''
     >>> e = RRSIGBadLengthEd448(length=500)
     >>> e.description
-    'The length of the signature is 500 bits, but an Ed448 signature (DNSSEC algorithm 16) must be 912 bits long.'
+    'The length of the signature is 500 bits, but an Ed448 signature (DNSSEC algorithm 16) must be 912 bits long.  See ...'
     '''
     curve = 'Ed448'
     algorithm = 16
@@ -540,7 +550,7 @@ class ReferralForDSQuery(DSError):
     '''
     >>> e = ReferralForDSQuery(parent='baz.')
     >>> e.description
-    'The server(s) for the parent zone (baz.) responded with a referral instead of answering authoritatively for the DS RR type.'
+    'The server(s) for the parent zone (baz.) responded with a referral instead of answering authoritatively for the DS RR type.  See ...'
     '''
     _abstract = False
     code = 'REFERRAL_FOR_DS_QUERY'
@@ -552,7 +562,7 @@ class DSDigestAlgorithmIgnored(DSError):
     '''
     >>> e = DSDigestAlgorithmIgnored(algorithm=1, new_algorithm=2)
     >>> e.description
-    'DS records with digest type 1 (SHA-1) are ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.'
+    'DS records with digest type 1 (SHA-1) are ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.  See ...'
     '''
     _abstract = False
     code = 'DS_DIGEST_ALGORITHM_IGNORED'
@@ -569,7 +579,7 @@ class DSDigestAlgorithmMaybeIgnored(DSError):
     '''
     >>> e = DSDigestAlgorithmMaybeIgnored(algorithm=1, new_algorithm=2)
     >>> e.description
-    'In the spirit of RFC 4509, DS records with digest type 1 (SHA-1) might be ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.'
+    'In the spirit of RFC 4509, DS records with digest type 1 (SHA-1) might be ignored when DS records with digest type 2 (SHA-256) exist in the same RRset.  See ...'
     '''
     _abstract = False
     code = 'DS_DIGEST_ALGORITHM_MAYBE_IGNORED'
@@ -589,7 +599,7 @@ class DigestAlgorithmNotSupported(DSDigestError):
     '''
     >>> e = DigestAlgorithmNotSupported(algorithm=5)
     >>> e.description
-    'Generating cryptographic hashes using algorithm 5 (5) is not supported by this code, so the cryptographic status of the DS RR is unknown.'
+    'Generating cryptographic hashes using algorithm 5 (5) is not supported by this code, so the cryptographic status of the DS RR is unknown.  See ...'
     '''
 
     _abstract = False
@@ -606,7 +616,7 @@ class DigestAlgorithmValidationProhibited(DSDigestError):
     '''
     >>> e = DigestAlgorithmValidationProhibited(algorithm=5)
     >>> e.description
-    'DNSSEC specification prohibits validation of DS records that use digest algorithm 5 (5).'
+    'DNSSEC specification prohibits validation of DS records that use digest algorithm 5 (5).  See ...'
     '''
 
     _abstract = False
@@ -623,7 +633,7 @@ class DigestAlgorithmProhibited(DSDigestError):
     '''
     >>> e = DigestAlgorithmProhibited(algorithm=5)
     >>> e.description
-    'DNSSEC specification prohibits signing with DS records that use digest algorithm 5 (5).'
+    'DNSSEC specification prohibits signing with DS records that use digest algorithm 5 (5).  See ...'
     '''
 
     _abstract = False
@@ -640,7 +650,7 @@ class DigestAlgorithmNotRecommended(DSDigestError):
     '''
     >>> e = DigestAlgorithmNotRecommended(algorithm=5)
     >>> e.description
-    'DNSSEC specification recommends not signing with DS records that use digest algorithm 5 (5).'
+    'DNSSEC specification recommends not signing with DS records that use digest algorithm 5 (5).  See ...'
     '''
 
     _abstract = False
@@ -657,7 +667,7 @@ class DNSKEYRevokedDS(DSDigestError):
     '''
     >>> e = DNSKEYRevokedDS()
     >>> e.description
-    'The DNSKEY RR corresponding to the DS RR has the REVOKE bit set.  A revoked key cannot be used with DS records.'
+    'The DNSKEY RR corresponding to the DS RR has the REVOKE bit set.  A revoked key cannot be used with DS records.  See ...'
     '''
 
     _abstract = False
@@ -670,7 +680,7 @@ class DigestInvalid(DSDigestError):
     '''
     >>> e = DigestInvalid()
     >>> e.description
-    'The cryptographic hash in the Digest field of the DS RR does not match the computed value.'
+    'The cryptographic hash in the Digest field of the DS RR does not match the computed value.  See ...'
     '''
 
     _abstract = False
@@ -696,7 +706,7 @@ class SnameNotCoveredNameError(SnameNotCovered):
     '''
     >>> e = SnameNotCoveredNameError(sname='foo.baz.')
     >>> e.description
-    'No NSEC RR covers the SNAME (foo.baz.).'
+    'No NSEC RR covers the SNAME (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -716,7 +726,7 @@ class NextClosestEncloserNotCoveredNameError(NextClosestEncloserNotCovered):
     '''
     >>> e = NextClosestEncloserNotCoveredNameError(next_closest_encloser='foo.baz.')
     >>> e.description
-    'No NSEC3 RR covers the next closest encloser (foo.baz.).'
+    'No NSEC3 RR covers the next closest encloser (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -743,7 +753,7 @@ class WildcardNotCoveredNSEC(WildcardNotCovered):
     '''
     >>> e = WildcardNotCoveredNSEC(wildcard='*.foo.baz.')
     >>> e.description
-    'No NSEC RR covers the wildcard (*.foo.baz.).'
+    'No NSEC RR covers the wildcard (*.foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -765,7 +775,7 @@ class NoClosestEncloserNameError(NoClosestEncloser):
     '''
     >>> e = NoClosestEncloserNameError(sname='foo.baz.')
     >>> e.description
-    'No NSEC3 RR corresponds to the closest encloser of the SNAME (foo.baz.).'
+    'No NSEC3 RR corresponds to the closest encloser of the SNAME (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -793,7 +803,7 @@ class OptOutFlagNotSetNODATA(OptOutFlagNotSet):
     '''
     >>> e = OptOutFlagNotSetNODATA(next_closest_encloser='foo.baz.')
     >>> e.description
-    'The opt-out flag was not set in the NSEC3 RR covering the next closest encloser (foo.baz.) but was required for the NODATA response.'
+    'The opt-out flag was not set in the NSEC3 RR covering the next closest encloser (foo.baz.) but was required for the NODATA response.  See ...'
     '''
 
     _abstract = False
@@ -812,7 +822,7 @@ class ReferralWithSOABitNSEC(ReferralWithSOABit):
     '''
     >>> e = ReferralWithSOABitNSEC(sname='foo.baz.')
     >>> e.description
-    'The SOA bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    'The SOA bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -833,7 +843,7 @@ class ReferralWithDSBitNSEC(ReferralWithDSBit):
     '''
     >>> e = ReferralWithDSBitNSEC(sname='foo.baz.')
     >>> e.description
-    'The DS bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    'The DS bit was set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -854,7 +864,7 @@ class ReferralWithoutNSBitNSEC(ReferralWithoutNSBit):
     '''
     >>> e = ReferralWithoutNSBitNSEC(sname='foo.baz.')
     >>> e.description
-    'The NS bit was not set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).'
+    'The NS bit was not set in the bitmap of the NSEC RR corresponding to the delegated name (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -878,7 +888,7 @@ class StypeInBitmapNODATANSEC(StypeInBitmapNODATA):
     '''
     >>> e = StypeInBitmapNODATANSEC(stype='A', sname='foo.baz.')
     >>> e.description
-    'The A bit was set in the bitmap of the NSEC RR corresponding to the SNAME (foo.baz.).'
+    'The A bit was set in the bitmap of the NSEC RR corresponding to the SNAME (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -917,7 +927,7 @@ class NoNSECMatchingSnameNODATA(NoNSECMatchingSname):
     '''
     >>> e = NoNSECMatchingSnameNODATA(sname='foo.baz.')
     >>> e.description
-    'No NSEC RR matches the SNAME (foo.baz.).'
+    'No NSEC RR matches the SNAME (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -937,7 +947,7 @@ class NoNSEC3MatchingSnameNODATA(NoNSEC3MatchingSname):
     '''
     >>> e = NoNSEC3MatchingSnameNODATA(sname='foo.baz.')
     >>> e.description
-    'No NSEC3 RR matches the SNAME (foo.baz.).'
+    'No NSEC3 RR matches the SNAME (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -951,7 +961,7 @@ class WildcardExpansionInvalid(NSECError):
     '''
     >>> e = WildcardExpansionInvalid(sname='a.b.c.foo.baz.', wildcard='*.foo.baz.', next_closest_encloser='b.c.foo.baz.')
     >>> e.description
-    'The wildcard expansion of *.foo.baz. to a.b.c.foo.baz. is invalid, as the NSEC RR indicates that the next closest encloser (b.c.foo.baz.) exists.'
+    'The wildcard expansion of *.foo.baz. to a.b.c.foo.baz. is invalid, as the NSEC RR indicates that the next closest encloser (b.c.foo.baz.) exists.  See ...'
     '''
 
     _abstract = False
@@ -973,7 +983,7 @@ class WildcardCoveredAnswerNSEC(WildcardCoveredAnswer):
     '''
     >>> e = WildcardCoveredAnswerNSEC(wildcard='*.foo.baz.')
     >>> e.description
-    "The NSEC RR covers the wildcard itself (*.foo.baz.), indicating that it doesn't exist."
+    "The NSEC RR covers the wildcard itself (*.foo.baz.), indicating that it doesn't exist.  See ..."
     '''
 
     _abstract = False
@@ -1014,7 +1024,7 @@ class ExistingCoveredNSEC(ExistingCovered):
     '''
     >>> e = ExistingCoveredNSEC(queries=[('www.foo.baz.', 'A'), ('www1.foo.baz.', 'TXT')])
     >>> e.description
-    "The following queries resulted in an answer response, even though the NSEC records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT"
+    "The following queries resulted in an answer response, even though the NSEC records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT  See ..."
     '''
 
     _abstract = False
@@ -1025,7 +1035,7 @@ class ExistingCoveredNSEC3(ExistingCovered):
     '''
     >>> e = ExistingCoveredNSEC3(queries=[('www.foo.baz.', 'A'), ('www1.foo.baz.', 'TXT')])
     >>> e.description
-    "The following queries resulted in an answer response, even though the NSEC3 records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT"
+    "The following queries resulted in an answer response, even though the NSEC3 records indicate that the queried names don't exist: www.foo.baz./A, www1.foo.baz./TXT  See ..."
     '''
 
     _abstract = False
@@ -1040,7 +1050,7 @@ class ExistingTypeNotInBitmapNSEC(ExistingTypeNotInBitmap):
     '''
     >>> e = ExistingTypeNotInBitmapNSEC(queries=[('www.foo.baz.', 'A'), ('www.foo.baz.', 'TXT')])
     >>> e.description
-    "The following queries resulted in an answer response, even though the bitmap in the NSEC RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT"
+    "The following queries resulted in an answer response, even though the bitmap in the NSEC RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT  See ..."
     '''
 
     _abstract = False
@@ -1051,7 +1061,7 @@ class ExistingTypeNotInBitmapNSEC3(ExistingTypeNotInBitmap):
     '''
     >>> e = ExistingTypeNotInBitmapNSEC3(queries=[('www.foo.baz.', 'A'), ('www.foo.baz.', 'TXT')])
     >>> e.description
-    "The following queries resulted in an answer response, even though the bitmap in the NSEC3 RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT"
+    "The following queries resulted in an answer response, even though the bitmap in the NSEC3 RR indicates that the queried records don't exist: www.foo.baz./A, www.foo.baz./TXT  See ..."
     '''
 
     _abstract = False
@@ -1062,7 +1072,7 @@ class SnameCoveredNODATANSEC(NSECError):
     '''
     >>> e = SnameCoveredNODATANSEC(sname='foo.baz.')
     >>> e.description
-    "The NSEC RR covers the SNAME (foo.baz.), indicating that it doesn't exist."
+    "The NSEC RR covers the SNAME (foo.baz.), indicating that it doesn't exist.  See ..."
     '''
 
     _abstract = False
@@ -1077,7 +1087,7 @@ class LastNSECNextNotZone(NSECError):
     '''
     >>> e = LastNSECNextNotZone(nsec_owner='z.foo.baz.', next_name='a.foo.baz.', zone_name='foo.baz.')
     >>> e.description
-    'The value of the Next Domain Name field in the NSEC RR with owner name z.foo.baz. indicates that it is the last NSEC RR in the zone, but the value (a.foo.baz.) did not match the name of the zone apex (foo.baz.).'
+    'The value of the Next Domain Name field in the NSEC RR with owner name z.foo.baz. indicates that it is the last NSEC RR in the zone, but the value (a.foo.baz.) did not match the name of the zone apex (foo.baz.).  See ...'
     '''
 
     _abstract = False
@@ -1091,7 +1101,7 @@ class UnsupportedNSEC3Algorithm(NSECError):
     '''
     >>> e = UnsupportedNSEC3Algorithm(algorithm=2)
     >>> e.description
-    'Generating NSEC3 hashes using algorithm 2 is not supported by this code.'
+    'Generating NSEC3 hashes using algorithm 2 is not supported by this code.  See ...'
     '''
 
     _abstract = False
@@ -1105,7 +1115,7 @@ class InvalidNSEC3OwnerName(NSECError):
     '''
     >>> e = InvalidNSEC3OwnerName(name='foo.com.')
     >>> e.description
-    'The NSEC3 owner name (foo.com.) is invalid; it does not appear to be the Base32 Hex encoding of a hashed owner name.'
+    'The NSEC3 owner name (foo.com.) is invalid; it does not appear to be the Base32 Hex encoding of a hashed owner name.  See ...'
     '''
 
     _abstract = False
@@ -1119,7 +1129,7 @@ class InvalidNSEC3Hash(NSECError):
     '''
     >>> e = InvalidNSEC3Hash(name='foo', nsec3_hash='foo===')
     >>> e.description
-    'The NSEC3 record for foo is invalid; the value of the Next Hashed Owner Name field (foo===) does not appear to be a valid hash.'
+    'The NSEC3 record for foo is invalid; the value of the Next Hashed Owner Name field (foo===) does not appear to be a valid hash.  See ...'
     '''
 
     _abstract = False
@@ -1146,10 +1156,10 @@ class NetworkError(InvalidResponseError):
     '''
     >>> e = NetworkError(tcp=False, errno='EHOSTUNREACH')
     >>> e.description
-    'The server was not reachable over UDP (EHOSTUNREACH).'
+    'The server was not reachable over UDP (EHOSTUNREACH).  See ...'
     >>> e = NetworkError(tcp=False, errno='ECONNREFUSED')
     >>> e.description
-    'The UDP connection was refused (ECONNREFUSED).'
+    'The UDP connection was refused (ECONNREFUSED).  See ...'
     >>> e.terse_description
     'NETWORK_ERROR:ECONNREFUSED'
     '''
@@ -1159,6 +1169,7 @@ class NetworkError(InvalidResponseError):
     description_template = '%(description)s'
     terse_description_template = '%(code)s:%(errno)s'
     required_params = InvalidResponseError.required_params + ['errno']
+    references = ['RFC 1035, Sec. 4.2']
 
     def __init__(self, *args, **kwargs):
         super(NetworkError, self).__init__(**kwargs)
@@ -1187,13 +1198,14 @@ class Timeout(InvalidResponseError):
     '''
     >>> e = Timeout(tcp=False, attempts=3)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times).'
+    'No response was received from the server over UDP (tried 3 times).  See ...'
     '''
 
     _abstract = False
     code = 'TIMEOUT'
     description_template = "No response was received from the server over %(proto)s (tried %(attempts)d times)."
     required_params = InvalidResponseError.required_params + ['attempts']
+    references = ['RFC 1035, Sec. 4.2']
 
 class UnknownResponseError(InvalidResponseError):
     '''
@@ -1214,7 +1226,7 @@ class InvalidRcode(InvalidResponseError):
     '''
     >>> e = InvalidRcode(tcp=False, rcode='SERVFAIL')
     >>> e.description
-    'The response had an invalid RCODE (SERVFAIL).'
+    'The response had an invalid RCODE (SERVFAIL).  See ...'
     >>> e.terse_description
     'INVALID_RCODE:SERVFAIL'
     '''
@@ -1224,12 +1236,13 @@ class InvalidRcode(InvalidResponseError):
     description_template = "The response had an invalid RCODE (%(rcode)s)."
     terse_description_template = '%(code)s:%(rcode)s'
     required_params = InvalidResponseError.required_params + ['rcode']
+    references = ['RFC 1035, Sec. 4.1.1']
 
 class NotAuthoritative(ResponseError):
     '''
     >>> e = NotAuthoritative()
     >>> e.description
-    'The Authoritative Answer (AA) flag was not set in the response.'
+    'The Authoritative Answer (AA) flag was not set in the response.  See ...'
     '''
 
     _abstract = False
@@ -1242,7 +1255,7 @@ class AuthoritativeReferral(ResponseError):
     '''
     >>> e = AuthoritativeReferral()
     >>> e.description
-    'The Authoritative Answer (AA) flag was set in the referral response.'
+    'The Authoritative Answer (AA) flag was set in the referral response.  See ...'
     '''
 
     _abstract = False
@@ -1255,7 +1268,7 @@ class RecursionNotAvailable(ResponseError):
     '''
     >>> e = RecursionNotAvailable()
     >>> e.description
-    'Recursion was desired, but the Recursion Available (RA) flag was not set in the response.'
+    'Recursion was desired, but the Recursion Available (RA) flag was not set in the response.  See ...'
     '''
 
     _abstract = False
@@ -1271,7 +1284,8 @@ class ResponseErrorWithCondition(ResponseError):
 
     def __init__(self, *args, **kwargs):
         super(ResponseErrorWithCondition, self).__init__(**kwargs)
-        self.template_kwargs['response_error_description'] = self.template_kwargs['response_error'].description[:-1]
+        desc = self.template_kwargs['response_error'].description_without_references
+        self.template_kwargs['response_error_description'] = desc[:-1]
         if self.template_kwargs['query_specific']:
             self.template_kwargs['query_specific_text'] = ' (however, this server appeared to respond legitimately to other queries with %s)' % (self.precondition % self.template_kwargs)
         else:
@@ -1281,7 +1295,7 @@ class ResponseErrorWithRequestFlag(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the RD flag was cleared.'
+    'No response was received from the server over UDP (tried 3 times) until the RD flag was cleared.  See ...'
     '''
 
     _abstract = False
@@ -1298,7 +1312,7 @@ class ResponseErrorWithoutRequestFlag(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithoutRequestFlag(response_error=Timeout(tcp=False, attempts=3), flag='RD', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the RD flag was set.'
+    'No response was received from the server over UDP (tried 3 times) until the RD flag was set.  See ...'
     '''
 
     _abstract = False
@@ -1315,7 +1329,7 @@ class ResponseErrorWithEDNS(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithEDNS(response_error=Timeout(tcp=False, attempts=3), query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.'
+    'No response was received from the server over UDP (tried 3 times) until EDNS was disabled.  See ...'
     '''
 
     _abstract = False
@@ -1331,7 +1345,7 @@ class ResponseErrorWithEDNSVersion(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithEDNSVersion(response_error=Timeout(tcp=False, attempts=3), edns_old=3, edns_new=0, query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the version of EDNS was changed from 3 to 0.'
+    'No response was received from the server over UDP (tried 3 times) until the version of EDNS was changed from 3 to 0.  See ...'
     '''
 
     _abstract = False
@@ -1349,7 +1363,7 @@ class ResponseErrorWithEDNSFlag(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was cleared.'
+    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was cleared.  See ...'
     '''
 
     _abstract = False
@@ -1366,7 +1380,7 @@ class ResponseErrorWithoutEDNSFlag(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithoutEDNSFlag(response_error=Timeout(tcp=False, attempts=3), flag='DO', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was set.'
+    'No response was received from the server over UDP (tried 3 times) until the DO EDNS flag was set.  See ...'
     '''
 
     _abstract = False
@@ -1383,7 +1397,7 @@ class ResponseErrorWithEDNSOption(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was removed.'
+    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was removed.  See ...'
     '''
 
     _abstract = False
@@ -1400,7 +1414,7 @@ class ResponseErrorWithoutEDNSOption(ResponseErrorWithCondition):
     '''
     >>> e = ResponseErrorWithoutEDNSOption(response_error=Timeout(tcp=False, attempts=3), option='NSID', query_specific=False)
     >>> e.description
-    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was added.'
+    'No response was received from the server over UDP (tried 3 times) until the NSID EDNS option was added.  See ...'
     '''
 
     _abstract = False
@@ -1420,7 +1434,7 @@ class EDNSVersionMismatch(EDNSError):
     '''
     >>> e = EDNSVersionMismatch(request_version=1, response_version=0)
     >>> e.description
-    'The server responded with EDNS version 0 when a request with EDNS version 1 was sent, instead of responding with RCODE BADVERS.'
+    'The server responded with EDNS version 0 when a request with EDNS version 1 was sent, instead of responding with RCODE BADVERS.  See ...'
     '''
 
     _abstract = False
@@ -1433,7 +1447,7 @@ class EDNSIgnored(EDNSError):
     '''
     >>> e = EDNSIgnored()
     >>> e.description
-    'The server responded with no OPT record, rather than with RCODE FORMERR.'
+    'The server responded with no OPT record, rather than with RCODE FORMERR.  See ...'
     '''
 
     _abstract = False
@@ -1446,7 +1460,7 @@ class EDNSSupportNoOpt(EDNSError):
     '''
     >>> e = EDNSSupportNoOpt()
     >>> e.description
-    'The server appeared to understand EDNS by including RRSIG records, but its response included no OPT record.'
+    'The server appeared to understand EDNS by including RRSIG records, but its response included no OPT record.  See ...'
     '''
 
     _abstract = False
@@ -1459,7 +1473,7 @@ class GratuitousOPT(EDNSError):
     '''
     >>> e = GratuitousOPT()
     >>> e.description
-    'The server responded with an OPT record, even though none was sent in the request.'
+    'The server responded with an OPT record, even though none was sent in the request.  See ...'
     '''
 
     _abstract = False
@@ -1472,7 +1486,7 @@ class ImplementedEDNSVersionNotProvided(EDNSError):
     '''
     >>> e = ImplementedEDNSVersionNotProvided(request_version=100, response_version=100)
     >>> e.description
-    'The server responded with BADVERS to EDNS version 100 but responded with version 100 instead of providing the highest EDNS version it implements.'
+    'The server responded with BADVERS to EDNS version 100 but responded with version 100 instead of providing the highest EDNS version it implements.  See ...'
     '''
 
     _abstract = False
@@ -1485,7 +1499,7 @@ class EDNSUndefinedFlagsSet(EDNSError):
     '''
     >>> e = EDNSUndefinedFlagsSet(flags=0x80)
     >>> e.description
-    'The server set EDNS flags that are undefined: 0x80.'
+    'The server set EDNS flags that are undefined: 0x80.  See ...'
     '''
 
     _abstract = False
@@ -1505,14 +1519,15 @@ class DNSSECDowngrade(EDNSError):
 
     def __init__(self, *args, **kwargs):
         super(DNSSECDowngrade, self).__init__(**kwargs)
-        self.template_kwargs['response_error_description'] = self.template_kwargs['response_error'].description[0].lower() + self.template_kwargs['response_error'].description[1:-1]
+        desc = self.template_kwargs['response_error'].description_without_references
+        self.template_kwargs['response_error_description'] = desc[0].lower() + desc[1:-1]
         self.template_kwargs['precondition'] = self.precondition
 
 class DNSSECDowngradeDOBitCleared(DNSSECDowngrade):
     '''
     >>> e = DNSSECDowngradeDOBitCleared(response_error=Timeout(tcp=False, attempts=3))
     >>> e.description
-    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with the DO bit set.'
+    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with the DO bit set.  See ...'
     '''
 
     _abstract = False
@@ -1524,7 +1539,7 @@ class DNSSECDowngradeEDNSDisabled(DNSSECDowngrade):
     '''
     >>> e = DNSSECDowngradeEDNSDisabled(response_error=Timeout(tcp=False, attempts=3), query_specific=False)
     >>> e.description
-    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with EDNS enabled.'
+    'DNSSEC was effectively downgraded because no response was received from the server over UDP (tried 3 times) with EDNS enabled.  See ...'
     '''
 
     _abstract = False
@@ -1539,7 +1554,7 @@ class GratuitousCookie(DNSCookieError):
     '''
     >>> e = GratuitousCookie()
     >>> e.description
-    'The server sent a COOKIE option when none was sent by the client.'
+    'The server sent a COOKIE option when none was sent by the client.  See ...'
     '''
 
     _abstract = False
@@ -1551,7 +1566,7 @@ class MalformedCookieWithoutFORMERR(DNSCookieError):
     '''
     >>> e = MalformedCookieWithoutFORMERR()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a FORMERR status when issued a malformed COOKIE option.'
+    'The server appears to support DNS cookies but did not return a FORMERR status when issued a malformed COOKIE option.  See ...'
     '''
 
     _abstract = False
@@ -1563,7 +1578,7 @@ class NoCookieOption(DNSCookieError):
     '''
     >>> e = NoCookieOption()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a COOKIE option.'
+    'The server appears to support DNS cookies but did not return a COOKIE option.  See ...'
     '''
 
     _abstract = False
@@ -1575,7 +1590,7 @@ class NoServerCookieWithoutBADCOOKIE(DNSCookieError):
     '''
     >>> e = NoServerCookieWithoutBADCOOKIE()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a BADCOOKIE status when no server cookie was sent.'
+    'The server appears to support DNS cookies but did not return a BADCOOKIE status when no server cookie was sent.  See ...'
     '''
 
     _abstract = False
@@ -1587,7 +1602,7 @@ class InvalidServerCookieWithoutBADCOOKIE(DNSCookieError):
     '''
     >>> e = InvalidServerCookieWithoutBADCOOKIE()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.'
+    'The server appears to support DNS cookies but did not return a BADCOOKIE status when an invalid server cookie was sent.  See ...'
     '''
 
     _abstract = False
@@ -1599,7 +1614,7 @@ class NoServerCookie(DNSCookieError):
     '''
     >>> e = NoServerCookie()
     >>> e.description
-    'The server appears to support DNS cookies but did not return a server cookie with its COOKIE option.'
+    'The server appears to support DNS cookies but did not return a server cookie with its COOKIE option.  See ...'
     '''
 
     _abstract = False
@@ -1611,7 +1626,7 @@ class ClientCookieMismatch(DNSCookieError):
     '''
     >>> e = ClientCookieMismatch()
     >>> e.description
-    'The client cookie returned by the server did not match what was sent.'
+    'The client cookie returned by the server did not match what was sent.  See ...'
     '''
 
     _abstract = False
@@ -1623,7 +1638,7 @@ class CookieInvalidLength(DNSCookieError):
     '''
     >>> e = CookieInvalidLength(length=61)
     >>> e.description
-    'The cookie returned by the server had an invalid length of 61 bytes.'
+    'The cookie returned by the server had an invalid length of 61 bytes.  See ...'
     '''
 
     _abstract = False
@@ -1636,7 +1651,7 @@ class UnableToRetrieveDNSSECRecords(ResponseError):
     '''
     >>> e = UnableToRetrieveDNSSECRecords()
     >>> e.description
-    'The DNSSEC records necessary to validate the response could not be retrieved from the server.'
+    'The DNSSEC records necessary to validate the response could not be retrieved from the server.  See ...'
     '''
 
     _abstract = False
@@ -1650,7 +1665,7 @@ class MissingRRSIG(ResponseError):
     '''
     >>> e = MissingRRSIG()
     >>> e.description
-    'No RRSIG covering the RRset was returned in the response.'
+    'No RRSIG covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1674,7 +1689,7 @@ class MissingRRSIGForAlgDNSKEY(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDNSKEY(algorithm=5)
     >>> e.description
-    'The DNSKEY RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    'The DNSKEY RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1685,7 +1700,7 @@ class MissingRRSIGForAlgDS(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDS(algorithm=5)
     >>> e.description
-    'The DS RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    'The DS RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1696,7 +1711,7 @@ class MissingRRSIGForAlgDLV(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDLV(algorithm=5)
     >>> e.description
-    'The DLV RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.'
+    'The DLV RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1715,7 +1730,7 @@ class MissingNSECForNXDOMAIN(MissingNSEC):
     '''
     >>> e = MissingNSECForNXDOMAIN()
     >>> e.description
-    'No NSEC RR(s) were returned to validate the NXDOMAIN response.'
+    'No NSEC RR(s) were returned to validate the NXDOMAIN response.  See ...'
     '''
 
     _abstract = False
@@ -1727,7 +1742,7 @@ class MissingNSECForNODATA(MissingNSEC):
     '''
     >>> e = MissingNSECForNODATA()
     >>> e.description
-    'No NSEC RR(s) were returned to validate the NODATA response.'
+    'No NSEC RR(s) were returned to validate the NODATA response.  See ...'
     '''
 
     _abstract = False
@@ -1739,7 +1754,7 @@ class MissingNSECForWildcard(MissingNSEC):
     '''
     >>> e = MissingNSECForWildcard()
     >>> e.description
-    'No NSEC RR(s) were returned to validate the wildcard response.'
+    'No NSEC RR(s) were returned to validate the wildcard response.  See ...'
     '''
 
     _abstract = False
@@ -1760,7 +1775,7 @@ class MissingSOAForNXDOMAIN(MissingSOA):
     '''
     >>> e = MissingSOAForNXDOMAIN()
     >>> e.description
-    'No SOA RR was returned with the NXDOMAIN response.'
+    'No SOA RR was returned with the NXDOMAIN response.  See ...'
     '''
 
     _abstract = False
@@ -1772,7 +1787,7 @@ class MissingSOAForNODATA(MissingSOA):
     '''
     >>> e = MissingSOAForNODATA()
     >>> e.description
-    'No SOA RR was returned with the NODATA response.'
+    'No SOA RR was returned with the NODATA response.  See ...'
     '''
 
     _abstract = False
@@ -1800,7 +1815,7 @@ class SOAOwnerNotZoneForNXDOMAIN(SOAOwnerNotZone):
     '''
     >>> e = SOAOwnerNotZoneForNXDOMAIN(soa_owner_name='foo.baz.', zone_name='bar.')
     >>> e.description
-    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NXDOMAIN response.'
+    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NXDOMAIN response.  See ...'
     '''
 
     _abstract = False
@@ -1812,7 +1827,7 @@ class SOAOwnerNotZoneForNODATA(SOAOwnerNotZone):
     '''
     >>> e = SOAOwnerNotZoneForNODATA(soa_owner_name='foo.baz.', zone_name='bar.')
     >>> e.description
-    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NODATA response.'
+    'An SOA RR with owner name (foo.baz.) not matching the zone name (bar.) was returned with the NODATA response.  See ...'
     '''
 
     _abstract = False
@@ -1824,7 +1839,7 @@ class InconsistentNXDOMAIN(ResponseError):
     '''
     >>> e = InconsistentNXDOMAIN(qname='foo.baz.', rdtype_nxdomain='NS', rdtype_noerror='A')
     >>> e.description
-    'The server returned a no error (NOERROR) response when queried for foo.baz. having record data of type A, but returned a name error (NXDOMAIN) when queried for foo.baz. having record data of type NS.'
+    'The server returned a no error (NOERROR) response when queried for foo.baz. having record data of type A, but returned a name error (NXDOMAIN) when queried for foo.baz. having record data of type NS.  See ...'
     '''
 
     _abstract = False
@@ -1837,23 +1852,23 @@ class InconsistentNXDOMAINAncestry(ResponseError):
     '''
     >>> e = InconsistentNXDOMAINAncestry(qname='foo.baz.', ancestor_qname='baz.')
     >>> e.description
-    "A query for foo.baz. results in a NOERROR response, while a query for its ancestor, baz., returns a name error (NXDOMAIN), which indicates that subdomains of baz., including foo.baz., don't exist."
+    "A query for foo.baz. results in a NOERROR response, while a query for its ancestor, baz., returns a name error (NXDOMAIN), which indicates that subdomains of baz., including foo.baz., don't exist.  See ..."
     '''
 
     _abstract = False
     code = 'INCONSISTENT_NXDOMAIN_ANCESTOR'
     description_template = "A query for %(qname)s results in a NOERROR response, while a query for its ancestor, %(ancestor_qname)s, returns a name error (NXDOMAIN), which indicates that subdomains of %(ancestor_qname)s, including %(qname)s, don't exist."
     required_params = ['qname', 'ancestor_qname']
-    references = []
+    references = ['RFC 8020, Sec. 2']
 
 class PMTUExceeded(ResponseError):
     '''
     >>> e = PMTUExceeded(pmtu_lower_bound=None, pmtu_upper_bound=None)
     >>> e.description
-    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size.'
+    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size.  See ...'
     >>> e = PMTUExceeded(pmtu_lower_bound=511, pmtu_upper_bound=513)
     >>> e.description
-    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size. The PMTU was bounded between 511 and 513 bytes.'
+    'No response was received until the UDP payload size was decreased, indicating that the server might be attempting to send a payload that exceeds the path maximum transmission unit (PMTU) size. The PMTU was bounded between 511 and 513 bytes.  See ...'
     '''
 
     _abstract = False
@@ -1872,7 +1887,7 @@ class PMTUExceeded(ResponseError):
 class ForeignClassData(ResponseError):
     section = None
     description_template = 'Data of class %(cls)s was found in the %(section)s section of the response.'
-    references = ['RFC 1034', 'RFC 1035']
+    references = ['RFC 1034, Sec. 6.1', 'RFC 1035, Sec. 5.2']
     required_params = ['cls']
 
     def __init__(self, **kwargs):
@@ -1883,7 +1898,7 @@ class ForeignClassDataAnswer(ForeignClassData):
     '''
     >>> e = ForeignClassDataAnswer(cls='CH')
     >>> e.description
-    'Data of class CH was found in the Answer section of the response.'
+    'Data of class CH was found in the Answer section of the response.  See ...'
     '''
     section = 'Answer'
     _abstract = False
@@ -1893,7 +1908,7 @@ class ForeignClassDataAuthority(ForeignClassData):
     '''
     >>> e = ForeignClassDataAuthority(cls='CH')
     >>> e.description
-    'Data of class CH was found in the Authority section of the response.'
+    'Data of class CH was found in the Authority section of the response.  See ...'
     '''
     section = 'Authority'
     _abstract = False
@@ -1903,7 +1918,7 @@ class ForeignClassDataAdditional(ForeignClassData):
     '''
     >>> e = ForeignClassDataAdditional(cls='CH')
     >>> e.description
-    'Data of class CH was found in the Additional section of the response.'
+    'Data of class CH was found in the Additional section of the response.  See ...'
     '''
     section = 'Additional'
     _abstract = False
@@ -1929,7 +1944,7 @@ class MissingSEPForAlg(DelegationError):
     '''
     >>> e = MissingSEPForAlg(algorithm=5, source='DS')
     >>> e.description
-    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no DS RR matched a DNSKEY with algorithm 5 that signs the zone's DNSKEY RRset."
+    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no DS RR matched a DNSKEY with algorithm 5 that signs the zone's DNSKEY RRset.  See ..."
     '''
 
     _abstract = False
@@ -1950,7 +1965,7 @@ class NoSEP(DelegationError):
     '''
     >>> e = NoSEP(source='DS')
     >>> e.description
-    'No valid RRSIGs made by a key corresponding to a DS RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone.'
+    'No valid RRSIGs made by a key corresponding to a DS RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone.  See ...'
     '''
 
     _abstract = False
@@ -1973,7 +1988,7 @@ class NoNSInParentNXDOMAIN(NoNSInParent):
     '''
     >>> e = NoNSInParentNXDOMAIN(parent='baz.')
     >>> e.description
-    'No delegation NS records were detected in the parent zone (baz.).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
+    'No delegation NS records were detected in the parent zone (baz.).  This results in an NXDOMAIN response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.  See ...'
     '''
 
     _abstract = False
@@ -1986,7 +2001,7 @@ class NoNSInParentNoData(NoNSInParent):
     '''
     >>> e = NoNSInParentNoData(parent='baz.')
     >>> e.description
-    'No delegation NS records were detected in the parent zone (baz.).  This results in a NODATA response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.'
+    'No delegation NS records were detected in the parent zone (baz.).  This results in a NODATA response to a DS query (for DNSSEC), even if the parent servers are authoritative for the child.  See ...'
     '''
 
     _abstract = False
@@ -2040,25 +2055,27 @@ class NSNameNotInChild(NSNameError):
     '''
     >>> e = NSNameNotInChild(names=('ns1.foo.baz.',), parent='baz.')
     >>> e.description
-    'The following NS name(s) were found in the delegation NS RRset (i.e., in the baz. zone), but not in the authoritative NS RRset: ns1.foo.baz.'
+    'The following NS name(s) were found in the delegation NS RRset (i.e., in the baz. zone), but not in the authoritative NS RRset: ns1.foo.baz.  See ...'
     '''
 
     _abstract = False
     code = 'NS_NAME_NOT_IN_CHILD'
     description_template = "The following NS name(s) were found in the delegation NS RRset (i.e., in the %(parent)s zone), but not in the authoritative NS RRset: %(names_text)s"
     required_params = NSNameError.required_params + ['parent']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class NSNameNotInParent(NSNameError):
     '''
     >>> e = NSNameNotInParent(names=('ns1.foo.baz.',), parent='baz.')
     >>> e.description
-    'The following NS name(s) were found in the authoritative NS RRset, but not in the delegation NS RRset (i.e., in the baz. zone): ns1.foo.baz.'
+    'The following NS name(s) were found in the authoritative NS RRset, but not in the delegation NS RRset (i.e., in the baz. zone): ns1.foo.baz.  See ...'
     '''
 
     _abstract = False
     code = 'NS_NAME_NOT_IN_PARENT'
     description_template = "The following NS name(s) were found in the authoritative NS RRset, but not in the delegation NS RRset (i.e., in the %(parent)s zone): %(names_text)s"
     required_params = NSNameError.required_params + ['parent']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class ErrorResolvingNSName(NSNameError):
     '''
@@ -2075,12 +2092,13 @@ class MissingGlueForNSName(NSNameError):
     '''
     >>> e = MissingGlueForNSName(names=('ns1.foo.baz.',))
     >>> e.description
-    'The following NS name(s) required glue, but no glue was returned in the referral: ns1.foo.baz.'
+    'The following NS name(s) required glue, but no glue was returned in the referral: ns1.foo.baz.  See ...'
     '''
 
     _abstract = False
     code = 'MISSING_GLUE_FOR_NS_NAME'
     description_template = "The following NS name(s) required glue, but no glue was returned in the referral: %(names_text)s"
+    references = ['RFC 1034, Sec. 4.2.1']
 
 class NoAddressForNSName(NSNameError):
     '''
@@ -2122,13 +2140,14 @@ class GlueMismatchError(DelegationError):
     '''
     >>> e = GlueMismatchError(name='ns1.foo.baz.', glue_addresses=('192.0.2.1',), auth_addresses=('192.0.2.2',))
     >>> e.description
-    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from its authoritative address(es) (192.0.2.2).'
+    'The glue address(es) for ns1.foo.baz. (192.0.2.1) differed from its authoritative address(es) (192.0.2.2).  See ...'
     '''
 
     _abstract = False
     code = 'GLUE_MISMATCH'
     description_template = 'The glue address(es) for %(name)s (%(glue_addresses_text)s) differed from its authoritative address(es) (%(auth_addresses_text)s).'
     required_params = ['name', 'glue_addresses', 'auth_addresses']
+    references = ['RFC 1034, Sec. 4.2.2']
 
     def __init__(self, **kwargs):
         super(GlueMismatchError, self).__init__(**kwargs)
@@ -2139,49 +2158,53 @@ class MissingGlueIPv4(DelegationError):
     '''
     >>> e = MissingGlueIPv4(name='ns1.foo.baz.')
     >>> e.description
-    'Authoritative A records exist for ns1.foo.baz., but there are no corresponding A glue records.'
+    'Authoritative A records exist for ns1.foo.baz., but there are no corresponding A glue records.  See ...'
     '''
 
     _abstract = False
     code = 'MISSING_GLUE_IPV4'
     description_template = "Authoritative A records exist for %(name)s, but there are no corresponding A glue records."
     required_params = ['name']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class MissingGlueIPv6(DelegationError):
     '''
     >>> e = MissingGlueIPv6(name='ns1.foo.baz.')
     >>> e.description
-    'Authoritative AAAA records exist for ns1.foo.baz., but there are no corresponding AAAA glue records.'
+    'Authoritative AAAA records exist for ns1.foo.baz., but there are no corresponding AAAA glue records.  See ...'
     '''
 
     _abstract = False
     code = 'MISSING_GLUE_IPV6'
     description_template = "Authoritative AAAA records exist for %(name)s, but there are no corresponding AAAA glue records."
     required_params = ['name']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class ExtraGlueIPv4(DelegationError):
     '''
     >>> e = ExtraGlueIPv4(name='ns1.foo.baz.')
     >>> e.description
-    'A glue records exist for ns1.foo.baz., but there are no corresponding authoritative A records.'
+    'A glue records exist for ns1.foo.baz., but there are no corresponding authoritative A records.  See ...'
     '''
 
     _abstract = False
     code = 'EXTRA_GLUE_IPV4'
     description_template = "A glue records exist for %(name)s, but there are no corresponding authoritative A records."
     required_params = ['name']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class ExtraGlueIPv6(DelegationError):
     '''
     >>> e = ExtraGlueIPv6(name='ns1.foo.baz.')
     >>> e.description
-    'AAAA glue records exist for ns1.foo.baz., but there are no corresponding authoritative AAAA records.'
+    'AAAA glue records exist for ns1.foo.baz., but there are no corresponding authoritative AAAA records.  See ...'
     '''
 
     _abstract = False
     code = 'EXTRA_GLUE_IPV6'
     description_template = "AAAA glue records exist for %(name)s, but there are no corresponding authoritative AAAA records."
     required_params = ['name']
+    references = ['RFC 1034, Sec. 4.2.2']
 
 class ServerUnresponsive(DelegationError):
     description_template = "The server(s) were not responsive to queries over %(proto)s."
@@ -2195,56 +2218,61 @@ class ServerUnresponsiveUDP(ServerUnresponsive):
     '''
     >>> e = ServerUnresponsiveUDP()
     >>> e.description
-    'The server(s) were not responsive to queries over UDP.'
+    'The server(s) were not responsive to queries over UDP.  See ...'
     '''
 
     _abstract = False
     code = 'SERVER_UNRESPONSIVE_UDP'
     proto = 'UDP'
+    references = ['RFC 1035, Sec. 4.2']
 
 class ServerUnresponsiveTCP(ServerUnresponsive):
     '''
     >>> e = ServerUnresponsiveTCP()
     >>> e.description
-    'The server(s) were not responsive to queries over TCP.'
+    'The server(s) were not responsive to queries over TCP.  See ...'
     '''
 
     _abstract = False
     code = 'SERVER_UNRESPONSIVE_TCP'
     proto = 'TCP'
+    references = ['RFC 1035, Sec. 4.2']
 
 class ServerInvalidResponseUDP(DelegationError):
     '''
     >>> e = ServerInvalidResponseUDP()
     >>> e.description
-    'The server(s) responded over UDP with a malformed response or with an invalid RCODE.'
+    'The server(s) responded over UDP with a malformed response or with an invalid RCODE.  See ...'
     '''
 
     _abstract = False
     code = 'SERVER_INVALID_RESPONSE_UDP'
     description_template = 'The server(s) responded over UDP with a malformed response or with an invalid RCODE.'
+    references = ['RFC 1035, Sec. 4.1.1']
 
 class ServerInvalidResponseTCP(DelegationError):
     '''
     >>> e = ServerInvalidResponseTCP()
     >>> e.description
-    'The server(s) responded over TCP with a malformed response or with an invalid RCODE.'
+    'The server(s) responded over TCP with a malformed response or with an invalid RCODE.  See ...'
     '''
 
     _abstract = False
     code = 'SERVER_INVALID_RESPONSE_TCP'
     description_template = 'The server(s) responded over TCP with a malformed response or with an invalid RCODE.'
+    references = ['RFC 1035, Sec. 4.1.1']
 
 class ServerNotAuthoritative(DelegationError):
     '''
     >>> e = ServerNotAuthoritative()
     >>> e.description
-    'The server(s) did not respond authoritatively for the namespace.'
+    'The server(s) did not respond authoritatively for the namespace.  See ...'
     '''
 
     _abstract = False
     code = 'SERVER_NOT_AUTHORITATIVE'
     description_template = "The server(s) did not respond authoritatively for the namespace."
+    references = ['RFC 1035, Sec. 4.1.1']
 
 class DNAMEError(DomainNameAnalysisError):
     pass
@@ -2253,43 +2281,47 @@ class DNAMENoCNAME(DNAMEError):
     '''
     >>> e = DNAMENoCNAME()
     >>> e.description
-    'No synthesized CNAME RR was found accompanying the DNAME record.'
+    'No synthesized CNAME RR was found accompanying the DNAME record.  See ...'
     '''
     _abstract = False
     description_template = "No synthesized CNAME RR was found accompanying the DNAME record."
     code = 'DNAME_NO_CNAME'
+    references = ['RFC 6672, Sec. 3.1']
 
 class DNAMETargetMismatch(DNAMEError):
     '''
     >>> e = DNAMETargetMismatch(included_target='foo.baz.', synthesized_target='bar.baz.')
     >>> e.description
-    'The included CNAME RR is not a valid synthesis of the DNAME record (foo.baz. != bar.baz.).'
+    'The included CNAME RR is not a valid synthesis of the DNAME record (foo.baz. != bar.baz.).  See ...'
     '''
     _abstract = False
     description_template = "The included CNAME RR is not a valid synthesis of the DNAME record (%(included_target)s != %(synthesized_target)s)."
     code = 'DNAME_TARGET_MISMATCH'
     required_params = ['included_target', 'synthesized_target']
+    references = ['RFC 6672, Sec. 2.2']
 
 class DNAMETTLZero(DNAMEError):
     '''
     >>> e = DNAMETTLZero()
     >>> e.description
-    'The TTL of the synthesized CNAME RR is 0.'
+    'The TTL of the synthesized CNAME RR is 0.  See ...'
     '''
     _abstract = False
     description_template = "The TTL of the synthesized CNAME RR is 0."
     code = 'DNAME_TTL_ZERO'
+    references = ['RFC 6672, Sec. 3.1']
 
 class DNAMETTLMismatch(DNAMEError):
     '''
     >>> e = DNAMETTLMismatch(cname_ttl=50, dname_ttl=60)
     >>> e.description
-    'The TTL of the synthesized CNAME RR (50) does not match the TTL of the DNAME record (60).'
+    'The TTL of the synthesized CNAME RR (50) does not match the TTL of the DNAME record (60).  See ...'
     '''
     _abstract = False
     description_template = "The TTL of the synthesized CNAME RR (%(cname_ttl)d) does not match the TTL of the DNAME record (%(dname_ttl)d)."
     code = 'DNAME_TTL_MISMATCH'
     required_params = ['cname_ttl', 'dname_ttl']
+    references = ['RFC 6672, Sec. 3.1']
 
 class DNSKEYError(DomainNameAnalysisError):
     pass
@@ -2308,12 +2340,13 @@ class DNSKEYNotAtZoneApex(DNSKEYError):
     '''
     >>> e = DNSKEYNotAtZoneApex(zone='foo.baz.', name='bar.foo.baz.')
     >>> e.description
-    'The owner name of the DNSKEY RRset (bar.foo.baz.) does not match the zone apex (foo.baz.).'
+    'The owner name of the DNSKEY RRset (bar.foo.baz.) does not match the zone apex (foo.baz.).  See ...'
     '''
     _abstract = False
     description_template = "The owner name of the DNSKEY RRset (%(name)s) does not match the zone apex (%(zone)s)."
     code = 'DNSKEY_NOT_AT_ZONE_APEX'
     required_params = ['zone', 'name']
+    references = ['RFC 4035, Sec. 5.3.1']
 
 class DNSKEYBadLength(DNSKEYError):
     pass
@@ -2334,7 +2367,7 @@ class DNSKEYBadLengthGOST(DNSKEYBadLength):
     '''
     >>> e = DNSKEYBadLengthGOST(length=500)
     >>> e.description
-    'The length of the key is 500 bits, but a GOST public key (DNSSEC algorithm 12) must be 512 bits long.'
+    'The length of the key is 500 bits, but a GOST public key (DNSSEC algorithm 12) must be 512 bits long.  See ...'
     '''
     _abstract = False
     description_template = 'The length of the key is %(length)d bits, but a GOST public key (DNSSEC algorithm 12) must be 512 bits long.'
@@ -2360,7 +2393,7 @@ class DNSKEYBadLengthECDSA256(DNSKEYBadLengthECDSA):
     '''
     >>> e = DNSKEYBadLengthECDSA256(length=500)
     >>> e.description
-    'The length of the key is 500 bits, but an ECDSA public key using Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.'
+    'The length of the key is 500 bits, but an ECDSA public key using Curve P-256 (DNSSEC algorithm 13) must be 512 bits long.  See ...'
     '''
     curve = 'P-256'
     algorithm = 13
@@ -2372,7 +2405,7 @@ class DNSKEYBadLengthECDSA384(DNSKEYBadLengthECDSA):
     '''
     >>> e = DNSKEYBadLengthECDSA384(length=500)
     >>> e.description
-    'The length of the key is 500 bits, but an ECDSA public key using Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.'
+    'The length of the key is 500 bits, but an ECDSA public key using Curve P-384 (DNSSEC algorithm 14) must be 768 bits long.  See ...'
     '''
     curve = 'P-384'
     algorithm = 14
@@ -2398,7 +2431,7 @@ class DNSKEYBadLengthEd25519(DNSKEYBadLengthEdDSA):
     '''
     >>> e = DNSKEYBadLengthEd25519(length=500)
     >>> e.description
-    'The length of the key is 500 bits, but an Ed25519 public key (DNSSEC algorithm 15) must be 256 bits long.'
+    'The length of the key is 500 bits, but an Ed25519 public key (DNSSEC algorithm 15) must be 256 bits long.  See ...'
     '''
     curve = 'Ed25519'
     algorithm = 15
@@ -2410,7 +2443,7 @@ class DNSKEYBadLengthEd448(DNSKEYBadLengthEdDSA):
     '''
     >>> e = DNSKEYBadLengthEd448(length=500)
     >>> e.description
-    'The length of the key is 500 bits, but an Ed448 public key (DNSSEC algorithm 16) must be 456 bits long.'
+    'The length of the key is 500 bits, but an Ed448 public key (DNSSEC algorithm 16) must be 456 bits long.  See ...'
     '''
     curve = 'Ed448'
     algorithm = 16
@@ -2425,22 +2458,24 @@ class NoTrustAnchorSigning(TrustAnchorError):
     '''
     >>> e = NoTrustAnchorSigning(zone='foo.baz.')
     >>> e.description
-    'One or more keys were designated as trust anchors for foo.baz., but none were found signing the DNSKEY RRset.'
+    'One or more keys were designated as trust anchors for foo.baz., but none were found signing the DNSKEY RRset.  See ...'
     '''
     _abstract = False
     description_template = "One or more keys were designated as trust anchors for %(zone)s, but none were found signing the DNSKEY RRset."
     code = 'NO_TRUST_ANCHOR_SIGNING'
     required_params = ['zone']
+    references = ['RFC 4035, Sec. 5']
 
 class RevokedNotSigning(DNSKEYError):
     '''
     >>> e = RevokedNotSigning()
     >>> e.description
-    'The key was revoked but was not found signing the RRset.'
+    'The key was revoked but was not found signing the RRset.  See ...'
     '''
     _abstract = False
     description_template = "The key was revoked but was not found signing the RRset."
     code = 'REVOKED_NOT_SIGNING'
+    references = ['RFC 5011, Sec. 2.1']
 
 class ZoneDataError(DomainNameAnalysisError):
     pass
@@ -2449,7 +2484,7 @@ class CNAMEWithOtherData(ZoneDataError):
     '''
     >>> e = CNAMEWithOtherData(name='foo.')
     >>> e.description
-    'The server returned CNAME for foo., but records of other types exist at that name.'
+    'The server returned CNAME for foo., but records of other types exist at that name.  See ...'
     '''
     _abstract = False
     description_template = "The server returned CNAME for %(name)s, but records of other types exist at that name."
@@ -2461,7 +2496,7 @@ class CNAMELoop(ZoneDataError):
     '''
     >>> e = CNAMELoop()
     >>> e.description
-    'This record results in a CNAME loop.'
+    'This record results in a CNAME loop.  See ...'
     '''
     _abstract = False
     description_template = "This record results in a CNAME loop."
