@@ -438,7 +438,7 @@ class DNSQueryTransportHandler(object):
             self.timeout = self.timeout_baseline
 
         if self._sock is not None:
-            # if a pre-existing socket is available for re-use, then use that
+            # if a preexisting socket is available for re-use, then use that
             # instead
             try:
                 self._reuse_socket()
