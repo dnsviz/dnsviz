@@ -1111,6 +1111,20 @@ class UnsupportedNSEC3Algorithm(NSECError):
     required_params = ['algorithm']
     nsec_type = 'NSEC3'
 
+class NSEC3IterationCountNonZero(NSECError):
+    '''
+    >>> e = NSEC3IterationCountNonZero(iteration_count=101)
+    >>> e.description
+    'Generating NSEC3 hashes using 101 iterations is considered bad practice, zero iterations should be used.'
+    '''
+
+    _abstract = False
+    code = 'NSEC3_ITERATION_COUNT_NON_ZERO'
+    description_template = "Generating %(nsec_type)s hashes using %(iteration_count)d iterations is considered bad practice, zero iterations should be used."
+    references = ['RFC 9276, Sec. 3.1']
+    required_params = ['iteration_count']
+    nsec_type = 'NSEC3'
+
 class InvalidNSEC3OwnerName(NSECError):
     '''
     >>> e = InvalidNSEC3OwnerName(name='foo.com.')
