@@ -2536,7 +2536,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         trusted_keys_rdata = set([k for z, k in trusted_keys if z == self.name])
         trusted_keys_self_signing = set()
 
-        # buid a list of responsive servers
+        # build a list of responsive servers
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         servers_responsive = set()
         servers_authoritative = self.zone.get_auth_or_designated_servers()
