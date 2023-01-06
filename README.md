@@ -81,7 +81,7 @@ $ source ~/myenv/bin/activate
 (myenv) $ pip install -r requirements.txt
 ```
 (Note that this installs the dependencies that are python packages, but some of
-these packages have non-python dependecies, such as Graphviz (required for
+these packages have non-python dependencies, such as Graphviz (required for
 pygraphviz) that are not installed automatically.)
 
 Next download and install DNSViz from the Python Package Index (PyPI):

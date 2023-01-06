@@ -1380,7 +1380,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if response.message is None:
             return
 
-        # if there was foriegn class data, then warn about it -- except for SIG
+        # if there was foreign class data, then warn about it -- except for SIG
         # records in the additional section
         ans_cls = [r.rdclass for r in response.message.answer if r.rdclass != cls]
         auth_cls = [r.rdclass for r in response.message.authority if r.rdclass != cls]
@@ -2536,7 +2536,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         trusted_keys_rdata = set([k for z, k in trusted_keys if z == self.name])
         trusted_keys_self_signing = set()
 
-        # buid a list of responsive servers
+        # build a list of responsive servers
         bailiwick_map, default_bailiwick = self.get_bailiwick_mapping()
         servers_responsive = set()
         servers_authoritative = self.zone.get_auth_or_designated_servers()

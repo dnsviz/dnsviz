@@ -30,7 +30,7 @@ powers the Web-based analysis available at http://dnsviz.net/
 #XXX Normally the py3_install macro would be used here,
 # but dnsviz/config.py is build with the install command,
 # so install MUST call the build subcommand, so config.py
-# will be proplerly placed.  With py3_install, the
+# will be properly placed.  With py3_install, the
 # --skip-build argument is used.
 %{__python3} %{py_setup} %{?py_setup_args} install -O1 --root %{buildroot} %{?*}
 

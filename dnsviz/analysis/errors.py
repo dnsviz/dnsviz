@@ -1260,7 +1260,7 @@ class NotAuthoritative(ResponseError):
     '''
 
     _abstract = False
-    code = 'NOT_AUTHORITATVE'
+    code = 'NOT_AUTHORITATIVE'
     description_template = "The Authoritative Answer (AA) flag was not set in the response."
     references = ['RFC 1035, Sec. 4.1.1']
     required_params = []
