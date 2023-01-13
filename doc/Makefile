@@ -20,7 +20,7 @@ ICONWIDTH = 25
 icons: $(ICONPNGFILES)
 
 $(ICONPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.svg
-	$(INKSCAPE) -z -w $(ICONWIDTH) -e $@ $<
+	HOME=/var/tmp $(INKSCAPE) --export-width=$(ICONWIDTH) --export-type=png --export-filename=$@ $<
 
 # make banner png 220x100 file from logo.svg
 LOGOSVGFILE = $(SRCDIR)/logo.svg
@@ -41,13 +41,13 @@ LOGOFAVICONHEIGHT = 16
 logo: $(LOGOBANNERPNGFILE) $(LOGOICONPNGFILE) $(LOGOFAVICONPNGFILE)
 
 $(LOGOBANNERPNGFILE): $(LOGOSVGFILE)
-	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOBANNERVIEWBOX)"/' | $(INKSCAPE) -z -h $(LOGOBANNERHEIGHT) -e $@ /dev/stdin
+	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOBANNERVIEWBOX)"/' | HOME=/var/tmp $(INKSCAPE) --export-height=$(LOGOBANNERHEIGHT) --export-type=png --export-filename=$@ --pipe
 
 $(LOGOICONPNGFILE): $(LOGOSVGFILE)
-	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOICONVIEWBOX)"/' | $(INKSCAPE) -z -h $(LOGOICONHEIGHT) -e $@ /dev/stdin
+	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOICONVIEWBOX)"/' | HOME=/var/tmp $(INKSCAPE) --export-height=$(LOGOICONHEIGHT) --export-type=png --export-filename=$@ --pipe
 
 $(LOGOFAVICONPNGFILE): $(LOGOSVGFILE)
-	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOFAVICONVIEWBOX)"/' | $(INKSCAPE) -z -h $(LOGOFAVICONHEIGHT) -e $@ /dev/stdin
+	cat $< | sed 's/viewBox="0 0 504 252"/viewBox="$(LOGOFAVICONVIEWBOX)"/' | HOME=/var/tmp $(INKSCAPE) --export-height=$(LOGOFAVICONHEIGHT) --export-type=png --export-filename=$@ --pipe
 
 .PHONY: clean
 
