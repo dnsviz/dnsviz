@@ -1083,7 +1083,10 @@ class ArgHelper:
             if e.errno == errno.EADDRNOTAVAIL:
                 raise argparse.ArgumentTypeError('Cannot bind to specified IP address: "%s"' % addr)
         finally:
-            s.close()
+            try:
+                s.close()
+            except:
+                pass
         return addr
 
     @classmethod
