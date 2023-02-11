@@ -20,10 +20,10 @@ else:
     from setuptools.command.install import install
     from setuptools.command.build_py import build_py
 
-JQUERY_UI_PATH = "'http://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
-JQUERY_UI_CSS_PATH = "'http://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
-JQUERY_PATH = "'http://code.jquery.com/jquery-1.11.3.min.js'"
-RAPHAEL_PATH = "'http://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
+JQUERY_UI_PATH = "'https://code.jquery.com/ui/1.11.4/jquery-ui.min.js'"
+JQUERY_UI_CSS_PATH = "'https://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'"
+JQUERY_PATH = "'https://code.jquery.com/jquery-1.11.3.min.js'"
+RAPHAEL_PATH = "'https://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'"
 RESOLV_CONF = "'/etc/resolv.conf'"
 
 def apply_substitutions(filename, install_prefix):
