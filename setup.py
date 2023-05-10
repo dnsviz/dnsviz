@@ -120,7 +120,7 @@ else:
 
 create_config('')
 setup(name='dnsviz',
-        version='0.9.4',
+        version='0.10.0',
         author='Casey Deccio',
         author_email='casey@deccio.net',
         url='https://github.com/dnsviz/dnsviz/',
