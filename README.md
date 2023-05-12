@@ -71,6 +71,13 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
   `named(8)` to run with fewer restrictions; or 2) disable AppArmor completely.
 
 
+### Installation with Homebrew (Mac OS X)
+To install DNSViz with Homebrew, run the following command:
+```
+brew install dnsviz
+```
+
+
 ### Installation in a Virtual Environment
 
 To install DNSViz to a virtual environment, first create and activate a virtual
