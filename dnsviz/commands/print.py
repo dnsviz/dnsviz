@@ -63,7 +63,7 @@ logger = logging.getLogger()
 class AnalysisInputError(Exception):
     pass
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, filename):
+def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, filename, override_show_colors):
     G.add_trust(trusted_keys, supported_algs=supported_algs)
 
     try:
@@ -72,7 +72,10 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, filename):
         logger.error('%s: "%s"' % (e.strerror, filename))
         sys.exit(3)
 
-    show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
+    if override_show_colors:
+        show_colors = True
+    else:
+        show_colors = fh.isatty() and os.environ.get('TERM', 'dumb') != 'dumb'
 
     tuples = []
     processed = set()
@@ -355,6 +358,10 @@ class PrintArgHelper:
                     type=argparse.FileType('r'),
                     action='append', metavar='<filename>',
                     help='Use trusted keys from the designated file')
+        self.parser.add_argument('-S', '--show-colors',
+                const=True, default=False,
+                action='store_const',
+                help='Use terminal colors even if not a TTY or supported')
         self.parser.add_argument('-a', '--algorithms',
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<alg>,[<alg>...]',
@@ -626,11 +633,11 @@ def main(argv):
                 else:
                     name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
                     name = name.replace(os.sep, '--')
-                finish_graph(G, [name_obj], arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, '%s.txt' % name)
+                finish_graph(G, [name_obj], arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, '%s.txt' % name, arghelper.args.show_colors)
                 G = DNSAuthGraph()
 
         if not arghelper.args.derive_filename:
-            finish_graph(G, name_objs, arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, arghelper.args.output_file.fileno())
+            finish_graph(G, name_objs, arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, arghelper.args.output_file.fileno(), arghelper.args.show_colors)
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
