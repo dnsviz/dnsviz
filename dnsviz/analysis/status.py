@@ -1148,7 +1148,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         else:
             invalid_alg_err = None
         if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
-            self.warnings.append(Errors.NSEC3IterationCountNonZero(iteration_count=self.max_iterations))
+            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
@@ -1340,7 +1340,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
-            self.warnings.append(Errors.NSEC3IterationCountNonZero(iteration_count=self.max_iterations))
+            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
@@ -1485,7 +1485,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         else:
             invalid_alg_err = None
         if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
-            self.warnings.append(Errors.NSEC3IterationCountNonZero(iteration_count=self.max_iterations))
+            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if self.nsec_for_qname:
             # RFC 4035 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:
