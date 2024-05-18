@@ -1066,7 +1066,7 @@ class NSEC3Status(object):
         return None
 
 class NSEC3StatusNXDOMAIN(NSEC3Status):
-    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info, ignore_rfc9276):
         self.qname = qname
         self.origin = origin
         self.is_zone = is_zone
@@ -1126,7 +1126,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                     self.name_digest_map[wildcard_name] = {}
                 self.name_digest_map[wildcard_name][(salt, alg, iterations)] = digest_name
 
-        self._set_validation_status(nsec_set_info)
+        self._set_validation_status(nsec_set_info, ignore_rfc9276)
 
     def __str__(self):
         return 'NSEC3 record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
@@ -1141,17 +1141,18 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
     def _set_closest_encloser(self, nsec_set_info):
         self.closest_encloser = nsec_set_info.get_closest_encloser(self.qname, self.origin)
 
-    def _set_validation_status(self, nsec_set_info):
+    def _set_validation_status(self, nsec_set_info, ignore_rfc9276):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
         if invalid_algs:
             invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
         else:
             invalid_alg_err = None
-        if self.iterations > 0:
-            self.errors.append(Errors.NonZeroNSEC3IterationCount())
-        if self.salt is not None:
-            self.warnings.append(Errors.NonEmptyNSEC3Salt())
+        if not ignore_rfc9276:
+            if self.iterations > 0:
+                self.errors.append(Errors.NonZeroNSEC3IterationCount())
+            if self.salt is not None:
+                self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
@@ -1321,9 +1322,9 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         return d
 
 class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
-    def __init__(self, qname, wildcard_name, rdtype, origin, is_zone, nsec_set_info):
+    def __init__(self, qname, wildcard_name, rdtype, origin, is_zone, nsec_set_info, ignore_rfc9276):
         self.wildcard_name = wildcard_name
-        super(NSEC3StatusWildcard, self).__init__(qname, rdtype, origin, is_zone, nsec_set_info)
+        super(NSEC3StatusWildcard, self).__init__(qname, rdtype, origin, is_zone, nsec_set_info, ignore_rfc9276)
 
     def _set_closest_encloser(self, nsec_set_info):
         super(NSEC3StatusWildcard, self)._set_closest_encloser(nsec_set_info)
@@ -1340,12 +1341,13 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def __hash__(self):
         return hash(id(self))
 
-    def _set_validation_status(self, nsec_set_info):
+    def _set_validation_status(self, nsec_set_info, ignore_rfc9276):
         self.validation_status = NSEC_STATUS_VALID
-        if self.iterations > 0:
-            self.errors.append(Errors.NonZeroNSEC3IterationCount())
-        if self.salt is not None:
-            self.warnings.append(Errors.NonEmptyNSEC3Salt())
+        if not ignore_rfc9276:
+            if self.iterations > 0:
+                self.errors.append(Errors.NonZeroNSEC3IterationCount())
+            if self.salt is not None:
+                self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
@@ -1395,7 +1397,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         return d
 
 class NSEC3StatusNODATA(NSEC3Status):
-    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info):
+    def __init__(self, qname, rdtype, origin, is_zone, nsec_set_info, ignore_rfc9276):
         self.qname = qname
         self.rdtype = rdtype
         self.origin = origin
@@ -1473,7 +1475,7 @@ class NSEC3StatusNODATA(NSEC3Status):
                                 if nsec_set_info.rrsets[nsec_name].rrset[0].flags & 0x01:
                                     self.opt_out = True
 
-        self._set_validation_status(nsec_set_info)
+        self._set_validation_status(nsec_set_info, ignore_rfc9276)
 
     def __str__(self):
         return 'NSEC3 record(s) proving non-existence (NODATA) of %s/%s' % (fmt.humanize_name(self.qname), dns.rdatatype.to_text(self.rdtype))
@@ -1485,17 +1487,18 @@ class NSEC3StatusNODATA(NSEC3Status):
     def __hash__(self):
         return hash(id(self))
 
-    def _set_validation_status(self, nsec_set_info):
+    def _set_validation_status(self, nsec_set_info, ignore_rfc9276):
         self.validation_status = NSEC_STATUS_VALID
         valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
         if invalid_algs:
             invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
         else:
             invalid_alg_err = None
-        if self.iterations > 0:
-            self.errors.append(Errors.NonZeroNSEC3IterationCount())
-        if self.salt is not None:
-            self.warnings.append(Errors.NonEmptyNSEC3Salt())
+        if not ignore_rfc9276:
+            if self.iterations > 0:
+                self.errors.append(Errors.NonZeroNSEC3IterationCount())
+            if self.salt is not None:
+                self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if self.nsec_for_qname:
             # RFC 4035 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:

@@ -374,6 +374,10 @@ class PrintArgHelper:
                 const=True, default=False,
                 action='store_const',
                 help='Validate algorithms for which validation is otherwise prohibited')
+        self.parser.add_argument('--ignore-rfc9276',
+                const=True, default=False,
+                action='store_const',
+                help='Ignore errors associated with RFC 9276, NSEC3 parameter settings')
         self.parser.add_argument('-C', '--enforce-cookies',
                 const=True, default=False,
                 action='store_const',
@@ -608,7 +612,7 @@ def main(argv):
 
         G = DNSAuthGraph()
         for name_obj in name_objs:
-            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, validate_prohibited_algs=arghelper.args.validate_prohibited_algs)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, validate_prohibited_algs=arghelper.args.validate_prohibited_algs, ignore_rfc9276=arghelper.args.ignore_rfc9276)
             for qname, rdtype in name_obj.queries:
                 if arghelper.args.rr_types is None:
                     # if rdtypes was not specified, then graph all, with some
