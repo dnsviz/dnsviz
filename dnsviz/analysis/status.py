@@ -233,7 +233,7 @@ class RRSIGStatus(object):
             self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
         # Validation is prohibited or, at least, not recommended
         if self.rrsig.algorithm in DNSKEY_ALGS_PROHIBITED:
-            self.warnings.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
+            self.errors.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
         elif self.rrsig.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
@@ -447,7 +447,7 @@ class DSStatus(object):
             self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
         # Validation is prohibited or, at least, not recommended
         if self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
-            self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
+            self.errors.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
         elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
             self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
 
@@ -1149,7 +1149,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         else:
             invalid_alg_err = None
         if self.iterations > 0:
-            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+            self.errors.append(Errors.NonZeroNSEC3IterationCount())
         if self.salt is not None:
             self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.closest_encloser:
@@ -1343,7 +1343,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
         if self.iterations > 0:
-            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+            self.errors.append(Errors.NonZeroNSEC3IterationCount())
         if self.salt is not None:
             self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.nsec_names_covering_qname:
@@ -1493,7 +1493,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         else:
             invalid_alg_err = None
         if self.iterations > 0:
-            self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+            self.errors.append(Errors.NonZeroNSEC3IterationCount())
         if self.salt is not None:
             self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if self.nsec_for_qname:
