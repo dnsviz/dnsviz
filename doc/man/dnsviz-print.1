@@ -78,6 +78,12 @@ records that correspond to one more trusted keys for one or more DNS zones.
 
 This option may be used multiple times on the command line.
 .TP
+.B -S, --show-colors
+Use terminal colors even if output is not a TTY or colors are not supported.
+Normally \fBdnsviz-print(1)\fB detects terminal capabilities and uses colors
+only where supported.  This option overrides this detection and always includes
+terminal colors in the output.
+.TP
 .B -a, --algorithms \fIalg\fR[,\fIalg...\fI]
 Support only the DNSSEC algorithms specified.  If this option is used, any
 algorithms not specified will appear as "unsupported."  The status of any RRSIG
@@ -93,13 +99,19 @@ unknown.  Additionally, when a zone has only DS records with unsupported digest
 algorithms, the zone is treated as "insecure", assuming the DS records are
 properly authenticated.
 .TP
-.B -b, --validate-prohibited-algs
-Validate algorithms for which validation is otherwise prohibited.  Current
-DNSSEC specification prohibits validators from validating older, weaker
-algorithms associated with DNSKEY and DS records (see RFC 8624).  If this
-option is used, then a warning will be still be issued for DNSSEC records that
-use these older algorithms, but the code will still assess their cryptographic
-status, rather than ignoring them.
+.B --ignore-rfc8624
+Ignore errors associated with RFC 8624, DNSSEC algorithm implementation
+requirements.  RFC 8624 designates some DNSSEC signing algorithms and some DS
+digest algorithms as prohibited ("MUST NOT") or not recommended for validation
+and/or signing.  If this option is used, then no warnings will be issued, and
+the code will still assess their cryptographic status, rather than ignoring
+them.
+.TP
+.B --ignore-rfc9276
+Ignore errors associated with RFC 9276, NSEC3 parameter settings.  RFC 9276
+specifies that if NSEC3 is used, the iterations count must be 0 and the salt
+length must be 0.  If this option is used, then no warnings will be issued for
+NSEC3 records that violate this specification.
 .TP
 .B -C, --enforce-cookies
 Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
