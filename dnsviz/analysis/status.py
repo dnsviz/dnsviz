@@ -182,7 +182,7 @@ DS_DIGEST_ALGS_VALIDATION_PROHIBITED = ()
 RDTYPES_TTL_EXEMPT = (dns.rdatatype.NSEC3PARAM,)
 
 class RRSIGStatus(object):
-    def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs):
+    def __init__(self, rrset, rrsig, dnskey, zone_name, reference_ts, supported_algs, ignore_rfc8624):
         self.rrset = rrset
         self.rrsig = rrsig
         self.dnskey = dnskey
@@ -230,12 +230,15 @@ class RRSIGStatus(object):
         #
         # Signing is prohibited
         if self.rrsig.algorithm in DNSKEY_ALGS_VALIDATION_PROHIBITED:
-            self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
+            if not ignore_rfc8624:
+                self.warnings.append(Errors.AlgorithmValidationProhibited(algorithm=self.rrsig.algorithm))
         # Validation is prohibited or, at least, not recommended
         if self.rrsig.algorithm in DNSKEY_ALGS_PROHIBITED:
-            self.errors.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
+            if not ignore_rfc8624:
+                self.errors.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
         elif self.rrsig.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
-            self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
+            if not ignore_rfc8624:
+                self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
 
         if self.rrset.rrset.rdtype not in RDTYPES_TTL_EXEMPT:
             # If we are comparing TTLs (i.e., for authoritative server responses),
@@ -399,7 +402,7 @@ class RRSIGStatus(object):
         return d
 
 class DSStatus(object):
-    def __init__(self, ds, ds_meta, dnskey, supported_digest_algs):
+    def __init__(self, ds, ds_meta, dnskey, supported_digest_algs, ignore_rfc8624):
         self.ds = ds
         self.ds_meta = ds_meta
         self.dnskey = dnskey
@@ -444,12 +447,15 @@ class DSStatus(object):
         #
         # Signing is prohibited
         if self.ds.digest_type in DS_DIGEST_ALGS_VALIDATION_PROHIBITED:
-            self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
+            if not ignore_rfc8624:
+                self.warnings.append(Errors.DigestAlgorithmValidationProhibited(algorithm=self.ds.digest_type))
         # Validation is prohibited or, at least, not recommended
         if self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
-            self.errors.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
+            if not ignore_rfc8624:
+                self.errors.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
         elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
-            self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
+            if not ignore_rfc8624:
+                self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
 
         if self.dnskey is not None and \
                 self.dnskey.rdata.flags & fmt.DNSKEY_FLAGS['revoke']:

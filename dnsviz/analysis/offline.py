@@ -795,7 +795,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         (not x.effective_tcp and x.udp_responsive)) and \
                         (not require_valid or x.is_valid_response()))
 
-    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc9276=False):
+    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False):
         if trace is None:
             trace = []
 
@@ -839,18 +839,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
         self._index_dnskeys()
-        self._populate_rrsig_status_all(supported_algs)
-        self._populate_nodata_status(supported_algs, ignore_rfc9276)
-        self._populate_nxdomain_status(supported_algs, ignore_rfc9276)
+        self._populate_rrsig_status_all(supported_algs, ignore_rfc8624)
+        self._populate_nodata_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
+        self._populate_nxdomain_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_inconsistent_negative_dnssec_responses_all(ignore_rfc9276)
         self._finalize_key_roles()
         if not is_dlv:
-            self._populate_delegation_status(supported_algs, supported_digest_algs)
+            self._populate_delegation_status(supported_algs, supported_digest_algs, ignore_rfc8624)
         if self.dlv_parent is not None:
-            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs, ignore_rfc8624)
         self._populate_dnskey_status(trusted_keys)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, validate_prohibited_algs=False, ignore_rfc9276=False):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False):
         # identify supported algorithms as intersection of explicitly supported
         # and software supported
         if supported_algs is not None:
@@ -863,11 +863,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             supported_digest_algs = copy.copy(crypto._supported_digest_algs)
 
         # unless we are overriding, mark prohibited algorithms as not supported
-        if not validate_prohibited_algs:
+        if not ignore_rfc8624:
             supported_algs.difference_update(Status.DNSKEY_ALGS_VALIDATION_PROHIBITED)
             supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_VALIDATION_PROHIBITED)
 
-        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc9276)
+        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc8624, ignore_rfc9276)
 
     def _populate_name_status(self, trace=None):
         # using trace allows _populate_name_status to be called independent of
@@ -1477,7 +1477,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrset_errors[rrset_info] = []
         self.rrsig_status[rrset_info] = {}
 
-    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, populate_response_errors=True):
+    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, populate_response_errors=True):
         self._initialize_rrset_status(rrset_info)
 
         if qname_obj is None:
@@ -1568,7 +1568,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 rrsig.key_tag in (dnskey.key_tag, dnskey.key_tag_no_revoke) and \
                                 rrsig.algorithm == dnskey.rdata.algorithm):
                             continue
-                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
+                        rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, dnskey, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs, ignore_rfc8624)
                         validation_status_mapping[rrsig_status.signature_valid].add(rrsig_status)
 
                     # if we got results for multiple keys, then just select the one that validates
@@ -1592,7 +1592,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             # no corresponding DNSKEY
             if not self.rrsig_status[rrset_info][rrsig]:
-                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs)
+                rrsig_status = Status.RRSIGStatus(rrset_info, rrsig, None, zone_name, fmt.datetime_to_timestamp(self.analysis_end), supported_algs, ignore_rfc8624)
                 self.rrsig_status[rrsig_status.rrset][rrsig_status.rrsig][None] = rrsig_status
 
         # list errors for rrsets with which no RRSIGs were returned or not all algorithms were accounted for
@@ -1684,7 +1684,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_case_preservation_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
-    def _populate_rrsig_status_all(self, supported_algs):
+    def _populate_rrsig_status_all(self, supported_algs, ignore_rfc8624):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -1717,7 +1717,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 elif rdtype == dns.rdatatype.DLV:
                     qname_obj = qname_obj.dlv_parent
 
-                self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs)
+                self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624)
 
             self._populate_invalid_response_status(query)
 
@@ -1940,7 +1940,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 reference = 'parent or child'
             self.zone_warnings.append(Errors.NoNSAddressesForIPv6(reference=reference))
 
-    def _populate_delegation_status(self, supported_algs, supported_digest_algs):
+    def _populate_delegation_status(self, supported_algs, supported_digest_algs, ignore_rfc8624):
         self.ds_status_by_ds = {}
         self.ds_status_by_dnskey = {}
         self.zone_errors = []
@@ -1951,13 +1951,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.delegation_status = {}
         self.dnskey_with_ds = set()
 
-        self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs)
+        self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs, ignore_rfc8624)
         if self.dlv_parent is not None:
-            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs)
+            self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs, ignore_rfc8624)
         self._populate_ns_status()
         self._populate_server_status()
 
-    def _populate_ds_status(self, rdtype, supported_algs, supported_digest_algs):
+    def _populate_ds_status(self, rdtype, supported_algs, supported_digest_algs, ignore_rfc8624):
         if rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
             raise ValueError('Type can only be DS or DLV.')
         if self.parent is None:
@@ -2055,7 +2055,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             continue
 
                         # check if the digest is a match
-                        ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs)
+                        ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, dnskey, supported_digest_algs, ignore_rfc8624)
                         validation_status_mapping[ds_status.digest_valid].add(ds_status)
 
                         # if dnskey exists, then add to dnskey_with_ds
@@ -2103,7 +2103,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # no corresponding DNSKEY
                 if not self.ds_status_by_ds[rdtype][ds_rdata]:
-                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None, supported_digest_algs)
+                    ds_status = Status.DSStatus(ds_rdata, ds_rrset_info, None, supported_digest_algs, ignore_rfc8624)
                     self.ds_status_by_ds[rdtype][ds_rdata][None] = ds_status
                     if None not in self.ds_status_by_dnskey[rdtype]:
                         self.ds_status_by_dnskey[rdtype][None] = {}
@@ -2276,7 +2276,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def _populate_negative_response_status(self, query, neg_response_info, \
             bad_soa_error_cls, missing_soa_error_cls, upward_referral_error_cls, missing_nsec_error_cls, \
-            nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs, ignore_rfc9276):
+            nsec_status_cls, nsec3_status_cls, warnings, errors, supported_algs, ignore_rfc8624, ignore_rfc9276):
 
         qname_obj = self.get_name(neg_response_info.qname)
         is_zone = qname_obj.name == neg_response_info.qname and qname_obj.is_zone()
@@ -2311,7 +2311,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
 
-            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, populate_response_errors=False)
+            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, ignore_rfc8624, populate_response_errors=False)
 
             # make sure this query was made to a server designated as
             # authoritative
@@ -2371,7 +2371,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             status_by_soa_name = {}
 
             for nsec_rrset_info in nsec_set_info.rrsets.values():
-                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, populate_response_errors=False)
+                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624, populate_response_errors=False)
 
             for server, client in nsec_set_info.servers_clients:
                 if server not in auth_servers:
@@ -2418,7 +2418,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return statuses
 
-    def _populate_nxdomain_status(self, supported_algs, ignore_rfc9276):
+    def _populate_nxdomain_status(self, supported_algs, ignore_rfc8624, ignore_rfc9276):
         self.nxdomain_status = {}
         self.nxdomain_warnings = {}
         self.nxdomain_errors = {}
@@ -2434,7 +2434,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 Errors.SOAOwnerNotZoneForNXDOMAIN, Errors.MissingSOAForNXDOMAIN, None, \
                                 Errors.MissingNSECForNXDOMAIN, Status.NSECStatusNXDOMAIN, Status.NSEC3StatusNXDOMAIN, \
                                 self.nxdomain_warnings[neg_response_info], self.nxdomain_errors[neg_response_info], \
-                                supported_algs, ignore_rfc9276)
+                                supported_algs, ignore_rfc8624, ignore_rfc9276)
 
                 # check for NOERROR/NXDOMAIN inconsistencies
                 if neg_response_info.qname in self.yxdomain and rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
@@ -2462,7 +2462,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                         err1.add_server_client(server, client, response)
                                         err2.add_server_client(server, client, response)
 
-    def _populate_nodata_status(self, supported_algs, ignore_rfc9276):
+    def _populate_nodata_status(self, supported_algs, ignore_rfc8624, ignore_rfc9276):
         self.nodata_status = {}
         self.nodata_warnings = {}
         self.nodata_errors = {}
@@ -2478,7 +2478,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 Errors.SOAOwnerNotZoneForNODATA, Errors.MissingSOAForNODATA, Errors.UpwardReferral, \
                                 Errors.MissingNSECForNODATA, Status.NSECStatusNODATA, Status.NSEC3StatusNODATA, \
                                 self.nodata_warnings[neg_response_info], self.nodata_errors[neg_response_info], \
-                                supported_algs, ignore_rfc9276)
+                                supported_algs, ignore_rfc8624, ignore_rfc9276)
 
     def _populate_inconsistent_negative_dnssec_responses(self, neg_response_info, neg_status, ignore_rfc9276):
         for nsec_status in neg_status[neg_response_info]:

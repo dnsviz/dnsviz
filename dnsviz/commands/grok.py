@@ -228,10 +228,10 @@ class GrokArgHelper:
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<digest_alg>,[<digest_alg>...]',
                 help='Support only the specified DNSSEC digest algorithm(s)')
-        self.parser.add_argument('-b', '--validate-prohibited-algs',
+        self.parser.add_argument('--ignore-rfc8624',
                 const=True, default=False,
                 action='store_const',
-                help='Validate algorithms for which validation is otherwise prohibited')
+                help='Ignore errors associated with RFC 8624, DNSSEC algorithm implementation requirements')
         self.parser.add_argument('--ignore-rfc9276',
                 const=True, default=False,
                 action='store_const',
@@ -469,7 +469,7 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, validate_prohibited_algs=arghelper.args.validate_prohibited_algs, ignore_rfc9276=arghelper.args.ignore_rfc9276)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276)
 
             if arghelper.trusted_keys:
                 G = DNSAuthGraph()
