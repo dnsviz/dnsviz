@@ -55,8 +55,6 @@ from . import errors as Errors
 
 CLOCK_SKEW_WARNING = 300
 
-NSEC3_ITERATION_COUNT_WARNING = 0
-
 STATUS_VALID = 0
 STATUS_INDETERMINATE = 1
 STATUS_INVALID = 2
@@ -1082,11 +1080,11 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         self.nsec_names_covering_qname = {}
         self.nsec_names_covering_wildcard = {}
         self.opt_out = None
-        self.max_iterations = 0
+        self.iterations = 0
 
         for (salt, alg, iterations), nsec3_names in nsec_set_info.nsec3_params.items():
-            if iterations > self.max_iterations:
-                self.max_iterations = iterations
+            if iterations > self.iterations:
+                self.iterations = iterations
             digest_name = nsec_set_info.get_digest_name_for_nsec3(self.qname, self.origin, salt, alg, iterations)
             if self.qname not in self.name_digest_map:
                 self.name_digest_map[self.qname] = {}
@@ -1147,7 +1145,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
         else:
             invalid_alg_err = None
-        if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
+        if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
@@ -1339,7 +1337,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
 
     def _set_validation_status(self, nsec_set_info):
         self.validation_status = NSEC_STATUS_VALID
-        if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
+        if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
@@ -1416,11 +1414,11 @@ class NSEC3StatusNODATA(NSEC3Status):
         self.opt_out = None
         self.wildcard_has_rdtype = False
         self.wildcard_has_cname = False
-        self.max_iterations = 0
+        self.iterations = 0
 
         for (salt, alg, iterations), nsec3_names in nsec_set_info.nsec3_params.items():
-            if iterations > self.max_iterations:
-                self.max_iterations = iterations
+            if iterations > self.iterations:
+                self.iterations = iterations
             digest_name = nsec_set_info.get_digest_name_for_nsec3(self.qname, self.origin, salt, alg, iterations)
             if self.qname not in self.name_digest_map:
                 self.name_digest_map[self.qname] = {}
@@ -1484,7 +1482,7 @@ class NSEC3StatusNODATA(NSEC3Status):
             invalid_alg_err = Errors.UnsupportedNSEC3Algorithm(algorithm=list(invalid_algs)[0])
         else:
             invalid_alg_err = None
-        if self.max_iterations > NSEC3_ITERATION_COUNT_WARNING:
+        if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
         if self.nsec_for_qname:
             # RFC 4035 5.2, 6840 4.4
