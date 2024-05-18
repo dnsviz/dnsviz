@@ -1081,10 +1081,13 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         self.nsec_names_covering_wildcard = {}
         self.opt_out = None
         self.iterations = 0
+        self.salt = None
 
         for (salt, alg, iterations), nsec3_names in nsec_set_info.nsec3_params.items():
             if iterations > self.iterations:
                 self.iterations = iterations
+            if salt:
+                self.salt = salt
             digest_name = nsec_set_info.get_digest_name_for_nsec3(self.qname, self.origin, salt, alg, iterations)
             if self.qname not in self.name_digest_map:
                 self.name_digest_map[self.qname] = {}
@@ -1147,6 +1150,8 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             invalid_alg_err = None
         if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+        if self.salt is not None:
+            self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.closest_encloser:
             self.validation_status = NSEC_STATUS_INVALID
             if valid_algs:
@@ -1339,6 +1344,8 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         self.validation_status = NSEC_STATUS_VALID
         if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+        if self.salt is not None:
+            self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if not self.nsec_names_covering_qname:
             self.validation_status = NSEC_STATUS_INVALID
             valid_algs, invalid_algs = nsec_set_info.get_algorithm_support()
@@ -1415,10 +1422,13 @@ class NSEC3StatusNODATA(NSEC3Status):
         self.wildcard_has_rdtype = False
         self.wildcard_has_cname = False
         self.iterations = 0
+        self.salt = None
 
         for (salt, alg, iterations), nsec3_names in nsec_set_info.nsec3_params.items():
             if iterations > self.iterations:
                 self.iterations = iterations
+            if salt:
+                self.salt = salt
             digest_name = nsec_set_info.get_digest_name_for_nsec3(self.qname, self.origin, salt, alg, iterations)
             if self.qname not in self.name_digest_map:
                 self.name_digest_map[self.qname] = {}
@@ -1484,6 +1494,8 @@ class NSEC3StatusNODATA(NSEC3Status):
             invalid_alg_err = None
         if self.iterations > 0:
             self.warnings.append(Errors.NonZeroNSEC3IterationCount())
+        if self.salt is not None:
+            self.warnings.append(Errors.NonEmptyNSEC3Salt())
         if self.nsec_for_qname:
             # RFC 4035 5.2, 6840 4.4
             if self.rdtype == dns.rdatatype.DS or self.referral:

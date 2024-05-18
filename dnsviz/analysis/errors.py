@@ -1125,6 +1125,20 @@ class NonZeroNSEC3IterationCount(NSECError):
     required_params = []
     nsec_type = 'NSEC3'
 
+class NonEmptyNSEC3Salt(NSECError):
+    '''
+    >>> e = NonEmptyNSEC3Salt()
+    >>> e.description
+    'The salt value for an NSEC3 record should be empty.  See ...'
+    '''
+
+    _abstract = False
+    code = 'NONEMPTY_NSEC3_SALT'
+    description_template = 'The salt value for an %(nsec_type)s record should be empty.'
+    references = ['RFC 9276, Sec. 3.1']
+    required_params = []
+    nsec_type = 'NSEC3'
+
 class InvalidNSEC3OwnerName(NSECError):
     '''
     >>> e = InvalidNSEC3OwnerName(name='foo.com.')
