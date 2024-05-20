@@ -1400,7 +1400,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if msg.question and query.qname.to_text() != msg.question[0].name.to_text():
             Errors.DomainNameAnalysisError.insert_into_list(Errors.CasePreservationError(qname=fmt.humanize_name(query.qname, canonicalize=False)), warnings, server, client, response)
 
-    def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624):
+    def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
                 zone_name = wildcard_name.parent()
@@ -1416,7 +1416,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             status_by_response = {}
             for nsec_set_info in rrset_info.wildcard_info[wildcard_name].nsec_set_info:
                 if nsec_set_info.use_nsec3:
-                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
+                    status = Status.NSEC3StatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info, ignore_rfc9276)
                 else:
                     status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
 
