@@ -816,25 +816,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
-                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False)
+                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False, ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
 
         # populate status of ancestry
         if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
         if self.parent is not None:
-            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self])
+            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
         if self.dlv_parent is not None:
-            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self])
+            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
