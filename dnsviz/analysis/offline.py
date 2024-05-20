@@ -1400,7 +1400,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if msg.question and query.qname.to_text() != msg.question[0].name.to_text():
             Errors.DomainNameAnalysisError.insert_into_list(Errors.CasePreservationError(qname=fmt.humanize_name(query.qname, canonicalize=False)), warnings, server, client, response)
 
-    def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs):
+    def _populate_wildcard_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624):
         for wildcard_name in rrset_info.wildcard_info:
             if qname_obj is None:
                 zone_name = wildcard_name.parent()
@@ -1421,7 +1421,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
 
                 for nsec_rrset_info in nsec_set_info.rrsets.values():
-                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs)
+                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624)
 
                 if status.validation_status == Status.NSEC_STATUS_VALID:
                     if status not in statuses:
@@ -1618,7 +1618,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for alg in dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDLV(algorithm=alg), errors, server, client, response)
 
-        self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs)
+        self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624)
         self._populate_cname_status(rrset_info)
 
         if populate_response_errors:
