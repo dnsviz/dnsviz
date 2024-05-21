@@ -2,6 +2,7 @@
 
 source scripts/vars || exit 1
 
+[ -d $KEY_DIR ] || mkdir $KEY_DIR
 KSK_RSASHA1=`dnssec-keygen -q -K $KEY_DIR -f KSK -b 2048 -a RSASHA1 $ZONE_ORIGIN`
 ZSK_RSASHA1=`dnssec-keygen -q -K $KEY_DIR -b 1024 -a RSASHA1 $ZONE_ORIGIN`
 KSK_ECDSA=`dnssec-keygen -q -K $KEY_DIR -f KSK -a ECDSAP256SHA256 $ZONE_ORIGIN`
