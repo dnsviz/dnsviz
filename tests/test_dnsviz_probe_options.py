@@ -16,8 +16,8 @@ from dnsviz.ipaddr import IPAddr
 from dnsviz import transport
 
 DATA_DIR = os.path.dirname(__file__)
-EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zone', 'example.com.zone')
-EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zone', 'example.com.zone-delegation')
+EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone')
+EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone-delegation')
 EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.json.gz')
 
 class DNSVizProbeOptionsTestCase(unittest.TestCase):
