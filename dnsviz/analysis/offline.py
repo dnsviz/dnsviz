@@ -1618,7 +1618,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for alg in dnssec_algorithms_in_dlv.difference(algs_signing_rrset[(server,client,response)]):
                     Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingRRSIGForAlgDLV(algorithm=alg), errors, server, client, response)
 
-        self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624)
+        self._populate_wildcard_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_cname_status(rrset_info)
 
         if populate_response_errors:
