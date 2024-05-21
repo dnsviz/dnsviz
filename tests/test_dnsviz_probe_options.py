@@ -36,7 +36,12 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         self.first_port = ZoneFileToServe._next_free_port
         self.custom_query_mixin_edns_options_orig = CustomQueryMixin.edns_options[:]
 
+        with tempfile.NamedTemporaryFile('w', prefix='dnsviz', delete=False) as self.example_ds_file:
+            self.example_ds_file.write('example.com. IN DS 34983 10 1 EC358CFAAEC12266EF5ACFC1FEAF2CAFF083C418\n' + \
+                    'example.com. IN DS 34983 10 2 608D3B089D79D554A1947BD10BEC0A5B1BDBE67B4E60E34B1432ED00 33F24B49')
+
     def tearDown(self):
+        os.remove(self.example_ds_file.name)
         CustomQueryMixin.edns_options = self.custom_query_mixin_edns_options_orig[:]
 
     def test_authoritative_option(self):
@@ -322,7 +327,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         arg1_with_spaces = ' example.com : 34983 10 1 EC358CFAAEC12266EF5ACFC1FEAF2CAFF083C418, ' + \
             ' 34983 10 2 608D3B089D79D554A1947BD10BEC0A5B1BDBE67B4E60E34B1432ED00 33F24B49 '
 
-        arg2 = 'example.com:%s' % EXAMPLE_COM_DELEGATION
+        arg2 = 'example.com:%s' % self.example_ds_file.name
 
         delegation_mapping2 = {
                 (dns.name.from_text('example.com'), dns.rdatatype.DS):
