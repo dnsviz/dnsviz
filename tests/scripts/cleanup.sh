@@ -1,5 +1,5 @@
 #!/bin/bash
 
-rm keys/*
-rm zones/signed-nsec/*
-rm zones/signed-nsec3/*
+rm -rf keys
+rm -rf zones/signed-nsec
+rm -rf zones/signed-nsec3
