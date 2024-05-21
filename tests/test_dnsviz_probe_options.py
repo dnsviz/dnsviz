@@ -60,7 +60,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         delegation_mapping1 = {
                 (dns.name.from_text('example.com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('example.com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com', 'ns2.example.com', 'a.root-servers.net', 'ns1._dnsviz.example.com']),
+                            ['ns1.example.com.', 'ns2.example.com.', 'a.root-servers.net.', 'ns1._dnsviz.example.com.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.1', '192.0.2.2']),
@@ -87,7 +87,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         delegation_mapping2 = {
                 (dns.name.from_text('example.com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('example.com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com']),
+                            ['ns1.example.com.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.1'])
@@ -197,7 +197,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         delegation_mapping1 = {
                 (dns.name.from_text('example.com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('example.com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com', 'ns2.example.com']),
+                            ['ns1.example.com.', 'ns2.example.com.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.1', '192.0.2.2']),
@@ -214,7 +214,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         delegation_mapping2 = {
                 (dns.name.from_text('example.com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('example.com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com']),
+                            ['ns1.example.com.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['127.0.0.1'])
@@ -273,7 +273,7 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         delegation_mapping1 = {
                 (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS):
                         dns.rrset.from_text_list(WILDCARD_EXPLICIT_DELEGATION, 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com', 'ns2.example.com', 'a.root-servers.net']),
+                            ['ns1.example.com.', 'ns2.example.com.', 'a.root-servers.net.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.1', '192.0.2.2']),
@@ -528,25 +528,25 @@ class DNSVizProbeOptionsTestCase(unittest.TestCase):
         explicit_delegations1 = {
                 (dns.name.from_text('com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 }
         explicit_delegations2 = {
                 (dns.name.from_text('com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 }
         explicit_delegations3 = {
                 (dns.name.from_text('com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 }
         explicit_delegations4 = {
                 (dns.name.from_text('com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 (dns.name.from_text('net'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('net'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 }
 
         for ex in (explicit_delegations1, explicit_delegations2, explicit_delegations3, explicit_delegations4):
@@ -648,10 +648,10 @@ ns1.example 0 IN A 192.0.2.1
         explicit_delegations1 = {
                 (dns.name.from_text('com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['localhost']),
+                            ['localhost.']),
                 (dns.name.from_text('foo.com'), dns.rdatatype.NS):
                         dns.rrset.from_text_list(dns.name.from_text('foo.com'), 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.foo.com']),
+                            ['ns1.foo.com.']),
                 (dns.name.from_text('ns1.foo.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.foo.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.3']),
@@ -701,7 +701,7 @@ ns1.example 0 IN A 192.0.2.1
         explicit_delegations1 = {
                 (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS):
                         dns.rrset.from_text_list(WILDCARD_EXPLICIT_DELEGATION, 0, dns.rdataclass.IN, dns.rdatatype.NS,
-                            ['ns1.example.com', 'a.root-servers.net']),
+                            ['ns1.example.com.', 'a.root-servers.net.']),
                 (dns.name.from_text('ns1.example.com'), dns.rdatatype.A):
                         dns.rrset.from_text_list(dns.name.from_text('ns1.example.com'), 0, dns.rdataclass.IN, dns.rdatatype.A,
                             ['192.0.2.1', '192.0.2.4']),
