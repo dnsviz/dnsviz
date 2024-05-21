@@ -10,9 +10,9 @@ EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.js
 EXAMPLE_RECURSIVE = os.path.join(DATA_DIR, 'data', 'example-recursive.json.gz')
 ROOT_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'root-authoritative.json.gz')
 ROOT_RECURSIVE = os.path.join(DATA_DIR, 'data', 'root-recursive.json.gz')
-EXAMPLE_COM_SIGNED = os.path.join(DATA_DIR, 'zone', 'example.com.zone.signed')
-EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zone', 'example.com.zone')
-EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zone', 'example.com.zone-delegation')
+EXAMPLE_COM_SIGNED = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone.signed')
+EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone')
+EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone-delegation')
 
 class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def setUp(self):
