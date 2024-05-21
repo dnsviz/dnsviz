@@ -342,8 +342,8 @@ class ZoneFileToServe:
 options {
     directory "%(dir)s";
     pid-file "%(named_pid)s";
-    listen-on port %(port)d { localhost; };
-    listen-on-v6 port %(port)d { localhost; };
+    listen-on port %(port)d { 127.0.0.1; };
+    listen-on-v6 port %(port)d { ::1; };
     recursion no;
     notify no;
 };
