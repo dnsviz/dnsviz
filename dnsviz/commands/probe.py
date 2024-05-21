@@ -366,7 +366,7 @@ $TTL 600
 '''
     ZONEFILE_TEMPLATE_A = '@ IN A 127.0.0.1\n'
     ZONEFILE_TEMPLATE_AAAA = '@ IN AAAA ::1\n'
-    USAGE_RE = re.compile(r'usage:', re.IGNORECASE)
+    ERROR_RE = re.compile(r'permission\s+denied|error:', re.IGNORECASE)
 
     def __init__(self, domain, filename):
         self.domain = domain
@@ -440,10 +440,10 @@ $TTL 600
             self._cleanup_process()
             raise ZoneFileServiceError('There was an problem with the zone file for "%s":\n%s' % (args['zone_name'], stdout))
 
-        named_cmd_without_log = [self.NAMED, '-c', args['named_conf']]
-        named_cmd_with_log = named_cmd_without_log + ['-L', args['named_log']]
-        checked_usage = False
-        for named_cmd in (named_cmd_with_log, named_cmd_without_log):
+        named_cmd_without_debug = [self.NAMED, '-c', args['named_conf']]
+        named_cmd_with_debug = named_cmd_without_debug + ['-g']
+        started = False
+        for named_cmd in (named_cmd_without_debug, named_cmd_with_debug):
             try:
                 p = subprocess.Popen(named_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
             except OSError as e:
@@ -452,14 +452,10 @@ $TTL 600
 
             (stdout, stderr) = p.communicate()
             if p.returncode == 0:
+                started = True
                 break
 
             stdout = stdout.decode('utf-8')
-            if not checked_usage and self.USAGE_RE.search(stdout):
-                # Versions of BIND pre 9.11 don't support -L, so fall back to without -L
-                checked_usage = True
-                continue
-
             try:
                 with io.open(args['named_log'], 'r', encoding='utf-8') as fh:
                     log = fh.read()
@@ -467,8 +463,19 @@ $TTL 600
                 log = ''
             if not log:
                 log = stdout
+
+            if log:
+                break
+
+        if not started:
+            newlog = ''
+            lines = log.splitlines()
+            for line in lines:
+                if self.ERROR_RE.search(line):
+                    newlog += line + '\n'
+
             self._cleanup_process()
-            raise ZoneFileServiceError('There was an problem executing %s to serve the "%s" zone:\n%s' % (self.NAMED, args['zone_name'], log))
+            raise ZoneFileServiceError('There was an problem executing %s to serve the "%s" zone:\n%s' % (self.NAMED, args['zone_name'], newlog))
 
         try:
             with io.open(args['named_pid'], 'r', encoding='utf-8') as fh:
