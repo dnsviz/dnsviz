@@ -346,6 +346,7 @@ options {
     listen-on-v6 port %(port)d { ::1; };
     recursion no;
     notify no;
+    dnssec-validation no;
 };
 controls {};
 zone "%(zone_name)s" {
