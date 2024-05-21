@@ -839,7 +839,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
         self._index_dnskeys()
-        self._populate_rrsig_status_all(supported_algs, ignore_rfc8624)
+        self._populate_rrsig_status_all(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_nodata_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_nxdomain_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_inconsistent_negative_dnssec_responses_all(ignore_rfc9276)
@@ -1421,7 +1421,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     status = Status.NSECStatusWildcard(rrset_info.rrset.name, wildcard_name, rrset_info.rrset.rdtype, zone_name, False, nsec_set_info)
 
                 for nsec_rrset_info in nsec_set_info.rrsets.values():
-                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624)
+                    self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276)
 
                 if status.validation_status == Status.NSEC_STATUS_VALID:
                     if status not in statuses:
@@ -1477,7 +1477,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.rrset_errors[rrset_info] = []
         self.rrsig_status[rrset_info] = {}
 
-    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, populate_response_errors=True):
+    def _populate_rrsig_status(self, query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276, populate_response_errors=True):
         self._initialize_rrset_status(rrset_info)
 
         if qname_obj is None:
@@ -1684,7 +1684,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     self._populate_foreign_class_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
                     self._populate_case_preservation_warnings(self, response, server, client, self.response_warnings[query], self.response_errors[query])
 
-    def _populate_rrsig_status_all(self, supported_algs, ignore_rfc8624):
+    def _populate_rrsig_status_all(self, supported_algs, ignore_rfc8624, ignore_rfc9276):
         self.rrset_warnings = {}
         self.rrset_errors = {}
         self.rrsig_status = {}
@@ -1717,7 +1717,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 elif rdtype == dns.rdatatype.DLV:
                     qname_obj = qname_obj.dlv_parent
 
-                self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624)
+                self._populate_rrsig_status(query, rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276)
 
             self._populate_invalid_response_status(query)
 
@@ -2311,7 +2311,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for soa_rrset_info in neg_response_info.soa_rrset_info:
             soa_owner_name = soa_rrset_info.rrset.name
 
-            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, ignore_rfc8624, populate_response_errors=False)
+            self._populate_rrsig_status(query, soa_rrset_info, self.get_name(soa_owner_name), supported_algs, ignore_rfc8624, ignore_rfc9276, populate_response_errors=False)
 
             # make sure this query was made to a server designated as
             # authoritative
@@ -2371,7 +2371,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             status_by_soa_name = {}
 
             for nsec_rrset_info in nsec_set_info.rrsets.values():
-                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624, populate_response_errors=False)
+                self._populate_rrsig_status(query, nsec_rrset_info, qname_obj, supported_algs, ignore_rfc8624, ignore_rfc9276, populate_response_errors=False)
 
             for server, client in nsec_set_info.servers_clients:
                 if server not in auth_servers:
