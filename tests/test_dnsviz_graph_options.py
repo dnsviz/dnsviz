@@ -30,6 +30,12 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             self.logger.removeHandler(handler)
         self.logger.addHandler(logging.NullHandler())
 
+    def tearDown(self):
+        for filename in ('png', 'foo.xyz', 'foo.svg', 'foo.png',
+                         'foo.html', 'foo.dot'):
+            if os.path.exists(filename):
+                os.remove(filename)
+
     def test_rrtype_list(self):
         arg1 = 'A,AAAA,MX,CNAME'
         arg1_with_spaces = ' A , AAAA , MX , CNAME '
