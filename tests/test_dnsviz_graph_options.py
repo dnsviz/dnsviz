@@ -125,6 +125,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.build_parser('graph')
             arghelper.parse_args(args)
             arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Bad json
             args = ['-r', example_bad_json.name]
@@ -133,6 +134,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # No version
             args = ['-r', example_no_version.name]
@@ -141,6 +143,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
@@ -149,6 +152,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
@@ -157,6 +161,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
         finally:
             for tmpfile in (example_auth_out, example_bad_json, example_no_version, \
@@ -184,6 +189,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
+            arghelper.args.names_file.close()
 
             args = ['-r', example_names_only.name]
             arghelper = GraphArgHelper(self.logger)
@@ -192,6 +198,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net'), dns.name.from_text('example.org')])
+            arghelper.args.input_file.close()
 
             args = ['-r', example_names_only.name, 'example.com']
             arghelper = GraphArgHelper(self.logger)
@@ -200,6 +207,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com')])
+            arghelper.args.input_file.close()
         finally:
             for tmpfile in (names_file, example_names_only):
                 os.remove(tmpfile.name)
@@ -238,6 +246,8 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, tk_explicit)
+            for f in arghelper.args.trusted_keys_file:
+                f.close()
 
             args = ['-t', '/dev/null', 'example.com']
             arghelper = GraphArgHelper(self.logger)
@@ -246,6 +256,8 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, [])
+            for f in arghelper.args.trusted_keys_file:
+                f.close()
 
         finally:
             for tmpfile in (tk1_file, tk2_file):
@@ -260,6 +272,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
+        arghelper.args.names_file.close()
 
         # Names file and command-line domain names are mutually exclusive
         args = ['-O', '-o', '/dev/null']
@@ -268,6 +281,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
+        arghelper.args.output_file.close()
 
         # But this is allowed
         args = ['-o', '/dev/null']
@@ -275,6 +289,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.build_parser('graph')
         arghelper.parse_args(args)
         arghelper.check_args()
+        arghelper.args.output_file.close()
 
         # So is this
         args = ['-O']
@@ -291,6 +306,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.output_format, 'png')
+        arghelper.args.output_file.close()
 
         args = ['-o', 'foo.dot']
         arghelper = GraphArgHelper(self.logger)
@@ -298,6 +314,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.output_format, 'dot')
+        arghelper.args.output_file.close()
 
         args = ['-o', 'foo.png']
         arghelper = GraphArgHelper(self.logger)
@@ -305,6 +322,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.output_format, 'png')
+        arghelper.args.output_file.close()
 
         args = ['-o', 'foo.html']
         arghelper = GraphArgHelper(self.logger)
@@ -312,6 +330,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.output_format, 'html')
+        arghelper.args.output_file.close()
 
         args = ['-o', 'foo.svg']
         arghelper = GraphArgHelper(self.logger)
@@ -319,6 +338,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         arghelper.set_kwargs()
         self.assertEqual(arghelper.output_format, 'svg')
+        arghelper.args.output_file.close()
 
         args = ['-o', 'foo.xyz']
         arghelper = GraphArgHelper(self.logger)
@@ -326,6 +346,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.set_kwargs()
+        arghelper.args.output_file.close()
 
         args = ['-o', 'png']
         arghelper = GraphArgHelper(self.logger)
@@ -333,6 +354,7 @@ class DNSVizGraphOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.set_kwargs()
+        arghelper.args.output_file.close()
 
         args = ['-o', '-']
         arghelper = GraphArgHelper(self.logger)

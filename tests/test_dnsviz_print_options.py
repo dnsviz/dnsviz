@@ -119,6 +119,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Bad json
             args = ['-r', example_bad_json.name]
@@ -127,6 +128,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # No version
             args = ['-r', example_no_version.name]
@@ -135,6 +137,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
@@ -143,6 +146,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
@@ -151,6 +155,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
         finally:
             for tmpfile in (example_auth_out, example_bad_json, example_no_version, \
@@ -178,6 +183,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
+            arghelper.args.names_file.close()
 
             args = ['-r', example_names_only.name]
             arghelper = PrintArgHelper(self.logger)
@@ -186,6 +192,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net'), dns.name.from_text('example.org')])
+            arghelper.args.input_file.close()
 
             args = ['-r', example_names_only.name, 'example.com']
             arghelper = PrintArgHelper(self.logger)
@@ -194,6 +201,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com')])
+            arghelper.args.input_file.close()
         finally:
             for tmpfile in (names_file, example_names_only):
                 os.remove(tmpfile.name)
@@ -232,6 +240,8 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, tk_explicit)
+            for f in arghelper.args.trusted_keys_file:
+                f.close()
 
             args = ['-t', '/dev/null', 'example.com']
             arghelper = PrintArgHelper(self.logger)
@@ -240,6 +250,8 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
             arghelper.aggregate_trusted_key_info()
             arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, [])
+            for f in arghelper.args.trusted_keys_file:
+                f.close()
 
         finally:
             for tmpfile in (tk1_file, tk2_file):
@@ -254,6 +266,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
+        arghelper.args.names_file.close()
 
         # Names file and command-line domain names are mutually exclusive
         args = ['-O', '-o', '/dev/null']
@@ -262,6 +275,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
+        arghelper.args.output_file.close()
 
         # But this is allowed
         args = ['-o', '/dev/null']
@@ -269,6 +283,7 @@ class DNSVizPrintOptionsTestCase(unittest.TestCase):
         arghelper.build_parser('print')
         arghelper.parse_args(args)
         arghelper.check_args()
+        arghelper.args.output_file.close()
 
         # So is this
         args = ['-O']

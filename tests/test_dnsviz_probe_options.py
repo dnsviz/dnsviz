@@ -936,6 +936,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
             arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Bad json
             args = ['-r', example_bad_json.name]
@@ -944,6 +945,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # No version
             args = ['-r', example_no_version.name]
@@ -952,6 +954,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
@@ -960,6 +963,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
@@ -968,6 +972,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
+            arghelper.args.input_file.close()
 
         finally:
             for tmpfile in (example_auth_out, example_bad_json, example_no_version, \
@@ -1011,6 +1016,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
+            arghelper.args.names_file.close()
 
             args = ['-f', names_file_unicode.name]
             arghelper = ArgHelper(self.logger)
@@ -1018,6 +1024,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('xn--zckzah.')])
+            arghelper.args.names_file.close()
 
             args = ['-r', example_names_only.name]
             arghelper = ArgHelper(self.logger)
@@ -1026,6 +1033,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net'), dns.name.from_text('example.org')])
+            arghelper.args.input_file.close()
 
             args = ['-r', example_names_only.name, 'example.com']
             arghelper = ArgHelper(self.logger)
@@ -1034,6 +1042,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.ingest_input()
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com')])
+            arghelper.args.input_file.close()
         finally:
             for tmpfile in (names_file, names_file_unicode, example_names_only):
                 os.remove(tmpfile.name)
