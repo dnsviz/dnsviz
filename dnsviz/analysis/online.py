@@ -2129,9 +2129,11 @@ class Analyst(object):
         return dns.name.from_text(new_name)
 
     def _set_negative_queries(self, name_obj):
-        random_label = ''.join(random.sample('abcdefghijklmnopqrstuvwxyz1234567890', 10))
+        population = 'abcdefghijklmnopqrstuvwxyz1234567890'
+        random_label1 = ''.join(random.sample(population, 5))
+        random_label2 = ''.join(random.sample(population, 5))
         try:
-            name_obj.nxdomain_name = dns.name.from_text(random_label, name_obj.name)
+            name_obj.nxdomain_name = dns.name.from_text('%s.%s' % (random_label1, random_label2), name_obj.name)
             name_obj.nxdomain_rdtype = dns.rdatatype.A
         except dns.name.NameTooLong:
             pass
