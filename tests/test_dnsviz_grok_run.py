@@ -15,7 +15,6 @@ class DNSGrokRunTestCase(unittest.TestCase):
     def setUp(self):
         self.devnull = io.open('/dev/null', 'wb')
         self.current_cwd = os.getcwd()
-        self.dnsviz_bin = os.path.join(self.current_cwd, 'bin', 'dnsviz')
 
         tk = 'example.com. IN DNSKEY 256 3 7 AwEAAZ2YEuBl4X58v1CezDfZjT1viYn5kY3MF3lSDjvHjMZ6gJlYt4Qq oIdpChifmeJldEX9/wPc04Tg7MlEfV3m0x2j80dMyObM0FZTxzMgbTFk Zs0AWrDXELieGkFZv1FB9YoxSX2XqvpFxwvPyyszUtCy/c5hrb6vfKRB Jh+qIO+NsNrl6O8NiYjWWNjdiFw+c2BxzpArQoaA+rcoyDYwH4xGpvTw YLnE9HmkwTSQuwASkgWgX3KgTmsDEw4I0P5Tk+wvmNnaqDhmFMHJK5Oh 92wUX+ppxxSgUx4UIJmftzi7sCg0qekIYUf99Dkn7OlC8X0rjj+xO4cD hbTjGkxmsD0='
 
@@ -50,26 +49,26 @@ class DNSGrokRunTestCase(unittest.TestCase):
     def test_dnsviz_grok_input(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok', '-r', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok', '-r', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name], stdout=fh), 0)
 
     def test_dnsviz_grok_names_input(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.names_file.name, 'rb') as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
@@ -78,48 +77,48 @@ class DNSGrokRunTestCase(unittest.TestCase):
 
         #FIXME
         #with io.open(self.output.name, 'wb') as fh:
-        #    self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-t', self.tk_file.name], stdout=fh), 0)
+        #    self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-t', self.tk_file.name], stdout=fh), 0)
 
         #with io.open(self.output.name, 'wb') as fh_out:
         #    with io.open(self.tk_file.name, 'rb') as fh_in:
-        #        p = subprocess.Popen([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+        #        p = subprocess.Popen(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
         #        p.communicate(fh_in.read())
         #        self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_grok_output(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-o', '-'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-o', '-'], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'grok', '-r', self.example_auth_out.name, '-o', 'all.json'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', self.example_auth_out.name, '-o', 'all.json'], cwd=self.run_cwd, stdout=fh), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.json')))
 
     def test_dnsviz_grok_input_auth(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_grok_input_rec(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'grok'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 

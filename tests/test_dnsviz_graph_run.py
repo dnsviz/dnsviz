@@ -15,7 +15,6 @@ class DNSGraphRunTestCase(unittest.TestCase):
     def setUp(self):
         self.devnull = io.open('/dev/null', 'wb')
         self.current_cwd = os.getcwd()
-        self.dnsviz_bin = os.path.join(self.current_cwd, 'bin', 'dnsviz')
 
         tk = 'example.com. IN DNSKEY 256 3 7 AwEAAZ2YEuBl4X58v1CezDfZjT1viYn5kY3MF3lSDjvHjMZ6gJlYt4Qq oIdpChifmeJldEX9/wPc04Tg7MlEfV3m0x2j80dMyObM0FZTxzMgbTFk Zs0AWrDXELieGkFZv1FB9YoxSX2XqvpFxwvPyyszUtCy/c5hrb6vfKRB Jh+qIO+NsNrl6O8NiYjWWNjdiFw+c2BxzpArQoaA+rcoyDYwH4xGpvTw YLnE9HmkwTSQuwASkgWgX3KgTmsDEw4I0P5Tk+wvmNnaqDhmFMHJK5Oh 92wUX+ppxxSgUx4UIJmftzi7sCg0qekIYUf99Dkn7OlC8X0rjj+xO4cD hbTjGkxmsD0='
 
@@ -50,79 +49,79 @@ class DNSGraphRunTestCase(unittest.TestCase):
     def test_dnsviz_graph_input(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph', '-r', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph', '-r', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name], stdout=fh), 0)
 
     def test_dnsviz_graph_names_input(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.names_file.name, 'rb') as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_graph_tk_input(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-t', self.tk_file.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-t', self.tk_file.name], stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.tk_file.name, 'rb') as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_graph_output(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-Tdot', '-o', '-'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-Tdot', '-o', '-'], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-o', 'all.dot'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-o', 'all.dot'], cwd=self.run_cwd, stdout=fh), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.dot')))
             self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.com.dot')))
             self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.net.dot')))
 
-        self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-O'], cwd=self.run_cwd), 0)
+        self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-O'], cwd=self.run_cwd), 0)
         self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.com.dot')))
         self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.net.dot')))
 
     def test_dnsviz_graph_input_auth(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_graph_input_rec(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
@@ -136,7 +135,7 @@ class DNSGraphRunTestCase(unittest.TestCase):
 
         for fmt in ('dot', 'png', 'svg', 'html'):
             with io.open(self.output.name, 'wb') as fh:
-                self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-o', 'all.'+fmt], cwd=self.run_cwd, stdout=fh), 0)
+                self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-o', 'all.'+fmt], cwd=self.run_cwd, stdout=fh), 0)
                 self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.'+fmt)))
                 self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.com.' + fmt)))
                 self.assertFalse(os.path.exists(os.path.join(self.run_cwd, 'example.net.' + fmt)))
@@ -145,7 +144,7 @@ class DNSGraphRunTestCase(unittest.TestCase):
                     first_bytes = fh.read(len(magic_codes_mapping[fmt]))
                     self.assertEqual(first_bytes, magic_codes_mapping[fmt])
 
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'graph', '-r', self.example_auth_out.name, '-T', fmt, '-O'], cwd=self.run_cwd), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', self.example_auth_out.name, '-T', fmt, '-O'], cwd=self.run_cwd), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.com.' + fmt)))
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'example.net.' + fmt)))
 

@@ -17,7 +17,6 @@ EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'exampl
 class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def setUp(self):
         self.current_cwd = os.getcwd()
-        self.dnsviz_bin = os.path.join(self.current_cwd, 'bin', 'dnsviz')
 
         with gzip.open(EXAMPLE_AUTHORITATIVE, 'rb') as example_auth_in:
             with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as self.example_auth_out:
@@ -45,64 +44,64 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def test_dnsviz_probe_input(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], stdout=fh), 0)
 
     def test_dnsviz_probe_names_input(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.names_file.name, 'rb') as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_probe_output(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', '-', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', '-', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
 
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call([self.dnsviz_bin, 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', 'all.json', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
+            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', 'all.json', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.json')))
 
     def test_dnsviz_probe_auth(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_AUTHORITATIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_probe_rec(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_RECURSIVE) as fh_in:
-                p = subprocess.Popen([self.dnsviz_bin, 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
+                p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
     def test_dnsviz_probe_auth_local(self):
         with io.open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(
-                [self.dnsviz_bin, 'probe', '-d', '0', '-A',
+                ['dnsviz', 'probe', '-d', '0', '-A',
                     '-x' 'example.com:%s' % EXAMPLE_COM_SIGNED,
                     '-N' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
                     '-D' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
