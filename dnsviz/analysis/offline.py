@@ -3152,5 +3152,104 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
+    def queries_with_errors_warnings(self):
+        has_warnings = set()
+        has_errors = set()
+
+        for rrset_info in self.rrset_warnings:
+            if not self.rrset_warnings[rrset_info]:
+                continue
+            for (server, client), responses in rrset_info.servers_clients.items():
+                for response in responses:
+                    has_warnings.add((response.query.qname, response.query.rdtype))
+
+        for rrset_info in self.rrset_errors:
+            if not self.rrset_errors[rrset_info]:
+                continue
+            for (server, client), responses in rrset_info.servers_clients.items():
+                for response in responses:
+                    has_errors.add((response.query.qname, response.query.rdtype))
+
+        for rrset_info in self.rrsig_status:
+            for rrsig in self.rrsig_status[rrset_info]:
+                for dnskey in self.rrsig_status[rrset_info][rrsig]:
+                    rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
+                    for (server, client), responses in rrset_info.servers_clients.items():
+                        for response in responses:
+                            if rrsig_status.warnings:
+                                has_warnings.add((response.query.qname, response.query.rdtype))
+                            if rrsig_status.errors:
+                                has_errors.add((response.query.qname, response.query.rdtype))
+
+        for wildcard_info, statuses in self.wildcard_status.items():
+            for status in statuses:
+                for (server, client), responses in wildcard_info.servers_clients.items():
+                    for response in responses:
+                        if status.warnings:
+                            has_warnings.add((response.query.qname, response.query.rdtype))
+                        if status.errors:
+                            has_errors.add((response.query.qname, response.query.rdtype))
+
+        for dname_info, statuses in self.dname_status.items():
+            for status in statuses:
+                for (server, client), responses in dname_info.servers_clients.items():
+                    for response in responses:
+                        if status.warnings:
+                            has_warnings.add((response.query.qname, response.query.rdtype))
+                        if status.errors:
+                            has_errors.add((response.query.qname, response.query.rdtype))
+
+        for neg_response_info in self.nxdomain_status:
+            for status in self.nxdomain_status[neg_response_info]:
+                if status.warnings:
+                    has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
+                if status.errors:
+                    has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
+
+        for neg_response_info in self.nxdomain_warnings:
+            if not self.nxdomain_warnings[neg_response_info]:
+                continue
+            for (server, client), responses in neg_response_info.servers_clients.items():
+                for response in responses:
+                    has_warnings.add((response.query.qname, response.query.rdtype))
+
+        for neg_response_info in self.nxdomain_errors:
+            if not self.nxdomain_errors[neg_response_info]:
+                continue
+            for (server, client), responses in neg_response_info.servers_clients.items():
+                for response in responses:
+                    has_errors.add((response.query.qname, response.query.rdtype))
+
+        for neg_response_info in self.nodata_warnings:
+            if not self.nodata_warnings[neg_response_info]:
+                continue
+            for (server, client), responses in neg_response_info.servers_clients.items():
+                for response in responses:
+                    has_warnings.add((response.query.qname, response.query.rdtype))
+
+        for neg_response_info in self.nodata_errors:
+            if not self.nodata_errors[neg_response_info]:
+                continue
+            for (server, client), responses in neg_response_info.servers_clients.items():
+                for response in responses:
+                    has_errors.add((response.query.qname, response.query.rdtype))
+
+        for neg_response_info in self.nodata_status:
+            for status in self.nodata_status[neg_response_info]:
+                if status.warnings:
+                    has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
+                if status.errors:
+                    has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
+
+        for query in self.response_warnings:
+            if self.response_warnings[query]:
+                has_warnings.add((query.qname, query.rdtype))
+
+        for query in self.response_errors:
+            if self.response_errors[query]:
+                has_errors.add((query.qname, query.rdtype))
+
+        return has_warnings, has_errors
+
 class TTLAgnosticOfflineDomainNameAnalysis(OfflineDomainNameAnalysis):
     QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
