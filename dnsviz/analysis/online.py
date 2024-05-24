@@ -1341,6 +1341,9 @@ class Analyst(object):
             pass
         elif self._is_sld_or_lower(name):
             rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
+            # This helps investigate problems related to existing domains being
+            # covered by NSEC records
+            rdtypes.append(dns.rdatatype.HINFO)
 
         return rdtypes
 
