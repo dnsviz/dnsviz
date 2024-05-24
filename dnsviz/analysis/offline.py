@@ -625,7 +625,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return tup
 
-    def serialize_status_simple(self, rdtypes=None, processed=None):
+    def serialize_status_simple(self, rdtypes=None, ignore_qnames_rdtypes=None, processed=None):
         if processed is None:
             processed = set()
 
@@ -634,6 +634,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if rdtypes is None:
                 # if rdtypes was not specified, then serialize all, with some exceptions
                 if rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                    continue
+
+                if (qname, rdtype) in ignore_qnames_rdtypes:
                     continue
             else:
                 # if rdtypes was specified, then only serialize rdtypes that

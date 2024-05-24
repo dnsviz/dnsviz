@@ -58,6 +58,7 @@ except ImportError:
     else:
         raise
 
+IGNORE_UNLESS_ERRORS = set([dns.rdatatype.HINFO, dns.rdatatype.NSEC3PARAM])
 LOCAL_MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
 DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
 
@@ -473,11 +474,20 @@ def main(argv):
         G = DNSAuthGraph()
         for name_obj in name_objs:
             name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276)
+            has_warnings, has_errors = name_obj.queries_with_errors_warnings()
+            has_warnings_or_errors = has_warnings.union(has_errors)
             for qname, rdtype in name_obj.queries:
                 if arghelper.args.rr_types is None:
                     # if rdtypes was not specified, then graph all, with some
                     # exceptions
                     if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                        continue
+
+                    # Ignore some data types unless they are explicitly
+                    # requested or there are warnings or errors associated with
+                    # them.
+                    if rdtype in IGNORE_UNLESS_ERRORS and (qname, rdtype) not in has_warnings_or_errors:
+                        ignore_qnames_rdtypes.add((qname, rdtype))
                         continue
                 else:
                     # if rdtypes was specified, then only graph rdtypes that

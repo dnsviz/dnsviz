@@ -57,13 +57,15 @@ except ImportError:
     else:
         raise
 
+IGNORE_UNLESS_ERRORS = set([dns.rdatatype.HINFO, dns.rdatatype.NSEC3PARAM])
+
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
 logger = logging.getLogger()
 
 class AnalysisInputError(Exception):
     pass
 
-def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, filename, override_show_colors):
+def finish_graph(G, name_objs, rdtypes, ignore_qnames_rdtypes, trusted_keys, supported_algs, filename, override_show_colors):
     G.add_trust(trusted_keys, supported_algs=supported_algs)
 
     try:
@@ -81,7 +83,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, filename, 
     processed = set()
     for name_obj in name_objs:
         name_obj.populate_response_component_status(G)
-        tuples.extend(name_obj.serialize_status_simple(rdtypes, processed))
+        tuples.extend(name_obj.serialize_status_simple(rdtypes, ignore_qnames_rdtypes, processed))
 
     fh.write(textualize_status_output(tuples, show_colors))
 
@@ -611,13 +613,23 @@ def main(argv):
         arghelper.update_trusted_key_info(latest_analysis_date)
 
         G = DNSAuthGraph()
+        ignore_qnames_rdtypes = set()
         for name_obj in name_objs:
             name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276)
+            has_warnings, has_errors = name_obj.queries_with_errors_warnings()
+            has_warnings_or_errors = has_warnings.union(has_errors)
             for qname, rdtype in name_obj.queries:
                 if arghelper.args.rr_types is None:
                     # if rdtypes was not specified, then graph all, with some
                     # exceptions
                     if name_obj.is_zone() and rdtype in (dns.rdatatype.DNSKEY, dns.rdatatype.DS, dns.rdatatype.DLV):
+                        continue
+
+                    # Ignore some data types unless they are explicitly
+                    # requested or there are warnings or errors associated with
+                    # them.
+                    if rdtype in IGNORE_UNLESS_ERRORS and (qname, rdtype) not in has_warnings_or_errors:
+                        ignore_qnames_rdtypes.add((qname, rdtype))
                         continue
                 else:
                     # if rdtypes was specified, then only graph rdtypes that
@@ -637,11 +649,11 @@ def main(argv):
                 else:
                     name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
                     name = name.replace(os.sep, '--')
-                finish_graph(G, [name_obj], arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, '%s.txt' % name, arghelper.args.show_colors)
+                finish_graph(G, [name_obj], arghelper.args.rr_types, ignore_qnames_rdtypes, arghelper.trusted_keys, arghelper.args.algorithms, '%s.txt' % name, arghelper.args.show_colors)
                 G = DNSAuthGraph()
 
         if not arghelper.args.derive_filename:
-            finish_graph(G, name_objs, arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, arghelper.args.output_file.fileno(), arghelper.args.show_colors)
+            finish_graph(G, name_objs, arghelper.args.rr_types, ignore_qnames_rdtypes, arghelper.trusted_keys, arghelper.args.algorithms, arghelper.args.output_file.fileno(), arghelper.args.show_colors)
 
     except KeyboardInterrupt:
         logger.error('Interrupted.')
