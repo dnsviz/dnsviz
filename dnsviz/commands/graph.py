@@ -487,7 +487,6 @@ def main(argv):
                     # requested or there are warnings or errors associated with
                     # them.
                     if rdtype in IGNORE_UNLESS_ERRORS and (qname, rdtype) not in has_warnings_or_errors:
-                        ignore_qnames_rdtypes.add((qname, rdtype))
                         continue
                 else:
                     # if rdtypes was specified, then only graph rdtypes that
