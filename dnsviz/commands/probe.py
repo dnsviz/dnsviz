@@ -1273,7 +1273,7 @@ class ArgHelper:
             try:
                 resolver = Resolver.from_file(RESOLV_CONF, StandardRecursiveQueryCD, transport_manager=tm)
             except ResolvConfError:
-                raise ResolvConfError('If servers are not specified with the %s option, then %s must have valid nameserver entries.\n' % \
+                raise ResolvConfError('If servers are not specified with the %s option, then %s must have valid nameserver entries.' % \
                         (self._arg_mapping['recursive_servers'], RESOLV_CONF))
             if (WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS) not in self.explicit_delegations:
                 self.explicit_delegations[(WILDCARD_EXPLICIT_DELEGATION, dns.rdatatype.NS)] = dns.rrset.RRset(WILDCARD_EXPLICIT_DELEGATION, dns.rdataclass.IN, dns.rdatatype.NS)
