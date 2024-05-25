@@ -41,19 +41,27 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
         os.remove(self.output.name)
         subprocess.check_call(['rm', '-rf', self.run_cwd])
 
+    def assertReturnCode(self, retcode):
+        if retcode == 5:
+            self.skipTest("No resolvers available")
+        else:
+            self.assertEqual(retcode, 0)
+
+
     def test_dnsviz_probe_input(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
-                self.assertEqual(p.returncode, 0)
+                self.assertReturnCode(p.returncode)
 
         with io.open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], stdout=fh), 0)
 
     def test_dnsviz_probe_names_input(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh), 0)
+            ret = subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-f', self.names_file.name], stdout=fh)
+            self.assertReturnCode(ret)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with io.open(self.names_file.name, 'rb') as fh_in:
@@ -63,7 +71,8 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
 
     def test_dnsviz_probe_output(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
+            ret = subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, 'example.com'], cwd=self.run_cwd, stdout=fh)
+            self.assertReturnCode(ret)
 
         with io.open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', self.example_auth_out.name, '-o', '-', 'example.com'], cwd=self.run_cwd, stdout=fh), 0)
@@ -77,35 +86,35 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
             with gzip.open(EXAMPLE_AUTHORITATIVE) as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
-                self.assertEqual(p.returncode, 0)
+                self.assertReturnCode(p.returncode)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_AUTHORITATIVE) as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
-                self.assertEqual(p.returncode, 0)
+                self.assertReturnCode(p.returncode)
 
     def test_dnsviz_probe_rec(self):
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(EXAMPLE_RECURSIVE) as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', 'example.com'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
-                self.assertEqual(p.returncode, 0)
+                self.assertReturnCode(p.returncode)
 
         with io.open(self.output.name, 'wb') as fh_out:
             with gzip.open(ROOT_RECURSIVE) as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', '.'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
-                self.assertEqual(p.returncode, 0)
+                self.assertReturnCode(p.returncode)
 
     def test_dnsviz_probe_auth_local(self):
         with io.open(self.output.name, 'wb') as fh:
-            self.assertEqual(subprocess.call(
+            self.assertReturnCode(subprocess.call(
                 ['dnsviz', 'probe', '-d', '0', '-A',
                     '-x' 'example.com:%s' % EXAMPLE_COM_SIGNED,
                     '-N' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
                     '-D' 'example.com:%s' % EXAMPLE_COM_DELEGATION,
-                    'example.com'], stdout=fh), 0)
+                    'example.com'], stdout=fh))
 
 if __name__ == '__main__':
     unittest.main()
