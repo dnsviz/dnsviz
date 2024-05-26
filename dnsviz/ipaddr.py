@@ -30,6 +30,9 @@ import socket
 
 INTERFACE_RE = re.compile(r'%[a-z0-9]+$')
 
+class LinkLocalAddress(ValueError):
+    pass
+
 class IPAddr(str):
     def __new__(cls, string):
         # python 2/3 compatibility
@@ -38,7 +41,8 @@ class IPAddr(str):
         if ':' in string:
             af = socket.AF_INET6
             vers = 6
-            string = INTERFACE_RE.sub('', string)
+            if INTERFACE_RE.search(string) is not None:
+                raise LinkLocalAddress()
         else:
             af = socket.AF_INET
             vers = 4

@@ -25,6 +25,7 @@ from __future__ import unicode_literals
 
 import bisect
 import io
+import logging
 import math
 import random
 import threading
@@ -40,6 +41,8 @@ from . import util
 import dns.rdataclass, dns.exception, dns.message, dns.rcode, dns.resolver
 
 MAX_CNAME_REDIRECTION = 20
+
+logger = logging.getLogger(__name__)
 
 class ResolvConfError(Exception):
     pass
@@ -131,6 +134,8 @@ class Resolver:
                     if len(words) > 1 and words[0] == 'nameserver':
                         try:
                             servers.append(IPAddr(words[1]))
+                        except LinkLocalAddress:
+                            logger.warning('Link-local addresses in %s are not currently supported.' % (resolv_conf))
                         except ValueError:
                             pass
         except IOError as e:
