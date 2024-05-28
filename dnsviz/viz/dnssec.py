@@ -951,9 +951,9 @@ class DNSAuthGraph:
             rrset_info_with_warnings = [x for x in nsec_status.nsec_set_info.rrsets.values() if name_obj.rrset_warnings[x]]
 
             img_str = ''
-            if rrset_info_with_errors:
+            if nsec_status.errors or rrset_info_with_errors:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % ERROR_ICON
-            elif rrset_info_with_warnings:
+            elif nsec_status.warnings or rrset_info_with_warnings:
                 img_str = '<IMG SCALE="TRUE" SRC="%s"/>' % WARNING_ICON
 
             # if it is NXDOMAIN, not type DS
