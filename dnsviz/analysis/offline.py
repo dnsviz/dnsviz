@@ -2532,16 +2532,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for neg_response_info in query.nxdomain_info:
                 self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.nxdomain_status, ignore_rfc9276)
 
-        if self.is_zone() or self.parent is None:
+        if self.is_zone() or self.zone is None:
             return
 
-        for (qname, rdtype), query in self.parent.queries.items():
+        for (qname, rdtype), query in self.zone.queries.items():
             if rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
                 continue
             for neg_response_info in query.nodata_info:
-                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.parent.nodata_status, ignore_rfc9276)
+                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nodata_status, ignore_rfc9276)
             for neg_response_info in query.nxdomain_info:
-                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.parent.nxdomain_status, ignore_rfc9276)
+                self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nxdomain_status, ignore_rfc9276)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
