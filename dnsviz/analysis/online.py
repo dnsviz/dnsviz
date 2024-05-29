@@ -1756,13 +1756,10 @@ class Analyst(object):
                 queries[(name_obj.name, dns.rdatatype.NSEC3PARAM)] = self.diagnostic_query(name_obj.name, dns.rdatatype.NSEC3PARAM, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_bad=COOKIE_STANDIN)
 
                 # negative queries for all zones
-                self._set_negative_queries(name_obj)
+                self._set_nxdomain_query(name_obj)
                 if name_obj.nxdomain_name is not None:
                     self.logger.debug('Preparing query %s/%s (NXDOMAIN)...' % (fmt.humanize_name(name_obj.nxdomain_name), dns.rdatatype.to_text(name_obj.nxdomain_rdtype)))
                     queries[(name_obj.nxdomain_name, name_obj.nxdomain_rdtype)] = self.diagnostic_query(name_obj.nxdomain_name, name_obj.nxdomain_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
-                if name_obj.nxrrset_name is not None:
-                    self.logger.debug('Preparing query %s/%s (NODATA)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
                 # if the name is SLD or lower, then ask MX and TXT
                 if self._is_sld_or_lower(name_obj.name):
@@ -1774,6 +1771,14 @@ class Analyst(object):
 
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+
+        # Issue a NODATA query (with type CNAME) for all zones.  This is used
+        # to detect problems with subdomains.
+        if name_obj.is_zone() and not self.explicit_only:
+            self._set_nodata_query(name_obj)
+            if name_obj.nxrrset_name is not None:
+                self.logger.debug('Preparing query %s/%s (NODATA)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
@@ -2131,7 +2136,7 @@ class Analyst(object):
             return None
         return dns.name.from_text(new_name)
 
-    def _set_negative_queries(self, name_obj):
+    def _set_nxdomain_query(self, name_obj):
         population = 'abcdefghijklmnopqrstuvwxyz1234567890'
         random_label1 = ''.join(random.sample(population, 5))
         random_label2 = ''.join(random.sample(population, 5))
@@ -2141,6 +2146,7 @@ class Analyst(object):
         except dns.name.NameTooLong:
             pass
 
+    def _set_nodata_query(self, name_obj):
         name_obj.nxrrset_name = name_obj.name
         name_obj.nxrrset_rdtype = dns.rdatatype.CNAME
 
