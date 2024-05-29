@@ -578,6 +578,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 dnskey_response_info = parent_obj.get_response_info(parent_obj.name, dns.rdatatype.DNSKEY)
                 name_tup[7].extend(parent_obj._serialize_response_component_list_simple(dns.rdatatype.DNSKEY, dnskey_response_info, False))
 
+            # handle NODATA in the zone, if there is an error/warning
+            if not self.is_zone() and parent_obj == self.zone:
+                has_warnings, has_errors = parent_obj.queries_with_errors_warnings(classes=Errors.ExistingCovered)
+                has_warnings_or_errors = has_warnings.union(has_errors)
+
+                qname = parent_obj.nxrrset_name
+                rdtype = parent_obj.nxrrset_rdtype
+                if qname is not None and (qname, rdtype) in has_warnings_or_errors:
+                    processed.add((qname, rdtype))
+                    if (qname, rdtype) in has_warnings_or_errors:
+                        name_tup[7].extend(parent_obj._serialize_response_component_list_simple(rdtype, parent_obj.get_response_info(qname, rdtype), True))
+
             parent_is_signed = parent_obj.signed
 
         # handle nxdomain_ancestor
