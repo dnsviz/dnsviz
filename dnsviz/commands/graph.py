@@ -42,6 +42,7 @@ except ImportError:
 import dns.exception, dns.name
 
 from dnsviz.analysis import OfflineDomainNameAnalysis, DNS_RAW_VERSION
+from dnsviz.analysis.errors import ExistingCovered
 from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
 from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
@@ -494,6 +495,13 @@ def main(argv):
                     if qname != name_obj.name or rdtype not in arghelper.args.rr_types:
                         continue
                 G.graph_rrset_auth(name_obj, qname, rdtype)
+
+            # Also graph the NODATA query for the zone name, if applicable
+            if not name_obj.is_zone() and name_obj.zone is not None:
+                z_has_warnings, z_has_errors = name_obj.zone.queries_with_errors_warnings(ExistingCovered)
+                z_has_warnings_or_errors = z_has_warnings.union(z_has_errors)
+                if (name_obj.zone.nxrrset_name, name_obj.zone.nxrrset_rdtype) in z_has_warnings_or_errors:
+                    G.graph_rrset_auth(name_obj.zone, name_obj.zone.nxrrset_name, name_obj.zone.nxrrset_rdtype)
 
             if arghelper.args.rr_types is not None:
                 for rdtype in arghelper.args.rr_types:
