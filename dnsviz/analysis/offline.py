@@ -3149,6 +3149,19 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 qname_type_str = '%s/%s/%s' % (lb2s(qname.canonicalize().to_text()), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
                 d[name_str]['queries'][qname_type_str] = query_serialized
 
+        # handle NODATA in the zone or the original parent, if there is an error/warning
+        if trace and not trace[0].is_zone() and self == trace[0].zone:
+            has_warnings, has_errors = self.queries_with_errors_warnings(classes=Errors.ExistingCovered)
+            has_warnings_or_errors = has_warnings.union(has_errors)
+
+            qname = self.nxrrset_name
+            rdtype = self.nxrrset_rdtype
+            if qname is not None and (qname, rdtype) in has_warnings_or_errors:
+                query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
+                if query_serialized:
+                    qname_type_str = '%s/%s/%s' % (lb2s(qname.canonicalize().to_text()), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+                    d[name_str]['queries'][qname_type_str] = query_serialized
+
         if not d[name_str]['queries']:
             del d[name_str]['queries']
 
