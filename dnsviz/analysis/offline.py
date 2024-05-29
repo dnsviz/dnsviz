@@ -3166,12 +3166,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         return d
 
-    def queries_with_errors_warnings(self):
+    def queries_with_errors_warnings(self, classes=None):
         has_warnings = set()
         has_errors = set()
 
         for rrset_info in self.rrset_warnings:
             if not self.rrset_warnings[rrset_info]:
+                continue
+            if classes is not None and \
+                    not [e for e in self.rrset_warnings[rrset_info] if isinstance(e, classes)]:
                 continue
             for (server, client), responses in rrset_info.servers_clients.items():
                 for response in responses:
@@ -3179,6 +3182,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         for rrset_info in self.rrset_errors:
             if not self.rrset_errors[rrset_info]:
+                continue
+            if classes is not None and \
+                    not [e for e in self.rrset_errors[rrset_info] if isinstance(e, classes)]:
                 continue
             for (server, client), responses in rrset_info.servers_clients.items():
                 for response in responses:
@@ -3191,37 +3197,56 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     for (server, client), responses in rrset_info.servers_clients.items():
                         for response in responses:
                             if rrsig_status.warnings:
-                                has_warnings.add((response.query.qname, response.query.rdtype))
+                                if classes is None or \
+                                        [e for e in rrsig_status.warnings if isinstance(e, classes)]:
+                                    has_warnings.add((response.query.qname, response.query.rdtype))
                             if rrsig_status.errors:
-                                has_errors.add((response.query.qname, response.query.rdtype))
+                                if classes is None or \
+                                        [e for e in rrsig_status.errors if isinstance(e, classes)]:
+                                    has_errors.add((response.query.qname, response.query.rdtype))
 
         for wildcard_info, statuses in self.wildcard_status.items():
             for status in statuses:
                 for (server, client), responses in wildcard_info.servers_clients.items():
                     for response in responses:
                         if status.warnings:
-                            has_warnings.add((response.query.qname, response.query.rdtype))
+                            if classes is None or \
+                                    [e for e in status.warnings if isinstance(e, classes)]:
+                                has_warnings.add((response.query.qname, response.query.rdtype))
                         if status.errors:
-                            has_errors.add((response.query.qname, response.query.rdtype))
+                            if classes is None or \
+                                    [e for e in status.errors if isinstance(e, classes)]:
+                                has_errors.add((response.query.qname, response.query.rdtype))
 
         for dname_info, statuses in self.dname_status.items():
             for status in statuses:
                 for (server, client), responses in dname_info.servers_clients.items():
                     for response in responses:
                         if status.warnings:
-                            has_warnings.add((response.query.qname, response.query.rdtype))
+                            if classes is None or \
+                                    [e for e in status.warnings if isinstance(e, classes)]:
+                                has_warnings.add((response.query.qname, response.query.rdtype))
                         if status.errors:
-                            has_errors.add((response.query.qname, response.query.rdtype))
+                            if classes is None or \
+                                    [e for e in status.errors if isinstance(e, classes)]:
+                                has_errors.add((response.query.qname, response.query.rdtype))
 
         for neg_response_info in self.nxdomain_status:
             for status in self.nxdomain_status[neg_response_info]:
                 if status.warnings:
-                    has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
+                    if classes is None or \
+                            [e for e in status.warnings if isinstance(e, classes)]:
+                        has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
                 if status.errors:
-                    has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
+                    if classes is None or \
+                            [e for e in status.errors if isinstance(e, classes)]:
+                        has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
 
         for neg_response_info in self.nxdomain_warnings:
             if not self.nxdomain_warnings[neg_response_info]:
+                continue
+            if classes is not None and \
+                    not [e for e in status.errors if isinstance(e, classes)]:
                 continue
             for (server, client), responses in neg_response_info.servers_clients.items():
                 for response in responses:
@@ -3230,12 +3255,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for neg_response_info in self.nxdomain_errors:
             if not self.nxdomain_errors[neg_response_info]:
                 continue
+            if classes is not None and \
+                    not [e for e in self.nxdomain_errors[neg_response_info] if isinstance(e, classes)]:
+                continue
             for (server, client), responses in neg_response_info.servers_clients.items():
                 for response in responses:
                     has_errors.add((response.query.qname, response.query.rdtype))
 
         for neg_response_info in self.nodata_warnings:
             if not self.nodata_warnings[neg_response_info]:
+                continue
+            if classes is not None and \
+                    not [e for e in self.nodata_warnings[neg_response_info] if isinstance(e, classes)]:
                 continue
             for (server, client), responses in neg_response_info.servers_clients.items():
                 for response in responses:
@@ -3244,6 +3275,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for neg_response_info in self.nodata_errors:
             if not self.nodata_errors[neg_response_info]:
                 continue
+            if classes is not None and \
+                    not [e for e in self.nodata_errors[neg_response_info] if isinstance(e, classes)]:
+                continue
             for (server, client), responses in neg_response_info.servers_clients.items():
                 for response in responses:
                     has_errors.add((response.query.qname, response.query.rdtype))
@@ -3251,17 +3285,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for neg_response_info in self.nodata_status:
             for status in self.nodata_status[neg_response_info]:
                 if status.warnings:
-                    has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
+                    if classes is None or \
+                            [e for e in status.warnings if isinstance(e, classes)]:
+                        has_warnings.add((neg_response_info.qname, neg_response_info.rdtype))
                 if status.errors:
-                    has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
+                    if classes is None or \
+                            [e for e in status.errors if isinstance(e, classes)]:
+                        has_errors.add((neg_response_info.qname, neg_response_info.rdtype))
 
         for query in self.response_warnings:
             if self.response_warnings[query]:
-                has_warnings.add((query.qname, query.rdtype))
+                if classes is None or \
+                        [e for e in self.response_warnings[query] if isinstance(e, classes)]:
+                    has_warnings.add((query.qname, query.rdtype))
 
         for query in self.response_errors:
             if self.response_errors[query]:
-                has_errors.add((query.qname, query.rdtype))
+                if classes is None or \
+                        [e for e in self.response_errors[query] if isinstance(e, classes)]:
+                    has_errors.add((query.qname, query.rdtype))
 
         return has_warnings, has_errors
 
