@@ -28,15 +28,32 @@ for zone in unsigned signed-nsec signed-nsec3; do
 	probe_output=`mktemp`
 	grok_output=`mktemp`
 
-	dnsviz probe -A -x $ZONE_ORIGIN:$ZONE_DIR/$zone/$zone_file \
+	if ! dnsviz probe -A -x $ZONE_ORIGIN:$ZONE_DIR/$zone/$zone_file \
 		-N $ZONE_ORIGIN:$ZONE_DIR/$zone/$ZONE_FILE_DELEGATION \
-		$ZONE_ORIGIN foo.$ZONE_ORIGIN foo.wildcard.$ZONE_ORIGIN > $probe_output || RET=1
+		$ZONE_ORIGIN foo.$ZONE_ORIGIN foo.wildcard.$ZONE_ORIGIN > $probe_output ; then
+		echo 'dnsviz probe failed' 1>&2
+		RET=1
+		continue
+	fi
 
-	dnsviz grok -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION -l warning < $probe_output > $grok_output || RET=1
-	dnsviz print -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION < $probe_output > /dev/null || RET=1
-	dnsviz graph -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION -Thtml < $probe_output > /dev/null || RET=1
+	if ! dnsviz grok -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION -l warning < $probe_output > $grok_output ; then
+		echo 'dnsviz print failed' 1>&2
+		RET=1
+	fi
+	if ! dnsviz print -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION < $probe_output > /dev/null ; then
+		echo 'dnsviz grok failed' 1>&2
+		RET=1
+	fi
+	if ! dnsviz graph -t $ZONE_DIR/$zone/$ZONE_FILE_DELEGATION -Thtml < $probe_output > /dev/null ; then
+		echo 'dnsviz graph failed' 1>&2
+		RET=1
+	fi
 
-	[ -z "`cat $grok_output`" ] || RET=1
+	if ! [ -z "`cat $grok_output`" ] ; then
+		echo 'dnsviz grok output not empty:  ' 1>&2
+		cat $grok_output 1>&2
+		RET=1
+	fi
 
 	rm $probe_output
 	rm $grok_output
