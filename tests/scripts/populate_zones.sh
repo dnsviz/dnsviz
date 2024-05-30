@@ -18,6 +18,6 @@ rm dsset-$ZONE_ORIGIN.
 
 [ -d $ZONE_DIR/signed-nsec3 ] || mkdir $ZONE_DIR/signed-nsec3
 cat $ZONE_DIR/unsigned/$ZONE_FILE $KEY_DIR/$KSK_RSASHA256.key $KEY_DIR/$ZSK_RSASHA256.key > $ZONE_DIR/signed-nsec3/$ZONE_FILE
-dnssec-signzone -K $KEY_DIR -x -k $KSK_RSASHA256 -o $ZONE_ORIGIN -3 - $ZONE_DIR/signed-nsec3/$ZONE_FILE $ZSK_RSASHA256
+dnssec-signzone -K $KEY_DIR -x -k $KSK_RSASHA256 -o $ZONE_ORIGIN -3 - -H 0 $ZONE_DIR/signed-nsec3/$ZONE_FILE $ZSK_RSASHA256
 cat $ZONE_DIR/unsigned/$ZONE_FILE_DELEGATION dsset-$ZONE_ORIGIN. > $ZONE_DIR/signed-nsec3/$ZONE_FILE_DELEGATION
 rm dsset-$ZONE_ORIGIN.
