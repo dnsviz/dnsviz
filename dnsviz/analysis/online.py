@@ -1769,13 +1769,13 @@ class Analyst(object):
                     self.logger.debug('Preparing query %s/TXT...' % fmt.humanize_name(name_obj.name))
                     queries[(name_obj.name, dns.rdatatype.TXT)] = self.diagnostic_query(name_obj.name, dns.rdatatype.TXT, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
-        # Issue a NODATA query (with type CNAME) for all zones.  This is used
-        # to detect problems with subdomains.
-        if name_obj.is_zone() and not self.explicit_only:
-            self._set_nodata_query(name_obj)
-            if name_obj.nxrrset_name is not None:
-                self.logger.debug('Preparing query %s/%s (NODATA)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
-                queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+            # Issue a NODATA query (with type CNAME) for all zones.  This is used
+            # to detect problems with subdomains.
+            if name_obj.is_zone() and not self.explicit_only:
+                self._set_nodata_query(name_obj)
+                if name_obj.nxrrset_name is not None:
+                    self.logger.debug('Preparing query %s/%s (NODATA)...' % (fmt.humanize_name(name_obj.nxrrset_name), dns.rdatatype.to_text(name_obj.nxrrset_rdtype)))
+                    queries[(name_obj.nxrrset_name, name_obj.nxrrset_rdtype)] = self.diagnostic_query(name_obj.nxrrset_name, name_obj.nxrrset_rdtype, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
         # for zones and for (non-zone) names which have DNSKEYs referenced
         if name_obj.is_zone() or self._force_dnskey_query(name_obj.name):
