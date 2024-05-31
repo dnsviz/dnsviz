@@ -3271,7 +3271,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if not self.nxdomain_warnings[neg_response_info]:
                 continue
             if classes is not None and \
-                    not [e for e in nxdomain_warnings[neg_response_info].errors if isinstance(e, classes)]:
+                    not [e for e in self.nxdomain_warnings[neg_response_info].errors if isinstance(e, classes)]:
                 continue
             for (server, client), responses in neg_response_info.servers_clients.items():
                 for response in responses:
