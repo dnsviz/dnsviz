@@ -18,14 +18,15 @@ powers the Web-based analysis available at https://dnsviz.net/
 ## Installation
 
 DNSViz packages are available in repositories for popular operating systems,
-such as Debian, Ubuntu, and FreeBSD.  DNSViz can also be installed on Mac OS X
-via Homebrew or MacPorts.
+such as Debian, Ubuntu, Fedora, and FreeBSD, using their typical installation
+commands.  DNSViz can also be installed on Mac OS X via Homebrew or MacPorts.
 
 The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
 [virtual environment](#installation-in-a-virtual-environment), and installation
-on [Fedora, RHEL 8, CentOS 8,](#fedora--rhel-8--centos-8-rpm-build-and-install) and
-[RHEL 7](#rhel-7-rpm-build-and-install).
+on
+[RHEL 8 or 9, CentOS Stream 8 or 9,](#rhel-8--centos-8-rpm-build-and-install),
+and [RHEL 7](#rhel-7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
@@ -33,17 +34,18 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7, 3.5 - 3.9) - https://www.python.org/
+* python (2.7, 3.5 - 3.11) - https://www.python.org/
+  (Note that python 2.7 support will be removed in a future release.)
 
 * dnspython (1.13.0 or later) - https://www.dnspython.org/
 
 * pygraphviz (1.3 or later) - https://pygraphviz.github.io/
 
-* M2Crypto (0.37.0 or later) - https://gitlab.com/m2crypto/m2crypto
+* M2Crypto (0.38.0 or later) - https://gitlab.com/m2crypto/m2crypto
 
 Note that earlier versions of the software listed above might also work with
 DNSViz, but with some caveats.  For example, M2Crypto 0.28.0 and later will
-work, but versions of M2Crypto earlier than 0.37.0 lack support for DNSSEC
+work, but versions of M2Crypto earlier than 0.38.0 lack support for DNSSEC
 algorithms 15 (Ed25519) and 16 (Ed448).  Also, while DNSViz itself still works
 with python 2.7, some versions of its software dependencies have moved on:
 pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
@@ -66,9 +68,19 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
   not need to be running (i.e., as a server).
 
   Note that default AppArmor policies for Debian are known to cause issues when
-  invoking `named(8)` from DNSViz for pre-deployment testing.  Two solutions to
-  this problem are to either: 1) create a local policy for AppArmor that allows
-  `named(8)` to run with fewer restrictions; or 2) disable AppArmor completely.
+  invoking `named(8)` from DNSViz for pre-deployment testing.  AppArmor can be
+  temporarily disabled for `named(8)` with the following:
+
+  ```
+  $ sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
+  ```
+
+  After pre-deployment testing is finished, AppArmor for `named(8)` can be
+  re-enabled with the following:
+
+  ```
+  $ sudo apparmor_parser /etc/apparmor.d/usr.sbin.named
+  ```
 
 
 ### Installation in a Virtual Environment
@@ -80,9 +92,10 @@ $ virtualenv ~/myenv
 $ source ~/myenv/bin/activate
 (myenv) $ pip install -r requirements.txt
 ```
-(Note that this installs the dependencies that are python packages, but some of
+Note that this installs the dependencies that are python packages, but some of
 these packages have non-python dependencies, such as Graphviz (required for
-pygraphviz) that are not installed automatically.)
+pygraphviz), OpenSSL (required for M2Crypto), and swig (required for building
+either) that are not installed automatically.
 
 Next download and install DNSViz from the Python Package Index (PyPI):
 ```
@@ -94,46 +107,67 @@ or locally, from a downloaded or cloned copy of DNSViz:
 ```
 
 
-### Fedora / RHEL 8 / CentOS 8 RPM Build and Install
+### RHEL 8/9 or CentOS Stream 8/9 -- RPM Build and Install
 
-*RHEL 8 only*: Enable CodeReady Linux Builder by following the instructions [here](https://access.redhat.com/articles/4348511).
+To build an RPM and install it on RHEL 8 or 9 or CentOS Stream 8 or 9, use the
+following instructions.
 
-*CentOS 8 only*: Enable PowerTools and EPEL with the following two commands:
+*RHEL 8 and 9 only*: Enable CodeReady Linux Builder and Extra Packages for
+Enterprise Linux (EPEL) with following:
+
 ```
-$ sudo dnf config-manager --set-enabled powertools
+$ sudo subscription-manager repos --enable codeready-builder-for-rhel-$(vers)-$(arch)-rpms #RHEL9
+$ sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(vers).noarch.rpm
+```
+(where `$(vers)` refers to version, either `8` or `9`, and `$(arch)` refers to
+the architecture, e.g., `x86_64` or `aarch64`. If you are unsure, run
+`sudo subscription-manager repos --list` to show available options.)
+
+*CentOS Stream 8 or 9 only*: Enable PowerTools or CodeReady Linux Builder and
+EPEL with the following:
+
+```
+$ sudo dnf config-manager --set-enabled $(tool)
 $ sudo dnf install epel-release
 ```
+(where `$(tool)` refers to the tool, either `powertools` for CentOS Stream 8 or
+`crb` for CentOS Stream 9.)
 
-The remaining instructions are for Fedora, RHEL 8, and CentOS 8.
+The remaining instructions are for RHEL 8 or 9 *and* CentOS Stream 8 or 9.
 
 Install the tools for building an RPM, and set up the rpmbuild tree.
+
 ```
-$ sudo dnf install rpm-build rpmdevtools python3-devel
+$ sudo dnf install rpm-build rpmdevtools make python3-devel python3-build
 $ rpmdev-setuptree
 ```
 
 From within the DNSViz source directory, create a source distribution tarball
 and copy it and the DNSViz spec file to the appropriate rpmbuild
 subdirectories.
+
 ```
-$ python3 setup.py sdist
+$ python3 -m build
 $ cp dist/dnsviz-*.tar.gz ~/rpmbuild/SOURCES/
 $ cp contrib/dnsviz.spec ~/rpmbuild/SPECS/
 ```
 
 Install dnspython, pygraphviz, and M2Crypto.
+
 ```
 $ sudo dnf install python3-dns python3-pygraphviz python3-m2crypto
 ```
-(Note that as of Fedora 33 / RHEL 8 / CentOS 8, the latest version of M2Crypto is 0.35.2.  If you
-would like support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448), you will
-need to install M2Crypto using `pip3`.  For example, see [installation to a
-virtual environment](#installation-in-a-virtual-environment).)
+(Note that for RHEL 8 and CentOS Stream 8, the version of M2Crypto is 0.35.  If
+you would like support for DNSSEC algorithms 15 (Ed25519) and 16 (Ed448),
+[M2Crypto 0.38 or higher is required](#dependencies).  Thus, if you want this
+functionality, you will need to install M2Crypto using `pip3`.  For example,
+see
+[installation to a virtual environment](#installation-in-a-virtual-environment).)
 
 Build and install the DNSViz RPM.
 ```
 $ rpmbuild -ba rpmbuild/SPECS/dnsviz.spec
-$ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*-1.*.noarch.rpm
+$ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*.noarch.rpm
 ```
 
 
