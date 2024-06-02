@@ -25,7 +25,7 @@ The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
 [virtual environment](#installation-in-a-virtual-environment), and installation
 on
-[RHEL 8 or 9, CentOS Stream 8 or 9,](#rhel-8--centos-8-rpm-build-and-install),
+[RHEL 8 or 9, CentOS Stream 8 or 9,](#rhel-89-or-centos-stream-89----rpm-build-and-install),
 and [RHEL 7](#rhel-7-rpm-build-and-install).
 
 Instructions for running in a Docker container are also available
