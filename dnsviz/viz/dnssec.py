@@ -438,7 +438,9 @@ class DNSAuthGraph:
         return self.G.get_node(node_str)
 
     def add_dnskey_non_existent(self, name, zone, algorithm, key_tag):
-        node_str = self.dnskey_node_str(0, name, algorithm, key_tag)
+        # We just use 99999 as a "high number", so it doesn't collide with the
+        # lower numbers assigned to real DNSKEYs
+        node_str = self.dnskey_node_str(99999, name, algorithm, key_tag)
 
         if not self.G.has_node(node_str):
             label_str = '<<FONT POINT-SIZE="%d" FACE="%s">DNSKEY</FONT><BR/><FONT POINT-SIZE="%d">alg=%d, id=%d</FONT>>' % \
