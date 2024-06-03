@@ -69,7 +69,8 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'misconfigured': '#f4b800',
         'indeterminate': '#f4b800',
         'expired': '#6131a3',
-        'invalid': '#be1515' }
+        'invalid': '#be1515',
+        'alias': 'black' }
 
 INVIS_STYLE_RE = re.compile(r'(^|,)invis(,|$)')
 DASHED_STYLE_RE = re.compile(r'(^|,)dashed(,|$)')
@@ -1076,9 +1077,9 @@ class DNSAuthGraph:
             alias_zone = self.node_subgraph_name[alias][8:-4]
             target_zone = self.node_subgraph_name[target][8:-4]
             if alias_zone.endswith(target_zone) and alias_zone != target_zone:
-                self.G.add_edge(target, alias, color='black', dir='back', constraint='false')
+                self.G.add_edge(target, alias, color=COLORS['alias'], dir='back', constraint='false')
             else:
-                self.G.add_edge(target, alias, color='black', dir='back')
+                self.G.add_edge(target, alias, color=COLORS['alias'], dir='back')
 
     def add_rrsigs(self, name_obj, zone_obj, rrset_info, signed_node, port=None):
         for rrsig in name_obj.rrsig_status[rrset_info]:
