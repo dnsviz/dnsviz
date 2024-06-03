@@ -324,12 +324,13 @@ class DNSAuthGraph:
                 return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
 
     def id_for_dnskey(self, name, dnskey):
+        wire = dnskey.to_wire()
         try:
-            return self.dnskey_ids[(name,dnskey)]
+            return self.dnskey_ids[(name,wire)]
         except KeyError:
-            self.dnskey_ids[(name,dnskey)] = self.next_dnskey_id
+            self.dnskey_ids[(name,wire)] = self.next_dnskey_id
             self.next_dnskey_id += 1
-            return self.dnskey_ids[(name,dnskey)]
+            return self.dnskey_ids[(name,wire)]
 
     def id_for_ds(self, name, ds):
         try:
