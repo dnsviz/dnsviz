@@ -1800,6 +1800,11 @@ class Analyst(object):
                 # we also do a query with small UDP payload to elicit and test a truncated response
                 queries[(name_obj.name, -dns.rdatatype.DNSKEY)] = self.truncation_diagnostic_query(name_obj.name, dns.rdatatype.DNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
 
+                self.logger.debug('Preparing query %s/CDNSKEY...' % fmt.humanize_name(name_obj.name))
+                queries[(name_obj.name, dns.rdatatype.CDNSKEY)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.CDNSKEY, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+                self.logger.debug('Preparing query %s/CDS...' % fmt.humanize_name(name_obj.name))
+                queries[(name_obj.name, dns.rdatatype.CDS)] = self.pmtu_diagnostic_query(name_obj.name, dns.rdatatype.CDS, self.rdclass, servers, bailiwick, self.client_ipv4, self.client_ipv6, odd_ports=odd_ports, cookie_jar=cookie_jar, cookie_standin=COOKIE_STANDIN)
+
             # query for DS/DLV
             if name_obj.parent is not None:
                 parent_servers = name_obj.zone.parent.get_auth_or_designated_servers()

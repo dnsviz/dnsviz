@@ -70,6 +70,9 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'indeterminate': '#f4b800',
         'expired': '#6131a3',
         'invalid': '#be1515',
+        'alias': 'black',
+        'CDNSKEY': 'lightgray',
+        'CDS': 'lightgray',
         'alias': 'black' }
 
 INVIS_STYLE_RE = re.compile(r'(^|,)invis(,|$)')
@@ -1075,6 +1078,51 @@ class DNSAuthGraph:
         #self.G.add_edge(rrset_node, wildcard_node, color=COLORS['secure'], style='invis', dir='back')
         #return rrset_node
 
+    def add_cds(self, zone_obj, rrset_info, my_nodes):
+        for rdata in rrset_info.rrset:
+            nodes_to_link_to = set()
+
+            nodes_to_link_to.add(self._dnskey_node_for_cds(zone_obj, rdata))
+
+            for my_node in my_nodes:
+                for target_node in nodes_to_link_to:
+                    if not self.G.has_edge(target_node, my_node):
+                        self.G.add_edge(target_node, my_node, color=COLORS['CDS'], dir='back', constraint='false')
+
+    def add_cdnskey(self, zone_obj, rrset_info, my_nodes):
+        for rdata in rrset_info.rrset:
+
+            # create a "DNSKEY" from CDNSKEY
+            cdnskey = Response.DNSKEYMeta(rrset_info.rrset.name, rdata, rrset_info.rrset.ttl)
+            dnskey_node = self._dnskey_node_for_cdnskey(zone_obj, cdnskey)
+
+            for my_node in my_nodes:
+                if not self.G.has_edge(dnskey_node, my_node):
+                    self.G.add_edge(dnskey_node, my_node, color=COLORS['CDNSKEY'], dir='back', constraint='false')
+
+    def _dnskey_node_for_cdnskey(self, zone_obj, cdnskey):
+        try:
+            return self.get_dnskey(self.id_for_dnskey(zone_obj.name, cdnskey.rdata), zone_obj.name, cdnskey.rdata.algorithm, cdnskey.key_tag)
+        except KeyError:
+            return self.add_dnskey_non_existent(zone_obj.name, zone_obj.name, cdnskey.rdata.algorithm, cdnskey.key_tag)
+
+    def _dnskey_node_for_cds(self, zone_obj, cds):
+        dnskeys = zone_obj.get_dnskeys()
+        dnskey_node = None
+        for dnskey in dnskeys:
+            if cds.algorithm == dnskey.rdata.algorithm and cds.key_tag == dnskey.key_tag:
+                dnskey_msg = dnskey.message_for_ds()
+                status = crypto.validate_ds_digest(cds.digest_type, cds.digest, dnskey_msg)
+                dnskey_node = self.get_dnskey(self.id_for_dnskey(zone_obj.name, dnskey.rdata), zone_obj.name, dnskey.rdata.algorithm, dnskey.key_tag)
+                if status:
+                    return dnskey_node
+
+        # if we could not get an exact match, we use what was closest (i.e.,
+        # algorithm and key tag matched).
+        if dnskey_node is not None:
+            return dnskey_node
+        return self.add_dnskey_non_existent(zone_obj.name, zone_obj.name, cds.algorithm, cds.key_tag)
+
     def add_alias(self, alias, target):
         if not [x for x in self.G.out_edges(target) if x[1] == alias and x.attr['color'] == 'black']:
             alias_zone = self.node_subgraph_name[alias][8:-4]
@@ -1179,6 +1227,14 @@ class DNSAuthGraph:
             if rrset_info.rrset.rdtype == dns.rdatatype.CNAME:
                 for my_node in my_nodes:
                     node_to_cname_mapping.add((my_node, rrset_info.rrset[0].target))
+
+            elif rdtype == dns.rdatatype.CDNSKEY:
+                if name == zone_obj.name:
+                    self.add_cdnskey(zone_obj, rrset_info, my_nodes)
+
+            elif rdtype == dns.rdatatype.CDS:
+                if name == zone_obj.name:
+                    self.add_cds(zone_obj, rrset_info, my_nodes)
 
             self.processed_rrsets[(my_name, rdtype)] += my_nodes
 
