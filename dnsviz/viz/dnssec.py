@@ -327,7 +327,10 @@ class DNSAuthGraph:
                 return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
 
     def id_for_dnskey(self, name, dnskey):
-        wire = dnskey.to_wire()
+        # dnspython 1/2 compatibility
+        f = io.BytesIO()
+        dnskey.to_wire(f)
+        wire = f.getvalue()
         try:
             return self.dnskey_ids[(name,wire)]
         except KeyError:
