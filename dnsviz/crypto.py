@@ -195,6 +195,13 @@ else:
     _check_ed_support()
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
+    mydigest = get_ds_digest(digest_alg, dnskey_msg)
+    if mydigest is None:
+        return None
+    else:
+        return mydigest == digest
+
+def get_ds_digest(digest_alg, dnskey_msg):
     if not digest_alg_is_supported(digest_alg):
         _log_unsupported_alg(digest_alg, ALG_TYPE_DIGEST)
         return None
@@ -202,23 +209,23 @@ def validate_ds_digest(digest_alg, digest, dnskey_msg):
     if digest_alg == 1:
         md = EVP.MessageDigest('sha1')
         md.update(dnskey_msg)
-        return md.final() == digest
+        return md.final()
     elif digest_alg == 2:
         md = EVP.MessageDigest('sha256')
         md.update(dnskey_msg)
-        return md.final() == digest
+        return md.final()
     elif digest_alg == 3:
         _gost_init()
         try:
             md = EVP.MessageDigest(GOST_DIGEST_NAME)
             md.update(dnskey_msg)
-            return md.final() == digest
+            return md.final()
         finally:
             _gost_cleanup()
     elif digest_alg == 4:
         md = EVP.MessageDigest('sha384')
         md.update(dnskey_msg)
-        return md.final() == digest
+        return md.final()
 
 def _dnskey_to_dsa(key):
     # get T
