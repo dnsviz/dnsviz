@@ -1539,3 +1539,17 @@ class TruncatedResponse(DNSResponseComponent):
 
     def __hash__(self):
         return hash(id(self))
+
+def dnskey_rrset_to_ds_rrset(dnskey_rrset_info, digest_algs):
+    rrset = dns.rrset.RRset(dnskey_rrset_info.rrset.name, dnskey_rrset_info.rrset.rdclass, dns.rdatatype.DS)
+    for dnskey_rdata in dnskey_rrset_info.rrset:
+        dnskey_meta = DNSKEYMeta(dnskey_rrset_info.rrset.name, dnskey_rdata, dnskey_rrset_info.rrset.ttl)
+        dnskey_meta.servers_clients = copy.deepcopy(dnskey_rrset_info.servers_clients)
+        dnskey_msg = dnskey_meta.message_for_ds()
+        for digest_alg in digest_algs:
+            digest = crypto.get_ds_digest(digest_alg, dnskey_meta.message_for_ds())
+            rdata = dns.rdtypes.ANY.DS.DS(dns.rdataclass.IN, dns.rdatatype.DS, dnskey_meta.key_tag, dnskey_meta.rdata.algorithm, digest_alg, digest)
+            rrset.add(rdata)
+    ds_rrset_info = RRsetInfo(rrset, dnskey_rrset_info.ttl_cmp)
+    ds_rrset_info.servers_clients = copy.deepcopy(dnskey_rrset_info.servers_clients)
+    return ds_rrset_info
