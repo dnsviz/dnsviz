@@ -116,7 +116,7 @@ following instructions.
 Enterprise Linux (EPEL) with following:
 
 ```
-$ sudo subscription-manager repos --enable codeready-builder-for-rhel-$(vers)-$(arch)-rpms #RHEL9
+$ sudo subscription-manager repos --enable codeready-builder-for-rhel-$(vers)-$(arch)-rpms
 $ sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(vers).noarch.rpm
 ```
 (where `$(vers)` refers to version, either `8` or `9`, and `$(arch)` refers to
