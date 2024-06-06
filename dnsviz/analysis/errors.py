@@ -1990,7 +1990,7 @@ class MissingSEPForAlg(DelegationError):
             raise TypeError('The "source" keyword argument is required for instantiation.')
 
 class MissingSEPForAlgCDNSKEY(MissingSEPForAlg):
-    references = MissingSEPForAlg.references + ['RFC 7344, Sec. 3']
+    references = MissingSEPForAlg.references + ['RFC 7344, Sec. 3', 'RFC 7344, Sec. 5']
 
 class NoSEP(DelegationError):
     '''
@@ -2013,7 +2013,7 @@ class NoSEP(DelegationError):
             raise TypeError('The "source" keyword argument is required for instantiation.')
 
 class NoSEPCDNSKEY(NoSEP):
-    references = NoSEP.references + ['RFC 7344, Sec. 3']
+    references = NoSEP.references + ['RFC 7344, Sec. 3', 'RFC 7344, Sec. 5']
 
 class NoNSInParent(DelegationError):
     pass
@@ -2307,6 +2307,80 @@ class ServerNotAuthoritative(DelegationError):
     code = 'SERVER_NOT_AUTHORITATIVE'
     description_template = "The server(s) did not respond authoritatively for the namespace."
     references = ['RFC 1035, Sec. 4.1.1']
+
+class CDNSKEYCDSError(DomainNameAnalysisError):
+    pass
+
+class CDNSKEYCDSOnlyError(CDNSKEYCDSError):
+    rdtype = None
+
+    def __init__(self, *args, **kwargs):
+        super(CDNSKEYCDSOnlyError, self).__init__(**kwargs)
+        self.template_kwargs['rdtype'] = self.rdtype
+
+class DSConsistencyError(CDNSKEYCDSOnlyError):
+    description_template = 'The contents of the DS RRset are inconsistent with those of the %(rdtype)s RRset.'
+    references = ['RFC 7344, Sec. 3', 'RFC 7344, Sec. 5']
+
+class CDNSKEYInconsistentWithDS(DSConsistencyError):
+    '''
+    >>> e = CDNSKEYInconsistentWithDS()
+    >>> e.description
+    'The contents of the DS RRset are inconsistent with those of the CDNSKEY RRset.  See ...'
+    '''
+
+    _abstract = False
+    code = 'CDNSKEY_INCONSISTENT_WITH_DS'
+    rdtype = 'CDNSKEY'
+
+class CDSInconsistentWithDS(DSConsistencyError):
+    '''
+    >>> e = CDSInconsistentWithDS()
+    >>> e.description
+    'The contents of the DS RRset are inconsistent with those of the CDS RRset.  See ...'
+    '''
+
+    _abstract = False
+    code = 'CDS_INCONSISTENT_WITH_DS'
+    rdtype = 'CDS'
+
+class MultipleCDNSKEYCDS(CDNSKEYCDSOnlyError):
+    description_template = 'Multiple variants of %(rdtype)s RRsets were found.'
+    references = ['RFC 7344, Sec. 3', 'RFC 7344, Sec. 5']
+
+class MultipleCDNSKEY(MultipleCDNSKEYCDS):
+    '''
+    >>> e = MultipleCDNSKEY()
+    >>> e.description
+    'Multiple variants of CDNSKEY RRsets were found.  See ...'
+    '''
+
+    _abstract = False
+    code = 'MULTIPLE_CDNSKEY'
+    rdtype = 'CDNSKEY'
+
+class MultipleCDS(MultipleCDNSKEYCDS):
+    '''
+    >>> e = MultipleCDS()
+    >>> e.description
+    'Multiple variants of CDS RRsets were found.  See ...'
+    '''
+
+    _abstract = False
+    code = 'MULTIPLE_CDS'
+    rdtype = 'CDS'
+
+class CDNSKEYInconsistentWithCDS(CDNSKEYCDSError):
+    '''
+    >>> e = CDNSKEYInconsistentWithCDS()
+    >>> e.description
+    'The contents of the CDNSKEY RRset are inconsistent with those of the CDS RRset.  See...'
+    '''
+
+    _abstract = False
+    description_template = 'The contents of the CDNSKEY RRset are inconsistent with those of the CDS RRset.'
+    references = ['RFC 7344, Sec. 4']
+    code = 'CDNSKEY_INCONSISTENT_WITH_CDS'
 
 class DNAMEError(DomainNameAnalysisError):
     pass

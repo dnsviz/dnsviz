@@ -858,6 +858,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_nodata_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_nxdomain_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_inconsistent_negative_dnssec_responses_all(ignore_rfc9276)
+        self._populate_cdnskey_cds_singularity()
+        self._populate_cdnskey_cds_consistency()
+        self._populate_cdnskey_cds_ds_consistency()
         self._finalize_key_roles()
         if not is_dlv:
             self._populate_delegation_status(supported_algs, supported_digest_algs, ignore_rfc8624)
@@ -2589,6 +2592,106 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nodata_status, ignore_rfc9276)
             for neg_response_info in query.nxdomain_info:
                 self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nxdomain_status, ignore_rfc9276)
+
+    def _populate_cdnskey_cds_singularity(self):
+        for rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
+            if (self.name, rdtype) not in self.queries:
+                continue
+            if rdtype == dns.rdatatype.CDNSKEY:
+                err_cls = Errors.MultipleCDNSKEY
+            else:
+                err_cls = Errors.MultipleCDS
+            rrset_answer_info = self.queries[(self.name, rdtype)].answer_info
+            if len(rrset_answer_info) > 1:
+                # more than one answer!
+                for rrset_info in rrset_answer_info:
+                    self.rrset_errors[rrset_info].append(err_cls())
+
+    def _populate_cdnskey_cds_ds_consistency(self):
+        if (self.name, dns.rdatatype.DS) not in self.queries:
+            return
+        ds_rrset_answer_info = self.queries[(self.name, dns.rdatatype.DS)].answer_info
+        cds_has_error = set()
+        for ds_rrset_info in ds_rrset_answer_info:
+            digest_alg_map = {}
+
+            # Create a list of digest algs for every algorithm/key tag.  We use
+            # this for creating a set of DS from the CDNSKEY with digest
+            # algorithms matching those of the DS set.
+            for ds_rdata in ds_rrset_info.rrset:
+                if (ds_rdata.algorithm, ds_rdata.key_tag) not in digest_alg_map:
+                    digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)] = set()
+                digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)].add(ds_rdata.digest_type)
+
+            # Create a canonicalized list of rdata for comparing DS to CDS
+            # (We cannot just use straight-up set comparison because they are
+            # different types.)
+            ds_rr_list = Response.RRsetInfo.sorted_rdata_list(ds_rrset_info.rrset)
+
+            if (self.name, dns.rdatatype.CDS) in self.queries:
+                rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDS)].answer_info
+                for rrset_info in rrset_answer_info:
+                    # Created a sorted list of rdata for comparison
+                    cds_rr_list = Response.RRsetInfo.sorted_rdata_list(rrset_info.rrset)
+                    if ds_rr_list != cds_rr_list:
+                        # If any CDS RRset has contents different than those of
+                        # the DS RRset, then warn.
+                        if rrset_info not in cds_has_error:
+                            self.rrset_warnings[rrset_info].append(Errors.CDSInconsistentWithDS())
+                            cds_has_error.add(rrset_info)
+
+            if (self.name, dns.rdatatype.CDNSKEY) in self.queries:
+                rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDNSKEY)].answer_info
+                for rrset_info in rrset_answer_info:
+                    # Create a DS RRset from the CDNSKEY RRset
+                    cds_rrset_info = Response.dnskey_rrset_to_ds_rrset(rrset_info, digest_alg_map, (2,))
+                    # Created a sorted list of rdata for comparison
+                    cds_rr_list = Response.RRsetInfo.sorted_rdata_list(cds_rrset_info.rrset)
+                    if ds_rr_list != cds_rr_list:
+                        # If any CDNSKEY RRset has contents different than
+                        # those of the DS RRset, then warn.
+                        if rrset_info not in cds_has_error:
+                            self.rrset_warnings[rrset_info].append(Errors.CDNSKEYInconsistentWithDS())
+                            cds_has_error.add(rrset_info)
+
+    def _populate_cdnskey_cds_consistency(self):
+        if (self.name, dns.rdatatype.CDS) not in self.queries or \
+                (self.name, dns.rdatatype.CDNSKEY) not in self.queries:
+            return
+
+        ds_rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDS)].answer_info
+        cds_has_error = set()
+        for ds_rrset_info in ds_rrset_answer_info:
+            digest_alg_map = {}
+
+            # Create a list of digest algs for every algorithm/key tag.  We use
+            # this for creating a set of DS from the CDNSKEY with digest
+            # algorithms matching those of the DS set.
+            for ds_rdata in ds_rrset_info.rrset:
+                if (ds_rdata.algorithm, ds_rdata.key_tag) not in digest_alg_map:
+                    digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)] = set()
+                digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)].add(ds_rdata.digest_type)
+
+            # Create a canonicalized list of rdata for comparing DS to CDS
+            # (We cannot just use straight-up set comparison because they are
+            # different types.)
+            ds_rr_list = Response.RRsetInfo.sorted_rdata_list(ds_rrset_info.rrset)
+
+            rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDNSKEY)].answer_info
+            for rrset_info in rrset_answer_info:
+                # Create a DS RRset from the CDNSKEY RRset
+                cds_rrset_info = Response.dnskey_rrset_to_ds_rrset(rrset_info, digest_alg_map, (2,))
+                # Created a sorted list of rdata for comparison
+                cds_rr_list = Response.RRsetInfo.sorted_rdata_list(cds_rrset_info.rrset)
+                if ds_rr_list != cds_rr_list:
+                    # If any CDNSKEY RRset has contents different than
+                    # those of the DS RRset, then warn.
+                    if rrset_info not in cds_has_error:
+                        self.rrset_errors[rrset_info].append(Errors.CDNSKEYInconsistentWithCDS())
+                        cds_has_error.add(rrset_info)
+                    if ds_rrset_info not in cds_has_error:
+                        self.rrset_errors[ds_rrset_info].append(Errors.CDNSKEYInconsistentWithCDS())
+                        cds_has_error.add(ds_rrset_info)
 
     def _populate_dnskey_status(self, trusted_keys):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
