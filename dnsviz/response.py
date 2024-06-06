@@ -1059,12 +1059,17 @@ class RRsetInfo(DNSResponseComponent):
         return hash(id(self))
 
     @classmethod
+    def sorted_rdata_list(cls, rrset):
+        rdata_list = [RdataWrapper(x) for x in rrset]
+        rdata_list.sort()
+        return rdata_list
+
+    @classmethod
     def rrset_canonicalized_to_wire(cls, rrset, name, ttl):
         s = b''
         name_wire = name.to_wire()
 
-        rdata_list = [RdataWrapper(x) for x in rrset]
-        rdata_list.sort()
+        rdata_list = cls.sorted_rdata_list(rrset)
 
         for rdataw in rdata_list:
             rdata = rdataw._rdata
