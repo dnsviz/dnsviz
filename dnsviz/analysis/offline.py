@@ -2042,7 +2042,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             # the rest of the logic here. An more elegant solution is desirable.
             orig_ds_rrset_info = ds_rrset_info
             if rdtype == dns.rdatatype.CDNSKEY:
-                ds_rrset_info = Response.dnskey_rrset_to_ds_rrset(ds_rrset_info, digest_algs_for_cds)
+                ds_rrset_info = Response.dnskey_rrset_to_ds_rrset(ds_rrset_info, {}, digest_algs_for_cds)
 
             # for each set of DS records provided by one or more servers,
             # identify the set of DNSSEC algorithms and the set of digest
