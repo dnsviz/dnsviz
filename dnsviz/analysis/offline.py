@@ -1967,14 +1967,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.dnskey_with_ds = set()
 
         self._populate_ds_status(dns.rdatatype.DS, supported_algs, supported_digest_algs, ignore_rfc8624)
+        self._populate_ds_status(dns.rdatatype.CDS, supported_algs, supported_digest_algs, ignore_rfc8624)
+        self._populate_ds_status(dns.rdatatype.CDNSKEY, supported_algs, supported_digest_algs, ignore_rfc8624)
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs, ignore_rfc8624)
         self._populate_ns_status()
         self._populate_server_status()
 
     def _populate_ds_status(self, rdtype, supported_algs, supported_digest_algs, ignore_rfc8624):
-        if rdtype not in (dns.rdatatype.DS, dns.rdatatype.DLV):
-            raise ValueError('Type can only be DS or DLV.')
+        if rdtype not in (dns.rdatatype.DS, dns.rdatatype.CDS, dns.rdatatype.CDNSKEY, dns.rdatatype.DLV):
+            raise ValueError('Type can only be DS, CDS, CDNSKEY, or DLV.')
         if self.parent is None:
             return
         if rdtype == dns.rdatatype.DLV:
@@ -1994,8 +1996,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         try:
             ds_rrset_answer_info = self.queries[(name, rdtype)].answer_info
         except KeyError:
-            # zones should have DS queries
-            if self.is_zone():
+            # zones should have DS queries, even if there
+            # aren't any for CDS or CDNSKEY.
+            if rdtype == dns.rdatatype.DS and self.is_zone():
                 raise
             else:
                 return
@@ -2024,11 +2027,22 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     if response.is_valid_response() and response.is_complete_response() and not response.is_referral(self.name, dns.rdatatype.DNSKEY, dnskey_query.rdclass, bailiwick):
                         dnskey_server_client_responses.add((server,client,response))
 
+        # Use digest alg 2 for generating CDS from CDNSKEY
+        digest_algs_for_cds = (2,)
+
         for ds_rrset_info in ds_rrset_answer_info:
             # there are CNAMEs that show up here...
             if not (ds_rrset_info.rrset.name == name and ds_rrset_info.rrset.rdtype == rdtype):
                 continue
             ds_rrset_exists = True
+
+            # XXX This is a bit of a hack.  Basically, if CDNSKEY is used, then
+            # ds_rrset_info actually contains information on CDNSKEY answers.
+            # We need to convert them to CDS responses for them to work with
+            # the rest of the logic here. An more elegant solution is desirable.
+            orig_ds_rrset_info = ds_rrset_info
+            if rdtype == dns.rdatatype.CDNSKEY:
+                ds_rrset_info = Response.dnskey_rrset_to_ds_rrset(ds_rrset_info, digest_algs_for_cds)
 
             # for each set of DS records provided by one or more servers,
             # identify the set of DNSSEC algorithms and the set of digest
@@ -2133,14 +2147,35 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                 supported_ds_algs.intersection(algs_validating_sep[(server,client,response)]):
                             self.delegation_status[rdtype] = Status.DELEGATION_STATUS_SECURE
                         elif supported_ds_algs:
-                            Errors.DomainNameAnalysisError.insert_into_list(Errors.NoSEP(source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], server, client, response)
+                            if rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
+                                # Associate with the RRSet
+                                err = Errors.NoSEPCDNSKEY(source=dns.rdatatype.to_text(rdtype))
+                                Errors.DomainNameAnalysisError.insert_into_list(err, self.rrset_errors[orig_ds_rrset_info], server, client, response)
+                            else:
+                                # Associate with the delegation
+                                err = Errors.NoSEP(source=dns.rdatatype.to_text(rdtype))
+                                Errors.DomainNameAnalysisError.insert_into_list(err, self.delegation_errors[rdtype], server, client, response)
 
                 # report an error if one or more algorithms are incorrectly validated
                 for (server,client,response) in algs_signing_sep:
                     for alg in ds_algs.difference(algs_signing_sep[(server,client,response)]):
-                        Errors.DomainNameAnalysisError.insert_into_list(Errors.MissingSEPForAlg(algorithm=alg, source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], server, client, response)
+                        if rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
+                            # Associate with the RRSet
+                            err = Errors.MissingSEPForAlgCDNSKEY(algorithm=alg, source=dns.rdatatype.to_text(rdtype))
+                            Errors.DomainNameAnalysisError.insert_into_list(err, self.rrset_errors[orig_ds_rrset_info], server, client, response)
+                        else:
+                            # Associate with the delegation
+                            err = Errors.MissingSEPForAlg(algorithm=alg, source=dns.rdatatype.to_text(rdtype))
+                            Errors.DomainNameAnalysisError.insert_into_list(err, self.delegation_errors[rdtype], server, client, response)
             else:
-                Errors.DomainNameAnalysisError.insert_into_list(Errors.NoSEP(source=dns.rdatatype.to_text(rdtype)), self.delegation_errors[rdtype], None, None, None)
+                if rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
+                    # Associate with the RRSet
+                    err = Errors.NoSEPCDNSKEY(source=dns.rdatatype.to_text(rdtype))
+                    Errors.DomainNameAnalysisError.insert_into_list(err, self.rrset_errors[orig_ds_rrset_info], None, None, None)
+                else:
+                    # Associate with the delegation
+                    err = Errors.NoSEP(source=dns.rdatatype.to_text(rdtype))
+                    Errors.DomainNameAnalysisError.insert_into_list(err, self.delegation_errors[rdtype], None, None, None)
 
         if self.delegation_status[rdtype] is None:
             if ds_rrset_answer_info:

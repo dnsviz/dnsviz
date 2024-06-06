@@ -1989,6 +1989,9 @@ class MissingSEPForAlg(DelegationError):
         except KeyError:
             raise TypeError('The "source" keyword argument is required for instantiation.')
 
+class MissingSEPForAlgCDNSKEY(MissingSEPForAlg):
+    references = MissingSEPForAlg.references + ['RFC 7344, Sec. 3']
+
 class NoSEP(DelegationError):
     '''
     >>> e = NoSEP(source='DS')
@@ -2008,6 +2011,9 @@ class NoSEP(DelegationError):
             self.template_kwargs['source'] = kwargs['source']
         except KeyError:
             raise TypeError('The "source" keyword argument is required for instantiation.')
+
+class NoSEPCDNSKEY(NoSEP):
+    references = NoSEP.references + ['RFC 7344, Sec. 3']
 
 class NoNSInParent(DelegationError):
     pass
