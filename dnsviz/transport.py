@@ -73,8 +73,8 @@ MAX_PORT_BIND_ATTEMPTS=10
 MAX_WAIT_FOR_REQUEST=30
 HTTP_HEADER_END_RE = re.compile(r'(\r\n\r\n|\n\n|\r\r)')
 HTTP_STATUS_RE = re.compile(r'^HTTP/\S+ (?P<status>\d+) ')
-CONTENT_LENGTH_RE = re.compile(r'^Content-Length: (?P<length>\d+)', re.MULTILINE)
-CHUNKED_ENCODING_RE = re.compile(r'^Transfer-Encoding: chunked(\r\n|\r|\n)', re.MULTILINE)
+CONTENT_LENGTH_RE = re.compile(r'^Content-[Ll]ength: (?P<length>\d+)', re.MULTILINE)
+CHUNKED_ENCODING_RE = re.compile(r'^Transfer-[Ee]ncoding: chunked(\r\n|\r|\n)', re.MULTILINE)
 CHUNK_SIZE_RE = re.compile(r'^(?P<length>[0-9a-fA-F]+)(;[^\r\n]+)?(\r\n|\r|\n)')
 CRLF_START_RE = re.compile(r'^(\r\n|\n|\r)')
 
@@ -798,7 +798,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         self.sock = new_sock
 
     def _post_data(self):
-        return 'content=' + urlquote.quote(json.dumps(self.serialize_requests()))
+        return json.dumps(self.serialize_requests())
 
     def _authentication_header(self):
         if not self.username:
@@ -812,7 +812,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def init_req(self):
         data = self._post_data()
-        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.10.0\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/x-www-form-urlencoded\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
+        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.10.0\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/json\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 

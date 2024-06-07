@@ -22,7 +22,6 @@
 
 from __future__ import unicode_literals
 
-import cgi
 import json
 import os
 import re
@@ -99,7 +98,7 @@ def get_qname(msg):
             break
 
         # append label to list
-        labels.append(msg[index:index + l])
+        labels.append(msg[index:index + l].decode('latin1'))
 
         index += l
 
@@ -165,7 +164,8 @@ def main():
             os.environ['REQUEST_METHOD'] = 'POST'
         if os.environ['REQUEST_METHOD'] != 'POST':
             raise RemoteQueryError('Request method %s not supported' % os.environ['REQUEST_METHOD'])
-        form = cgi.FieldStorage()
+        if os.environ['CONTENT_TYPE'] != 'application/json':
+            raise RemoteQueryError('Incorrect content type: %s' % os.environ['CONTENT_TYPE'])
 
         response_queue = queue.Queue()
         queries_in_waiting = set()
@@ -173,14 +173,17 @@ def main():
         tm = transport.DNSQueryTransportManager()
         qtms = []
         try:
-            if 'content' not in form:
-                raise RemoteQueryError('No "content" field found in input')
+            try:
+                content_len = int(os.environ['CONTENT_LENGTH'])
+                raw_content = sys.stdin.read(content_len)
+            except (OSError, ValueError) as e:
+                raise RemoteQueryError('Reading of input failed: %s' % str(e))
 
             # load the json content
             try:
-                content = json.loads(form['content'].value)
+                content = json.loads(raw_content)
             except ValueError:
-                raise RemoteQueryError('JSON decoding of HTTP request failed: %s' % form['content'])
+                raise RemoteQueryError('JSON decoding of HTTP request failed: %s' % raw_content)
 
             if 'version' not in content:
                 raise RemoteQueryError('No version information in HTTP request.')
@@ -214,7 +217,7 @@ def main():
                 th = th_factory.build(processed_queue=response_queue)
                 th.add_qtm(qtm)
                 th.init_req()
-                tm.query_nowait(th)
+                tm.handle_msg_nowait(th)
                 queries_in_waiting.add(th)
 
             while queries_in_waiting:
