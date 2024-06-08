@@ -2613,6 +2613,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         ds_rrset_answer_info = self.queries[(self.name, dns.rdatatype.DS)].answer_info
         cds_has_error = set()
         for ds_rrset_info in ds_rrset_answer_info:
+            # there are CNAMEs that show up here...
+            if not (ds_rrset_info.rrset.name == self.name and \
+                    ds_rrset_info.rrset.rdtype == dns.rdatatype.DS):
+                continue
+
             digest_alg_map = {}
 
             # Create a list of digest algs for every algorithm/key tag.  We use
@@ -2662,6 +2667,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         ds_rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDS)].answer_info
         cds_has_error = set()
         for ds_rrset_info in ds_rrset_answer_info:
+            # there are CNAMEs that show up here...
+            if not (ds_rrset_info.rrset.name == self.name and \
+                    ds_rrset_info.rrset.rdtype == dns.rdatatype.DS):
+                continue
+
             digest_alg_map = {}
 
             # Create a list of digest algs for every algorithm/key tag.  We use
