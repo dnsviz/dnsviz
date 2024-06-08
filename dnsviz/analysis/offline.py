@@ -2669,7 +2669,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for ds_rrset_info in ds_rrset_answer_info:
             # there are CNAMEs that show up here...
             if not (ds_rrset_info.rrset.name == self.name and \
-                    ds_rrset_info.rrset.rdtype == dns.rdatatype.DS):
+                    ds_rrset_info.rrset.rdtype == dns.rdatatype.CDS):
                 continue
 
             digest_alg_map = {}
