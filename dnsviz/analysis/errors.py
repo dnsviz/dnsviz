@@ -1791,7 +1791,7 @@ class MissingNSECForWildcard(MissingNSEC):
     response = 'wildcard'
 
 class MissingSOA(ResponseError):
-    description_template = 'No SOA RR was returned with the %(response)s response.'
+    description_template = 'The %(response)s response did not include an SOA record.'
     references = ['RFC 1034, Sec. 4.3.4']
     response = None
 
@@ -1803,7 +1803,7 @@ class MissingSOAForNXDOMAIN(MissingSOA):
     '''
     >>> e = MissingSOAForNXDOMAIN()
     >>> e.description
-    'No SOA RR was returned with the NXDOMAIN response.  See ...'
+    'The NXDOMAIN response did not include an SOA record.  See RFC 1034, Sec. 4.3.4, RFC 2308, Sec. 2.1.'
     '''
 
     _abstract = False
@@ -1815,7 +1815,7 @@ class MissingSOAForNODATA(MissingSOA):
     '''
     >>> e = MissingSOAForNODATA()
     >>> e.description
-    'No SOA RR was returned with the NODATA response.  See ...'
+    'The NODATA response did not include an SOA record.  See RFC 1034, Sec. 4.3.4, RFC 2308, Sec. 2.2.'
     '''
 
     _abstract = False
