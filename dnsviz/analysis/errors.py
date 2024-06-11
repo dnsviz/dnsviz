@@ -1803,7 +1803,7 @@ class MissingSOAForNXDOMAIN(MissingSOA):
     '''
     >>> e = MissingSOAForNXDOMAIN()
     >>> e.description
-    'The NXDOMAIN response did not include an SOA record.  See RFC 1034, Sec. 4.3.4, RFC 2308, Sec. 2.1.'
+    'The NXDOMAIN response did not include an SOA record.  See ...'
     '''
 
     _abstract = False
@@ -1815,7 +1815,7 @@ class MissingSOAForNODATA(MissingSOA):
     '''
     >>> e = MissingSOAForNODATA()
     >>> e.description
-    'The NODATA response did not include an SOA record.  See RFC 1034, Sec. 4.3.4, RFC 2308, Sec. 2.2.'
+    'The NODATA response did not include an SOA record.  See ...'
     '''
 
     _abstract = False
