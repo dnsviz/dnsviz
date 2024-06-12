@@ -2699,6 +2699,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDNSKEY)].answer_info
             for rrset_info in rrset_answer_info:
+                # there are CNAMEs that show up here...
+                if not (rrset_info.rrset.name == self.name and \
+                        rrset_info.rrset.rdtype == dns.rdatatype.CDNSKEY):
+                    continue
+
                 # Create a DS RRset from the CDNSKEY RRset
                 cds_rrset_info = Response.dnskey_rrset_to_ds_rrset(rrset_info, digest_alg_map, (2,))
                 # Created a sorted list of rdata for comparison
