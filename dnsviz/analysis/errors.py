@@ -2370,6 +2370,62 @@ class MultipleCDS(MultipleCDNSKEYCDS):
     code = 'MULTIPLE_CDS'
     rdtype = 'CDS'
 
+class DNSSECDeleteRecordError(CDNSKEYCDSOnlyError):
+    pass
+
+class DNSSECDeleteRecordIncorrectValues(DNSSECDeleteRecordError):
+    references = ['RFC 8078, Sec. 4']
+
+class CDNSKEYRecordIncorrectDeleteValues(DNSSECDeleteRecordIncorrectValues):
+    '''
+    >>> e = CDNSKEYRecordIncorrectDeleteValues()
+    >>> e.description
+    'The contents of a CDNSKEY record used for DNSSEC deletion (algorithm 0) should be 0, 3, 0, AA==.  See...'
+    '''
+
+    _abstract = False
+    description_template = 'The contents of a %(rdtype)s record used for DNSSEC deletion (algorithm 0) should be 0, 3, 0, AA==.'
+    code = 'CDNSKEY_INCORRECT_DELETE_VALUES'
+    rdtype = 'CDNSKEY'
+
+class CDSRecordIncorrectDeleteValues(DNSSECDeleteRecordIncorrectValues):
+    '''
+    >>> e = CDSRecordIncorrectDeleteValues()
+    >>> e.description
+    'The contents of a CDS record used for DNSSEC deletion (algorithm 0) should be 0, 0, 0, 00.  See...'
+    '''
+
+    _abstract = False
+    description_template = 'The contents of a %(rdtype)s record used for DNSSEC deletion (algorithm 0) should be 0, 0, 0, 00.'
+    code = 'CDS_INCORRECT_DELETE_VALUES'
+    rdtype = 'CDS'
+
+class DNSSECDeleteMultipleRecords(DNSSECDeleteRecordError):
+    description_template = 'A %(rdtype)s RRset used for DNSSEC deletion (algorithm 0) should only include a single record.'
+    references = ['RFC 8078, Sec. 4']
+
+class CDNSKEYDeleteMultipleRecords(DNSSECDeleteMultipleRecords):
+    '''
+    >>> e = CDNSKEYDeleteMultipleRecords()
+    >>> e.description
+    'A CDNSKEY RRset used for DNSSEC deletion (algorithm 0) should only include a single record.  See...'
+    '''
+
+    _abstract = False
+    code = 'CDNSKEY_DELETE_MULTIPLE_RECORDS'
+    rdtype = 'CDNSKEY'
+
+class CDSDeleteMultipleRecords(DNSSECDeleteMultipleRecords):
+    '''
+    >>> e = CDSDeleteMultipleRecords()
+    >>> e.description
+    'A CDS RRset used for DNSSEC deletion (algorithm 0) should only include a single record.  See...'
+    '''
+
+    _abstract = False
+    code = 'CDS_DELETE_MULTIPLE_RECORDS'
+    rdtype = 'CDS'
+
 class CDNSKEYInconsistentWithCDS(CDNSKEYCDSError):
     '''
     >>> e = CDNSKEYInconsistentWithCDS()

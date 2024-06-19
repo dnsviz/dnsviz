@@ -66,6 +66,7 @@ DNSSEC_KEY_LENGTH_ERRORS = {
         14: Errors.DNSKEYBadLengthECDSA384, 15: Errors.DNSKEYBadLengthEd25519,
         16: Errors.DNSKEYBadLengthEd448,
 }
+DNSSEC_DELETE_ALG = 0
 
 _logger = logging.getLogger(__name__)
 
@@ -858,7 +859,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_nodata_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_nxdomain_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_inconsistent_negative_dnssec_responses_all(ignore_rfc9276)
-        self._populate_cdnskey_cds_singularity()
+        self._populate_cdnskey_cds_correctness()
         self._populate_cdnskey_cds_consistency()
         self._populate_cdnskey_cds_ds_consistency()
         self._finalize_key_roles()
@@ -2593,7 +2594,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for neg_response_info in query.nxdomain_info:
                 self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nxdomain_status, ignore_rfc9276)
 
-    def _populate_cdnskey_cds_singularity(self):
+    def _populate_cdnskey_cds_correctness(self):
         for rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
             if (self.name, rdtype) not in self.queries:
                 continue
@@ -2606,6 +2607,27 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # more than one answer!
                 for rrset_info in rrset_answer_info:
                     self.rrset_errors[rrset_info].append(err_cls())
+
+            for rrset_info in rrset_answer_info:
+                # there are CNAMEs that show up here...
+                if not (rrset_info.rrset.name == self.name and rrset_info.rrset.rdtype == rdtype):
+                    continue
+                rdata_with_alg_0 = [r for r in rrset_info.rrset if r.algorithm == DNSSEC_DELETE_ALG]
+                if not rdata_with_alg_0:
+                    continue
+                if len(rrset_info.rrset) > 1:
+                    if rdtype == dns.rdatatype.CDNSKEY:
+                        err_cls = Errors.CDNSKEYDeleteMultipleRecords
+                    else:
+                        err_cls = Errors.CDSDeleteMultipleRecords
+                    self.rrset_errors[rrset_info].append(err_cls())
+                for rdata in rdata_with_alg_0:
+                    if rdtype == dns.rdatatype.CDNSKEY and \
+                            (rdata.protocol, rdata.flags, rdata.key) != (3, 0, b'\x00'):
+                        self.rrset_errors[rrset_info].append(Errors.CDNSKEYRecordIncorrectDeleteValues())
+                    elif rdtype == dns.rdatatype.CDS and \
+                            (rdata.key_tag, rdata.digest_type, rdata.digest) != (0, 0, b'\x00'):
+                        self.rrset_errors[rrset_info].append(Errors.CDNSKEYRecordIncorrectDeleteValues())
 
     def _populate_cdnskey_cds_ds_consistency(self):
         if (self.name, dns.rdatatype.DS) not in self.queries:
