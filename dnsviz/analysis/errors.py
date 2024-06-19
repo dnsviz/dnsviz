@@ -2001,7 +2001,7 @@ class NoSEP(DelegationError):
 
     _abstract = False
     code = 'NO_SEP'
-    description_template = "No valid RRSIGs made by a key corresponding to a DS RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone."
+    description_template = "No valid RRSIGs made by a key corresponding to a %(source)s RR were found covering the DNSKEY RRset, resulting in no secure entry point (SEP) into the zone."
     references = ['RFC 4035, Sec. 2.2', 'RFC 6840, Sec. 5.11']
     required_params = []
 
