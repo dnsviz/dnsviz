@@ -859,14 +859,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_nodata_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_nxdomain_status(supported_algs, ignore_rfc8624, ignore_rfc9276)
         self._populate_inconsistent_negative_dnssec_responses_all(ignore_rfc9276)
-        self._populate_cdnskey_cds_correctness()
-        self._populate_cdnskey_cds_consistency()
-        self._populate_cdnskey_cds_ds_consistency()
         self._finalize_key_roles()
         if not is_dlv:
             self._populate_delegation_status(supported_algs, supported_digest_algs, ignore_rfc8624)
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs, ignore_rfc8624)
+        self._populate_cdnskey_cds_correctness()
+        self._populate_cdnskey_cds_consistency()
+        self._populate_cdnskey_cds_ds_consistency()
         self._populate_dnskey_status(trusted_keys)
 
     def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False):
