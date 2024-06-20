@@ -2370,6 +2370,32 @@ class MultipleCDS(MultipleCDNSKEYCDS):
     code = 'MULTIPLE_CDS'
     rdtype = 'CDS'
 
+class CDNSKEYCDSSignerInvalid(CDNSKEYCDSOnlyError):
+    description_template = 'The %(rdtype)s RRset must be signed with a key that is represented in both the current DNSKEY and the current DS RRset.'
+    references = ['RFC 7344, Sec. 4.1']
+
+class CDNSKEYSignerInvalid(CDNSKEYCDSSignerInvalid):
+    '''
+    >>> e = CDNSKEYSignerInvalid()
+    >>> e.description
+    'The CDNSKEY RRset must be signed with a key that is represented in both the current DNSKEY and the current DS RRset.  See ...'
+    '''
+
+    _abstract = False
+    code = 'CDNSKEY_SIGNER_INVALID'
+    rdtype = 'CDNSKEY'
+
+class CDSSignerInvalid(CDNSKEYCDSSignerInvalid):
+    '''
+    >>> e = CDSSignerInvalid()
+    >>> e.description
+    'The CDS RRset must be signed with a key that is represented in both the current DNSKEY and the current DS RRset.  See ...'
+    '''
+
+    _abstract = False
+    code = 'CDS_SIGNER_INVALID'
+    rdtype = 'CDS'
+
 class DNSSECDeleteRecordError(CDNSKEYCDSOnlyError):
     pass
 

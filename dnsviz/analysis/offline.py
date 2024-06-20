@@ -2613,6 +2613,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if not (rrset_info.rrset.name == self.name and rrset_info.rrset.rdtype == rdtype):
                     continue
 
+                # Check that the RRset is signed by a DNSKEY that is
+                # represented in both the current DNSKEY set and the current DS
+                # set.
+                signer_in_dnskey_and_ds = False
+                for rrsig in self.rrsig_status[rrset_info]:
+                    for dnskey in self.rrsig_status[rrset_info][rrsig]:
+                        rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
+                        if rrsig_status.dnskey is not None:
+                            if self.ds_status_by_dnskey[dns.rdatatype.DS][dnskey]:
+                                signer_in_dnskey_and_ds = True
+                                break
+                if not signer_in_dnskey_and_ds:
+                    if rdtype == dns.rdatatype.CDNSKEY:
+                        err_cls = Errors.CDNSKEYSignerInvalid
+                    else:
+                        err_cls = Errors.CDSSignerInvalid
+                    self.rrset_errors[rrset_info].append(err_cls())
+
                 # From this point on, consider only records associated with
                 # DNSSEC deletion (CDS or CDNSKEY with algorithm 0)
                 rdata_with_alg_0 = [r for r in rrset_info.rrset if r.algorithm == DNSSEC_DELETE_ALG]
