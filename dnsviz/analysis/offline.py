@@ -2612,15 +2612,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # there are CNAMEs that show up here...
                 if not (rrset_info.rrset.name == self.name and rrset_info.rrset.rdtype == rdtype):
                     continue
+
+                # From this point on, consider only records associated with
+                # DNSSEC deletion (CDS or CDNSKEY with algorithm 0)
                 rdata_with_alg_0 = [r for r in rrset_info.rrset if r.algorithm == DNSSEC_DELETE_ALG]
                 if not rdata_with_alg_0:
                     continue
+
+                # Add an error if there is more than one record in the CDS /
+                # CDNSKEY RRset.
                 if len(rrset_info.rrset) > 1:
                     if rdtype == dns.rdatatype.CDNSKEY:
                         err_cls = Errors.CDNSKEYDeleteMultipleRecords
                     else:
                         err_cls = Errors.CDSDeleteMultipleRecords
                     self.rrset_errors[rrset_info].append(err_cls())
+
+                # Add an error if the values for CDS / CDNSKEY record are
+                # incorrect.
                 for rdata in rdata_with_alg_0:
                     if rdtype == dns.rdatatype.CDNSKEY and \
                             (rdata.protocol, rdata.flags, rdata.key) != (3, 0, b'\x00'):
