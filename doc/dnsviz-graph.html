@@ -16,6 +16,7 @@
 			<li><a href="#ds-rrs">DS RRs</a></li>
 			<li><a href="#nsecnsec3-rrs">NSEC/NSEC3 RRs</a></li>
 			<li><a href="#rrsigs">RRSIGs</a></li>
+			<li><a href="#cdnskeycds-rrsets">CDNSKEY/CDS RRsets</a></li>
 			<li><a href="#wildcards">Wildcards</a></li>
 			<li><a href="#node-status">Node Status</a></li>
 			<li><a href="#warnings-errors">Warnings and Errors</a></li>
@@ -354,6 +355,27 @@
 					RRset is anticipated, multiple RRSIG edges will be drawn from DNSKEY
 					to NSEC or NSEC3 nodes, each pointing to the respective compartment
 					corresponding to the NSEC or NSEC3 record.</p></td></tr>
+		</table>
+
+		<h4><a name="cdnskeycds-rrsets">CDNSKEY/CDS RRs</a></h4>
+		<table>
+			<tr><td><img src="images/cdnskey-cds.png"
+					alt="CDNSKEY/CDS RRsets" /></td><td><p>CDNSKEY and CDS records are
+					used by the child zone to signal to its parent the DS record(s) that
+					it desires to be published, per RFC 7344.  The CDNSKEY and CDS RRsets
+					are represented as any other RRset (see <a href="#rrsets">RRsets</a>);
+					that is, there is a single node per RRset, as opposed to a single node
+					per CDNSKEY or CDS record.</p>
+
+					<p>CDNSKEY and CDS RRsets are mapped to the DNSKEYs they correspond to
+					with a gray edge from the RRset to the DNSKEY node.</p></td></tr>
+
+			<tr><td><img src="images/cdnskey-cds-nodnskey.png"
+					alt="CDNSKEY/CDS RRsets referencing a non-existent DNSKEY" /></td><td>
+					<p>If the DNSKEY referenced does not exist, the DNSKEY node is
+					represented with a dashed gray border (see
+					<a href="#dnskey-rrs">DNSKEY RRs</a> and
+					<a href="#ds-rrs">DS RRs</a>).</p></td></tr>
 		</table>
 
 		<h4><a name="wildcards">Wildcards</a></h4>

@@ -451,6 +451,18 @@ RRSIG per RRset is anticipated, multiple RRSIG edges will be drawn from DNSKEY
 to NSEC or NSEC3 nodes, each pointing to the respective compartment
 corresponding to the NSEC or NSEC3 record.
 
+.SS CDNSKEY/CDS RRsets
+CDNSKEY and CDS records are used by the child zone to signal to its parent the
+DS record(s) that it desires to be published, per RFC 7344.  The CDNSKEY and
+CDS RRsets are represented as any other RRset (see \fB"RRsets"\fR); that is,
+there is a single node per RRset, as opposed to a single node per CDNSKEY or
+CDS record.
+
+CDNSKEY and CDS RRsets are mapped to the DNSKEYs they correspond to with a gray
+edge from the CDNSKEY or CDS RRset to the DNSKEY node(s).  If the DNSKEY
+referenced does not exist, the DNSKEY node is represented with a dashed gray
+border (see \fB"DNSKEY RRs"\fR and \fB"DS RRs"\fR).
+
 .SS Wildcards
 When the RRSIG covering an RRset has a labels field with value greater than the
 number of labels in the name, it is indicative that the resulting RRset was
