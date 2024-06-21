@@ -93,13 +93,19 @@ unknown.  Additionally, when a zone has only DS records with unsupported digest
 algorithms, the zone is treated as "insecure", assuming the DS records are
 properly authenticated.
 .TP
-.B -b, --validate-prohibited-algs
-Validate algorithms for which validation is otherwise prohibited.  Current
-DNSSEC specification prohibits validators from validating older, weaker
-algorithms associated with DNSKEY and DS records (see RFC 8624).  If this
-option is used, then a warning will be still be issued for DNSSEC records that
-use these older algorithms, but the code will still assess their cryptographic
-status, rather than ignoring them.
+.B --ignore-rfc8624
+Ignore errors associated with RFC 8624, DNSSEC algorithm implementation
+requirements.  RFC 8624 designates some DNSSEC signing algorithms and some DS
+digest algorithms as prohibited ("MUST NOT") or not recommended for validation
+and/or signing.  If this option is used, then no warnings will be issued, and
+the code will still assess their cryptographic status, rather than ignoring
+them.
+.TP
+.B --ignore-rfc9276
+Ignore errors associated with RFC 9276, NSEC3 parameter settings.  RFC 9276
+specifies that if NSEC3 is used, the iterations count must be 0 and the salt
+length must be 0.  If this option is used, then no warnings will be issued for
+NSEC3 records that violate this specification.
 .TP
 .B -C, --enforce-cookies
 Enforce DNS cookies strictly. Require a server to return a "BADCOOKIE" response
