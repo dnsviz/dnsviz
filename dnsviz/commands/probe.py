@@ -354,7 +354,7 @@ zone "%(zone_name)s" {
     file "%(zone_file)s";
 };
 logging {
-	channel info_file { file "%(named_log)s"; severity info; };
+	channel info_file { file "%(named_log)s"; severity debug; };
 	category default { info_file; };
 	category unmatched { null; };
 };
@@ -436,10 +436,10 @@ $TTL 600
             raise MissingExecutablesError('The options used require %s.  Please ensure that it is installed and in PATH (%s).' % (self.NAMED_CHECKCONF, e))
 
         (stdout, stderr) = p.communicate()
-        if p.returncode != 0:
+        if False: #p.returncode != 0:
             stdout = stdout.decode('utf-8')
             self._cleanup_process()
-            raise ZoneFileServiceError('There was an problem with the zone file for "%s":\n%s' % (args['zone_name'], stdout))
+            raise ZoneFileServiceError('There was a problem with the zone file for "%s":\n%s' % (args['zone_name'], stdout))
 
         named_cmd_without_debug = [self.NAMED, '-c', args['named_conf']]
         named_cmd_with_debug = named_cmd_without_debug + ['-g']

@@ -811,7 +811,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         (not x.effective_tcp and x.udp_responsive)) and \
                         (not require_valid or x.is_valid_response()))
 
-    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False):
+    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False):
         if trace is None:
             trace = []
 
@@ -832,25 +832,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
-                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False, ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False, ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
 
         # populate status of ancestry
         if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
         if self.parent is not None:
-            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
         if self.dlv_parent is not None:
-            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276)
+            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds)
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
@@ -864,12 +864,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             self._populate_delegation_status(supported_algs, supported_digest_algs, ignore_rfc8624)
         if self.dlv_parent is not None:
             self._populate_ds_status(dns.rdatatype.DLV, supported_algs, supported_digest_algs, ignore_rfc8624)
-        self._populate_cdnskey_cds_correctness()
+        self._populate_cdnskey_cds_correctness(trust_cdnskey_cds)
         self._populate_cdnskey_cds_consistency()
         self._populate_cdnskey_cds_ds_consistency()
         self._populate_dnskey_status(trusted_keys)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False):
         # identify supported algorithms as intersection of explicitly supported
         # and software supported
         if supported_algs is not None:
@@ -886,7 +886,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             supported_algs.difference_update(Status.DNSKEY_ALGS_VALIDATION_PROHIBITED)
             supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_VALIDATION_PROHIBITED)
 
-        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc8624, ignore_rfc9276)
+        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc8624, ignore_rfc9276, trust_cdnskey_cds)
 
     def _populate_name_status(self, trace=None):
         # using trace allows _populate_name_status to be called independent of
@@ -2594,7 +2594,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             for neg_response_info in query.nxdomain_info:
                 self._populate_inconsistent_negative_dnssec_responses(neg_response_info, self.zone.nxdomain_status, ignore_rfc9276)
 
-    def _populate_cdnskey_cds_correctness(self):
+    def _populate_cdnskey_cds_correctness(self, trust_cdnskey_cds):
         for rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
             if (self.name, rdtype) not in self.queries:
                 continue
@@ -2615,21 +2615,24 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
                 # Check that the RRset is signed by a DNSKEY that is
                 # represented in both the current DNSKEY set and the current DS
-                # set.
-                signer_in_dnskey_and_ds = False
-                for rrsig in self.rrsig_status[rrset_info]:
-                    for dnskey in self.rrsig_status[rrset_info][rrsig]:
-                        rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
-                        if rrsig_status.dnskey is not None:
-                            if self.ds_status_by_dnskey[dns.rdatatype.DS][dnskey]:
-                                signer_in_dnskey_and_ds = True
-                                break
-                if not signer_in_dnskey_and_ds:
-                    if rdtype == dns.rdatatype.CDNSKEY:
-                        err_cls = Errors.CDNSKEYSignerInvalid
-                    else:
-                        err_cls = Errors.CDSSignerInvalid
-                    self.rrset_errors[rrset_info].append(err_cls())
+                # set.  The exception is if trust_cdnskey_cds is True, which
+                # means that "the Parent validates the CDS/CDNSKEY through some
+                # other means."
+                if not trust_cdnskey_cds:
+                    signer_in_dnskey_and_ds = False
+                    for rrsig in self.rrsig_status[rrset_info]:
+                        for dnskey in self.rrsig_status[rrset_info][rrsig]:
+                            rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
+                            if rrsig_status.dnskey is not None:
+                                if self.ds_status_by_dnskey[dns.rdatatype.DS][dnskey]:
+                                    signer_in_dnskey_and_ds = True
+                                    break
+                    if not signer_in_dnskey_and_ds:
+                        if rdtype == dns.rdatatype.CDNSKEY:
+                            err_cls = Errors.CDNSKEYSignerInvalid
+                        else:
+                            err_cls = Errors.CDSSignerInvalid
+                        self.rrset_errors[rrset_info].append(err_cls())
 
                 # From this point on, consider only records associated with
                 # DNSSEC deletion (CDS or CDNSKEY with algorithm 0)

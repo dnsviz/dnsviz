@@ -119,6 +119,17 @@ designated as "private", it is flagged as an error.  However, there are some
 cases where this is allowed.  For example, if the diagnostic queries are issued
 to servers in an experimental environment, this might be permissible.
 .TP
+.B --trust-cdnskey-cds
+Trust all CDNSKEY and CDS records, even if they are not "signed with a key that
+is represented in both the current DNSKEY and DS RRsets" (RFC 7344).  This is
+allowed if "the Parent uses the CDS or CDNSKEY RRset for initial enrollment; in
+that case, the Parent validates the CDS/CDNSKEY through some other means" (RFC
+7344).  Because there is no way for DNSViz to discover the out-of-band means
+with which the parent might have validated the CDNSKEY and/or CDS records, this
+trust is signaled with the use of the \fB--trust-cdnskey-cds\fR command-line
+option.
+
+.TP
 .B -R, --rr-types \fItype\fR[,\fItype...\fI]
 Process queries of only the specified type(s) (e.g., A, AAAA).  The default is
 to process all types queried as part of the diagnostic input.
@@ -384,7 +395,7 @@ Extraneous RRSIG RRs do not, in and of themselves, constitute an error. For
 example, sometimes they are deliberately pre-published before their
 corresponding DNSKEYs, as part of an algorithm rollover.  However, every RRset
 must be covered by RRSIGs for every algorithm in the DNSKEY RRset, as per RFC
-4035.
+4035 and RFC 6840.
 
 .IP "indeterminate - match pre-revoke"
 A special case of an RRSIG with no matching DNSKEY is when the RRSIG matched a

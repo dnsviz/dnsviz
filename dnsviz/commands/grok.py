@@ -244,6 +244,10 @@ class GrokArgHelper:
                 const=True, default=False,
                 action='store_const',
                 help='Allow private IP addresses for authoritative DNS servers')
+        self.parser.add_argument('--trust-cdnskey-cds',
+                const=True, default=False,
+                action='store_const',
+                help='Trust all CDNSKEY/CDS records')
         self.parser.add_argument('-o', '--output-file',
                 type=argparse.FileType('wb'), default=stdout_buffer,
                 action='store', metavar='<filename>',
@@ -469,7 +473,7 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276, trust_cdnskey_cds=arghelper.args.trust_cdnskey_cds)
 
             if arghelper.trusted_keys:
                 G = DNSAuthGraph()
