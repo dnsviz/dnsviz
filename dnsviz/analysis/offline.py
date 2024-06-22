@@ -2618,16 +2618,15 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # represented in both the current DNSKEY set and the current DS
                 # set.  The exception is if trust_cdnskey_cds is True, which
                 # means that "the Parent validates the CDS/CDNSKEY through some
-                # other means."
+                # other means" (RFC 7344).
                 if not trust_cdnskey_cds:
                     signer_in_dnskey_and_ds = False
                     for rrsig in self.rrsig_status[rrset_info]:
                         for dnskey in self.rrsig_status[rrset_info][rrsig]:
                             rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
-                            if rrsig_status.dnskey is not None:
-                                if self.ds_status_by_dnskey[dns.rdatatype.DS][dnskey]:
-                                    signer_in_dnskey_and_ds = True
-                                    break
+                            if rrsig_status.dnskey is not None and rrsig_status.dnskey in self.dnskey_with_ds[dns.rdatatype.DS]:
+                                signer_in_dnskey_and_ds = True
+                                break
                     if not signer_in_dnskey_and_ds:
                         if rdtype == dns.rdatatype.CDNSKEY:
                             err_cls = Errors.CDNSKEYSignerInvalid
