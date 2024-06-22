@@ -2657,7 +2657,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         self.rrset_errors[rrset_info].append(Errors.CDNSKEYRecordIncorrectDeleteValues())
                     elif rdtype == dns.rdatatype.CDS and \
                             (rdata.key_tag, rdata.digest_type, rdata.digest) != (0, 0, b'\x00'):
-                        self.rrset_errors[rrset_info].append(Errors.CDNSKEYRecordIncorrectDeleteValues())
+                        self.rrset_errors[rrset_info].append(Errors.CDSRecordIncorrectDeleteValues())
 
     def _populate_cdnskey_cds_ds_consistency(self):
         if (self.name, dns.rdatatype.DS) not in self.queries:
