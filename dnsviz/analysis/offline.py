@@ -2624,7 +2624,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     for rrsig in self.rrsig_status[rrset_info]:
                         for dnskey in self.rrsig_status[rrset_info][rrsig]:
                             rrsig_status = self.rrsig_status[rrset_info][rrsig][dnskey]
-                            if rrsig_status.dnskey is not None and rrsig_status.dnskey in self.dnskey_with_ds[dns.rdatatype.DS]:
+                            if rrsig_status.dnskey is not None and \
+                                    dns.rdatatype.DS in self.dnskey_with_ds and \
+                                    rrsig_status.dnskey in self.dnskey_with_ds[dns.rdatatype.DS]:
                                 signer_in_dnskey_and_ds = True
                                 break
                     if not signer_in_dnskey_and_ds:
@@ -2809,7 +2811,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # if the key is shown to be signing anything other than the
                 # DNSKEY RRset, or if it associated with a DS or trust anchor,
                 # then mark it as an error; otherwise, mark it as a warning.
-                if dnskey in self.zsks or dnskey in self.dnskey_with_ds[dns.rdatatype.DS] or dnskey.rdata in trusted_keys_rdata:
+                if dnskey in self.zsks or \
+                        (dns.rdatatype.DS in self.dnskey_with_ds and dnskey in self.dnskey_with_ds[dns.rdatatype.DS]) or \
+                        dnskey.rdata in trusted_keys_rdata:
                     dnskey.errors.append(err)
                 else:
                     dnskey.warnings.append(err)
