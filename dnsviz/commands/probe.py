@@ -1027,10 +1027,10 @@ class ArgHelper:
                 type=helper.ds_for_domain, default=[],
                 action='append', metavar='<domain>:"<ds>"[,"<ds>"...]',
                 help='Use the specified DS records for a domain')
-        self.parser.add_argument('-n', '--nsid',
-                const=self.nsid_option(),
+        self.parser.add_argument('--no-nsid',
+                const=True, default=False,
                 action='store_const',
-                help='Use the NSID EDNS option in queries')
+                help='Do not use the NSID EDNS option in queries')
         self.parser.add_argument('-e', '--client-subnet',
                 type=self.ecs_option,
                 action='store', metavar='<subnet>[:<prefix_len>]',
@@ -1371,8 +1371,8 @@ class ArgHelper:
 
         if self.args.client_subnet:
             CustomQueryMixin.edns_options.append(self.args.client_subnet)
-        if self.args.nsid:
-            CustomQueryMixin.edns_options.append(self.args.nsid)
+        if not self.args.no_nsid:
+            CustomQueryMixin.edns_options.append(self.nsid_option())
         if self.args.cookie:
             CustomQueryMixin.edns_options.append(self.args.cookie)
 
