@@ -221,10 +221,18 @@ class DNSResponse:
         except IndexError:
             return None
 
+        if hasattr(dns.edns, 'NSIDOption'):
+            # dnspython >= 2.6 with NSIDOption
+            data = nsid_opt.nsid
+        else:
+            # dnspython < 2.6 with Generic Option
+            data = nsid_opt.data
+
         try:
-            nsid_val = nsid_opt.data.decode('ascii')
+            nsid_val = data.decode('ascii')
         except UnicodeDecodeError:
-            nsid_val = '0x' + lb2s(binascii.hexlify(nsid_opt.data))
+            nsid_val = '0x' + lb2s(binascii.hexlify(data))
+
         return nsid_val
 
     def request_cookie_tag(self):
