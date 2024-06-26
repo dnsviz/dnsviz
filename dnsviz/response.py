@@ -228,9 +228,9 @@ class DNSResponse:
             # dnspython < 2.6 with Generic Option
             data = nsid_opt.data
 
-        try:
+        if all(c >= 0x20 and c <= 0x7e for c in data):
             nsid_val = data.decode('ascii')
-        except UnicodeDecodeError:
+        else:
             nsid_val = '0x' + lb2s(binascii.hexlify(data))
 
         return nsid_val
