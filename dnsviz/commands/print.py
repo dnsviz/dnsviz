@@ -393,7 +393,7 @@ class PrintArgHelper:
                 const=True, default=False,
                 action='store_const',
                 help='Trust all CDNSKEY/CDS records')
-        self.parser.add_argument('--allow-multisigner',
+        self.parser.add_argument('--multi-signer',
                 const=True, default=False,
                 action='store_const',
                 help='Don\'t issue errors for missing KSKs with DS RRs (e.g., for multi-signer setups)')
@@ -624,7 +624,7 @@ def main(argv):
         G = DNSAuthGraph()
         ignore_qnames_rdtypes = set()
         for name_obj in name_objs:
-            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276, trust_cdnskey_cds=arghelper.args.trust_cdnskey_cds, allow_multisigner=arghelper.args.allow_multisigner)
+            name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276, trust_cdnskey_cds=arghelper.args.trust_cdnskey_cds, multi_signer=arghelper.args.multi_signer)
             has_warnings, has_errors = name_obj.queries_with_errors_warnings()
             has_warnings_or_errors = has_warnings.union(has_errors)
             for qname, rdtype in name_obj.queries:

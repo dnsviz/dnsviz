@@ -135,10 +135,10 @@ with which the parent might have validated the CDNSKEY and/or CDS records, this
 trust is signaled with the use of the \fB--trust-cdnskey-cds\fR command-line
 option.
 .TP
-.B --allow-multisigner
+.B --multi-signer
 Don't issue errors for missing KSKs with DS RRs.  Typically an error is issued
 if a given DNSKEY is not found in the DNSKEY RRset returned by one or more
-servers.  If \fB--allow-multisigner\fR is specified, then no error is issued,
+servers.  If \fB--multi-signer\fR is specified, then no error is issued,
 in the case that 1) the DNSKEY is not signing any non-DNSKEY RRsets (i.e., is a
 zone-signing key or ZSK) and 2) the DNSKEY corresponds to a DS record in the
 parent.  This corresponds to the Model 2 use case in RFC 8901.

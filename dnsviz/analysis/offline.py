@@ -811,7 +811,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         (not x.effective_tcp and x.udp_responsive)) and \
                         (not require_valid or x.is_valid_response()))
 
-    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False, allow_multisigner=False):
+    def _populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, trace=None, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False, multi_signer=False):
         if trace is None:
             trace = []
 
@@ -832,25 +832,25 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+                    cname_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
         if follow_mx:
             for target, mx_obj in self.mx_targets.items():
                 if mx_obj is not None:
-                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False, ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+                    mx_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], follow_mx=False, ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+                signer_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+                ns_obj._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
 
         # populate status of ancestry
         if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+            self.nxdomain_ancestor._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
         if self.parent is not None:
-            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+            self.parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
         if self.dlv_parent is not None:
-            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, allow_multisigner=allow_multisigner)
+            self.dlv_parent._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv=True, trace=trace + [self], ignore_rfc8624=ignore_rfc8624, ignore_rfc9276=ignore_rfc9276, trust_cdnskey_cds=trust_cdnskey_cds, multi_signer=multi_signer)
 
         _logger.debug('Assessing status of %s...' % (fmt.humanize_name(self.name)))
         self._populate_name_status()
@@ -867,9 +867,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self._populate_cdnskey_cds_correctness(trust_cdnskey_cds)
         self._populate_cdnskey_cds_consistency()
         self._populate_cdnskey_cds_ds_consistency()
-        self._populate_dnskey_status(trusted_keys, allow_multisigner)
+        self._populate_dnskey_status(trusted_keys, multi_signer)
 
-    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False, allow_multisigner=False):
+    def populate_status(self, trusted_keys, supported_algs=None, supported_digest_algs=None, is_dlv=False, follow_mx=True, ignore_rfc8624=False, ignore_rfc9276=False, trust_cdnskey_cds=False, multi_signer=False):
         # identify supported algorithms as intersection of explicitly supported
         # and software supported
         if supported_algs is not None:
@@ -886,7 +886,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             supported_algs.difference_update(Status.DNSKEY_ALGS_VALIDATION_PROHIBITED)
             supported_digest_algs.difference_update(Status.DS_DIGEST_ALGS_VALIDATION_PROHIBITED)
 
-        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc8624, ignore_rfc9276, trust_cdnskey_cds, allow_multisigner)
+        self._populate_status(trusted_keys, supported_algs, supported_digest_algs, is_dlv, None, follow_mx, ignore_rfc8624, ignore_rfc9276, trust_cdnskey_cds, multi_signer)
 
     def _populate_name_status(self, trace=None):
         # using trace allows _populate_name_status to be called independent of
@@ -2772,7 +2772,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         self.rrset_errors[ds_rrset_info].append(Errors.CDNSKEYInconsistentWithCDS())
                         cds_has_error.add(ds_rrset_info)
 
-    def _populate_dnskey_status(self, trusted_keys, allow_multisigner):
+    def _populate_dnskey_status(self, trusted_keys, multi_signer):
         if (self.name, dns.rdatatype.DNSKEY) not in self.queries:
             return
 
@@ -2835,7 +2835,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if dnskey in self.zsks or dnskey.rdata in trusted_keys_rdata:
                     dnskey.errors.append(err)
                 elif (dns.rdatatype.DS in self.dnskey_with_ds and dnskey in self.dnskey_with_ds[dns.rdatatype.DS]):
-                    # If allow_multisigner was specified, then the user has
+                    # If multi_signer was specified, then the user has
                     # indicated that the "missing" KSK is simply an artifact of
                     # their use of RFC 8901, using Model 2.  With Model 2,
                     # different providers will serve different DNSKEY RRsets,
@@ -2843,9 +2843,9 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # corresponds to a DS record (section 2.1).  Thus, if the
                     # DNSKEY is a KSK (i.e., signs the DNSKEY RRset), and the
                     # DNSKEY corresponds to a DS record, then it might be a
-                    # multi-signer environment.  If allow_multisigner was
+                    # multi-signer environment.  If multi_signer was
                     # specified, then we don't issue an error.
-                    if dnskey in self.ksks and allow_multisigner:
+                    if dnskey in self.ksks and multi_signer:
                         pass
                     else:
                         dnskey.errors.append(err)
