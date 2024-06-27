@@ -230,7 +230,7 @@ class GraphArgHelper:
         self.parser.add_argument('--allow-multisigner',
                 const=True, default=False,
                 action='store_const',
-                help='Don\'t issue errors for missing KSKs with DS RRs (e.g., for multi-signer setups')
+                help='Don\'t issue errors for missing KSKs with DS RRs (e.g., for multi-signer setups)')
         self.parser.add_argument('-R', '--rr-types',
                 type=self.comma_separated_dns_types,
                 action='store', metavar='<type>,[<type>...]',
