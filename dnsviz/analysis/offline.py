@@ -2841,9 +2841,13 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     # different providers will serve different DNSKEY RRsets,
                     # each including (and signed by) their own KSK, which
                     # corresponds to a DS record (section 2.1).  Thus, if the
-                    # DNSKEY corresponds to a DS record, and allow_multisigner
-                    # was specified, then we don't issue an error.
-                    if not allow_multisigner:
+                    # DNSKEY is a KSK (i.e., signs the DNSKEY RRset), and the
+                    # DNSKEY corresponds to a DS record, then it might be a
+                    # multi-signer environment.  If allow_multisigner was
+                    # specified, then we don't issue an error.
+                    if dnskey in self.ksks and allow_multisigner:
+                        pass
+                    else:
                         dnskey.errors.append(err)
                 else:
                     dnskey.warnings.append(err)
