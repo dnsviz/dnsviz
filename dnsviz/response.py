@@ -221,6 +221,7 @@ class DNSResponse:
         except IndexError:
             return None
 
+        # Backwards compatibility with dnspython < 2.6
         if hasattr(dns.edns, 'NSIDOption'):
             # dnspython >= 2.6 with NSIDOption
             data = nsid_opt.nsid
