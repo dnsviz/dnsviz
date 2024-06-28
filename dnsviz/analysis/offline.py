@@ -1602,6 +1602,14 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                                     if rrset_info.rrset.rdtype == dns.rdatatype.DNSKEY:
                                         if self.ksks is not None:
                                             self.ksks.add(rrsig_status.dnskey)
+                                    # Per RFC 7344, CDNSKEY and CDS RRsets are
+                                    # signed by DNSKEYs that correspond to DS
+                                    # records.  This almost certainly
+                                    # corresponds to KSKs.  Thus, we should not
+                                    # be calling the DNSKEY a ZSK simply
+                                    # because it signs a CDNSKEY or CDS RRset.
+                                    elif rrset_info.rrset.rdtype in (dns.rdatatype.CDNSKEY, dns.rdatatype.CDS):
+                                        pass
                                     else:
                                         if self.zsks is not None:
                                             self.zsks.add(rrsig_status.dnskey)

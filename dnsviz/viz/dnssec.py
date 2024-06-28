@@ -75,6 +75,8 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'CDS': 'lightgray',
         'alias': 'black' }
 
+NODE_DNSKEY_CDNSKEY_CDS_RE = re.compile(r'^(DNSKEY-|RRset-\d+\|[^\|]+\|(CDNSKEY|CDS)$)')
+
 INVIS_STYLE_RE = re.compile(r'(^|,)invis(,|$)')
 DASHED_STYLE_RE = re.compile(r'(^|,)dashed(,|$)')
 OPTOUT_STYLE_RE = re.compile(r'BGCOLOR="lightgray"')
@@ -1966,7 +1968,7 @@ class DNSAuthGraph:
                 ds_edges = [x for x in out_edges if x[1].startswith('DS-') or x[1].startswith('DLV-')]
 
                 is_ksk = bool([x for x in in_edges if x[0].startswith('DNSKEY-')])
-                is_zsk = bool([x for x in in_edges if not x[0].startswith('DNSKEY-')])
+                is_zsk = bool([x for x in in_edges if NODE_DNSKEY_CDNSKEY_CDS_RE.match(x[0]) is None])
                 non_existent = DASHED_STYLE_RE.search(n.attr['style']) is not None
                 has_sep_bit = n.attr['fillcolor'] == 'lightgray'
 
