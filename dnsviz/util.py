@@ -50,8 +50,8 @@ ROOT_HINTS_STR_DEFAULT = '''
 A.ROOT-SERVERS.NET.      3600000      A     198.41.0.4
 A.ROOT-SERVERS.NET.      3600000      AAAA  2001:503:ba3e::2:30
 .                        3600000      NS    B.ROOT-SERVERS.NET.
-B.ROOT-SERVERS.NET.      3600000      A     192.228.79.201
-B.ROOT-SERVERS.NET.      3600000      AAAA  2001:500:200::b
+B.ROOT-SERVERS.NET.      3600000      A     170.247.170.2
+B.ROOT-SERVERS.NET.      3600000      AAAA  2801:1b8:10::b
 .                        3600000      NS    C.ROOT-SERVERS.NET.
 C.ROOT-SERVERS.NET.      3600000      A     192.33.4.12
 C.ROOT-SERVERS.NET.      3600000      AAAA  2001:500:2::c
@@ -91,6 +91,8 @@ HISTORICAL_ROOT_IPS = (
         (dns.name.from_text('h.root-servers.net.'), IPAddr('2001:500:1::803f:235')), # 2015-12-01
         (dns.name.from_text('l.root-servers.net.'), IPAddr('2001:500:3::42')), # 2016-03-24
         (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:84::b')), # 2017-06-01
+        (dns.name.from_text('b.root-servers.net.'), IPAddr('2001:500:200::b')),
+        (dns.name.from_text('b.root-servers.net.'), IPAddr('192.228.79.201')),
 )
 
 # The following list should include all current and historical trust anchors
