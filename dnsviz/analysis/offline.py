@@ -2173,6 +2173,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 for (server,client,response) in algs_signing_sep:
                     for alg in ds_algs.difference(algs_signing_sep[(server,client,response)]):
                         if rdtype in (dns.rdatatype.CDS, dns.rdatatype.CDNSKEY):
+                            if alg == DNSSEC_DELETE_ALG:
+                                continue
                             # Associate with the RRSet
                             err = Errors.MissingSEPForAlgCDNSKEY(algorithm=alg, source=dns.rdatatype.to_text(rdtype))
                             Errors.DomainNameAnalysisError.insert_into_list(err, self.rrset_errors[orig_ds_rrset_info], server, client, response)
