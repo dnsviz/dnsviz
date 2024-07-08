@@ -71,6 +71,11 @@ else:
     _supported_algs.update(set([1,5,7,8,10]))
     _supported_digest_algs.update(set([1,2,4]))
 
+from cryptography.hazmat.primitives.asymmetric import rsa as RSA
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
+
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
@@ -277,20 +282,18 @@ def _dnskey_to_rsa(key):
         return None
 
     # get the exponent
-    e = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:offset+e_len])))
+    e = int.from_bytes(key[offset:offset+e_len], 'big')
     offset += e_len
 
     if len(key) <= offset:
         return None
 
     # get the modulus
-    n = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:])))
+    n = int.from_bytes(key[offset:], 'big')
 
     # create the RSA public key
-    rsa = RSA.new_pub_key((e,n))
-    pubkey = EVP.PKey()
-    pubkey.assign_rsa(rsa)
-
+    rsa = RSA.RSAPublicNumbers(e, n)
+    pubkey = rsa.public_key()
     return pubkey
 
 def _dnskey_to_gost(key):
@@ -331,22 +334,22 @@ def _validate_rrsig_rsa(alg, sig, msg, key):
         return False
 
     if alg in (1,):
-        md='md5'
+        hsh = hashes.MD5()
     elif alg in (5,7):
-        md='sha1'
+        hsh = hashes.SHA1()
     elif alg in (8,):
-        md='sha256'
+        hsh = hashes.SHA256()
     elif alg in (10,):
-        md='sha512'
+        hsh = hashes.SHA512()
     else:
         raise ValueError('RSA Algorithm unknown.')
 
-    # reset context for appropriate hash
-    pubkey.reset_context(md=md)
-    pubkey.verify_init()
-    pubkey.verify_update(msg)
-
-    return pubkey.verify_final(sig) == 1
+    try:
+        pubkey.verify(sig, msg, padding.PKCS1v15(), hsh)
+    except InvalidSignature:
+        return False
+    else:
+        return True
 
 def _validate_rrsig_dsa(alg, sig, msg, key):
     pubkey = _dnskey_to_dsa(key)
