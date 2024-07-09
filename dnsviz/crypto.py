@@ -72,7 +72,6 @@ else:
     _supported_digest_algs.update(set([1,2,4]))
 
 from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
-from cryptography.hazmat.primitives.asymmetric import ec as EC1
 from cryptography.hazmat.primitives.asymmetric import ed25519 as ED25519
 from cryptography.hazmat.primitives.asymmetric import ed448 as ED448
 from cryptography.hazmat.primitives.asymmetric import rsa as RSA
@@ -316,14 +315,14 @@ def _dnskey_to_ed(alg, key):
 
 def _dnskey_to_ec(alg, key):
     if alg == 13:
-        curve = EC1.SECP256R1()
+        curve = EC.NID_X9_62_prime256v1
     elif alg == 14:
-        curve = EC1.SECP384R1()
+        curve = EC.NID_secp384r1
     else:
         raise ValueError('Algorithm not supported')
 
     try:
-        return EC1.EllipticCurvePublicKey.from_encoded_point(curve, EC_NOCOMPRESSION + key)
+        return EC.pub_key_from_params(curve, EC_NOCOMPRESSION + key)
     except ValueError:
         return None
 
@@ -412,10 +411,10 @@ def _validate_rrsig_ec(alg, sig, msg, key):
         return False
 
     if alg in (13,):
-        alg = EC1.ECDSA(hashes.SHA256())
+        alg='sha256'
         sigsize = 64
     elif alg in (14,):
-        alg = EC1.ECDSA(hashes.SHA384())
+        alg='sha384'
         sigsize = 96
     else:
         raise ValueError('EC hash algorithm unknown!')
@@ -427,21 +426,19 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     # get R
     new_offset = offset+sigsize//2
-    r = int.from_bytes(sig[offset:new_offset], 'big')
+    r = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     # get S
     new_offset = offset+sigsize//2
-    s = int.from_bytes(sig[offset:new_offset], 'big')
+    s = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
-    sig = utils.encode_dss_signature(r, s)
-    try:
-        pubkey.verify(sig, msg, alg)
-    except InvalidSignature:
-        return False
-    else:
-        return True
+    md = EVP.MessageDigest(alg)
+    md.update(msg)
+    digest = md.final()
+
+    return pubkey.verify_dsa(digest, r, s) == 1
 
 def _validate_rrsig_ed(alg, sig, msg, key):
     pubkey = _dnskey_to_ed(alg, key)
