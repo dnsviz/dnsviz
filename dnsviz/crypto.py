@@ -72,8 +72,6 @@ else:
     _supported_digest_algs.update(set([1,2,4]))
 
 from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
-from cryptography.hazmat.primitives.asymmetric import ed25519 as ED25519
-from cryptography.hazmat.primitives.asymmetric import ed448 as ED448
 from cryptography.hazmat.primitives.asymmetric import rsa as RSA
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric import utils
@@ -83,6 +81,9 @@ from cryptography.exceptions import InvalidSignature
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
+
+ED25519_PREFIX = b'\x30\x2a\x30\x05\x06\x03\x2b\x65\x70\x03\x21\x00'
+ED448_PREFIX = b'\x30\x43\x30\x05\x06\x03\x2b\x65\x71\x03\x3a\x00'
 
 # python3/python2 dual compatibility
 if not isinstance(GOST_ENGINE_NAME, str):
@@ -307,11 +308,14 @@ def _dnskey_to_gost(key):
 
 def _dnskey_to_ed(alg, key):
     if alg == 15:
-        return ED25519.Ed25519PublicKey.from_public_bytes(key)
+        der = ED25519_PREFIX + key
     elif alg == 16:
-        return ED448.Ed448PublicKey.from_public_bytes(key)
+        der = ED448_PREFIX + key
     else:
         raise ValueError('Algorithm not supported')
+
+    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64encodebytes(der)+b'-----END PUBLIC KEY-----'
+    return EVP.load_key_string_pubkey(pem)
 
 def _dnskey_to_ec(alg, key):
     if alg == 13:
@@ -447,12 +451,9 @@ def _validate_rrsig_ed(alg, sig, msg, key):
     if pubkey is None:
         return False
 
-    try:
-        pubkey.verify(sig, msg)
-    except InvalidSignature:
-        return False
-    else:
-        return True
+    pubkey.reset_context(None)
+    pubkey.digest_verify_init()
+    return pubkey.digest_verify(sig, msg) == 1
 
 def validate_rrsig(alg, sig, msg, key):
     if not alg_is_supported(alg):
