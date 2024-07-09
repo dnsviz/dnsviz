@@ -214,13 +214,13 @@ def get_ds_digest(digest_alg, dnskey_msg):
         return None
 
     if digest_alg == 1:
-        md = EVP.MessageDigest('sha1')
+        md = hashes.Hash(hashes.SHA1())
         md.update(dnskey_msg)
-        return md.final()
+        return md.finalize()
     elif digest_alg == 2:
-        md = EVP.MessageDigest('sha256')
+        md = hashes.Hash(hashes.SHA256())
         md.update(dnskey_msg)
-        return md.final()
+        return md.finalize()
     elif digest_alg == 3:
         _gost_init()
         try:
@@ -230,9 +230,9 @@ def get_ds_digest(digest_alg, dnskey_msg):
         finally:
             _gost_cleanup()
     elif digest_alg == 4:
-        md = EVP.MessageDigest('sha384')
+        md = hashes.Hash(hashes.SHA384())
         md.update(dnskey_msg)
-        return md.final()
+        return md.finalize()
 
 def _dnskey_to_dsa(key):
     # get T
