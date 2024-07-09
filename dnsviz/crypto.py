@@ -71,10 +71,8 @@ else:
     _supported_algs.update(set([1,5,7,8,10]))
     _supported_digest_algs.update(set([1,2,4]))
 
-from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
 from cryptography.hazmat.primitives.asymmetric import rsa as RSA
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.asymmetric import utils
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 
@@ -244,28 +242,26 @@ def _dnskey_to_dsa(key):
 
     # get Q
     new_offset = offset+20
-    q = int.from_bytes(key[offset:new_offset], 'big')
+    q = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get P
     new_offset = offset+64+(t<<3)
-    p = int.from_bytes(key[offset:new_offset], 'big')
+    p = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get G
     new_offset = offset+64+(t<<3)
-    g = int.from_bytes(key[offset:new_offset], 'big')
+    g = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # get Y
     new_offset = offset+64+(t<<3)
-    y = int.from_bytes(key[offset:new_offset], 'big')
+    y = bn_to_mpi(hex_to_bn(binascii.hexlify(key[offset:new_offset])))
     offset = new_offset
 
     # create the DSA public key
-    param_nums = DSA1.DSAParameterNumbers(p, q, g)
-    dsa = DSA1.DSAPublicNumbers(y, param_nums)
-    return dsa.public_key()
+    return DSA.pub_key_from_params(p,q,g,y)
 
 def _dnskey_to_rsa(key):
     try:
@@ -371,22 +367,19 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
 
     # get R
     new_offset = offset+20
-    r = int.from_bytes(sig[offset:new_offset], 'big')
+    r = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
     # get S
     new_offset = offset+20
-    s = int.from_bytes(sig[offset:new_offset], 'big')
+    s = bn_to_mpi(hex_to_bn(binascii.hexlify(sig[offset:new_offset])))
     offset = new_offset
 
-    sig = utils.encode_dss_signature(r, s)
+    md = EVP.MessageDigest('sha1')
+    md.update(msg)
+    digest = md.final()
 
-    try:
-        pubkey.verify(sig, msg, hashes.SHA1())
-    except InvalidSignature:
-        return False
-    else:
-        return True
+    return pubkey.verify(digest, r, s) == 1
 
 def _validate_rrsig_gost(alg, sig, msg, key):
     _gost_init()
