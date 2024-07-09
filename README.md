@@ -34,20 +34,19 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* python (2.7, 3.5 - 3.11) - https://www.python.org/
+* python (2.7, 3.5 - 3.12) - https://www.python.org/
   (Note that python 2.7 support will be removed in a future release.)
 
 * dnspython (1.13.0 or later) - https://www.dnspython.org/
 
 * pygraphviz (1.3 or later) - https://pygraphviz.github.io/
 
-* M2Crypto (0.38.0 or later) - https://gitlab.com/m2crypto/m2crypto
+* cryptography (36.0.0 or later) - https://cryptography.io/
 
 Note that earlier versions of the software listed above might also work with
-DNSViz, but with some caveats.  For example, M2Crypto 0.28.0 and later will
-work, but versions of M2Crypto earlier than 0.38.0 lack support for DNSSEC
-algorithms 15 (Ed25519) and 16 (Ed448).  Also, while DNSViz itself still works
-with python 2.7, some versions of its software dependencies have moved on:
+DNSViz, but are not supported.  For example, versions of cryptography as early
+as 2.6 seem to work.  Also note that while DNSViz itself still works with
+python 2.7, some versions of its software dependencies have moved on:
 pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
 
 
@@ -57,7 +56,16 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for python 2.7.
 
   With OpenSSL version 1.1.0 and later, the OpenSSL GOST Engine is necessary to
   validate DNSSEC signatures with algorithm 12 (GOST R 34.10-2001) and create
-  digests of type 3 (GOST R 34.11-94).
+  digests of type 3 (GOST R 34.11-94).  M2Crypto is also needed for GOST support.
+
+* M2Crypto - https://gitlab.com/m2crypto/m2crypto
+
+  While almost all of the cryptgraphic support for DNSViz is handled with the
+  cryptography Python module, support for algorithm 12 (GOST R 34.10-2001)
+  digest type 3 (GOST R 34.11-94) require the OpenSSL GOST Engine.  That engine
+  must be loaded dynamically, and there is no support for that with
+  cryptography.  Thus, if you need to support algorithm 12 or digest type 3,
+  you must also install M2Crypto.
 
 * ISC BIND - https://www.isc.org/bind/
 
