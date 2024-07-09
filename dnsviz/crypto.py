@@ -37,8 +37,8 @@ import os
 import re
 
 from cryptography.hazmat.backends import openssl as OpenSSL
-from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
-from cryptography.hazmat.primitives.asymmetric import ec as EC1
+from cryptography.hazmat.primitives.asymmetric import dsa as DSA
+from cryptography.hazmat.primitives.asymmetric import ec as EC
 from cryptography.hazmat.primitives.asymmetric import ed25519 as ED25519
 from cryptography.hazmat.primitives.asymmetric import ed448 as ED448
 from cryptography.hazmat.primitives.asymmetric import rsa as RSA
@@ -212,8 +212,8 @@ def _dnskey_to_dsa(key):
     offset = new_offset
 
     # create the DSA public key
-    param_nums = DSA1.DSAParameterNumbers(p, q, g)
-    dsa = DSA1.DSAPublicNumbers(y, param_nums)
+    param_nums = DSA.DSAParameterNumbers(p, q, g)
+    dsa = DSA.DSAPublicNumbers(y, param_nums)
     return dsa.public_key()
 
 def _dnskey_to_rsa(key):
@@ -265,14 +265,14 @@ def _dnskey_to_ed(alg, key):
 
 def _dnskey_to_ec(alg, key):
     if alg == 13:
-        curve = EC1.SECP256R1()
+        curve = EC.SECP256R1()
     elif alg == 14:
-        curve = EC1.SECP384R1()
+        curve = EC.SECP384R1()
     else:
         raise ValueError('Algorithm not supported')
 
     try:
-        return EC1.EllipticCurvePublicKey.from_encoded_point(curve, EC_NOCOMPRESSION + key)
+        return EC.EllipticCurvePublicKey.from_encoded_point(curve, EC_NOCOMPRESSION + key)
     except ValueError:
         return None
 
@@ -361,10 +361,10 @@ def _validate_rrsig_ec(alg, sig, msg, key):
         return False
 
     if alg in (13,):
-        alg = EC1.ECDSA(hashes.SHA256())
+        alg = EC.ECDSA(hashes.SHA256())
         sigsize = 64
     elif alg in (14,):
-        alg = EC1.ECDSA(hashes.SHA384())
+        alg = EC.ECDSA(hashes.SHA384())
         sigsize = 96
     else:
         raise ValueError('EC hash algorithm unknown!')
