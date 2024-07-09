@@ -75,6 +75,10 @@ GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07
 GOST_ENGINE_NAME = b'gost'
 GOST_DIGEST_NAME = b'GOST R 34.11-94'
 
+# For backwards compatibility with cryptography < 36.0.
+# See https://cryptography.io/en/latest/faq/#faq-missing-backend
+backend = OpenSSL.backend
+
 # python3/python2 dual compatibility
 if not isinstance(GOST_ENGINE_NAME, str):
     GOST_ENGINE_NAME = lb2s(GOST_ENGINE_NAME)
@@ -163,11 +167,11 @@ def get_ds_digest(digest_alg, dnskey_msg):
         return None
 
     if digest_alg == 1:
-        md = hashes.Hash(hashes.SHA1())
+        md = hashes.Hash(hashes.SHA1(), backend)
         md.update(dnskey_msg)
         return md.finalize()
     elif digest_alg == 2:
-        md = hashes.Hash(hashes.SHA256())
+        md = hashes.Hash(hashes.SHA256(), backend)
         md.update(dnskey_msg)
         return md.finalize()
     elif digest_alg == 3:
@@ -179,7 +183,7 @@ def get_ds_digest(digest_alg, dnskey_msg):
         finally:
             _gost_cleanup()
     elif digest_alg == 4:
-        md = hashes.Hash(hashes.SHA384())
+        md = hashes.Hash(hashes.SHA384(), backend)
         md.update(dnskey_msg)
         return md.finalize()
 
@@ -230,7 +234,7 @@ def _dnskey_to_dsa(key):
     # create the DSA public key
     param_nums = DSA.DSAParameterNumbers(p, q, g)
     dsa = DSA.DSAPublicNumbers(y, param_nums)
-    return dsa.public_key()
+    return dsa.public_key(backend)
 
 def _dnskey_to_rsa(key):
     try:
@@ -270,7 +274,7 @@ def _dnskey_to_rsa(key):
 
     # create the RSA public key
     rsa = RSA.RSAPublicNumbers(e, n)
-    pubkey = rsa.public_key()
+    pubkey = rsa.public_key(backend)
     return pubkey
 
 def _dnskey_to_gost(key):
