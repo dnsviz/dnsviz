@@ -36,6 +36,17 @@ import hashlib
 import os
 import re
 
+from cryptography.hazmat.backends import openssl as OpenSSL
+from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
+from cryptography.hazmat.primitives.asymmetric import ec as EC1
+from cryptography.hazmat.primitives.asymmetric import ed25519 as ED25519
+from cryptography.hazmat.primitives.asymmetric import ed448 as ED448
+from cryptography.hazmat.primitives.asymmetric import rsa as RSA
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import utils
+from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
+
 from . import format as fmt
 lb2s = fmt.latin1_binary_to_string
 
@@ -52,34 +63,13 @@ ALG_TYPE_DNSSEC_TEXT = [
 ]
 
 _crypto_sources = {
-        'M2Crypto >= 0.21.1': (set([1,5,7,8,10]), set([1,2,4]), set([1])),
-        'M2Crypto >= 0.24.0': (set([3,6,13,14]), set(), set()),
-        'M2Crypto >= 0.24.0 and either openssl < 1.1.0 or openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
-        'M2Crypto >= 0.37.0 and openssl >= 1.1.1': (set([15,16]), set(), set()),
+        'M2Crypto >= 0.24.0 and openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
 }
-_logged_modules = set()
+_logged_modules = (set(), set(), set())
 
-_supported_algs = set()
-_supported_digest_algs = set()
+_supported_algs = set([1,3,5,6,7,8,10,13,14,15,16])
+_supported_digest_algs = set([1,2,4])
 _supported_nsec3_algs = set([1])
-try:
-    from M2Crypto import EVP, RSA
-    from M2Crypto.m2 import hex_to_bn, bn_to_mpi
-except:
-    pass
-else:
-    _supported_algs.update(set([1,5,7,8,10]))
-    _supported_digest_algs.update(set([1,2,4]))
-
-from cryptography.hazmat.primitives.asymmetric import dsa as DSA1
-from cryptography.hazmat.primitives.asymmetric import ec as EC1
-from cryptography.hazmat.primitives.asymmetric import ed25519 as ED25519
-from cryptography.hazmat.primitives.asymmetric import ed448 as ED448
-from cryptography.hazmat.primitives.asymmetric import rsa as RSA
-from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.asymmetric import utils
-from cryptography.hazmat.primitives import hashes
-from cryptography.exceptions import InvalidSignature
 
 GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
 GOST_ENGINE_NAME = b'gost'
@@ -99,7 +89,6 @@ except AttributeError:
 
 EC_NOCOMPRESSION = b'\x04'
 
-
 def _init_dynamic():
     try:
         Engine.load_dynamic()
@@ -107,13 +96,6 @@ def _init_dynamic():
         pass
     else:
         atexit.register(Engine.cleanup)
-
-def _check_dsa_support():
-    try:
-        DSA.pub_key_from_params
-        _supported_algs.update((3,6))
-    except AttributeError:
-        pass
 
 def _check_gost_support():
     _gost_init()
@@ -127,17 +109,6 @@ def _check_gost_support():
     finally:
         _gost_cleanup()
 
-def _check_ec_support():
-    try:
-        EC.pub_key_from_params
-        _supported_algs.update((13,14))
-    except AttributeError:
-        pass
-
-def _check_ed_support():
-    if m2.OPENSSL_VERSION_NUMBER >= 0x10101000:
-        _supported_algs.update((15,16))
-
 def alg_is_supported(alg):
     return alg in _supported_algs
 
@@ -150,8 +121,8 @@ def nsec3_alg_is_supported(alg):
 def _log_unsupported_alg(alg, alg_type):
     for mod in _crypto_sources:
         if alg in _crypto_sources[mod][alg_type]:
-            if mod not in _logged_modules:
-                _logged_modules.add(mod)
+            if mod not in _logged_modules[alg_type]:
+                _logged_modules[alg_type].add(mod)
                 logger.warning('Warning: Without the installation of %s, cryptographic validation of DNSSEC %s %d (and possibly others) is not supported.' % (mod, ALG_TYPE_DNSSEC_TEXT[alg_type], alg))
             return
 
@@ -173,33 +144,11 @@ def _gost_cleanup():
         gost.finish()
 
 try:
-    from M2Crypto import DSA
-except:
-    pass
-else:
-    _check_dsa_support()
-
-try:
-    from M2Crypto import Engine, m2
+    from M2Crypto import Engine, EVP, m2
     _init_dynamic()
-except:
-    pass
-else:
     _check_gost_support()
-
-try:
-    from M2Crypto import EC
 except:
     pass
-else:
-    _check_ec_support()
-
-try:
-    from M2Crypto.m2 import digest_verify_init
-except:
-    pass
-else:
-    _check_ed_support()
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
     mydigest = get_ds_digest(digest_alg, dnskey_msg)
