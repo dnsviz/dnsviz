@@ -12,7 +12,7 @@ BuildRequires:  python3-devel
 BuildRequires:  graphviz
 BuildRequires:  make
 Requires:       python3-pygraphviz >= 1.3
-Requires:       python3-m2crypto >= 0.28.0
+Requires:       python3-cryptography >= 36.0.0
 Requires:       python3-dns >= 1.13
 
 %description
