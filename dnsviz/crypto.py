@@ -193,22 +193,38 @@ def _dnskey_to_dsa(key):
 
     # get Q
     new_offset = offset+20
-    q = int.from_bytes(key[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        q = int.from_bytes(key[offset:new_offset], 'big')
+    else:
+        q = int(key[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # get P
     new_offset = offset+64+(t<<3)
-    p = int.from_bytes(key[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        p = int.from_bytes(key[offset:new_offset], 'big')
+    else:
+        p = int(key[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # get G
     new_offset = offset+64+(t<<3)
-    g = int.from_bytes(key[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        g = int.from_bytes(key[offset:new_offset], 'big')
+    else:
+        g = int(key[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # get Y
     new_offset = offset+64+(t<<3)
-    y = int.from_bytes(key[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        y = int.from_bytes(key[offset:new_offset], 'big')
+    else:
+        y = int(key[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # create the DSA public key
@@ -235,14 +251,22 @@ def _dnskey_to_rsa(key):
         return None
 
     # get the exponent
-    e = int.from_bytes(key[offset:offset+e_len], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        e = int.from_bytes(key[offset:offset+e_len], 'big')
+    else:
+        e = int(key[offset:offset+e_len].encode('hex'), 16)
     offset += e_len
 
     if len(key) <= offset:
         return None
 
     # get the modulus
-    n = int.from_bytes(key[offset:], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        n = int.from_bytes(key[offset:], 'big')
+    else:
+        n = int(key[offset:].encode('hex'), 16)
 
     # create the RSA public key
     rsa = RSA.RSAPublicNumbers(e, n)
@@ -317,12 +341,20 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
 
     # get R
     new_offset = offset+20
-    r = int.from_bytes(sig[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        r = int.from_bytes(sig[offset:new_offset], 'big')
+    else:
+        r = int(sig[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # get S
     new_offset = offset+20
-    s = int.from_bytes(sig[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        s = int.from_bytes(sig[offset:new_offset], 'big')
+    else:
+        s = int(sig[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     sig = utils.encode_dss_signature(r, s)
@@ -376,12 +408,20 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     # get R
     new_offset = offset+sigsize//2
-    r = int.from_bytes(sig[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        r = int.from_bytes(sig[offset:new_offset], 'big')
+    else:
+        r = int(sig[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     # get S
     new_offset = offset+sigsize//2
-    s = int.from_bytes(sig[offset:new_offset], 'big')
+    # python3/python2 dual compatibility
+    if hasattr(int, 'from_bytes'):
+        s = int.from_bytes(sig[offset:new_offset], 'big')
+    else:
+        s = int(sig[offset:new_offset].encode('hex'), 16)
     offset = new_offset
 
     sig = utils.encode_dss_signature(r, s)
