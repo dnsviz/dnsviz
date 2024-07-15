@@ -28,7 +28,7 @@ jobs:
     - name: Install DNSViz and dependencies
       run: |
         sudo apt install libssl-dev libgraphviz-dev
-        sudo apt install bind9 graphviz libssl
+        sudo apt install bind9 graphviz openssl
         pip3 install dnspython pygraphviz m2crypto
         pip3 install .
     - name: Disable AppArmor
