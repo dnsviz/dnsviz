@@ -884,7 +884,7 @@ ns1.example 0 IN A 192.0.2.1
         CustomQueryMixin.edns_options = self.custom_query_mixin_edns_options_orig[:]
 
         # None
-        args = ['-c', '', 'example.com']
+        args = ['--no-nsid', '-c', '', 'example.com']
         arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
@@ -893,18 +893,18 @@ ns1.example 0 IN A 192.0.2.1
 
         CustomQueryMixin.edns_options = self.custom_query_mixin_edns_options_orig[:]
 
-        # Only DNS cookie 
+        # Only DNS cookie and NSID
         args = ['example.com']
         arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
         arghelper.set_kwargs()
-        self.assertEqual(set([o.otype for o in CustomQueryMixin.edns_options]), set([10]))
+        self.assertEqual(set([o.otype for o in CustomQueryMixin.edns_options]), set([3, 10]))
 
         CustomQueryMixin.edns_options = self.custom_query_mixin_edns_options_orig[:]
 
         # All EDNS options
-        args = ['-n', '-e', '192.0.2.0/24', 'example.com']
+        args = ['-e', '192.0.2.0/24', 'example.com']
         arghelper = ArgHelper(self.logger)
         arghelper.build_parser('probe')
         arghelper.parse_args(args)
