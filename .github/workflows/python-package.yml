@@ -26,7 +26,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
     - name: Tests
       run: |
         python -m -o ELLIPSIS dnsviz/analysis/errors.py
