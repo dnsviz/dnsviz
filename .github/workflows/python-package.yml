@@ -60,8 +60,12 @@ jobs:
     - name: Install DNSViz and dependencies
       run: |
         brew install bind pkg-config swig json-c graphviz openssl@3
-        export SWIG_FEATURES="-I/opt/homebrew/include"
-        pip3 install pip install --global-option="-I/opt/homebrew/include" dnspython pygraphviz m2crypto
+        export GRAPHVIZ_DIR="$(brew --prefix graphviz)"
+        export OPENSSL_DIR="$(brew --prefix openssl)"
+        pip install dnspython pygraphviz m2crypto \
+          --config-settings=--global-option=build_ext \
+          --config-settings=--global-option="-I$GRAPHVIZ_DIR/include:$OPENSSL_DIR/include" \
+          --config-settings=--global-option="-L$GRAPHVIZ_DIR/lib:$OPENSSL_DIR/lib"
         pip3 install .
     - name: Test - errors.py
       run: |
