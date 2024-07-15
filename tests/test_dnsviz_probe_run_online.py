@@ -1,5 +1,6 @@
 import io
 import os
+import platform
 import subprocess
 import tempfile
 import unittest
@@ -35,6 +36,9 @@ class DNSVizProbeRunOnlineTestCase(unittest.TestCase):
             self.assertReturnCode(subprocess.call(['dnsviz', 'probe', '-d', '0', 'example.com'], stdout=fh))
 
     def test_dnsviz_probe_rec_multi(self):
+        if platform.system().lower() == 'darwin':
+            # Skip MacOS
+            return
         with io.open(self.output.name, 'wb') as fh:
             self.assertReturnCode(subprocess.call(['dnsviz', 'probe', '-d', '0', '-t', '3', '.', 'example.com', 'example.net'], stdout=fh))
 

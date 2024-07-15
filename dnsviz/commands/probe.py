@@ -35,6 +35,7 @@ import json
 import logging
 import multiprocessing
 import multiprocessing.managers
+import platform
 import os
 import random
 import re
@@ -976,7 +977,7 @@ class ArgHelper:
                     action='store', metavar='<filename>',
                     help='Read diagnostic queries from a file')
         self.parser.add_argument('-t', '--threads',
-                type=self.positive_int, default=1,
+                type=self.positive_int_not_darwin, default=1,
                 action='store', metavar='<threads>',
                 help='Use the specified number of threads for parallel queries')
         self.parser.add_argument('-4', '--ipv4',
@@ -1060,6 +1061,14 @@ class ArgHelper:
 
     def parse_args(self, args):
         self.args = self.parser.parse_args(args)
+
+    @classmethod
+    def positive_int_not_darwin(cls, arg):
+        val = cls.positive_int(arg)
+        if platform.system().lower() == 'darwin':
+            msg = "Using more than one thread is not currently supported on MacOS."
+            raise argparse.ArgumentTypeError(msg)
+        return val
 
     @classmethod
     def positive_int(cls, arg):
