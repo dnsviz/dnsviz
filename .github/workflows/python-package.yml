@@ -26,7 +26,8 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
+        sudo apt install libssl-dev libgraphviz-dev
+        pip3 install dnspython pygraphviz m2crypto
     - name: Tests
       run: |
         which python3
