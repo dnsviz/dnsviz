@@ -42,3 +42,31 @@ jobs:
         cd tests && \
         ./scripts/populate_zones.sh && \
         ./scripts/test_dnsviz.sh
+
+  Test-on-MacOS-custom:
+  
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install DNSViz and dependencies
+      run: |
+        brew install bind graphviz openssl
+        pip3 install dnspython pygraphviz m2crypto
+        pip3 install .
+    - name: Test - errors.py
+      run: |
+        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+    - name: Test - run tests
+      run: |
+        cd tests && \
+        ./scripts/populate_zones.sh && \
+        ./scripts/test_dnsviz.sh
