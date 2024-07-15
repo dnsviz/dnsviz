@@ -27,7 +27,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt install libssl-dev libgraphviz-dev
-        pip3 install dnspython pygraphviz-m2crypto
+        pip3 install dnspython pygraphviz m2crypto
         pip3 install .
     - name: Tests
       run: |
