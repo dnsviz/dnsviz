@@ -59,7 +59,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install DNSViz and dependencies
       run: |
-        brew install bind graphviz openssl
+        brew install bind graphviz openssl swig
         pip3 install dnspython pygraphviz m2crypto
         pip3 install .
     - name: Test - errors.py
