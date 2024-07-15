@@ -22,7 +22,7 @@ jobs:
       run: |
         sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
         sudo apt install bind9
-        pip3 install .
+        sudo pip3 install .
     - name: Disable AppArmor
       run: |
         sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
@@ -52,8 +52,9 @@ jobs:
     - name: Install DNSViz and dependencies
       run: |
         sudo apt install libssl-dev libgraphviz-dev
+        sudo apt install bind9
         pip3 install dnspython pygraphviz m2crypto
-        pip3 install .
+        sudo pip3 install .
     - name: Disable AppArmor
       run: |
         sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
