@@ -23,6 +23,9 @@ jobs:
         sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
         sudo apt install bind9
         pip3 install .
+    - name: Disable AppArmor
+      run: |
+        sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
     - name: Test - errors.py
       run: |
         python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
@@ -51,6 +54,9 @@ jobs:
         sudo apt install libssl-dev libgraphviz-dev
         pip3 install dnspython pygraphviz m2crypto
         pip3 install .
+    - name: Disable AppArmor
+      run: |
+        sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
     - name: Test - errors.py
       run: |
         python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
