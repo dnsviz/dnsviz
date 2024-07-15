@@ -10,8 +10,8 @@ on:
     branches: [ "master", "ci" ]
 
 jobs:
-  build:
-
+  Test-on-Ubuntu-custom:
+  
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -26,10 +26,25 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        sudo apt install libssl-dev libgraphviz-dev
+        pip3 install dnspython pygraphviz-m2crypto
+        pip3 install .
+    - name: Tests
+      run: |
+        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+
+  Test-on-Ubuntu-native:
+  
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install DNSViz and dependencies
+      run: |
         sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
         pip3 install .
     - name: Tests
       run: |
-        which python3
-        echo $PYTHONPATH
         python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
