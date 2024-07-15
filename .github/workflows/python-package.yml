@@ -10,30 +10,6 @@ on:
     branches: [ "master", "ci" ]
 
 jobs:
-  Test-on-Ubuntu-native:
-  
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install DNSViz and dependencies
-      run: |
-        sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
-        sudo apt install bind9
-        sudo pip3 install .
-    - name: Disable AppArmor
-      run: |
-        sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
-    - name: Test - errors.py
-      run: |
-        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
-    - name: Test runtime
-      run: |
-        cd tests && \
-        ./scripts/populate_zones.sh && \
-        ./scripts/test_dnsviz.sh
 
   Test-on-Ubuntu-custom:
   
@@ -54,7 +30,7 @@ jobs:
         sudo apt install libssl-dev libgraphviz-dev
         sudo apt install bind9
         pip3 install dnspython pygraphviz m2crypto
-        sudo pip3 install .
+        pip3 install .
     - name: Disable AppArmor
       run: |
         sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
