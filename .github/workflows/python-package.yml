@@ -1,7 +1,4 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
-name: Python package
+name: Build and Test DNSViz
 
 on:
   push:
@@ -10,13 +7,14 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
+
+  Test-on-Ubuntu-custom:
 
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
@@ -24,9 +22,53 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Install DNSViz and dependencies
       run: |
-        sudo apt install python3-dnspython python3-pygraphviz python3-m2crypto
-    - name: Tests
+        sudo apt install libssl-dev libgraphviz-dev
+        sudo apt install bind9 graphviz openssl
+        pip3 install dnspython pygraphviz m2crypto
+        pip3 install .
+    - name: Disable AppArmor
       run: |
-        python -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+        sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
+    - name: Run errors.py doctest
+      run: |
+        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+    - name: Test runtime options and functionality
+      run: |
+        cd tests && \
+        ./scripts/populate_zones.sh && \
+        ./scripts/test_dnsviz.sh
+
+  Test-on-MacOS:
+
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install DNSViz and dependencies
+      run: |
+        brew install bind pkg-config swig json-c graphviz openssl@3
+        export GRAPHVIZ_DIR="$(brew --prefix graphviz)"
+        export OPENSSL_DIR="$(brew --prefix openssl)"
+        pip install dnspython pygraphviz m2crypto \
+          --config-settings=--global-option=build_ext \
+          --config-settings=--global-option="-I$GRAPHVIZ_DIR/include:$OPENSSL_DIR/include" \
+          --config-settings=--global-option="-L$GRAPHVIZ_DIR/lib:$OPENSSL_DIR/lib"
+        pip3 install .
+    - name: Run errors.py doctest
+      run: |
+        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+    - name: Test runtime options and functionality
+      run: |
+        cd tests && \
+        ./scripts/populate_zones.sh && \
+        ./scripts/test_dnsviz.sh
