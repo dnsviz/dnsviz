@@ -15,10 +15,11 @@ from dnsviz.commands.probe import ZoneFileToServe, ArgHelper, DomainListArgHelpe
 from dnsviz.ipaddr import IPAddr
 from dnsviz import transport
 
-DATA_DIR = os.path.dirname(__file__)
-EXAMPLE_COM_ZONE = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone')
-EXAMPLE_COM_DELEGATION = os.path.join(DATA_DIR, 'zones', 'signed-nsec3', 'example.com.zone-delegation')
-EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.json.gz')
+from vars import *
+
+EXAMPLE_COM_ZONE = get_zone_file('signed-nsec3', True)
+EXAMPLE_COM_DELEGATION = get_delegation_file('signed-nsec3')
+EXAMPLE_AUTHORITATIVE = get_probe_output_auth_file('unsigned')
 
 class DNSVizProbeOptionsTestCase(unittest.TestCase):
     def setUp(self):
@@ -926,12 +927,8 @@ ns1.example 0 IN A 192.0.2.1
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_invalid_version_2:
             example_invalid_version_2.write(b'{ "_meta._dnsviz.": { "version": 5.0 } }')
 
-        with gzip.open(EXAMPLE_AUTHORITATIVE, 'rb') as example_auth_in:
-            with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_auth_out:
-                example_auth_out.write(example_auth_in.read())
-
         try:
-            args = ['-r', example_auth_out.name]
+            args = ['-r', EXAMPLE_AUTHORITATIVE]
             arghelper = ArgHelper(self.logger)
             arghelper.build_parser('probe')
             arghelper.parse_args(args)
@@ -975,7 +972,7 @@ ns1.example 0 IN A 192.0.2.1
             arghelper.args.input_file.close()
 
         finally:
-            for tmpfile in (example_auth_out, example_bad_json, example_no_version, \
+            for tmpfile in (example_bad_json, example_no_version, \
                     example_invalid_version_1, example_invalid_version_2):
                 os.remove(tmpfile.name)
 

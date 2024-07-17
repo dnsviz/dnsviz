@@ -1,4 +1,5 @@
 import argparse
+import binascii
 import datetime
 import gzip
 import importlib
@@ -14,20 +15,42 @@ import dns.name, dns.rdatatype, dns.rrset, dns.zone
 from dnsviz.format import utc
 from dnsviz.util import get_default_trusted_keys
 
-mod = importlib.import_module('dnsviz.commands.grok')
-GrokArgHelper = getattr(mod, 'GrokArgHelper')
+from vars import *
+
+mod = importlib.import_module('dnsviz.commands.print')
+PrintArgHelper = getattr(mod, 'PrintArgHelper')
 AnalysisInputError = getattr(mod, 'AnalysisInputError')
 
-DATA_DIR = os.path.dirname(__file__)
-EXAMPLE_AUTHORITATIVE = os.path.join(DATA_DIR, 'data', 'example-authoritative.json.gz')
+EXAMPLE_AUTHORITATIVE = get_probe_output_auth_file('unsigned')
 
-
-class DNSVizGrokOptionsTestCase(unittest.TestCase):
+class DNSVizPrintOptionsTestCase(unittest.TestCase):
     def setUp(self):
         self.logger = logging.getLogger()
         for handler in self.logger.handlers:
             self.logger.removeHandler(handler)
         self.logger.addHandler(logging.NullHandler())
+
+    def test_rrtype_list(self):
+        arg1 = 'A,AAAA,MX,CNAME'
+        arg1_with_spaces = ' A , AAAA , MX , CNAME '
+        arg2 = 'A'
+        arg3 = 'A,BLAH'
+        arg4_empty = ''
+        arg4_empty_spaces = ' '
+
+        type_list1 = [dns.rdatatype.A, dns.rdatatype.AAAA, dns.rdatatype.MX, dns.rdatatype.CNAME]
+        type_list2 = [dns.rdatatype.A]
+        empty_list = []
+
+        self.assertEqual(PrintArgHelper.comma_separated_dns_types(arg1), type_list1)
+        self.assertEqual(PrintArgHelper.comma_separated_dns_types(arg1_with_spaces), type_list1)
+        self.assertEqual(PrintArgHelper.comma_separated_dns_types(arg2), type_list2)
+        self.assertEqual(PrintArgHelper.comma_separated_dns_types(arg4_empty), empty_list)
+        self.assertEqual(PrintArgHelper.comma_separated_dns_types(arg4_empty_spaces), empty_list)
+
+        # invalid schema
+        with self.assertRaises(argparse.ArgumentTypeError):
+            PrintArgHelper.comma_separated_dns_types(arg3)
 
     def test_integer_list(self):
         arg1 = '1,2,3,4,5'
@@ -45,33 +68,33 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
         int_set2 = set([1])
         empty_set = set([])
 
-        self.assertEqual(GrokArgHelper.comma_separated_ints(arg1), int_list1)
-        self.assertEqual(GrokArgHelper.comma_separated_ints(arg1_with_spaces), int_list1)
-        self.assertEqual(GrokArgHelper.comma_separated_ints(arg2), int_list2)
-        self.assertEqual(GrokArgHelper.comma_separated_ints(arg4_empty), empty_list)
-        self.assertEqual(GrokArgHelper.comma_separated_ints(arg4_empty_spaces), empty_list)
+        self.assertEqual(PrintArgHelper.comma_separated_ints(arg1), int_list1)
+        self.assertEqual(PrintArgHelper.comma_separated_ints(arg1_with_spaces), int_list1)
+        self.assertEqual(PrintArgHelper.comma_separated_ints(arg2), int_list2)
+        self.assertEqual(PrintArgHelper.comma_separated_ints(arg4_empty), empty_list)
+        self.assertEqual(PrintArgHelper.comma_separated_ints(arg4_empty_spaces), empty_list)
 
-        self.assertEqual(GrokArgHelper.comma_separated_ints_set(arg1), int_set1)
-        self.assertEqual(GrokArgHelper.comma_separated_ints_set(arg1_with_spaces), int_set1)
-        self.assertEqual(GrokArgHelper.comma_separated_ints_set(arg2), int_set2)
-        self.assertEqual(GrokArgHelper.comma_separated_ints_set(arg4_empty), empty_set)
-        self.assertEqual(GrokArgHelper.comma_separated_ints_set(arg4_empty_spaces), empty_set)
+        self.assertEqual(PrintArgHelper.comma_separated_ints_set(arg1), int_set1)
+        self.assertEqual(PrintArgHelper.comma_separated_ints_set(arg1_with_spaces), int_set1)
+        self.assertEqual(PrintArgHelper.comma_separated_ints_set(arg2), int_set2)
+        self.assertEqual(PrintArgHelper.comma_separated_ints_set(arg4_empty), empty_set)
+        self.assertEqual(PrintArgHelper.comma_separated_ints_set(arg4_empty_spaces), empty_set)
 
         # invalid schema
         with self.assertRaises(argparse.ArgumentTypeError):
-            GrokArgHelper.comma_separated_ints(arg3)
+            PrintArgHelper.comma_separated_ints(arg3)
 
     def test_valid_domain_name(self):
         arg1 = '.'
         arg2 = 'www.example.com'
         arg3 = 'www..example.com'
 
-        self.assertEqual(GrokArgHelper.valid_domain_name(arg1), dns.name.from_text(arg1))
-        self.assertEqual(GrokArgHelper.valid_domain_name(arg2), dns.name.from_text(arg2))
+        self.assertEqual(PrintArgHelper.valid_domain_name(arg1), dns.name.from_text(arg1))
+        self.assertEqual(PrintArgHelper.valid_domain_name(arg2), dns.name.from_text(arg2))
 
         # invalid domain name
         with self.assertRaises(argparse.ArgumentTypeError):
-            GrokArgHelper.valid_domain_name(arg3)
+            PrintArgHelper.valid_domain_name(arg3)
 
     def test_ingest_input(self):
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_bad_json:
@@ -86,22 +109,18 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_invalid_version_2:
             example_invalid_version_2.write(b'{ "_meta._dnsviz.": { "version": 5.0 } }')
 
-        with gzip.open(EXAMPLE_AUTHORITATIVE, 'rb') as example_auth_in:
-            with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_auth_out:
-                example_auth_out.write(example_auth_in.read())
-
         try:
-            args = ['-r', example_auth_out.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            args = ['-r', EXAMPLE_AUTHORITATIVE]
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.ingest_input()
             arghelper.args.input_file.close()
 
             # Bad json
             args = ['-r', example_bad_json.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
@@ -109,8 +128,8 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
             # No version
             args = ['-r', example_no_version.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
@@ -118,8 +137,8 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
             # Invalid version
             args = ['-r', example_invalid_version_1.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
@@ -127,22 +146,22 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
             # Invalid version
             args = ['-r', example_invalid_version_2.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             with self.assertRaises(AnalysisInputError):
                 arghelper.ingest_input()
             arghelper.args.input_file.close()
 
         finally:
-            for tmpfile in (example_auth_out, example_bad_json, example_no_version, \
+            for tmpfile in (example_bad_json, example_no_version, \
                     example_invalid_version_1, example_invalid_version_2):
                 os.remove(tmpfile.name)
 
     def test_ingest_names(self):
         args = ['example.com', 'example.net']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
         arghelper.ingest_names()
         self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
@@ -155,16 +174,16 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
         try:
             args = ['-f', names_file.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.ingest_names()
             self.assertEqual(list(arghelper.names), [dns.name.from_text('example.com'), dns.name.from_text('example.net')])
             arghelper.args.names_file.close()
 
             args = ['-r', example_names_only.name]
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.ingest_input()
             arghelper.ingest_names()
@@ -172,8 +191,8 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
             arghelper.args.input_file.close()
 
             args = ['-r', example_names_only.name, 'example.com']
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.ingest_input()
             arghelper.ingest_names()
@@ -191,14 +210,17 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
         tk_explicit = [(dns.name.from_text('example.com'), dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.DNSKEY, tk1_rdata)),
                 (dns.name.from_text('example.com'), dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.DNSKEY, tk2_rdata))]
 
+        now = datetime.datetime.now(utc)
+        tk_default = get_default_trusted_keys(now)
+
         args = ['example.com']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
         arghelper.aggregate_trusted_key_info()
         self.assertEqual(arghelper.trusted_keys, None)
-        arghelper.update_trusted_key_info()
-        self.assertEqual(arghelper.trusted_keys, [])
+        arghelper.update_trusted_key_info(now)
+        self.assertEqual(arghelper.trusted_keys, tk_default)
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as tk1_file:
             tk1_file.write(tk1.encode('utf-8'))
@@ -208,21 +230,21 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
         try:
             args = ['-t', tk1_file.name, '-t', tk2_file.name, 'example.com']
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.aggregate_trusted_key_info()
-            arghelper.update_trusted_key_info()
+            arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, tk_explicit)
             for f in arghelper.args.trusted_keys_file:
                 f.close()
 
             args = ['-t', '/dev/null', 'example.com']
-            arghelper = GrokArgHelper(self.logger)
-            arghelper.build_parser('grok')
+            arghelper = PrintArgHelper(self.logger)
+            arghelper.build_parser('print')
             arghelper.parse_args(args)
             arghelper.aggregate_trusted_key_info()
-            arghelper.update_trusted_key_info()
+            arghelper.update_trusted_key_info(now)
             self.assertEqual(arghelper.trusted_keys, [])
             for f in arghelper.args.trusted_keys_file:
                 f.close()
@@ -235,43 +257,36 @@ class DNSVizGrokOptionsTestCase(unittest.TestCase):
 
         # Names file and command-line domain names are mutually exclusive
         args = ['-f', '/dev/null', 'example.com']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
         with self.assertRaises(argparse.ArgumentTypeError):
             arghelper.check_args()
         arghelper.args.names_file.close()
 
-    def test_log_level(self):
-
         # Names file and command-line domain names are mutually exclusive
-        args = []
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        args = ['-O', '-o', '/dev/null']
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
-        arghelper.set_kwargs()
-        self.assertEqual(arghelper.log_level, logging.DEBUG)
+        with self.assertRaises(argparse.ArgumentTypeError):
+            arghelper.check_args()
+        arghelper.args.output_file.close()
 
-        args = ['-l', 'info']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        # But this is allowed
+        args = ['-o', '/dev/null']
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
-        arghelper.set_kwargs()
-        self.assertEqual(arghelper.log_level, logging.INFO)
+        arghelper.check_args()
+        arghelper.args.output_file.close()
 
-        args = ['-l', 'warning']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
+        # So is this
+        args = ['-O']
+        arghelper = PrintArgHelper(self.logger)
+        arghelper.build_parser('print')
         arghelper.parse_args(args)
-        arghelper.set_kwargs()
-        self.assertEqual(arghelper.log_level, logging.WARNING)
-
-        args = ['-l', 'error']
-        arghelper = GrokArgHelper(self.logger)
-        arghelper.build_parser('grok')
-        arghelper.parse_args(args)
-        arghelper.set_kwargs()
-        self.assertEqual(arghelper.log_level, logging.ERROR)
+        arghelper.check_args()
 
 if __name__ == '__main__':
     unittest.main()

@@ -26,8 +26,9 @@ jobs:
       run: |
         sudo apt install libssl-dev libgraphviz-dev
         sudo apt install bind9 graphviz openssl
-        pip3 install dnspython pygraphviz cryptography
-        pip3 install .
+        pip install dnspython pygraphviz cryptography
+        pip install pytest
+        pip install .
     - name: Disable AppArmor
       run: |
         sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
@@ -36,9 +37,7 @@ jobs:
         python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
     - name: Test runtime options and functionality
       run: |
-        cd tests && \
-        ./scripts/populate_zones.sh && \
-        ./scripts/test_dnsviz.sh
+        pytest
 
   Test-on-MacOS:
 
@@ -63,12 +62,11 @@ jobs:
           --config-settings=--global-option=build_ext \
           --config-settings=--global-option="-I$GRAPHVIZ_DIR/include:$OPENSSL_DIR/include" \
           --config-settings=--global-option="-L$GRAPHVIZ_DIR/lib:$OPENSSL_DIR/lib"
-        pip3 install .
+        pip install pytest
+        pip install .
     - name: Run errors.py doctest
       run: |
         python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
     - name: Test runtime options and functionality
       run: |
-        cd tests && \
-        ./scripts/populate_zones.sh && \
-        ./scripts/test_dnsviz.sh
+        pytest
