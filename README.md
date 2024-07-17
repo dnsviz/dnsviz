@@ -17,16 +17,19 @@ powers the Web-based analysis available at https://dnsviz.net/
 
 ## Installation
 
-DNSViz packages are available in repositories for popular operating systems,
-such as Debian, Ubuntu, Fedora, and FreeBSD, using their typical installation
-commands.  DNSViz can also be installed on Mac OS X via Homebrew or MacPorts.
+DNSViz is available in package repositories for popular operating systems, such
+as Debian, Ubuntu, Fedora, Gentoo, and FreeBSD.  It is also available in the
+Extra Packages for Linux (EPEL) repository for Red Hat Enterprise Linux
+(RHEL) 8 and 9 and CentOS 8 and 9. (See
+[notes](#rhel-89-or-centos-stream-89-notes) for installation on RHEL and
+Centos.)  In each case, it can be installed using the package installation
+commands typical for that operating system.  DNSViz can also be installed on
+Mac OS X using Homebrew or MacPorts.
 
 The remainer of this section covers other methods of installation, including a
 list of [dependencies](#dependencies), installation to a
-[virtual environment](#installation-in-a-virtual-environment), and installation
-on
-[RHEL 8 or 9, CentOS Stream 8 or 9,](#rhel-89-or-centos-stream-89----rpm-build-and-install),
-and [RHEL 7](#rhel-7-rpm-build-and-install).
+[virtual environment](#installation-in-a-virtual-environment), and
+[notes for installing on RHEL 8 or 9 or CentOS Stream 8 or 9,](#rhel-89-or-centos-stream-89-notes)).
 
 Instructions for running in a Docker container are also available
 [later in this document](#docker-container).
@@ -115,10 +118,10 @@ or locally, from a downloaded or cloned copy of DNSViz:
 ```
 
 
-### RHEL 8/9 or CentOS Stream 8/9 -- RPM Build and Install
+### RHEL 8/9 or CentOS Stream 8/9 Notes
 
-To build an RPM and install it on RHEL 8 or 9 or CentOS Stream 8 or 9, use the
-following instructions.
+DNSViz can be installed on RHEL 8 or 9 or CentOS Stream 8 or 9 from the EPEL
+repository.  Follow the instructions in this section to enable EPEL.
 
 *RHEL 8 and 9 only*: Enable CodeReady Linux Builder and Extra Packages for
 Enterprise Linux (EPEL) with following:
@@ -141,56 +144,12 @@ $ sudo dnf install epel-release
 (where `$(tool)` refers to the tool, either `powertools` for CentOS Stream 8 or
 `crb` for CentOS Stream 9.)
 
-The remaining instructions are for RHEL 8 or 9 *and* CentOS Stream 8 or 9.
-
-Install the tools for building an RPM, and set up the rpmbuild tree.
-
-```
-$ sudo dnf install rpm-build rpmdevtools make python3-devel python3-build
-$ rpmdev-setuptree
-```
-
-From within the DNSViz source directory, create a source distribution tarball
-and copy it and the DNSViz spec file to the appropriate rpmbuild
-subdirectories.
+For both RHEL 8 or 9 *and* CentOS Stream 8 or 9, once EPEL is enabled, install
+DNSViz using `dnf`:
 
 ```
-$ python3 -m build
-$ cp dist/dnsviz-*.tar.gz ~/rpmbuild/SOURCES/
-$ cp contrib/dnsviz.spec ~/rpmbuild/SPECS/
+$ sudo dnf install dnsviz
 ```
-
-Install dnspython, pygraphviz, and cryptography.
-
-```
-$ sudo dnf install python3-dns python3-pygraphviz python3-cryptography
-```
-
-Build and install the DNSViz RPM.
-```
-$ rpmbuild -ba rpmbuild/SPECS/dnsviz.spec
-$ sudo rpm -iv rpmbuild/RPMS/noarch/dnsviz-*.noarch.rpm
-```
-
-
-### RHEL 7 RPM Build and Install
-
-Install pygraphviz, cryptography, and dnspython, after installing their build
-dependencies.
-```
-$ sudo yum install python3 gcc python3-devel graphviz-devel openssl-devel
-$ pip3 install --user pbr cryptography pygraphviz dnspython
-```
-
-Install rpm-build tools, then build and install the DNSViz RPM.
-```
-$ sudo yum install rpm-build
-$ python3 setup.py bdist_rpm --install-script contrib/rpm-install.sh --distribution-name el7
-$ sudo rpm -iv dist/dnsviz-*-1.noarch.rpm
-```
-
-Note that a custom install script is used to properly install the DNSViz man
-pages.
 
 
 ## Usage
