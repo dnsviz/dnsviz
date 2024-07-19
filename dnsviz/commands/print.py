@@ -41,7 +41,7 @@ except ImportError:
 
 import dns.exception, dns.name
 
-from dnsviz.analysis import TTLAgnosticOfflineDomainNameAnalysis, DNS_RAW_VERSION
+from dnsviz.analysis import deserialize, DNS_RAW_VERSION
 from dnsviz.analysis.errors import ExistingCovered
 from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
@@ -610,7 +610,7 @@ def main(argv):
             if name_str not in arghelper.analysis_structured or arghelper.analysis_structured[name_str].get('stub', True):
                 logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
                 continue
-            name_obj = TTLAgnosticOfflineDomainNameAnalysis.deserialize(name, arghelper.analysis_structured, cache, strict_cookies=arghelper.args.enforce_cookies, allow_private=arghelper.args.allow_private)
+            name_obj = deserialize(name, arghelper.analysis_structured, cache, strict_cookies=arghelper.args.enforce_cookies, allow_private=arghelper.args.allow_private)
             name_objs.append(name_obj)
 
             if latest_analysis_date is None or latest_analysis_date > name_obj.analysis_end:

@@ -1,2 +1,2 @@
 from .online import COOKIE_STANDIN, WILDCARD_EXPLICIT_DELEGATION, Analyst, OnlineDomainNameAnalysis, PrivateAnalyst, RecursiveAnalyst, PrivateRecursiveAnalyst, NetworkConnectivityException, DNS_RAW_VERSION
-from .offline import OfflineDomainNameAnalysis, TTLAgnosticOfflineDomainNameAnalysis, DNS_PROCESSED_VERSION
+from .offline import OfflineDomainNameAnalysis, TTLAgnosticOfflineDomainNameAnalysis, deserialize, DNS_PROCESSED_VERSION

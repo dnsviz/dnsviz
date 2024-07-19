@@ -49,6 +49,7 @@ lb2s = fmt.latin1_binary_to_string
 
 from . import errors as Errors
 from .online import OnlineDomainNameAnalysis, \
+        analysis_type_codes, \
         ANALYSIS_TYPE_AUTHORITATIVE, ANALYSIS_TYPE_RECURSIVE, ANALYSIS_TYPE_CACHE
 from . import status as Status
 
@@ -3597,3 +3598,18 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
 class TTLAgnosticOfflineDomainNameAnalysis(OfflineDomainNameAnalysis):
     QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
+
+def deserialize(name, d1, cache=None, **kwargs):
+    name_str = lb2s(name.canonicalize().to_text())
+    d = d1[name_str]
+
+    analysis_type = analysis_type_codes[d['type']]
+
+    if analysis_type == ANALYSIS_TYPE_RECURSIVE:
+        cls = TTLAgnosticOfflineDomainNameAnalysis
+    elif analysis_type == ANALYSIS_TYPE_AUTHORITATIVE:
+        cls = OfflineDomainNameAnalysis
+    else:
+        raise ValueError('Unsupported analysis type: %s' % (d['type']))
+
+    return cls.deserialize(name, d1, cache=cache, **kwargs)
