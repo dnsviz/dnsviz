@@ -64,6 +64,7 @@ else:
 
 import dns.exception
 
+from . import dist
 from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
 from .format import latin1_binary_to_string as lb2s
 
@@ -812,7 +813,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
     def init_req(self):
         data = self._post_data()
-        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/0.11.0\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/json\r\n\r\n%s' % (self.path, self.host, self._authentication_header(), len(data), data), 'latin1')
+        self.msg_send = codecs.encode('POST %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: DNSViz/%s\r\nAccept: application/json\r\n%sContent-Length: %d\r\nContent-Type: application/json\r\n\r\n%s' % (self.path, self.host, dist.version, self._authentication_header(), len(data), data), 'latin1')
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 
