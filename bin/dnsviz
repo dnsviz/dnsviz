@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # This file is a part of DNSViz, a tool suite for DNS/DNSSEC monitoring,
 # analysis, and visualization.
@@ -6,7 +6,7 @@
 #
 # Copyright 2015-2016 VeriSign, Inc.
 #
-# Copyright 2016-2021 Casey Deccio
+# Copyright 2016-2024 Casey Deccio
 #
 # DNSViz is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -75,9 +75,24 @@ def main():
 
     opts = dict(opts)
 
+    if '-p' in opts:
+        sys.path.insert(0, opts['-p'])
+
+    # try importing the main module, to make sure it is reachable with the
+    # current path.
+    try:
+        dnsviz = importlib.import_module('dnsviz')
+    except ImportError:
+        sys.stderr.write('Could not find the dnsviz module.\n')
+        sys.exit(1)
+
     if '-v' in opts:
-        dist = importlib.metadata.distribution('dnsviz')
-        sys.stdout.write(dist.version + '\n')
+        try:
+            vers = dnsviz.dist.version
+        except AttributeError:
+            sys.stderr.write('Version information not available.\n')
+            sys.exit(1)
+        sys.stdout.write(dnsviz.dist.version + '\n')
         sys.exit(0)
 
     if len(args) < 1:
@@ -93,10 +108,7 @@ def main():
     else:
         command = args[0]
 
-    if '-p' in opts:
-        sys.path.insert(0, opts['-p'])
-
-    # first try importing just the commands module to make sure
+    # now try importing just the commands module to make sure
     # dnsviz is properly reachable with the current path
     importlib.import_module('%s.%s' % (CMD_DIR1, CMD_DIR2))
 
