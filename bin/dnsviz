@@ -26,6 +26,7 @@ from __future__ import unicode_literals
 
 import getopt
 import importlib
+import importlib.metadata
 import logging
 import os
 import sys
@@ -51,6 +52,7 @@ def usage(err=None):
         err = ''
     sys.stderr.write('''%sUsage: dnsviz [options] <command> [args]
 Options:
+    -v             - Show version information and exit.
     -p <path>      - Add path to the python path.
 Commands:
     probe          - Issue diagnostic DNS queries.
@@ -66,12 +68,17 @@ def main():
     check_deps()
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'p:')
+        opts, args = getopt.getopt(sys.argv[1:], 'vp:')
     except getopt.GetoptError as e:
         usage(str(e) + '\n')
         sys.exit(1)
 
     opts = dict(opts)
+
+    if '-v' in opts:
+        dist = importlib.metadata.distribution('dnsviz')
+        sys.stdout.write(dist.version + '\n')
+        sys.exit(0)
 
     if len(args) < 1:
         usage()
