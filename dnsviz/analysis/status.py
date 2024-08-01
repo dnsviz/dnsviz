@@ -235,7 +235,7 @@ class RRSIGStatus(object):
         # Validation is prohibited or, at least, not recommended
         if self.rrsig.algorithm in DNSKEY_ALGS_PROHIBITED:
             if not ignore_rfc8624:
-                self.errors.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
+                self.warnings.append(Errors.AlgorithmProhibited(algorithm=self.rrsig.algorithm))
         elif self.rrsig.algorithm in DNSKEY_ALGS_NOT_RECOMMENDED:
             if not ignore_rfc8624:
                 self.warnings.append(Errors.AlgorithmNotRecommended(algorithm=self.rrsig.algorithm))
@@ -452,7 +452,7 @@ class DSStatus(object):
         # Validation is prohibited or, at least, not recommended
         if self.ds.digest_type in DS_DIGEST_ALGS_PROHIBITED:
             if not ignore_rfc8624:
-                self.errors.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
+                self.warnings.append(Errors.DigestAlgorithmProhibited(algorithm=self.ds.digest_type))
         elif self.ds.digest_type in DS_DIGEST_ALGS_NOT_RECOMMENDED:
             if not ignore_rfc8624:
                 self.warnings.append(Errors.DigestAlgorithmNotRecommended(algorithm=self.ds.digest_type))
