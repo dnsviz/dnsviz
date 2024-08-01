@@ -299,12 +299,12 @@ class AlgorithmValidationProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification prohibits validation of RRSIGs with DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are prohibited from implementing validation of DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
     code = 'ALGORITHM_VALIDATION_PROHIBITED'
-    description_template = "DNSSEC specification prohibits validation of RRSIGs with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC implementers are prohibited from implementing validation of DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.1']
     required_params = ['algorithm']
 
@@ -318,12 +318,12 @@ class AlgorithmProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification prohibits signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are prohibited from implementing signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
     code = 'ALGORITHM_PROHIBITED'
-    description_template = "DNSSEC specification prohibits signing with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = 'DNSSEC implementers are prohibited from implementing signing with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s).'
     references = ['RFC 8624, Sec. 3.1']
     required_params = ['algorithm']
 
@@ -337,12 +337,12 @@ class AlgorithmNotRecommended(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC specification recommends not signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are recommended against implementing signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
     '''
 
     _abstract = False
     code = 'ALGORITHM_NOT_RECOMMENDED'
-    description_template = "DNSSEC specification recommends not signing with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC implementers are recommended against implementing signing with DNSSEC algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.1']
     required_params = ['algorithm']
 
@@ -614,14 +614,14 @@ class DigestAlgorithmNotSupported(DSDigestError):
 
 class DigestAlgorithmValidationProhibited(DSDigestError):
     '''
-    >>> e = DigestAlgorithmValidationProhibited(algorithm=5)
+    >>> e = DigestAlgorithmValidationProhibited(algorithm=1)
     >>> e.description
-    'DNSSEC specification prohibits validation of DS records that use digest algorithm 5 (5).  See ...'
+    'DNSSEC implementers are prohibited from implementing validation of DS algorithm 1 (SHA-1).  See ...'
     '''
 
     _abstract = False
     code = 'DIGEST_ALGORITHM_VALIDATION_PROHIBITED'
-    description_template = "DNSSEC specification prohibits validation of DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC implementers are prohibited from implementing validation of DS algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
@@ -631,14 +631,14 @@ class DigestAlgorithmValidationProhibited(DSDigestError):
 
 class DigestAlgorithmProhibited(DSDigestError):
     '''
-    >>> e = DigestAlgorithmProhibited(algorithm=5)
+    >>> e = DigestAlgorithmProhibited(algorithm=1)
     >>> e.description
-    'DNSSEC specification prohibits signing with DS records that use digest algorithm 5 (5).  See ...'
+    'DNSSEC implementers are prohibited from implementing signing with DS algorithm 1 (SHA-1).  See ...'
     '''
 
     _abstract = False
     code = 'DIGEST_ALGORITHM_PROHIBITED'
-    description_template = "DNSSEC specification prohibits signing with DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC implementers are prohibited from implementing signing with DS algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
@@ -648,14 +648,14 @@ class DigestAlgorithmProhibited(DSDigestError):
 
 class DigestAlgorithmNotRecommended(DSDigestError):
     '''
-    >>> e = DigestAlgorithmNotRecommended(algorithm=5)
+    >>> e = DigestAlgorithmNotRecommended(algorithm=1)
     >>> e.description
-    'DNSSEC specification recommends not signing with DS records that use digest algorithm 5 (5).  See ...'
+    'DNSSEC implementers are recommended against implementing signing with DS algorithm 1 (SHA-1).  See ...'
     '''
 
     _abstract = False
     code = 'DIGEST_ALGORITHM_NOT_RECOMMENDED'
-    description_template = "DNSSEC specification recommends not signing with DS records that use digest algorithm %(algorithm)d (%(algorithm_text)s)."
+    description_template = "DNSSEC implementers are recommended against implementing signing with DS algorithm %(algorithm)d (%(algorithm_text)s)."
     references = ['RFC 8624, Sec. 3.2']
     required_params = ['algorithm']
 
