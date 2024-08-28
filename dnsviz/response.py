@@ -229,6 +229,9 @@ class DNSResponse:
             # dnspython < 2.6 with Generic Option
             data = nsid_opt.data
 
+        # dnspython <= 1.12.x uses strings, but dnspython 1.13 uses bytearray (for python3)
+        if isinstance(data, str):
+            data = data.encode('utf-8')
         if all(c >= 0x20 and c <= 0x7e for c in data):
             nsid_val = data.decode('ascii')
         else:
