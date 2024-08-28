@@ -231,7 +231,7 @@ class DNSResponse:
 
         # dnspython <= 1.12.x uses strings, but dnspython 1.13 uses bytearray (for python3)
         if isinstance(data, str):
-            data = data.encode('utf-8')
+            data = bytearray(data.encode('utf-8'))
         if all(c >= 0x20 and c <= 0x7e for c in data):
             nsid_val = data.decode('ascii')
         else:
