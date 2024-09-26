@@ -23,6 +23,7 @@ EXAMPLE_AUTHORITATIVE = get_probe_output_auth_file('unsigned')
 
 class DNSVizProbeOptionsTestCase(unittest.TestCase):
     def setUp(self):
+        self.maxDiff = None
         self.helper = DomainListArgHelper()
         self.logger = logging.getLogger()
         for handler in self.logger.handlers:
