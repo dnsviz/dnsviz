@@ -234,7 +234,11 @@ def _dnskey_to_dsa(key):
     # create the DSA public key
     param_nums = DSA.DSAParameterNumbers(p, q, g)
     dsa = DSA.DSAPublicNumbers(y, param_nums)
-    return dsa.public_key(backend)
+
+    try:
+        return dsa.public_key(backend)
+    except ValueError:
+        return None
 
 def _dnskey_to_rsa(key):
     try:
@@ -274,8 +278,10 @@ def _dnskey_to_rsa(key):
 
     # create the RSA public key
     rsa = RSA.RSAPublicNumbers(e, n)
-    pubkey = rsa.public_key(backend)
-    return pubkey
+    try:
+        return rsa.public_key(backend)
+    except ValueError:
+        return None
 
 def _dnskey_to_gost(key):
     der = GOST_PREFIX + key
@@ -285,9 +291,15 @@ def _dnskey_to_gost(key):
 
 def _dnskey_to_ed(alg, key):
     if alg == 15:
-        return ED25519.Ed25519PublicKey.from_public_bytes(key)
+        try:
+            return ED25519.Ed25519PublicKey.from_public_bytes(key)
+        except ValueError:
+            return None
     elif alg == 16:
-        return ED448.Ed448PublicKey.from_public_bytes(key)
+        try:
+            return ED448.Ed448PublicKey.from_public_bytes(key)
+        except ValueError:
+            return None
     else:
         raise ValueError('Algorithm not supported')
 
