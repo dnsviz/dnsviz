@@ -2,9 +2,9 @@ name: Build and Test DNSViz
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "fix_tests" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "fix_tests" ]
 
 jobs:
 
