@@ -890,8 +890,11 @@ class DNSKEYMeta(DNSResponseComponent):
 
             offset = 1
             if e_len == 0:
-                b1 = map_func(key_str, 1)
-                b2 = map_func(key_str, 2)
+                try:
+                    b1 = map_func(key_str, 1)
+                    b2 = map_func(key_str, 2)
+                except IndexError:
+                    return 0
                 e_len = (b1 << 8) | b2
                 offset = 3
 
@@ -909,7 +912,10 @@ class DNSKEYMeta(DNSResponseComponent):
 
         # DSA keys
         elif rdata.algorithm in (3,6):
-            t = map_func(key_str, 0)
+            try:
+                t = map_func(key_str, 0)
+            except IndexError:
+                return 0
             return (64 + t*8)<<3
 
         # GOST keys
