@@ -221,13 +221,7 @@ class DNSResponse:
         except IndexError:
             return None
 
-        # Backwards compatibility with dnspython < 2.6
-        if hasattr(dns.edns, 'NSIDOption'):
-            # dnspython >= 2.6 with NSIDOption
-            data = nsid_opt.nsid
-        else:
-            # dnspython < 2.6 with Generic Option
-            data = nsid_opt.data
+        data = nsid_opt.data
 
         # dnspython <= 1.12.x uses strings, but dnspython 1.13 uses bytearray (for python3)
         if isinstance(data, str):
