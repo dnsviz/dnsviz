@@ -148,45 +148,26 @@ def get_ds_digest(digest_alg, dnskey_msg):
 def _dnskey_to_dsa(key):
     # get T
     t = key[0]
-    # python3/python2 dual compatibility
-    if not isinstance(t, int):
-        t = ord(t)
     offset = 1
 
     # get Q
     new_offset = offset+20
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        q = int.from_bytes(key[offset:new_offset], 'big')
-    else:
-        q = int(key[offset:new_offset].encode('hex'), 16)
+    q = int.from_bytes(key[offset:new_offset], 'big')
     offset = new_offset
 
     # get P
     new_offset = offset+64+(t<<3)
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        p = int.from_bytes(key[offset:new_offset], 'big')
-    else:
-        p = int(key[offset:new_offset].encode('hex'), 16)
+    p = int.from_bytes(key[offset:new_offset], 'big')
     offset = new_offset
 
     # get G
     new_offset = offset+64+(t<<3)
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        g = int.from_bytes(key[offset:new_offset], 'big')
-    else:
-        g = int(key[offset:new_offset].encode('hex'), 16)
+    g = int.from_bytes(key[offset:new_offset], 'big')
     offset = new_offset
 
     # get Y
     new_offset = offset+64+(t<<3)
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        y = int.from_bytes(key[offset:new_offset], 'big')
-    else:
-        y = int(key[offset:new_offset].encode('hex'), 16)
+    y = int.from_bytes(key[offset:new_offset], 'big')
     offset = new_offset
 
     # create the DSA public key
@@ -204,9 +185,6 @@ def _dnskey_to_rsa(key):
         e_len = key[0]
     except IndexError:
         return None
-    # python3/python2 dual compatibility
-    if not isinstance(e_len, int):
-        e_len = ord(e_len)
 
     offset = 1
     if e_len == 0:
@@ -217,22 +195,14 @@ def _dnskey_to_rsa(key):
         return None
 
     # get the exponent
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        e = int.from_bytes(key[offset:offset+e_len], 'big')
-    else:
-        e = int(key[offset:offset+e_len].encode('hex'), 16)
+    e = int.from_bytes(key[offset:offset+e_len], 'big')
     offset += e_len
 
     if len(key) <= offset:
         return None
 
     # get the modulus
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        n = int.from_bytes(key[offset:], 'big')
-    else:
-        n = int(key[offset:].encode('hex'), 16)
+    n = int.from_bytes(key[offset:], 'big')
 
     # create the RSA public key
     rsa = RSA.RSAPublicNumbers(e, n)
@@ -308,27 +278,16 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
 
     # get T
     t = sig[0]
-    # python3/python2 dual compatibility
-    if not isinstance(t, int):
-        t = ord(t)
     offset = 1
 
     # get R
     new_offset = offset+20
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        r = int.from_bytes(sig[offset:new_offset], 'big')
-    else:
-        r = int(sig[offset:new_offset].encode('hex'), 16)
+    r = int.from_bytes(sig[offset:new_offset], 'big')
     offset = new_offset
 
     # get S
     new_offset = offset+20
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        s = int.from_bytes(sig[offset:new_offset], 'big')
-    else:
-        s = int(sig[offset:new_offset].encode('hex'), 16)
+    s = int.from_bytes(sig[offset:new_offset], 'big')
     offset = new_offset
 
     sig = utils.encode_dss_signature(r, s)
@@ -363,20 +322,12 @@ def _validate_rrsig_ec(alg, sig, msg, key):
 
     # get R
     new_offset = offset+sigsize//2
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        r = int.from_bytes(sig[offset:new_offset], 'big')
-    else:
-        r = int(sig[offset:new_offset].encode('hex'), 16)
+    r = int.from_bytes(sig[offset:new_offset], 'big')
     offset = new_offset
 
     # get S
     new_offset = offset+sigsize//2
-    # python3/python2 dual compatibility
-    if hasattr(int, 'from_bytes'):
-        s = int.from_bytes(sig[offset:new_offset], 'big')
-    else:
-        s = int(sig[offset:new_offset].encode('hex'), 16)
+    s = int.from_bytes(sig[offset:new_offset], 'big')
     offset = new_offset
 
     sig = utils.encode_dss_signature(r, s)
