@@ -28,7 +28,6 @@
 from __future__ import unicode_literals
 
 import base64
-import binascii
 import copy
 import errno
 import codecs
@@ -49,7 +48,6 @@ from . import crypto
 from . import format as fmt
 from .ipaddr import IPAddr
 from .util import tuple_to_dict
-lb2s = fmt.latin1_binary_to_string
 
 class DNSResponse:
     '''A DNS response, including meta information'''
@@ -219,7 +217,7 @@ class DNSResponse:
         if all(c >= 0x20 and c <= 0x7e for c in data):
             nsid_val = data.decode('ascii')
         else:
-            nsid_val = '0x' + lb2s(binascii.hexlify(data))
+            nsid_val = '0x' + data.hex()
 
         return nsid_val
 
@@ -641,7 +639,7 @@ class DNSResponse:
                 if errno_name is not None:
                     d['errno'] = errno_name
         else:
-            d['message'] = lb2s(base64.b64encode(self.message.to_wire()))
+            d['message'] = base64.b64encode(self.message.to_wire()).decode('ascii')
         if self.msg_size is not None:
             d['msg_size'] = self.msg_size
         d['time_elapsed'] = int(self.response_time * 1000)
@@ -750,15 +748,6 @@ class DNSKEYMeta(DNSResponseComponent):
         '''Return the key_tag for the key, as specified in RFC 4034.  If
         clear_revoke is True, then clear the revoke flag of the DNSKEY RR
         first.'''
-
-        # python3/python2 dual compatibility
-        if isinstance(rdata.key, bytes):
-            if isinstance(rdata.key, str):
-                map_func = lambda x, y: ord(x[y])
-            else:
-                map_func = lambda x, y: x[y]
-        else:
-            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
 
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
@@ -881,7 +870,7 @@ class DNSKEYMeta(DNSResponseComponent):
             d['flags'] = self.rdata.flags
             d['protocol'] = self.rdata.protocol
             d['algorithm'] = self.rdata.algorithm
-            d['key'] = lb2s(base64.b64encode(self.rdata.key))
+            d['key'] = base64.b64encode(self.rdata.key).decode('ascii')
             d['ttl'] = self.ttl
             d['key_length'] = self.key_len
             d['key_tag'] = self.key_tag
@@ -910,7 +899,7 @@ class DNSKEYMeta(DNSResponseComponent):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -1079,7 +1068,7 @@ class RRsetInfo(DNSResponseComponent):
         if self.rrset.rdtype == dns.rdatatype.NSEC3:
             d['name'] = formatter(fmt.format_nsec3_name(self.rrset.name))
         else:
-            d['name'] = formatter(lb2s(self.rrset.name.canonicalize().to_text()))
+            d['name'] = formatter(self.rrset.name.canonicalize().to_text())
         d['ttl'] = self.rrset.ttl
         d['type'] = dns.rdatatype.to_text(self.rrset.rdtype)
         d['rdata'] = []
@@ -1091,9 +1080,6 @@ class RRsetInfo(DNSResponseComponent):
                 d['rdata'].append(fmt.format_nsec3_rrset_text(self.rrset[0].to_text()))
             else:
                 s = rdata.to_text()
-                # python3/python2 dual compatibility
-                if not isinstance(s, str):
-                    s = lb2s(s)
                 d['rdata'].append(formatter(s))
 
         if loglevel <= logging.INFO:
@@ -1105,7 +1091,7 @@ class RRsetInfo(DNSResponseComponent):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -1255,18 +1241,13 @@ class NSECSet(DNSResponseComponent):
         self.rrsets[name].create_or_update_rrsig_info(rrsig, ttl, server, client, response, rdclass, is_referral)
 
     def is_valid_nsec3_name(self, nsec_name, algorithm):
-        # python3/python2 dual compatibility
-        if isinstance(nsec_name[0], str):
-            map_func = lambda x: codecs.encode(x.upper(), 'latin1')
-        else:
-            map_func = lambda x: codecs.encode(chr(x).upper(), 'latin1')
 
         # check that NSEC3 name is valid
         if algorithm == 1:
             # base32hex encoding of SHA1 should be 32 bytes
             if len(nsec_name[0]) != 32:
                 return False
-        if [x for x in nsec_name[0] if map_func(x) not in base32.b32alphabet]:
+        if [x for x in nsec_name[0] if x.to_bytes() not in base32.b32alphabet]:
             return False
         return True
 
