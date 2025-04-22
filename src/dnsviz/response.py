@@ -34,23 +34,13 @@ import errno
 import codecs
 import datetime
 import hashlib
+import html
 import io
 import logging
+import collections
 import socket
 import struct
 import time
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    from html import escape
-except ImportError:
-    from cgi import escape
 
 import dns.edns, dns.flags, dns.message, dns.rcode, dns.rdataclass, dns.rdatatype, dns.rrset
 
@@ -642,7 +632,7 @@ class DNSResponse:
     def serialize_meta(self):
         from . import query as Q
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         # populate history, if not already populated
         if self.effective_flags is None:
@@ -658,15 +648,15 @@ class DNSResponse:
             d['rcode'] = dns.rcode.to_text(self.message.rcode())
             if self.message.edns >= 0:
                 d['edns_version'] = self.message.edns
-            d['answer'] = OrderedDict((
+            d['answer'] = collections.OrderedDict((
                 ('count', self.section_rr_count(self.message.answer)),
                 ('digest', self.section_digest(self.message.answer)),
             ))
-            d['authority'] = OrderedDict((
+            d['authority'] = collections.OrderedDict((
                 ('count', self.section_rr_count(self.message.authority)),
                 ('digest', self.section_digest(self.message.authority)),
             ))
-            d['additional'] = OrderedDict((
+            d['additional'] = collections.OrderedDict((
                 ('count', self.section_rr_count(self.message.additional)),
                 ('digest', self.section_digest(self.message.additional)),
             ))
@@ -683,7 +673,7 @@ class DNSResponse:
         d['retries'] = self.retries()
         if self.history:
             d['cumulative_response_time'] = int(self.total_response_time() * 1000)
-            d['effective_query_options'] = OrderedDict((
+            d['effective_query_options'] = collections.OrderedDict((
                 ('flags', self.effective_flags),
                 ('edns_version', self.effective_edns),
                 ('edns_max_udp_payload', self.effective_edns_max_udp_payload),
@@ -697,7 +687,7 @@ class DNSResponse:
             d['effective_query_options']['tcp'] = self.effective_tcp
 
             if self.responsive_cause_index is not None:
-                d['responsiveness_impediment'] = OrderedDict((
+                d['responsiveness_impediment'] = collections.OrderedDict((
                     ('cause', Q.retry_causes[self.history[self.responsive_cause_index].cause]),
                     ('action', Q.retry_actions[self.history[self.responsive_cause_index].action])
                 ))
@@ -707,7 +697,7 @@ class DNSResponse:
     def serialize(self):
         from . import query as Q
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
         if self.message is None:
             d['message'] = None
             d['error'] = Q.response_errors[self.error]
@@ -837,8 +827,8 @@ class DNSKEYMeta(DNSResponseComponent):
 
         # algorithm 1 is a special case
         if rdata.algorithm == 1:
-            b1 = map_func(rdata.key, -3)
-            b2 = map_func(rdata.key, -2)
+            b1 = rdata.key[-3]
+            b2 = rdata.key[-2]
             return (b1 << 8) | b2
 
         if clear_revoke:
@@ -850,7 +840,7 @@ class DNSKEYMeta(DNSResponseComponent):
 
         ac = 0
         for i in range(len(key_str)):
-            b = map_func(key_str, i)
+            b = key_str[i]
             if i & 1:
                 ac += b
             else:
@@ -865,28 +855,19 @@ class DNSKEYMeta(DNSResponseComponent):
 
         key_str = rdata.key
 
-        # python3/python2 dual compatibility
-        if isinstance(rdata.key, bytes):
-            if isinstance(rdata.key, str):
-                map_func = lambda x, y: ord(x[y])
-            else:
-                map_func = lambda x, y: x[y]
-        else:
-            map_func = lambda x, y: struct.unpack(b'B',x[y])[0]
-
         # RSA keys
         if rdata.algorithm in (1,5,7,8,10):
             try:
                 # get the exponent length
-                e_len = map_func(key_str, 0)
+                e_len = key_str[0]
             except IndexError:
                 return 0
 
             offset = 1
             if e_len == 0:
                 try:
-                    b1 = map_func(key_str, 1)
-                    b2 = map_func(key_str, 2)
+                    b1 = key_str[1]
+                    b2 = key_str[2]
                 except IndexError:
                     return 0
                 e_len = (b1 << 8) | b2
@@ -907,7 +888,7 @@ class DNSKEYMeta(DNSResponseComponent):
         # DSA keys
         elif rdata.algorithm in (3,6):
             try:
-                t = map_func(key_str, 0)
+                t = key_str[0]
             except IndexError:
                 return 0
             return (64 + t*8)<<3
@@ -951,10 +932,10 @@ class DNSKEYMeta(DNSResponseComponent):
                 (self.warnings and loglevel <= logging.WARNING) or \
                 (self.errors and loglevel <= logging.ERROR)
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -1153,10 +1134,10 @@ class RRsetInfo(DNSResponseComponent):
         return rrsig_canonicalized_wire + rrset_canonicalized_wire
 
     def serialize(self, consolidate_clients=True, show_servers=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
