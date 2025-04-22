@@ -930,7 +930,6 @@ class ArgHelper:
         self.th_factories = None
         self.processes = None
         self.dlv_domain = None
-        self.meta_only = None
         self.cache_level = None
         self.names = None
         self.analysis_structured = None
@@ -1376,7 +1375,6 @@ class ArgHelper:
         #    cache_level = None
         self.dlv_domain = None
         self.cache_level = None
-        self.meta_only = None
 
         if self.args.client_subnet:
             CustomQueryMixin.edns_options.append(self.args.client_subnet)
@@ -1590,7 +1588,7 @@ def main(argv):
 
         d = OrderedDict()
         for name_obj in name_objs:
-            name_obj.serialize(d, arghelper.meta_only)
+            name_obj.serialize(d)
         d['_meta._dnsviz.'] = dnsviz_meta
 
         try:
