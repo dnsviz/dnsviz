@@ -47,9 +47,6 @@ from cryptography.hazmat.primitives.asymmetric import utils
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 
-from . import format as fmt
-lb2s = fmt.latin1_binary_to_string
-
 logger = logging.getLogger(__name__)
 
 ALG_TYPE_DNSSEC = 0
@@ -64,7 +61,6 @@ ALG_TYPE_DNSSEC_TEXT = [
 
 _crypto_sources = {
         'cryptography >= 47.0.0': (set([18]), set(), set()),
-        'M2Crypto >= 0.24.0 and openssl >= 1.1.0 plus the OpenSSL GOST Engine': (set([12]), set([3]), set()),
 }
 _logged_modules = (set(), set(), set())
 
@@ -72,18 +68,9 @@ _supported_algs = set([1,3,5,6,7,8,10,13,14,15,16])
 _supported_digest_algs = set([1,2,4])
 _supported_nsec3_algs = set([1])
 
-GOST_PREFIX = b'\x30\x63\x30\x1c\x06\x06\x2a\x85\x03\x02\x02\x13\x30\x12\x06\x07\x2a\x85\x03\x02\x02\x23\x01\x06\x07\x2a\x85\x03\x02\x02\x1e\x01\x03\x43\x00\x04\x40'
-GOST_ENGINE_NAME = b'gost'
-GOST_DIGEST_NAME = b'GOST R 34.11-94'
-
 # For backwards compatibility with cryptography < 36.0.
 # See https://cryptography.io/en/latest/faq/#faq-missing-backend
 backend = OpenSSL.backend
-
-# python3/python2 dual compatibility
-if not isinstance(GOST_ENGINE_NAME, str):
-    GOST_ENGINE_NAME = lb2s(GOST_ENGINE_NAME)
-    GOST_DIGEST_NAME = lb2s(GOST_DIGEST_NAME)
 
 try:
     # available from python 3.1
@@ -101,18 +88,6 @@ def _init_dynamic():
         pass
     else:
         atexit.register(Engine.cleanup)
-
-def _check_gost_support():
-    _gost_init()
-    try:
-        md = EVP.MessageDigest(GOST_DIGEST_NAME)
-    except ValueError:
-        pass
-    else:
-        _supported_algs.add(12)
-        _supported_digest_algs.add(3)
-    finally:
-        _gost_cleanup()
 
 def _check_mldsa_support():
     try:
@@ -139,34 +114,10 @@ def _log_unsupported_alg(alg, alg_type):
                 logger.warning('Warning: Without the installation of %s, cryptographic validation of DNSSEC %s %d (and possibly others) is not supported.' % (mod, ALG_TYPE_DNSSEC_TEXT[alg_type], alg))
             return
 
-def _gost_init():
-    try:
-        gost = Engine.Engine(GOST_ENGINE_NAME)
-        gost.init()
-        gost.set_default()
-    except ValueError:
-        pass
-
-def _gost_cleanup():
-    from M2Crypto import Engine
-    try:
-        gost = Engine.Engine(GOST_ENGINE_NAME)
-    except ValueError:
-        pass
-    else:
-        gost.finish()
-
 try:
     from cryptography.hazmat.primitives.asymmetric import mldsa as MLDSA
     _check_mldsa_support()
 except ImportError:
-    pass
-
-try:
-    from M2Crypto import Engine, EVP, m2
-    _init_dynamic()
-    _check_gost_support()
-except:
     pass
 
 def validate_ds_digest(digest_alg, digest, dnskey_msg):
@@ -189,14 +140,6 @@ def get_ds_digest(digest_alg, dnskey_msg):
         md = hashes.Hash(hashes.SHA256(), backend)
         md.update(dnskey_msg)
         return md.finalize()
-    elif digest_alg == 3:
-        _gost_init()
-        try:
-            md = EVP.MessageDigest(GOST_DIGEST_NAME)
-            md.update(dnskey_msg)
-            return md.final()
-        finally:
-            _gost_cleanup()
     elif digest_alg == 4:
         md = hashes.Hash(hashes.SHA384(), backend)
         md.update(dnskey_msg)
@@ -298,12 +241,6 @@ def _dnskey_to_rsa(key):
     except ValueError:
         return None
 
-def _dnskey_to_gost(key):
-    der = GOST_PREFIX + key
-    pem = b'-----BEGIN PUBLIC KEY-----\n'+base64encodebytes(der)+b'-----END PUBLIC KEY-----'
-
-    return EVP.load_key_string_pubkey(pem)
-
 def _dnskey_to_ed(alg, key):
     if alg == 15:
         try:
@@ -403,25 +340,6 @@ def _validate_rrsig_dsa(alg, sig, msg, key):
     else:
         return True
 
-def _validate_rrsig_gost(alg, sig, msg, key):
-    _gost_init()
-
-    try:
-        pubkey = _dnskey_to_gost(key)
-
-        # if the key is invalid, then the signature is also invalid
-        if pubkey is None:
-            return False
-
-        pubkey.md = m2.get_digestbyname(GOST_DIGEST_NAME)
-        pubkey.verify_init()
-        pubkey.verify_update(msg)
-
-        return pubkey.verify_final(sig) == 1
-
-    finally:
-        _gost_cleanup()
-
 def _validate_rrsig_ec(alg, sig, msg, key):
     pubkey = _dnskey_to_ec(alg, key)
 
@@ -507,8 +425,6 @@ def validate_rrsig(alg, sig, msg, key):
         return _validate_rrsig_rsa(alg, sig, msg, key)
     elif alg in (3,6):
         return _validate_rrsig_dsa(alg, sig, msg, key)
-    elif alg in (12,):
-        return _validate_rrsig_gost(alg, sig, msg, key)
     elif alg in (13,14):
         return _validate_rrsig_ec(alg, sig, msg, key)
     elif alg in (15,16):
