@@ -29,6 +29,7 @@ from __future__ import unicode_literals
 
 import base64
 import datetime
+import html
 import logging
 
 # minimal support for python2.6
@@ -36,12 +37,6 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    from html import escape
-except ImportError:
-    from cgi import escape
 
 import dns.name, dns.rdatatype
 
@@ -326,7 +321,7 @@ class RRSIGStatus(object):
                 erroneous_status
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -513,7 +508,7 @@ class DSStatus(object):
                 erroneous_status
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -685,7 +680,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 (erroneous_status or nsec_list)
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -976,7 +971,7 @@ class NSECStatusNODATA(NSECStatus):
                 (erroneous_status or nsec_list)
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -1217,7 +1212,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                 (erroneous_status or nsec3_list)
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -1601,7 +1596,7 @@ class NSEC3StatusNODATA(NSEC3Status):
                 (erroneous_status or nsec3_list)
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -1752,7 +1747,7 @@ class CNAMEFromDNAMEStatus(object):
                 (erroneous_status or dname_serialized)
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
