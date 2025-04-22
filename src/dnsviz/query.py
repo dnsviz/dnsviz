@@ -29,24 +29,14 @@ from __future__ import unicode_literals
 
 import binascii
 import bisect
+import collections
 import copy
 import errno
 import io
+import queue
 import socket
 import struct
 import time
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    import queue
-except ImportError:
-    import Queue as queue
 
 import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
         dns.rdataclass, dns.rdatatype
@@ -54,7 +44,6 @@ import dns.edns, dns.exception, dns.flags, dns.message, dns.rcode, \
 from .ipaddr import *
 from .response import *
 from . import transport
-from .format import latin1_binary_to_string as lb2s
 
 RETRY_CAUSE_NETWORK_ERROR = RESPONSE_ERROR_NETWORK_ERROR = 1
 RETRY_CAUSE_FORMERR = RESPONSE_ERROR_FORMERR = 2
@@ -192,7 +181,7 @@ class DNSQueryRetryAttempt:
     def serialize(self):
         '''Return a serialized version of the query.'''
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
         d['time_elapsed'] = int(self.response_time * 1000)
         d['cause'] = retry_causes.get(self.cause, 'UNKNOWN')
         if self.cause_arg is not None:
@@ -345,13 +334,7 @@ class UseTCPOnTCFlagHandler(DNSResponseHandler):
     '''Retry with TCP if the TC flag is set in the response.'''
 
     def handle(self, response_wire, response, response_time):
-        # python3/python2 dual compatibility
-        if isinstance(response_wire, str):
-            map_func = lambda x: ord(x)
-        else:
-            map_func = lambda x: x
-
-        if response_wire is not None and map_func(response_wire[2]) & 0x02:
+        if response_wire is not None and response_wire[2] & 0x02:
             self._params['tcp'] = True
             return DNSQueryRetryAttempt(response_time, RETRY_CAUSE_TC_SET, len(response_wire), RETRY_ACTION_USE_TCP, None)
 
@@ -579,16 +562,10 @@ class PMTUBoundingHandler(DNSResponseHandler):
         if self._state == self.INVALID:
             return
 
-        # python3/python2 dual compatibility
-        if isinstance(response_wire, str):
-            map_func = lambda x: ord(x)
-        else:
-            map_func = lambda x: x
-
         timeouts = self._get_num_timeouts(response)
         is_timeout = isinstance(response, dns.exception.Timeout)
         is_valid = isinstance(response, dns.message.Message) and response.rcode() in (dns.rcode.NOERROR, dns.rcode.NXDOMAIN)
-        is_truncated = response_wire is not None and map_func(response_wire[2]) & 0x02
+        is_truncated = response_wire is not None and response_wire[2] & 0x02
         if response_wire is not None:
             response_len = len(response_wire)
         else:
@@ -1132,12 +1109,12 @@ class DNSQuery(object):
         return False
 
     def serialize(self):
-        d = OrderedDict((
-            ('qname', lb2s(self.qname.to_text())),
+        d = collections.OrderedDict((
+            ('qname', self.qname.to_text()),
             ('qclass', dns.rdataclass.to_text(self.rdclass)),
             ('qtype', dns.rdatatype.to_text(self.rdtype)),
         ))
-        d['options'] = OrderedDict((
+        d['options'] = collections.OrderedDict((
             ('flags', self.flags),
         ))
         if self.edns >= 0:
@@ -1148,14 +1125,14 @@ class DNSQuery(object):
             for o in self.edns_options:
                 s = io.BytesIO()
                 o.to_wire(s)
-                d['options']['edns_options'].append((o.otype, lb2s(binascii.hexlify(s.getvalue()))))
+                d['options']['edns_options'].append((o.otype, s.getvalue().hex()))
             d['options']['tcp'] = self.tcp
 
-        d['responses'] = OrderedDict()
+        d['responses'] = collections.OrderedDict()
         servers = list(self.responses.keys())
         servers.sort()
         for server in servers:
-            d['responses'][server] = OrderedDict()
+            d['responses'][server] = collections.OrderedDict()
             clients = list(self.responses[server].keys())
             clients.sort()
             for client in clients:
