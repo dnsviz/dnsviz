@@ -24,18 +24,13 @@
 from __future__ import unicode_literals
 
 import datetime
+import html
 
 # minimal support for python2.6
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    from html import escape
-except ImportError:
-    from cgi import escape
 
 import dnsviz.format as fmt
 from dnsviz.util import tuple_to_dict
@@ -96,16 +91,16 @@ class DomainNameAnalysisError(object):
 
     @property
     def html_description(self):
-        description_template_escaped = escape(self.description_template, True)
+        description_template_escaped = html.escape(self.description_template, True)
         template_kwargs_escaped = {}
         for n, v in self.template_kwargs.items():
             if isinstance(v, int):
                 template_kwargs_escaped[n] = v
             else:
                 if isinstance(v, str):
-                    template_kwargs_escaped[n] = escape(v)
+                    template_kwargs_escaped[n] = html.escape(v)
                 else:
-                    template_kwargs_escaped[n] = escape(str(v))
+                    template_kwargs_escaped[n] = html.escape(str(v))
         desc = description_template_escaped % template_kwargs_escaped
         if self.references:
             desc += '  See %s.' % (', '.join(self.references))
