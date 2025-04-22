@@ -55,21 +55,6 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for Python 2.7.
 
 ### Optional Software
 
-* OpenSSL GOST Engine - https://github.com/gost-engine/engine
-
-  With OpenSSL version 1.1.0 and later, the OpenSSL GOST Engine is necessary to
-  validate DNSSEC signatures with algorithm 12 (GOST R 34.10-2001) and create
-  digests of type 3 (GOST R 34.11-94).  M2Crypto is also needed for GOST support.
-
-* M2Crypto - https://gitlab.com/m2crypto/m2crypto
-
-  While almost all of the cryptgraphic support for DNSViz is handled with the
-  cryptography Python module, support for algorithm 12 (GOST R 34.10-2001)
-  digest type 3 (GOST R 34.11-94) require the OpenSSL GOST Engine.  That engine
-  must be loaded dynamically, and there is no support for that with
-  cryptography.  Thus, if you need to support algorithm 12 or digest type 3,
-  you must also install M2Crypto.
-
 * ISC BIND - https://www.isc.org/bind/
 
   When using DNSViz for [pre-deployment testing](#pre-deployment-dns-testing)
