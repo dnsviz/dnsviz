@@ -26,11 +26,13 @@ from __future__ import unicode_literals
 import base64
 import bisect
 import codecs
+import collections
 import errno
 import fcntl
 import io
 import json
 import os
+import queue
 import random
 import re
 import select
@@ -40,33 +42,12 @@ import struct
 import subprocess
 import threading
 import time
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    import queue
-except ImportError:
-    import Queue as queue
-try:
-    import urllib.parse
-except ImportError:
-    import urlparse
-    import urllib
-    urlquote = urllib
-else:
-    urlparse = urllib.parse
-    urlquote = urllib.parse
+import urllib
 
 import dns.exception
 
 from . import dist
 from .ipaddr import IPAddr, ANY_IPV6, ANY_IPV4
-from .format import latin1_binary_to_string as lb2s
 
 DNS_TRANSPORT_VERSION = 1.0
 
@@ -175,8 +156,8 @@ class DNSQueryTransportMeta(object):
         self.end_time = None
 
     def serialize_request(self):
-        d = OrderedDict()
-        d['req'] = lb2s(base64.b64encode(self.req))
+        d = collections.OrderedDict()
+        d['req'] = base64.b64encode(self.req).decode('ascii')
         d['dst'] = self.dst
         d['dport'] = self.dport
         if self.src is not None:
@@ -246,9 +227,9 @@ class DNSQueryTransportMeta(object):
         return cls(req, dst, tcp, timeout, dport, src, sport)
 
     def serialize_response(self):
-        d = OrderedDict()
+        d = collections.OrderedDict()
         if self.res is not None:
-            d['res'] = lb2s(base64.b64encode(self.res))
+            d['res'] = base64.b64encode(self.res).decode('ascii')
         else:
             d['res'] = None
         if self.err is not None:
@@ -599,16 +580,10 @@ class DNSQueryTransportHandlerDNS(DNSQueryTransportHandler):
         self.msg_send_len = len(qtm.req)
         self.msg_send_index = 0
 
-        # python3/python2 dual compatibility
-        if isinstance(self.msg_send, str):
-            map_func = lambda x: ord(x)
-        else:
-            map_func = lambda x: x
-
         self._queryid_wire = self.msg_send[:2]
         index = 12
-        while map_func(self.msg_send[index]) != 0:
-            index += map_func(self.msg_send[index]) + 1
+        while self.msg_send[index] != 0:
+            index += self.msg_send[index] + 1
         index += 4
         self._question_wire = self.msg_send[12:index]
 
@@ -750,7 +725,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
         self.transport_type = socket.SOCK_STREAM
 
-        parse_result = urlparse.urlparse(url)
+        parse_result = urllib.parse.urlparse(url)
         scheme = parse_result.scheme
         if not scheme:
             scheme = 'http'
@@ -809,7 +784,7 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
         username = self.username
         if self.password:
             username += ':' + self.password
-        return 'Authorization: Basic %s\r\n' % (lb2s(base64.b64encode(codecs.encode(username, 'utf-8'))))
+        return 'Authorization: Basic %s\r\n' % (base64.b64encode(codecs.encode(username, 'utf-8')).decode('ascii'))
 
     def init_req(self):
         data = self._post_data()
@@ -855,13 +830,13 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
             # still reading status and headers
             if self.chunked_encoding is None and self.msg_recv_len is None:
-                headers_end_match = HTTP_HEADER_END_RE.search(lb2s(self.msg_recv_buf))
+                headers_end_match = HTTP_HEADER_END_RE.search(self.msg_recv_buf.decode('ascii'))
                 if headers_end_match is not None:
                     headers = self.msg_recv_buf[:headers_end_match.start()]
                     self.msg_recv_buf = self.msg_recv_buf[headers_end_match.end():]
 
                     # check HTTP status
-                    status_match = HTTP_STATUS_RE.search(lb2s(headers))
+                    status_match = HTTP_STATUS_RE.search(headers.decode('ascii'))
                     if status_match is None:
                         self.err = RemoteQueryTransportError('Malformed HTTP status line')
                         return True
@@ -872,12 +847,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                     # get content length or determine whether "chunked"
                     # transfer encoding is used
-                    content_length_match = CONTENT_LENGTH_RE.search(lb2s(headers))
+                    content_length_match = CONTENT_LENGTH_RE.search(headers.decode('ascii'))
                     if content_length_match is not None:
                         self.chunked_encoding = False
                         self.msg_recv_len = int(content_length_match.group('length'))
                     else:
-                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(lb2s(headers)) is not None
+                        self.chunked_encoding = CHUNKED_ENCODING_RE.search(headers.decode('ascii')) is not None
 
             # handle chunked encoding first
             if self.chunked_encoding:
@@ -889,12 +864,12 @@ class DNSQueryTransportHandlerHTTP(DNSQueryTransportHandlerMulti):
 
                         # strip off beginning CRLF, if any
                         # (this is for chunks after the first one)
-                        crlf_start_match = CRLF_START_RE.search(lb2s(self.msg_recv_buf))
+                        crlf_start_match = CRLF_START_RE.search(self.msg_recv_buf.decode('ascii'))
                         if crlf_start_match is not None:
                             self.msg_recv_buf = self.msg_recv_buf[crlf_start_match.end():]
 
                         # find the chunk length
-                        chunk_len_match = CHUNK_SIZE_RE.search(lb2s(self.msg_recv_buf))
+                        chunk_len_match = CHUNK_SIZE_RE.search(self.msg_recv_buf.decode('ascii'))
                         if chunk_len_match is not None:
                             self.msg_recv_len = int(chunk_len_match.group('length'), 16)
                             self.msg_recv_buf = self.msg_recv_buf[chunk_len_match.end():]
@@ -1154,15 +1129,9 @@ class DNSQueryTransportHandlerWebSocketClient(DNSQueryTransportHandlerWebSocketS
 
         header += struct.pack(b'!BBBB', *mask)
 
-        # python3/python2 dual compatibility
-        if isinstance(data, str):
-            map_func = lambda x: ord(x)
-        else:
-            map_func = lambda x: x
-
         self.msg_send = header
         for i, b in enumerate(data):
-            self.msg_send += struct.pack(b'!B', mask[i % 4] ^ map_func(b))
+            self.msg_send += struct.pack(b'!B', mask[i % 4] ^ b)
         self.msg_send_len = len(self.msg_send)
         self.msg_send_index = 0
 
@@ -1234,7 +1203,7 @@ class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
 
     def __init__(self, url, sock=None, recycle_sock=True, processed_queue=None, factory=None):
 
-        parse_result = urlparse.urlparse(url)
+        parse_result = urllib.parse.urlparse(url)
         scheme = parse_result.scheme
         if not scheme:
             scheme = 'ssh'
