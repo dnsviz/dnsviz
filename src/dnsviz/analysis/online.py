@@ -768,7 +768,7 @@ class OnlineDomainNameAnalysis(object):
             return [], None
         return self.parent.get_ns_name_for_ip(ip)
 
-    def serialize(self, d=None, meta_only=False, trace=None):
+    def serialize(self, d=None, trace=None):
         if d is None:
             d = OrderedDict()
 
@@ -784,14 +784,14 @@ class OnlineDomainNameAnalysis(object):
 
         # serialize dependencies first because their version of the analysis
         # might be the most complete (considering re-dos)
-        self._serialize_dependencies(d, meta_only, trace)
+        self._serialize_dependencies(d, trace)
 
         if self.parent is not None:
-            self.parent.serialize(d, meta_only, trace + [self])
+            self.parent.serialize(d, trace + [self])
         if self.dlv_parent is not None:
-            self.dlv_parent.serialize(d, meta_only, trace + [self])
+            self.dlv_parent.serialize(d, trace + [self])
         if self.nxdomain_ancestor is not None:
-            self.nxdomain_ancestor.serialize(d, meta_only, trace + [self])
+            self.nxdomain_ancestor.serialize(d, trace + [self])
 
         clients_ipv4 = list(self.clients_ipv4)
         clients_ipv4.sort()
@@ -831,9 +831,9 @@ class OnlineDomainNameAnalysis(object):
                 d[name_str]['nxrrset_name'] = lb2s(self.nxrrset_name.to_text())
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
 
-        self._serialize_related(d[name_str], meta_only)
+        self._serialize_related(d[name_str])
 
-    def _serialize_related(self, d, meta_only):
+    def _serialize_related(self, d):
         if self._auth_ns_ip_mapping:
             d['auth_ns_ip_mapping'] = OrderedDict()
             ns_names = list(self._auth_ns_ip_mapping.keys())
@@ -851,25 +851,25 @@ class OnlineDomainNameAnalysis(object):
         query_keys.sort()
         for (qname, rdtype) in query_keys:
             for query in self.queries[(qname, rdtype)].queries.values():
-                d['queries'].append(query.serialize(meta_only))
+                d['queries'].append(query.serialize())
 
-    def _serialize_dependencies(self, d, meta_only, trace):
+    def _serialize_dependencies(self, d, trace):
         if self.stub:
             return
 
         for cname in self.cname_targets:
             for target, cname_obj in self.cname_targets[cname].items():
                 if cname_obj is not None:
-                    cname_obj.serialize(d, meta_only, trace=trace + [self])
+                    cname_obj.serialize(d, trace=trace + [self])
         for signer, signer_obj in self.external_signers.items():
             if signer_obj is not None:
-                signer_obj.serialize(d, meta_only, trace=trace + [self])
+                signer_obj.serialize(d, trace=trace + [self])
         for target, ns_obj in self.ns_dependencies.items():
             if ns_obj is not None:
-                ns_obj.serialize(d, meta_only, trace=trace + [self])
+                ns_obj.serialize(d, trace=trace + [self])
         for target, mx_obj in self.mx_targets.items():
             if mx_obj is not None:
-                mx_obj.serialize(d, meta_only, trace=trace + [self])
+                mx_obj.serialize(d, trace=trace + [self])
 
     @classmethod
     def deserialize(cls, name, d1, cache=None, **kwargs):
