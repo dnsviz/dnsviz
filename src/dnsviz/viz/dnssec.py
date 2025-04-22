@@ -29,6 +29,7 @@ from __future__ import unicode_literals
 
 import codecs
 import errno
+import html
 import io
 import json
 import os
@@ -41,12 +42,6 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    from html import escape
-except ImportError:
-    from cgi import escape
 
 import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 
@@ -86,13 +81,6 @@ NOTICE_ICON = str(ICON_PATH / 'notice.png')
 WARNING_ICON = str(ICON_PATH / 'warning.png')
 ERROR_ICON = str(ICON_PATH / 'error.png')
 
-# python3/python2.6 dual compatibility
-vers0, vers1, vers2 = sys.version_info[:3]
-if (vers0, vers1) == (2, 6):
-    execv_encode = lambda x: codecs.encode(x, sys.getfilesystemencoding())
-else:
-    execv_encode = lambda x: x
-
 class DNSKEYNonExistent(object):
     def __init__(self, name, algorithm, key_tag):
         self.name = name
@@ -121,7 +109,7 @@ class RRsetNonExistent(object):
         d = OrderedDict()
 
         if html_format:
-            formatter = lambda x: escape(x, True)
+            formatter = lambda x: html.escape(x, True)
         else:
             formatter = lambda x: x
 
@@ -306,7 +294,7 @@ class DNSAuthGraph:
 
     def to_raphael(self):
         with RedirectStderrRaiseOnError():
-            svg = self.G.draw(format=execv_encode('svg'), prog=execv_encode('dot'))
+            svg = self.G.draw(format='svg', prog='dot')
 
         dom = xml.dom.minidom.parseString(svg)
 
@@ -327,11 +315,17 @@ class DNSAuthGraph:
                 io.open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
+<<<<<<< HEAD:src/dnsviz/viz/dnssec.py
                 with RedirectStderrRaiseOnError():
                     return self.G.draw(format=execv_encode(format), prog=execv_encode('dot'))
             else:
                 with RedirectStderrRaiseOnError():
                     return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
+=======
+                return self.G.draw(format=format, prog='dot')
+            else:
+                return self.G.draw(path=path, format=format, prog='dot')
+>>>>>>> c62a9cb (Remove code associated with python2.7 compatibility):dnsviz/viz/dnssec.py
 
     def id_for_dnskey(self, name, dnskey):
         # dnspython 1/2 compatibility
