@@ -26,6 +26,7 @@ from __future__ import unicode_literals
 
 import argparse
 import codecs
+import collections
 import io
 import json
 import logging
@@ -33,17 +34,10 @@ import os
 import re
 import sys
 
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
 import dns.exception, dns.name
 
 from dnsviz.analysis import deserialize, DNS_RAW_VERSION
-from dnsviz.format import latin1_binary_to_string as lb2s
-from dnsviz.util import get_trusted_keys, io_try_buffered
+from dnsviz.util import get_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -176,50 +170,22 @@ class GrokArgHelper:
     def build_parser(self, prog):
         self.parser = argparse.ArgumentParser(description='Assess diagnostic DNS queries', prog=prog)
 
-        # python3/python2 dual compatibility
-        stdin_buffer = io_try_buffered(sys.stdin, 'rb', closefd=False)
-        stdout_buffer = io_try_buffered(sys.stdout, 'wb', closefd=False)
-
-        try:
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r', encoding='UTF-8'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
+        self.parser.add_argument('-f', '--names-file',
+                type=argparse.FileType('r', encoding='UTF-8'),
+                action='store', metavar='<filename>',
+                help='Read names from a file')
         #self.parser.add_argument('-s', '--silent',
         #        const=True, default=False,
         #        action='store_const',
         #        help='Suppress error messages')
-        try:
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r', encoding='UTF-8'), default=stdin_buffer,
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r'), default=stdin_buffer,
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
-        try:
-            self.parser.add_argument('-t', '--trusted-keys-file',
-                    type=argparse.FileType('r', encoding='UTF-8'),
-                    action='append', metavar='<filename>',
-                    help='Use trusted keys from the designated file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-t', '--trusted-keys-file',
-                    type=argparse.FileType('r'),
-                    action='append', metavar='<filename>',
-                    help='Use trusted keys from the designated file')
+        self.parser.add_argument('-r', '--input-file',
+                type=argparse.FileType('r', encoding='UTF-8'), default=sys.stdin.buffer,
+                action='store', metavar='<filename>',
+                help='Read diagnostic queries from a file')
+        self.parser.add_argument('-t', '--trusted-keys-file',
+                type=argparse.FileType('r', encoding='UTF-8'),
+                action='append', metavar='<filename>',
+                help='Use trusted keys from the designated file')
         self.parser.add_argument('-a', '--algorithms',
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<alg>,[<alg>...]',
@@ -253,7 +219,7 @@ class GrokArgHelper:
                 action='store_const',
                 help='Don\'t issue errors for missing KSKs with DS RRs (e.g., for multi-signer setups)')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb'), default=stdout_buffer,
+                type=argparse.FileType('wb'), default=sys.stdout.buffer,
                 action='store', metavar='<filename>',
                 help='Save the output to the specified file')
         self.parser.add_argument('-c', '--minimize-output',
@@ -313,41 +279,6 @@ class GrokArgHelper:
         else: # self.args.log_level == 'debug':
             self.log_level = logging.DEBUG
 
-    def set_buffers(self):
-        # This entire method is for
-        # python3/python2 dual compatibility
-        if self.args.input_file is not None:
-            if self.args.input_file.fileno() == sys.stdin.fileno():
-                filename = self.args.input_file.fileno()
-            else:
-                filename = self.args.input_file.name
-                self.args.input_file.close()
-            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.names_file is not None:
-            if self.args.names_file.fileno() == sys.stdin.fileno():
-                filename = self.args.names_file.fileno()
-            else:
-                filename = self.args.names_file.name
-                self.args.names_file.close()
-            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.trusted_keys_file is not None:
-            trusted_keys_files = []
-            for tk_file in self.args.trusted_keys_file:
-                if tk_file.fileno() == sys.stdin.fileno():
-                    filename = tk_file.fileno()
-                else:
-                    filename = tk_file.name
-                    tk_file.close()
-                trusted_keys_files.append(io.open(filename, 'r', encoding='utf-8'))
-            self.args.trusted_keys_file = trusted_keys_files
-        if self.args.output_file is not None:
-            if self.args.output_file.fileno() == sys.stdout.fileno():
-                filename = self.args.output_file.fileno()
-            else:
-                filename = self.args.output_file.name
-                self.args.output_file.close()
-            self.args.output_file = io.open(filename, 'wb')
-
     def aggregate_trusted_key_info(self):
         if not self.args.trusted_keys_file:
             return
@@ -391,7 +322,7 @@ class GrokArgHelper:
             raise AnalysisInputError('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
 
     def ingest_names(self):
-        self.names = OrderedDict()
+        self.names = collections.OrderedDict()
 
         if self.args.domain_name:
             for name in self.args.domain_name:
@@ -409,10 +340,6 @@ class GrokArgHelper:
 
         for arg in args:
             name = arg.strip()
-
-            # python3/python2 dual compatibility
-            if hasattr(name, 'decode'):
-                name = name.decode('utf-8')
 
             try:
                 name = dns.name.from_text(name)
@@ -439,7 +366,6 @@ def main(argv):
         try:
             arghelper.check_args()
             arghelper.set_kwargs()
-            arghelper.set_buffers()
             arghelper.aggregate_trusted_key_info()
             arghelper.ingest_input()
             arghelper.ingest_names()
@@ -463,9 +389,9 @@ def main(argv):
         name_objs = []
         cache = {}
         for name in arghelper.names:
-            name_str = lb2s(name.canonicalize().to_text())
+            name_str = name.canonicalize().to_text()
             if name_str not in arghelper.analysis_structured or arghelper.analysis_structured[name_str].get('stub', True):
-                logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
+                logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
                 continue
             name_obj = deserialize(name, arghelper.analysis_structured, cache, strict_cookies=arghelper.args.enforce_cookies, allow_private=arghelper.args.allow_private)
             name_objs.append(name_obj)
@@ -475,7 +401,7 @@ def main(argv):
 
         arghelper.update_trusted_key_info()
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
         for name_obj in name_objs:
             name_obj.populate_status(arghelper.trusted_keys, supported_algs=arghelper.args.algorithms, supported_digest_algs=arghelper.args.digest_algorithms, ignore_rfc8624=arghelper.args.ignore_rfc8624, ignore_rfc9276=arghelper.args.ignore_rfc9276, trust_cdnskey_cds=arghelper.args.trust_cdnskey_cds, multi_signer=arghelper.args.multi_signer)
 

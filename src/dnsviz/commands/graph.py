@@ -44,8 +44,7 @@ import dns.exception, dns.name
 from dnsviz.analysis import deserialize, DNS_RAW_VERSION
 from dnsviz.analysis.errors import ExistingCovered
 from dnsviz.config import DNSVIZ_SHARE_PATH, DNSVIZ_MEDIA_PATH
-from dnsviz.format import latin1_binary_to_string as lb2s
-from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
+from dnsviz.util import get_trusted_keys, get_default_trusted_keys
 
 # If the import of DNSAuthGraph fails because of the lack of pygraphviz, it
 # will be reported later
@@ -156,50 +155,22 @@ class GraphArgHelper:
     def build_parser(self, prog):
         self.parser = argparse.ArgumentParser(description='Graph the assessment of diagnostic DNS queries', prog=prog)
 
-        # python3/python2 dual compatibility
-        stdin_buffer = io_try_buffered(sys.stdin, 'rb', closefd=False)
-        stdout_buffer = io_try_buffered(sys.stdout, 'wb', closefd=False)
-
-        try:
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r', encoding='UTF-8'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
+        self.parser.add_argument('-f', '--names-file',
+                type=argparse.FileType('r', encoding='UTF-8'),
+                action='store', metavar='<filename>',
+                help='Read names from a file')
         #self.parser.add_argument('-s', '--silent',
         #        const=True, default=False,
         #        action='store_const',
         #        help='Suppress error messages')
-        try:
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r', encoding='UTF-8'), default=stdin_buffer,
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r'), default=stdin_buffer,
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
-        try:
-            self.parser.add_argument('-t', '--trusted-keys-file',
-                    type=argparse.FileType('r', encoding='UTF-8'),
-                    action='append', metavar='<filename>',
-                    help='Use trusted keys from the designated file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-t', '--trusted-keys-file',
-                    type=argparse.FileType('r'),
-                    action='append', metavar='<filename>',
-                    help='Use trusted keys from the designated file')
+        self.parser.add_argument('-r', '--input-file',
+                type=argparse.FileType('r', encoding='UTF-8'), default=sys.stdin.buffer,
+                action='store', metavar='<filename>',
+                help='Read diagnostic queries from a file')
+        self.parser.add_argument('-t', '--trusted-keys-file',
+                type=argparse.FileType('r', encoding='UTF-8'),
+                action='append', metavar='<filename>',
+                help='Use trusted keys from the designated file')
         self.parser.add_argument('-a', '--algorithms',
                 type=self.comma_separated_ints_set,
                 action='store', metavar='<alg>,[<alg>...]',
@@ -245,7 +216,7 @@ class GraphArgHelper:
                 action='store_const',
                 help='Derive the filename(s) from the format and domain name(s)')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb'), default=stdout_buffer,
+                type=argparse.FileType('wb'), default=sys.stdout.buffer,
                 action='store', metavar='<filename>',
                 help='Save the output to the specified file')
         self.parser.add_argument('-T', '--output-format',
@@ -323,41 +294,6 @@ class GraphArgHelper:
         else:
             self.output_format = 'dot'
 
-    def set_buffers(self):
-        # This entire method is for
-        # python3/python2 dual compatibility
-        if self.args.input_file is not None:
-            if self.args.input_file.fileno() == sys.stdin.fileno():
-                filename = self.args.input_file.fileno()
-            else:
-                filename = self.args.input_file.name
-                self.args.input_file.close()
-            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.names_file is not None:
-            if self.args.names_file.fileno() == sys.stdin.fileno():
-                filename = self.args.names_file.fileno()
-            else:
-                filename = self.args.names_file.name
-                self.args.names_file.close()
-            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.trusted_keys_file is not None:
-            trusted_keys_files = []
-            for tk_file in self.args.trusted_keys_file:
-                if tk_file.fileno() == sys.stdin.fileno():
-                    filename = tk_file.fileno()
-                else:
-                    filename = tk_file.name
-                    tk_file.close()
-                trusted_keys_files.append(io.open(filename, 'r', encoding='utf-8'))
-            self.args.trusted_keys_file = trusted_keys_files
-        if self.args.output_file is not None:
-            if self.args.output_file.fileno() == sys.stdout.fileno():
-                filename = self.args.output_file.fileno()
-            else:
-                filename = self.args.output_file.name
-                self.args.output_file.close()
-            self.args.output_file = io.open(filename, 'wb')
-
     def aggregate_trusted_key_info(self):
         if not self.args.trusted_keys_file:
             return
@@ -420,10 +356,6 @@ class GraphArgHelper:
         for arg in args:
             name = arg.strip()
 
-            # python3/python2 dual compatibility
-            if hasattr(name, 'decode'):
-                name = name.decode('utf-8')
-
             try:
                 name = dns.name.from_text(name)
             except UnicodeDecodeError as e:
@@ -450,7 +382,6 @@ def main(argv):
         try:
             arghelper.check_args()
             arghelper.set_kwargs()
-            arghelper.set_buffers()
             arghelper.aggregate_trusted_key_info()
             arghelper.ingest_input()
             arghelper.ingest_names()
@@ -466,9 +397,9 @@ def main(argv):
         name_objs = []
         cache = {}
         for name in arghelper.names:
-            name_str = lb2s(name.canonicalize().to_text())
+            name_str = name.canonicalize().to_text()
             if name_str not in arghelper.analysis_structured or arghelper.analysis_structured[name_str].get('stub', True):
-                logger.error('The analysis of "%s" was not found in the input.' % lb2s(name.to_text()))
+                logger.error('The analysis of "%s" was not found in the input.' % name.to_text())
                 continue
             name_obj = deserialize(name, arghelper.analysis_structured, cache, strict_cookies=arghelper.args.enforce_cookies, allow_private=arghelper.args.allow_private)
             name_objs.append(name_obj)
@@ -515,13 +446,13 @@ def main(argv):
             if arghelper.args.rr_types is not None:
                 for rdtype in arghelper.args.rr_types:
                     if (name_obj.name, rdtype) not in name_obj.queries:
-                        logger.error('No query for "%s/%s" was included in the analysis.' % (lb2s(name_obj.name.to_text()), dns.rdatatype.to_text(rdtype)))
+                        logger.error('No query for "%s/%s" was included in the analysis.' % (name_obj.name.to_text(), dns.rdatatype.to_text(rdtype)))
 
             if arghelper.args.derive_filename:
                 if name_obj.name == dns.name.root:
                     name = 'root'
                 else:
-                    name = lb2s(name_obj.name.canonicalize().to_text()).rstrip('.')
+                    name = name_obj.name.canonicalize().to_text().rstrip('.')
                     name = name.replace(os.sep, '--')
                 finish_graph(G, [name_obj], arghelper.args.rr_types, arghelper.trusted_keys, arghelper.args.algorithms, arghelper.output_format, '%s.%s' % (name, arghelper.output_format), not arghelper.args.redundant_edges)
                 G = DNSAuthGraph()
