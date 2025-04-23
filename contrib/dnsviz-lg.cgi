@@ -26,15 +26,10 @@ from __future__ import unicode_literals
 
 import json
 import os
+import queue
 import re
 import struct
 import sys
-
-# python3/python2 dual compatibility
-try:
-    import queue
-except ImportError:
-    import Queue as queue
 
 from dnsviz.ipaddr import *
 from dnsviz import transport
@@ -78,13 +73,8 @@ def get_qname(msg):
         if index >= len(msg):
             raise InvalidName()
 
-        # python3/python2 dual compatibility
-        if isinstance(msg, str):
-            l = struct.unpack(b'!B', msg[index])[0]
-        else:
-            l = msg[index]
-
         # no compression allowed in question
+        l = msg[index]
         if l & 0xc0:
             raise InvalidName()
 
