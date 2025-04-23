@@ -28,6 +28,7 @@ import argparse
 import atexit
 import binascii
 import codecs
+import collections
 import errno
 import getopt
 import io
@@ -48,20 +49,7 @@ import sys
 import tempfile
 import threading
 import time
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
-
-# python3/python2 dual compatibility
-try:
-    import urllib.parse
-except ImportError:
-    import urlparse
-else:
-    urlparse = urllib.parse
+import urllib
 
 import dns.edns, dns.exception, dns.message, dns.name, dns.rdata, dns.rdataclass, dns.rdatatype, dns.rdtypes.ANY.NS, dns.rdtypes.IN.A, dns.rdtypes.IN.AAAA, dns.resolver, dns.rrset
 
@@ -73,7 +61,6 @@ from dnsviz.query import DiagnosticQuery, QuickDNSSECQuery, StandardRecursiveQue
 from dnsviz.resolver import DNSAnswer, Resolver, ResolvConfError, PrivateFullResolver
 from dnsviz import transport
 from dnsviz.util import get_client_address, get_root_hints
-lb2s = fmt.latin1_binary_to_string
 
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
 logger = logging.getLogger()
@@ -385,7 +372,7 @@ $TTL 600
         zonefile = tempfile.NamedTemporaryFile('w', prefix='dnsviz', delete=False)
         atexit.register(os.remove, zonefile.name)
 
-        args = { 'zone_name': lb2s(domain.to_text()) }
+        args = { 'zone_name': domain.to_text() }
         if use_ipv6_loopback:
             zonefile_template = cls.ZONEFILE_TEMPLATE_PRE + cls.ZONEFILE_TEMPLATE_AAAA
         else:
@@ -421,7 +408,7 @@ $TTL 600
         env = { 'PATH': '%s:/sbin:/usr/sbin:/usr/local/sbin' % (os.environ.get('PATH', '')) }
 
         args = { 'dir': self.working_dir, 'port': self.port,
-                'zone_name': lb2s(self.domain.to_text()),
+                'zone_name': self.domain.to_text(),
                 'zone_file': os.path.abspath(self.filename) }
         args['named_conf'] = self.NAMED_CONF % args
         args['named_pid'] = self.NAMED_PID % args
@@ -641,7 +628,7 @@ class NameServerMappingsForDomain(object):
 
     def _create_name(self):
         # value is an address
-        name = 'ns%d.%s.%s' % (self._nsi, self.DYN_LABEL, lb2s(self.domain.canonicalize().to_text()))
+        name = 'ns%d.%s.%s' % (self._nsi, self.DYN_LABEL, self.domain.canonicalize().to_text())
         self._nsi += 1
         return name
 
@@ -759,16 +746,16 @@ class NameServerMappingsForDomain(object):
         try:
             ns_rrset = m.find_rrset(m.answer, self.domain, dns.rdataclass.IN, dns.rdatatype.NS)
         except KeyError:
-            raise argparse.ArgumentTypeError('No NS records for %s found in %s' % (lb2s(self.domain.canonicalize().to_text()), filename))
+            raise argparse.ArgumentTypeError('No NS records for %s found in %s' % (self.domain.canonicalize().to_text(), filename))
 
         for rdata in ns_rrset:
             a_rrsets = [r for r in m.answer if r.name == rdata.target and r.rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA)]
             if not a_rrsets or not rdata.target.is_subdomain(self.domain.parent()):
-                name_addr = lb2s(rdata.target.canonicalize().to_text())
+                name_addr = rdata.target.canonicalize().to_text()
             else:
                 for a_rrset in a_rrsets:
                     for a_rdata in a_rrset:
-                        name_addr = '%s=[%s]' % (lb2s(rdata.target.canonicalize().to_text()), a_rdata.address)
+                        name_addr = '%s=[%s]' % (rdata.target.canonicalize().to_text(), a_rdata.address)
             self._handle_name_addr_mapping(name_addr)
 
 class DelegationNameServerMappingsForDomain(NameServerMappingsForDomain):
@@ -824,7 +811,7 @@ class DSForDomain:
         try:
             ds_rrset = m.find_rrset(m.answer, self.domain, dns.rdataclass.IN, dns.rdatatype.DS)
         except KeyError:
-            raise argparse.ArgumentTypeError('No DS records for %s found in %s' % (lb2s(self.domain.canonicalize().to_text()), filename))
+            raise argparse.ArgumentTypeError('No DS records for %s found in %s' % (self.domain.canonicalize().to_text(), filename))
 
         for rdata in ds_rrset:
             self.delegation_mapping[(self.domain, dns.rdatatype.DS)].add(rdata)
@@ -944,37 +931,18 @@ class ArgHelper:
         self.parser = argparse.ArgumentParser(description='Issue diagnostic DNS queries', prog=prog)
         helper = DomainListArgHelper()
 
-        # python3/python2 dual compatibility
-        stdout_buffer = io.open(sys.stdout.fileno(), 'wb', closefd=False)
-
-        try:
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r', encoding='utf-8'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-f', '--names-file',
-                    type=argparse.FileType('r'),
-                    action='store', metavar='<filename>',
-                    help='Read names from a file')
+        self.parser.add_argument('-f', '--names-file',
+                type=argparse.FileType('r', encoding='utf-8'),
+                action='store', metavar='<filename>',
+                help='Read names from a file')
         self.parser.add_argument('-d', '--debug',
                 type=int, choices=range(4), default=2,
                 action='store', metavar='<level>',
                 help='Set debug level')
-        try:
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r', encoding='utf-8'),
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
-        except TypeError:
-            # this try/except is for
-            # python3/python2 dual compatibility
-            self.parser.add_argument('-r', '--input-file',
-                    type=argparse.FileType('r'),
-                    action='store', metavar='<filename>',
-                    help='Read diagnostic queries from a file')
+        self.parser.add_argument('-r', '--input-file',
+                type=argparse.FileType('r', encoding='utf-8'),
+                action='store', metavar='<filename>',
+                help='Read diagnostic queries from a file')
         self.parser.add_argument('-t', '--threads',
                 type=self.positive_int_not_darwin, default=1,
                 action='store', metavar='<threads>',
@@ -1044,7 +1012,7 @@ class ArgHelper:
                 action='store_const',
                 help='Issue queries to check EDNS compatibility')
         self.parser.add_argument('-o', '--output-file',
-                type=argparse.FileType('wb'), default=stdout_buffer,
+                type=argparse.FileType('wb'), default=sys.stdout.buffer,
                 action='store', metavar='<filename>',
                 help='Save the output to the specified file')
         self.parser.add_argument('-p', '--pretty-output',
@@ -1107,17 +1075,11 @@ class ArgHelper:
 
     @classmethod
     def valid_url(cls, arg):
-        url = urlparse.urlparse(arg)
+        url = urllib.parse.urlparse(arg)
         if url.scheme not in ('http', 'https', 'ws', 'ssh'):
             raise argparse.ArgumentTypeError('Unsupported URL scheme: "%s"' % url.scheme)
 
-        # check that version is >= 2.7.9 if HTTPS is requested
-        if url.scheme == 'https':
-            vers0, vers1, vers2 = sys.version_info[:3]
-            if (2, 7, 9) > (vers0, vers1, vers2):
-                raise argparse.ArgumentTypeError('Python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.')
-
-        elif url.scheme == 'ws':
+        if url.scheme == 'ws':
             if url.hostname is not None:
                 raise argparse.ArgumentTypeError('WebSocket URL must designate a local UNIX domain socket.')
 
@@ -1138,9 +1100,6 @@ class ArgHelper:
 
     @classmethod
     def valid_domain_name(cls, arg):
-        # python3/python2 dual compatibility
-        if isinstance(arg, bytes):
-            arg = codecs.decode(arg, sys.getfilesystemencoding())
         try:
             return dns.name.from_text(arg)
         except dns.exception.DNSException:
@@ -1188,14 +1147,9 @@ class ArgHelper:
         wire += struct.pack(b'!B', 0)
         wire += addr._ipaddr_bytes[:bytes_masked]
         if remainder:
-            # python3/python2 dual compatibility
             byte = addr._ipaddr_bytes[bytes_masked]
-            if isinstance(addr._ipaddr_bytes, str):
-                byte = ord(byte)
-
             mask = ~(2**(8 - remainder)-1)
             wire += struct.pack('B', mask & byte)
-
         return dns.edns.GenericOption(8, wire)
 
     @classmethod
@@ -1253,11 +1207,11 @@ class ArgHelper:
                 self.explicit_delegations[(localhost, loopback_rdtype)].add(loopback_rdtype_cls(dns.rdataclass.IN, loopback_rdtype, loopback))
                 self.odd_ports[(zone_name, loopback)] = zone.port
 
-        delegation_info_by_zone = OrderedDict()
+        delegation_info_by_zone = collections.OrderedDict()
         for arg in self.args.ds + self.args.delegation_information:
             zone_name = arg.domain.parent()
             if (zone_name, dns.rdatatype.NS) in self.explicit_delegations:
-                raise argparse.ArgumentTypeError('Cannot use "' + lb2s(zone_name.to_text()) + '" with %(authoritative_servers)s if a child zone is specified with %(delegation_information)s' % self._arg_mapping)
+                raise argparse.ArgumentTypeError('Cannot use "' + zone_name.to_text() + '" with %(authoritative_servers)s if a child zone is specified with %(delegation_information)s' % self._arg_mapping)
             if zone_name not in delegation_info_by_zone:
                 delegation_info_by_zone[zone_name] = {}
             for name, rdtype in arg.delegation_mapping:
@@ -1353,7 +1307,7 @@ class ArgHelper:
         if self.args.looking_glass_url:
             self.th_factories = []
             for looking_glass_url in self.args.looking_glass_url:
-                url = urlparse.urlparse(looking_glass_url)
+                url = urllib.parse.urlparse(looking_glass_url)
                 if url.scheme in ('http', 'https'):
                     self.th_factories.append(transport.DNSQueryTransportHandlerHTTPFactory(looking_glass_url, insecure=self.args.insecure))
                 elif url.scheme == 'ws':
@@ -1382,31 +1336,6 @@ class ArgHelper:
             CustomQueryMixin.edns_options.append(self.nsid_option())
         if self.args.cookie:
             CustomQueryMixin.edns_options.append(self.args.cookie)
-
-    def set_buffers(self):
-        # This entire method is for
-        # python3/python2 dual compatibility
-        if self.args.input_file is not None:
-            if self.args.input_file.fileno() == sys.stdin.fileno():
-                filename = self.args.input_file.fileno()
-            else:
-                filename = self.args.input_file.name
-                self.args.input_file.close()
-            self.args.input_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.names_file is not None:
-            if self.args.names_file.fileno() == sys.stdin.fileno():
-                filename = self.args.names_file.fileno()
-            else:
-                filename = self.args.names_file.name
-                self.args.names_file.close()
-            self.args.names_file = io.open(filename, 'r', encoding='utf-8')
-        if self.args.output_file is not None:
-            if self.args.output_file.fileno() == sys.stdout.fileno():
-                filename = self.args.output_file.fileno()
-            else:
-                filename = self.args.output_file.name
-                self.args.output_file.close()
-            self.args.output_file = io.open(filename, 'wb')
 
     def check_network_connectivity(self):
         if self.args.authoritative_analysis:
@@ -1454,7 +1383,7 @@ class ArgHelper:
             raise AnalysisInputError('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
 
     def ingest_names(self):
-        self.names = OrderedDict()
+        self.names = collections.OrderedDict()
 
         if self.args.domain_name:
             for name in self.args.domain_name:
@@ -1472,10 +1401,6 @@ class ArgHelper:
 
         for arg in args:
             name = arg.strip()
-
-            # python3/python2 dual compatibility
-            if hasattr(name, 'decode'):
-                name = name.decode('utf-8')
 
             try:
                 name = dns.name.from_text(name)
@@ -1509,7 +1434,6 @@ def main(argv):
         try:
             arghelper.check_args()
             arghelper.set_kwargs()
-            arghelper.set_buffers()
             arghelper.check_network_connectivity()
             arghelper.aggregate_delegation_info()
             arghelper.populate_recursive_servers()
@@ -1553,7 +1477,7 @@ def main(argv):
             kwargs = { 'indent': 4, 'separators': (',', ': ') }
         else:
             kwargs = {}
-        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [lb2s(n.to_text()) for n in arghelper.names] }
+        dnsviz_meta = { 'version': DNS_RAW_VERSION, 'names': [n.to_text() for n in arghelper.names] }
 
         NameServerMappingsForDomain.cleanup_resolvers()
 
@@ -1586,7 +1510,7 @@ def main(argv):
         if not name_objs:
             sys.exit(4)
 
-        d = OrderedDict()
+        d = collections.OrderedDict()
         for name_obj in name_objs:
             name_obj.serialize(d)
         d['_meta._dnsviz.'] = dnsviz_meta

@@ -25,14 +25,9 @@ from __future__ import unicode_literals
 import codecs
 import io
 import json
+import queue
 import threading
 import sys
-
-# python3/python2 dual compatibility
-try:
-    import queue
-except ImportError:
-    import Queue as queue
 
 from dnsviz import transport
 
