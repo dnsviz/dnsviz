@@ -35,9 +35,6 @@ class LinkLocalAddress(ValueError):
 
 class IPAddr(str):
     def __new__(cls, string):
-        # python 2/3 compatibility
-        if isinstance(string, bytes):
-            string = codecs.decode(string, 'latin1')
         if ':' in string:
             af = socket.AF_INET6
             vers = 6
