@@ -28,14 +28,7 @@ import datetime
 import errno
 import socket
 import sys
-
-# python3/python2 dual compatibility
-try:
-    import urllib.parse
-except ImportError:
-    import urlparse
-else:
-    urlparse = urllib.parse
+import urllib
 
 import dns.flags, dns.exception, dns.name, dns.opcode, dns.rdataclass, dns.rdatatype
 
@@ -324,14 +317,7 @@ class DigCommandLineQuery:
             return
 
         if self.lg_url not in looking_glass_cache:
-            # check that version is >= 2.7.9 if HTTPS is requested
-            if self.lg_url.startswith('https'):
-                vers0, vers1, vers2 = sys.version_info[:3]
-                if (2, 7, 9) > (vers0, vers1, vers2):
-                    sys.stderr.write('python version >= 2.7.9 is required to use a DNS looking glass with HTTPS.\n')
-                    sys.exit(1)
-
-            url = urlparse.urlparse(self.lg_url)
+            url = urllib.parse.urlparse(self.lg_url)
             if url.scheme in ('http', 'https'):
                 fact = transport.DNSQueryTransportHandlerHTTPFactory(self.lg_url, insecure=insecure)
             elif url.scheme == 'ws':
