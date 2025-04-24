@@ -52,7 +52,6 @@ import dnsviz.query as Q
 import dnsviz.resolver as Resolver
 from dnsviz import transport
 from dnsviz import util
-lb2s = fmt.latin1_binary_to_string
 
 _logger = logging.getLogger(__name__)
 
@@ -778,7 +777,7 @@ class OnlineDomainNameAnalysis(object):
         if self in trace:
             return
 
-        name_str = lb2s(self.name.canonicalize().to_text())
+        name_str = self.name.canonicalize().to_text()
         if name_str in d:
             return
 
@@ -802,9 +801,9 @@ class OnlineDomainNameAnalysis(object):
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         if self.cookie_standin is not None:
-            d[name_str]['cookie_standin'] = lb2s(binascii.hexlify(self.cookie_standin))
+            d[name_str]['cookie_standin'] = binascii.hexlify(self.cookie_standin).decode('utf-8')
         if self.cookie_bad is not None:
-            d[name_str]['cookie_bad'] = lb2s(binascii.hexlify(self.cookie_bad))
+            d[name_str]['cookie_bad'] = binascii.hexlify(self.cookie_bad).decode('utf-8')
         d[name_str]['analysis_start'] = fmt.datetime_to_str(self.analysis_start)
         d[name_str]['analysis_end'] = fmt.datetime_to_str(self.analysis_end)
         if not self.stub:
@@ -812,11 +811,11 @@ class OnlineDomainNameAnalysis(object):
             d[name_str]['clients_ipv6'] = clients_ipv6
 
             if self.parent is not None:
-                d[name_str]['parent'] = lb2s(self.parent_name().canonicalize().to_text())
+                d[name_str]['parent'] = self.parent_name().canonicalize().to_text()
             if self.dlv_parent is not None:
-                d[name_str]['dlv_parent'] = lb2s(self.dlv_parent_name().canonicalize().to_text())
+                d[name_str]['dlv_parent'] = self.dlv_parent_name().canonicalize().to_text()
             if self.nxdomain_ancestor is not None:
-                d[name_str]['nxdomain_ancestor'] = lb2s(self.nxdomain_ancestor_name().canonicalize().to_text())
+                d[name_str]['nxdomain_ancestor'] = self.nxdomain_ancestor_name().canonicalize().to_text()
             if self.referral_rdtype is not None:
                 d[name_str]['referral_rdtype'] = dns.rdatatype.to_text(self.referral_rdtype)
             if self.auth_rdtype is not None:
@@ -825,10 +824,10 @@ class OnlineDomainNameAnalysis(object):
                 d[name_str]['cookie_rdtype'] = dns.rdatatype.to_text(self.cookie_rdtype)
             d[name_str]['explicit_delegation'] = self.explicit_delegation
             if self.nxdomain_name is not None:
-                d[name_str]['nxdomain_name'] = lb2s(self.nxdomain_name.to_text())
+                d[name_str]['nxdomain_name'] = self.nxdomain_name.to_text()
                 d[name_str]['nxdomain_rdtype'] = dns.rdatatype.to_text(self.nxdomain_rdtype)
             if self.nxrrset_name is not None:
-                d[name_str]['nxrrset_name'] = lb2s(self.nxrrset_name.to_text())
+                d[name_str]['nxrrset_name'] = self.nxrrset_name.to_text()
                 d[name_str]['nxrrset_rdtype'] = dns.rdatatype.to_text(self.nxrrset_rdtype)
 
         self._serialize_related(d[name_str])
@@ -841,7 +840,7 @@ class OnlineDomainNameAnalysis(object):
             for name in ns_names:
                 addrs = list(self._auth_ns_ip_mapping[name])
                 addrs.sort()
-                d['auth_ns_ip_mapping'][lb2s(name.canonicalize().to_text())] = addrs
+                d['auth_ns_ip_mapping'][name.canonicalize().to_text()] = addrs
 
         if self.stub:
             return
@@ -879,7 +878,7 @@ class OnlineDomainNameAnalysis(object):
         if name in cache:
             return cache[name]
 
-        name_str = lb2s(name.canonicalize().to_text())
+        name_str = name.canonicalize().to_text()
         d = d1[name_str]
 
         analysis_type = analysis_type_codes[d['type']]
@@ -1033,13 +1032,13 @@ class OnlineDomainNameAnalysis(object):
                 self.cname_targets[cname][target] = self.__class__.deserialize(target, d, cache=cache)
         # these are optional
         for signer in self.external_signers:
-            if lb2s(signer.canonicalize().to_text()) in d:
+            if signer.canonicalize().to_text() in d:
                 self.external_signers[signer] = self.__class__.deserialize(signer, d, cache=cache)
         for target in self.ns_dependencies:
-            if lb2s(target.canonicalize().to_text()) in d:
+            if target.canonicalize().to_text() in d:
                 self.ns_dependencies[target] = self.__class__.deserialize(target, d, cache=cache)
         for target in self.mx_targets:
-            if lb2s(target.canonicalize().to_text()) in d:
+            if target.canonicalize().to_text() in d:
                 self.mx_targets[target] = self.__class__.deserialize(target, d, cache=cache)
 
 class ActiveDomainNameAnalysis(OnlineDomainNameAnalysis):
@@ -1337,7 +1336,7 @@ class Analyst(object):
             rdtypes.append(dns.rdatatype.TXT)
         elif name.is_subdomain(ARPA_NAME):
             pass
-        elif PROTO_LABEL_RE.search(lb2s(name[0])):
+        elif PROTO_LABEL_RE.search(name[0].decode('utf-8')):
             pass
         elif self._is_sld_or_lower(name):
             rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
@@ -1375,7 +1374,7 @@ class Analyst(object):
         determined by examining the structure of the name for _<port>._<proto>
         format.'''
 
-        if len(name) > 2 and DANE_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
+        if len(name) > 2 and DANE_PORT_RE.search(name[0].decode('utf-8')) is not None and PROTO_LABEL_RE.search(name[1].decode('utf-8')) is not None:
             return True
 
         return False
@@ -1385,7 +1384,7 @@ class Analyst(object):
         determined by examining the structure of the name for common
         service-related names.'''
 
-        if len(name) > 2 and SRV_PORT_RE.search(lb2s(name[0])) is not None and PROTO_LABEL_RE.search(lb2s(name[1])) is not None:
+        if len(name) > 2 and SRV_PORT_RE.search(name[0].decode('utf-8')) is not None and PROTO_LABEL_RE.search(name[1].decode('utf-8')) is not None:
             return True
 
         return False

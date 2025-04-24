@@ -45,7 +45,6 @@ from dnsviz.ipaddr import *
 import dnsviz.query as Q
 from dnsviz import response as Response
 from dnsviz.util import tuple_to_dict
-lb2s = fmt.latin1_binary_to_string
 
 from . import errors as Errors
 from .online import OnlineDomainNameAnalysis, \
@@ -421,7 +420,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         children = []
         if isinstance(info, Response.RRsetInfo):
             if info.rrset.rdtype == dns.rdatatype.CNAME:
-                rdata_tup.append((None, [], [], 'CNAME %s' % (lb2s(info.rrset[0].target.to_text()))))
+                rdata_tup.append((None, [], [], 'CNAME %s' % (info.rrset[0].target.to_text())))
             elif rdtype == dns.rdatatype.DNSKEY:
                 for d in info.rrset:
                     dnskey_meta = response_info.name_obj._dnskeys[d]
@@ -445,7 +444,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             elif rdtype == dns.rdatatype.NSEC3:
                 rdata_tup.append((None, [], [], '%s %s' % (fmt.format_nsec3_name(info.rrset.name), fmt.format_nsec3_rrset_text(info.rrset[0].to_text()))))
             elif rdtype == dns.rdatatype.NSEC:
-                rdata_tup.append((None, [], [], '%s %s' % (lb2s(info.rrset.name.to_text()), info.rrset[0].to_text())))
+                rdata_tup.append((None, [], [], '%s %s' % (info.rrset.name.to_text(), info.rrset[0].to_text())))
             elif rdtype == dns.rdatatype.DNAME:
                 warnings = [w.terse_description for w in dname_status.warnings]
                 errors = [e.terse_description for e in dname_status.errors]
@@ -2919,7 +2918,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 # Mark each individual NSEC in the set
                 elif isinstance(obj, Response.NSECSet):
                     for nsec_name in obj.rrsets:
-                        nsec_name_str = lb2s(nsec_name.canonicalize().to_text()).replace(r'"', r'\"')
+                        nsec_name_str = nsec_name.canonicalize().to_text().replace(r'"', r'\"')
                         response_component_status[obj.rrsets[nsec_name]] = G.status_for_node(node_str, nsec_name_str)
 
                 elif isinstance(obj, Response.NegativeResponseInfo):
@@ -3015,7 +3014,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             wildcard_names = list(rrset_info.wildcard_info.keys())
             wildcard_names.sort()
             for wildcard_name in wildcard_names:
-                wildcard_name_str = lb2s(wildcard_name.canonicalize().to_text())
+                wildcard_name_str = wildcard_name.canonicalize().to_text()
                 wildcard_proof_list[wildcard_name_str] = []
                 for nsec_status in self.wildcard_status[rrset_info.wildcard_info[wildcard_name]]:
                     nsec_serialized = nsec_status.serialize(self._serialize_rrset_info, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=self.zone.get_ns_name_for_ip)
@@ -3033,7 +3032,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if rrset_info.rrset.rdtype == dns.rdatatype.NSEC3:
                 d['id'] = '%s/%s/%s' % (fmt.format_nsec3_name(rrset_info.rrset.name), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
             else:
-                d['id'] = '%s/%s/%s' % (lb2s(rrset_info.rrset.name.canonicalize().to_text()), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
+                d['id'] = '%s/%s/%s' % (rrset_info.rrset.name.canonicalize().to_text(), dns.rdataclass.to_text(rrset_info.rrset.rdclass), dns.rdatatype.to_text(rrset_info.rrset.rdtype))
 
         if loglevel <= logging.DEBUG:
             d['description'] = str(rrset_info)
@@ -3061,7 +3060,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['servers'] = servers
 
             try:
-                ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names = list(set([self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text() for s in servers]))
             except IndexError:
                 ns_names = []
             ns_names.sort()
@@ -3123,7 +3122,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 (proof_list or soa_list)
 
         if show_id:
-            d['id'] = '%s/%s/%s' % (lb2s(neg_response_info.qname.canonicalize().to_text()), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
+            d['id'] = '%s/%s/%s' % (neg_response_info.qname.canonicalize().to_text(), 'IN', dns.rdatatype.to_text(neg_response_info.rdtype))
 
         if proof_list:
             d['proof'] = proof_list
@@ -3144,7 +3143,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['servers'] = servers
 
             try:
-                ns_names = list(set([lb2s(self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text()) for s in servers]))
+                ns_names = list(set([self.zone.get_ns_name_for_ip(s)[0][0].canonicalize().to_text() for s in servers]))
             except IndexError:
                 ns_names = []
             ns_names.sort()
@@ -3306,7 +3305,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             names = list(self.get_ns_names())
             names.sort()
             for name in names:
-                name_str = lb2s(name.canonicalize().to_text())
+                name_str = name.canonicalize().to_text()
                 d['servers'][name_str] = OrderedDict()
                 if name in glue_ip_mapping and glue_ip_mapping[name]:
                     servers = list(glue_ip_mapping[name])
@@ -3332,7 +3331,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 names = list(stealth_mapping)
                 names.sort()
                 for name in names:
-                    name_str = lb2s(name.canonicalize().to_text())
+                    name_str = name.canonicalize().to_text()
                     servers = stealth_mapping[name]
                     servers.sort()
                     d['servers'][name_str] = OrderedDict((
@@ -3365,7 +3364,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.stub:
             return d
 
-        name_str = lb2s(self.name.canonicalize().to_text())
+        name_str = self.name.canonicalize().to_text()
         if name_str in d:
             return d
 
@@ -3439,7 +3438,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
             query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
             if query_serialized:
-                qname_type_str = '%s/%s/%s' % (lb2s(qname.canonicalize().to_text()), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+                qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
                 d[name_str]['queries'][qname_type_str] = query_serialized
 
         # handle NODATA in the zone or the original parent, if there is an error/warning
@@ -3452,7 +3451,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             if qname is not None and (qname, rdtype) in has_warnings_or_errors:
                 query_serialized = self._serialize_query_status(self.queries[(qname, rdtype)], consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format)
                 if query_serialized:
-                    qname_type_str = '%s/%s/%s' % (lb2s(qname.canonicalize().to_text()), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
+                    qname_type_str = '%s/%s/%s' % (qname.canonicalize().to_text(), dns.rdataclass.to_text(dns.rdataclass.IN), dns.rdatatype.to_text(rdtype))
                     d[name_str]['queries'][qname_type_str] = query_serialized
 
         if not d[name_str]['queries']:
@@ -3629,7 +3628,7 @@ class TTLAgnosticOfflineDomainNameAnalysis(OfflineDomainNameAnalysis):
     QUERY_CLASS = Q.MultiQueryAggregateDNSResponse
 
 def deserialize(name, d1, cache=None, **kwargs):
-    name_str = lb2s(name.canonicalize().to_text())
+    name_str = name.canonicalize().to_text()
     d = d1[name_str]
 
     analysis_type = analysis_type_codes[d['type']]

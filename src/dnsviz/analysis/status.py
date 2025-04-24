@@ -44,7 +44,6 @@ from dnsviz import base32
 from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz.util import tuple_to_dict
-lb2s = fmt.latin1_binary_to_string
 
 from . import errors as Errors
 
@@ -326,19 +325,19 @@ class RRSIGStatus(object):
             formatter = lambda x: x
 
         if show_id:
-            d['id'] = '%s/%d/%d' % (lb2s(self.rrsig.signer.canonicalize().to_text()), self.rrsig.algorithm, self.rrsig.key_tag)
+            d['id'] = '%s/%d/%d' % (self.rrsig.signer.canonicalize().to_text(), self.rrsig.algorithm, self.rrsig.key_tag)
 
         if loglevel <= logging.DEBUG:
             d.update((
                 ('description', formatter(str(self))),
-                ('signer', formatter(lb2s(self.rrsig.signer.canonicalize().to_text()))),
+                ('signer', formatter(self.rrsig.signer.canonicalize().to_text())),
                 ('algorithm', self.rrsig.algorithm),
                 ('key_tag', self.rrsig.key_tag),
                 ('original_ttl', self.rrsig.original_ttl),
                 ('labels', self.rrsig.labels),
                 ('inception', fmt.timestamp_to_str(self.rrsig.inception)),
                 ('expiration', fmt.timestamp_to_str(self.rrsig.expiration)),
-                ('signature', lb2s(base64.b64encode(self.rrsig.signature))),
+                ('signature', base64.b64encode(self.rrsig.signature).decode('utf-8')),
                 ('ttl', self.rrset.rrsig_info[self.rrsig].ttl),
             ))
 
@@ -365,7 +364,7 @@ class RRSIGStatus(object):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -521,7 +520,7 @@ class DSStatus(object):
                 ('algorithm', self.ds.algorithm),
                 ('key_tag', self.ds.key_tag),
                 ('digest_type', self.ds.digest_type),
-                ('digest', lb2s(base64.b64encode(self.ds.digest))),
+                ('digest', base64.b64encode(self.ds.digest).decode('utf-8')),
             ))
 
             if html_format:
@@ -544,7 +543,7 @@ class DSStatus(object):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -699,18 +698,18 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['sname_covering'] = OrderedDict((
-                    ('covered_name', formatter(lb2s(qname.canonicalize().to_text()))),
-                    ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
-                    ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
+                    ('covered_name', formatter(qname.canonicalize().to_text())),
+                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
                 if self.nsec_names_covering_wildcard:
                     wildcard, nsec_names = list(self.nsec_names_covering_wildcard.items())[0]
                     nsec_name = list(nsec_names)[0]
                     nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                     d['wildcard_covering'] = OrderedDict((
-                        ('covered_name', formatter(lb2s(wildcard.canonicalize().to_text()))),
-                        ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
-                        ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
+                        ('covered_name', formatter(wildcard.canonicalize().to_text())),
+                        ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                        ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                     ))
 
         if loglevel <= logging.INFO or erroneous_status:
@@ -725,7 +724,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -986,20 +985,20 @@ class NSECStatusNODATA(NSECStatus):
 
         if loglevel <= logging.DEBUG:
             if self.nsec_for_qname is not None:
-                d['sname_nsec_match'] = formatter(lb2s(self.nsec_for_qname.rrset.name.canonicalize().to_text()))
+                d['sname_nsec_match'] = formatter(self.nsec_for_qname.rrset.name.canonicalize().to_text())
 
             if self.nsec_names_covering_qname:
                 qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
                 d['sname_covering'] = OrderedDict((
-                    ('covered_name', formatter(lb2s(qname.canonicalize().to_text()))),
-                    ('nsec_owner', formatter(lb2s(nsec_name.canonicalize().to_text()))),
-                    ('nsec_next', formatter(lb2s(nsec_rr.next.canonicalize().to_text())))
+                    ('covered_name', formatter(qname.canonicalize().to_text())),
+                    ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
+                    ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
                 ))
 
                 if self.nsec_for_wildcard_name is not None:
-                    d['wildcard_nsec_match'] = formatter(lb2s(self.wildcard_name.canonicalize().to_text()))
+                    d['wildcard_nsec_match'] = formatter(self.wildcard_name.canonicalize().to_text())
 
         if loglevel <= logging.INFO or erroneous_status:
             d['status'] = nsec_status_mapping[self.validation_status]
@@ -1013,7 +1012,7 @@ class NSECStatusNODATA(NSECStatus):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -1190,7 +1189,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
         for name in self.nsec_set_info.invalid_nsec3_owner:
             self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next).encode('utf-8')))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
@@ -1232,13 +1231,13 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             if self.closest_encloser:
                 encloser_name, nsec_names = list(self.closest_encloser.items())[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = formatter(lb2s(encloser_name.canonicalize().to_text()))
+                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
                 # could be inferred from wildcard
                 if nsec_name is not None:
                     d['closest_encloser_hash'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['next_closest_encloser'] = formatter(lb2s(next_closest_encloser.canonicalize().to_text()))
+                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = list(self.name_digest_map[next_closest_encloser].items())[0][1]
                 if digest_name is not None:
                     d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1257,7 +1256,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = list(self.name_digest_map[wildcard_name].items())[0][1]
-                d['wildcard'] = formatter(lb2s(wildcard_name.canonicalize().to_text()))
+                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
                     d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
@@ -1291,7 +1290,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -1380,7 +1379,7 @@ class NSEC3StatusWildcard(NSEC3StatusNXDOMAIN):
         for name in self.nsec_set_info.invalid_nsec3_owner:
             self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next).encode('utf-8')))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = super(NSEC3StatusWildcard, self).serialize(rrset_info_serializer, consolidate_clients=consolidate_clients, loglevel=loglevel, html_format=html_format, map_ip_to_ns_name=map_ip_to_ns_name)
@@ -1574,7 +1573,7 @@ class NSEC3StatusNODATA(NSEC3Status):
         for name in self.nsec_set_info.invalid_nsec3_owner:
             self.errors.append(Errors.InvalidNSEC3OwnerName(name=fmt.format_nsec3_name(name)))
         for name in self.nsec_set_info.invalid_nsec3_hash:
-            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=lb2s(base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next))))
+            self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next).encode('utf-8')))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         d = OrderedDict()
@@ -1624,11 +1623,11 @@ class NSEC3StatusNODATA(NSEC3Status):
             if self.closest_encloser:
                 encloser_name, nsec_names = list(self.closest_encloser.items())[0]
                 nsec_name = list(nsec_names)[0]
-                d['closest_encloser'] = formatter(lb2s(encloser_name.canonicalize().to_text()))
+                d['closest_encloser'] = formatter(encloser_name.canonicalize().to_text())
                 d['closest_encloser_digest'] = formatter(fmt.format_nsec3_name(nsec_name))
 
                 next_closest_encloser = self._get_next_closest_encloser(encloser_name)
-                d['next_closest_encloser'] = formatter(lb2s(next_closest_encloser.canonicalize().to_text()))
+                d['next_closest_encloser'] = formatter(next_closest_encloser.canonicalize().to_text())
                 digest_name = list(self.name_digest_map[next_closest_encloser].items())[0][1]
                 if digest_name is not None:
                     d['next_closest_encloser_hash'] = formatter(fmt.format_nsec3_name(digest_name))
@@ -1647,7 +1646,7 @@ class NSEC3StatusNODATA(NSEC3Status):
 
                 wildcard_name = self._get_wildcard(encloser_name)
                 wildcard_digest = list(self.name_digest_map[wildcard_name].items())[0][1]
-                d['wildcard'] = formatter(lb2s(wildcard_name.canonicalize().to_text()))
+                d['wildcard'] = formatter(wildcard_name.canonicalize().to_text())
                 if wildcard_digest is not None:
                     d['wildcard_hash'] = formatter(fmt.format_nsec3_name(wildcard_digest))
                 else:
@@ -1674,7 +1673,7 @@ class NSEC3StatusNODATA(NSEC3Status):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
@@ -1752,7 +1751,7 @@ class CNAMEFromDNAMEStatus(object):
             formatter = lambda x: x
 
         if show_id:
-            d['id'] = lb2s(self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text())
+            d['id'] = self.synthesized_cname.dname_info.rrset.name.canonicalize().to_text()
 
         if loglevel <= logging.DEBUG:
             d['description'] = formatter(str(self))
@@ -1762,8 +1761,8 @@ class CNAMEFromDNAMEStatus(object):
 
         if loglevel <= logging.DEBUG:
             if self.included_cname is not None:
-                d['cname_owner'] = formatter(lb2s(self.included_cname.rrset.name.canonicalize().to_text()))
-                d['cname_target'] = formatter(lb2s(self.included_cname.rrset[0].target.canonicalize().to_text()))
+                d['cname_owner'] = formatter(self.included_cname.rrset.name.canonicalize().to_text())
+                d['cname_target'] = formatter(self.included_cname.rrset[0].target.canonicalize().to_text())
 
         if loglevel <= logging.INFO or erroneous_status:
             d['status'] = dname_status_mapping[self.validation_status]
@@ -1777,7 +1776,7 @@ class CNAMEFromDNAMEStatus(object):
 
             if map_ip_to_ns_name is not None:
                 try:
-                    ns_names = list(set([lb2s(map_ip_to_ns_name(s)[0][0].canonicalize().to_text()) for s in servers]))
+                    ns_names = list(set([map_ip_to_ns_name(s)[0][0].canonicalize().to_text() for s in servers]))
                 except IndexError:
                     ns_names = []
                 ns_names.sort()
