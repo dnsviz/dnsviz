@@ -997,11 +997,7 @@ ns1.example 0 IN A 192.0.2.1
             names_file.write('example.com\nexample.net\n'.encode('utf-8'))
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as names_file_unicode:
-            try:
-                names_file_unicode.write(('%s\n' % (unicode_name)).encode('utf-8'))
-            # python3/python2 dual compatibility
-            except UnicodeDecodeError:
-                names_file_unicode.write(('%s\n' % (unicode_name)))
+            names_file_unicode.write(('%s\n' % (unicode_name)).encode('utf-8'))
 
         with tempfile.NamedTemporaryFile('wb', prefix='dnsviz', delete=False) as example_names_only:
             example_names_only.write(b'{ "_meta._dnsviz.": { "version": 1.2, "names": [ "example.com.", "example.net.", "example.org." ] } }') 

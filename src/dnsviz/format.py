@@ -64,11 +64,7 @@ class UTC(datetime.tzinfo):
         return ZERO
 
     def tzname(self, dt):
-        # python3/python2 dual compatibility
-        if type(b'') is str:
-            return b'UTC'
-        else:
-            return 'UTC'
+        return 'UTC'
 
     def dst(self, dt):
         return ZERO
@@ -153,7 +149,7 @@ def format_diff(date_now, date_relative):
 #################
 # Human representation of DNS names
 def format_nsec3_name(name):
-    return lb2s(dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text())
+    return dns.name.from_text(name.labels[0].upper(), name.parent().canonicalize()).to_text()
 
 def format_nsec3_rrset_text(nsec3_rrset_text):
     return re.sub(r'^(\d+\s+\d+\s+\d+\s+\S+\s+)([0-9a-zA-Z]+)', lambda x: '%s%s' % (x.group(1), x.group(2).upper()), nsec3_rrset_text).rstrip('.')
@@ -165,18 +161,9 @@ def humanize_name(name, idn=False, canonicalize=True):
         try:
             name = name.to_unicode()
         except UnicodeError:
-            name = lb2s(name.to_text())
+            name = name.to_text()
     else:
-        name = lb2s(name.to_text())
+        name = name.to_text()
     if name == '.':
         return name
     return name.rstrip('.')
-
-def latin1_binary_to_string(s):
-    # python3/python2 dual compatibility
-    #XXX In places where this method wraps calls to dns.name.Name.to_text(),
-    # this is no longer needed with dnspython 1.15.0
-    if isinstance(s, bytes):
-        return codecs.decode(s, 'latin1')
-    return s
-lb2s = latin1_binary_to_string
