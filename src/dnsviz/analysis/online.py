@@ -28,6 +28,7 @@
 from __future__ import unicode_literals
 
 import binascii
+import collections
 import datetime
 import logging
 import random
@@ -37,12 +38,6 @@ import sys
 import threading
 import time
 import uuid
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dns.flags, dns.name, dns.rdataclass, dns.rdatatype, dns.resolver
 
@@ -769,7 +764,7 @@ class OnlineDomainNameAnalysis(object):
 
     def serialize(self, d=None, trace=None):
         if d is None:
-            d = OrderedDict()
+            d = collections.OrderedDict()
 
         if trace is None:
             trace = []
@@ -797,7 +792,7 @@ class OnlineDomainNameAnalysis(object):
         clients_ipv6 = list(self.clients_ipv6)
         clients_ipv6.sort()
 
-        d[name_str] = OrderedDict()
+        d[name_str] = collections.OrderedDict()
         d[name_str]['type'] = analysis_types[self.analysis_type]
         d[name_str]['stub'] = self.stub
         if self.cookie_standin is not None:
@@ -834,7 +829,7 @@ class OnlineDomainNameAnalysis(object):
 
     def _serialize_related(self, d):
         if self._auth_ns_ip_mapping:
-            d['auth_ns_ip_mapping'] = OrderedDict()
+            d['auth_ns_ip_mapping'] = collections.OrderedDict()
             ns_names = list(self._auth_ns_ip_mapping.keys())
             ns_names.sort()
             for name in ns_names:
@@ -981,7 +976,7 @@ class OnlineDomainNameAnalysis(object):
         #   - Queries used to detect delegation (NS and referral_rdtype)
         #   - Queries used to detect NS records from authority section (auth_rdtype)
         #   - Queries used to detect server cookies (cookie_rdtype)
-        delegation_types = OrderedDict(((dns.rdatatype.NS, None),))
+        delegation_types = collections.OrderedDict(((dns.rdatatype.NS, None),))
         if self.referral_rdtype is not None:
             delegation_types[self.referral_rdtype] = None
         if self.auth_rdtype is not None:
@@ -1317,7 +1312,7 @@ class Analyst(object):
                     rdtypes.extend([dns.rdatatype.A, dns.rdatatype.AAAA])
 
         # remove duplicates
-        rdtypes = list(OrderedDict.fromkeys(rdtypes))
+        rdtypes = list(collections.OrderedDict.fromkeys(rdtypes))
 
         return rdtypes
 
@@ -1884,7 +1879,7 @@ class Analyst(object):
         if not parent_auth_servers:
             return False
 
-        servers_queried = OrderedDict(((dns.rdatatype.NS, set()),))
+        servers_queried = collections.OrderedDict(((dns.rdatatype.NS, set()),))
         referral_queries = {}
 
         try:
