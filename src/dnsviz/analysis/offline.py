@@ -27,15 +27,10 @@
 
 from __future__ import unicode_literals
 
+import collections
 import copy
 import errno
 import logging
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dns.flags, dns.rcode, dns.rdataclass, dns.rdatatype
 
@@ -514,7 +509,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def _serialize_status_simple(self, response_info_list, processed):
         tup = []
-        cname_info_map = OrderedDict()
+        cname_info_map = collections.OrderedDict()
 
         # just get the first one since the names are all supposed to be the
         # same
@@ -2987,7 +2982,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         self.response_component_status = response_component_status
 
     def _serialize_rrset_info(self, rrset_info, consolidate_clients=False, show_servers=True, show_server_meta=True, loglevel=logging.DEBUG, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         rrsig_list = []
         if self.rrsig_status[rrset_info]:
@@ -3009,7 +3004,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 if dname_serialized:
                     dname_list.append(dname_serialized)
 
-        wildcard_proof_list = OrderedDict()
+        wildcard_proof_list = collections.OrderedDict()
         if rrset_info.wildcard_info:
             wildcard_names = list(rrset_info.wildcard_info.keys())
             wildcard_names.sort()
@@ -3076,7 +3071,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                         nsid = response.nsid_val()
                         if nsid is not None:
                             nsids.add(nsid)
-                        cookie_tags[server] = OrderedDict((
+                        cookie_tags[server] = collections.OrderedDict((
                             ('request', response.request_cookie_tag()),
                             ('response', response.response_cookie_tag()),
                         ))
@@ -3088,7 +3083,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 d['query_options'] = list(tags)
                 d['query_options'].sort()
 
-                cookie_tag_mapping = OrderedDict()
+                cookie_tag_mapping = collections.OrderedDict()
                 for server in server_list:
                     cookie_tag_mapping[server] = cookie_tags[server]
                 d['cookie_status'] = cookie_tag_mapping
@@ -3102,7 +3097,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         return d
 
     def _serialize_negative_response_info(self, neg_response_info, neg_status, warnings, errors, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         proof_list = []
         for nsec_status in neg_status[neg_response_info]:
@@ -3158,7 +3153,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     nsid = response.nsid_val()
                     if nsid is not None:
                         nsids.add(nsid)
-                    cookie_tags[server] = OrderedDict((
+                    cookie_tags[server] = collections.OrderedDict((
                         ('request', response.request_cookie_tag()),
                         ('response', response.response_cookie_tag()),
                     ))
@@ -3170,7 +3165,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
             d['query_options'] = list(tags)
             d['query_options'].sort()
 
-            cookie_tag_mapping = OrderedDict()
+            cookie_tag_mapping = collections.OrderedDict()
             for server in server_list:
                 cookie_tag_mapping[server] = cookie_tags[server]
             d['cookie_status'] = cookie_tag_mapping
@@ -3184,7 +3179,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         return d
 
     def _serialize_query_status(self, query, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
         d['answer'] = []
         d['nxdomain'] = []
         d['nodata'] = []
@@ -3247,7 +3242,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         return d
 
     def _serialize_delegation_status(self, rdtype, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         dss = list(self.ds_status_by_ds[rdtype].keys())
         d['ds'] = []
@@ -3296,17 +3291,17 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         return d
 
     def _serialize_zone_status(self, consolidate_clients=False, loglevel=logging.DEBUG, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         if loglevel <= logging.DEBUG:
             glue_ip_mapping = self.get_glue_ip_mapping()
             auth_ns_ip_mapping = self.get_auth_ns_ip_mapping()
-            d['servers'] = OrderedDict()
+            d['servers'] = collections.OrderedDict()
             names = list(self.get_ns_names())
             names.sort()
             for name in names:
                 name_str = name.canonicalize().to_text()
-                d['servers'][name_str] = OrderedDict()
+                d['servers'][name_str] = collections.OrderedDict()
                 if name in glue_ip_mapping and glue_ip_mapping[name]:
                     servers = list(glue_ip_mapping[name])
                     servers.sort()
@@ -3334,7 +3329,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                     name_str = name.canonicalize().to_text()
                     servers = stealth_mapping[name]
                     servers.sort()
-                    d['servers'][name_str] = OrderedDict((
+                    d['servers'][name_str] = collections.OrderedDict((
                         ('stealth', servers),
                     ))
 
@@ -3351,7 +3346,7 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
     def serialize_status(self, d=None, is_dlv=False, loglevel=logging.DEBUG, ancestry_only=False, level=RDTYPES_ALL, trace=None, follow_mx=True, html_format=False):
         if d is None:
-            d = OrderedDict()
+            d = collections.OrderedDict()
 
         if trace is None:
             trace = []
@@ -3414,11 +3409,11 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
 
         erroneous_status = self.status not in (Status.NAME_STATUS_NOERROR, Status.NAME_STATUS_NXDOMAIN)
 
-        d[name_str] = OrderedDict()
+        d[name_str] = collections.OrderedDict()
         if loglevel <= logging.INFO or erroneous_status:
             d[name_str]['status'] = Status.name_status_mapping[self.status]
 
-        d[name_str]['queries'] = OrderedDict()
+        d[name_str]['queries'] = collections.OrderedDict()
         query_keys = list(self.queries.keys())
         query_keys.sort()
         required_rdtypes = self._rdtypes_for_analysis_level(level)
