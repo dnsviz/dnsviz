@@ -1,0 +1,107 @@
+# Stage 1: Build stage
+FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Install EPEL repository
+RUN dnf install -y \
+    https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+
+# Enable CRB repository
+RUN /usr/bin/crb enable
+
+# Install Python, graphviz, and build tools
+RUN dnf install -y \
+    python3.11 \
+    python3.11-devel \
+    gcc \
+    gcc-c++ \
+    make \
+    openssl-devel \
+    bind-utils \
+    graphviz \
+    python3-pygraphviz \
+    && dnf clean all
+
+# Set up project directory
+WORKDIR /app
+
+# Copy pyproject.toml and sync dependencies
+COPY pyproject.toml README.md ./
+COPY dnsviz ./dnsviz
+COPY bin ./bin
+COPY share ./share
+COPY doc ./doc
+COPY external ./external
+
+# Use uv to sync the project and install it
+ENV UV_PYTHON=/usr/bin/python3.11
+RUN uv sync --no-dev
+
+# Symlink system pygraphviz into uv's venv so dnsviz can find it
+RUN ln -sf /usr/lib64/python3.11/site-packages/pygraphviz /app/.venv/lib/python3.11/site-packages/pygraphviz && \
+    ln -sf /usr/lib64/python3.11/site-packages/_graphviz.*.so /app/.venv/lib/python3.11/site-packages/
+
+# Stage 2: Runtime stage
+FROM registry.access.redhat.com/ubi9/ubi-micro:latest
+
+# Copy Python 3.11 from builder
+COPY --from=builder /usr/bin/python3.11 /usr/bin/python3.11
+COPY --from=builder /usr/lib64/python3.11 /usr/lib64/python3.11
+COPY --from=builder /usr/lib64/libpython3.11.so* /usr/lib64/
+
+# Copy uv venv with all installed packages
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/dnsviz /app/dnsviz
+
+# Copy graphviz binaries and libraries
+COPY --from=builder /usr/bin/dot /usr/bin/dot
+COPY --from=builder /usr/bin/neato /usr/bin/neato
+COPY --from=builder /usr/bin/twopi /usr/bin/twopi
+COPY --from=builder /usr/bin/circo /usr/bin/circo
+COPY --from=builder /usr/bin/fdp /usr/bin/fdp
+COPY --from=builder /usr/lib64/graphviz /usr/lib64/graphviz
+COPY --from=builder /usr/lib64/libgvc.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcgraph.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcdt.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libpathplan.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libexpat.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libgd.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libfontconfig.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libfreetype.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libpng16.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libjpeg.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libz.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libX11.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libxcb.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libXau.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libXpm.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libbrotlidec.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libbrotlicommon.so* /usr/lib64/
+
+# Copy bind-tools
+COPY --from=builder /usr/bin/dig /usr/bin/dig
+COPY --from=builder /usr/bin/host /usr/bin/host
+COPY --from=builder /usr/bin/nslookup /usr/bin/nslookup
+
+# Copy required system libraries
+COPY --from=builder /usr/lib64/libssl.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libcrypto.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libbz2.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libreadline.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libsqlite3.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libffi.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libtinfo.so* /usr/lib64/
+COPY --from=builder /usr/lib64/libncursesw.so* /usr/lib64/
+
+# Set up library path
+ENV LD_LIBRARY_PATH=/usr/lib64
+
+# Set up environment
+ENV PATH="/app/.venv/bin:$PATH"
+ENV VIRTUAL_ENV="/app/.venv"
+
+WORKDIR /data
+ENTRYPOINT ["/app/.venv/bin/dnsviz"]
+CMD ["help"]

@@ -7,3 +7,7 @@
 dnsviz/config.py
 doc/images/
 .DS_Store
+
+.venv/
+__pycache__/
+*.egg-info/
