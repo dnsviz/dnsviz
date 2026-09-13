@@ -11,53 +11,45 @@ class ZoneCreator:
         self.unsigned_zone_file = get_zone_file('unsigned', False)
 
         self.keys = None
+        self.skip_keys = os.getenv('DNSVIZ_KEYGEN_SKIP', '').split()
 
     def create_dir(self, mydir):
         if not os.path.exists(mydir):
             os.mkdir(mydir)
 
+    def keygen(self, params):
+        key_dir = get_key_dir()
+        args = ['dnssec-keygen', '-q', '-K', key_dir]
+        args.extend(params)
+        args.append(ZONE_ORIGIN)
+        return subprocess.check_output(args).decode('utf-8').strip()
+
+    def add_key(self, algname, alg, bitsk=None, bitsz=None):
+        if algname in self.skip_keys:
+            return
+
+        args = ['-f', 'KSK', '-a', alg]
+        if bitsk is not None:
+            args.extend(['-b', str(bitsk)])
+        self.keys['KSK_'+algname] = \
+                self.keygen(args)
+
+        args = ['-a', alg]
+        if bitsz is not None:
+            args.extend(['-b', str(bitsz)])
+        self.keys['ZSK_'+algname] = \
+                self.keygen(args)
+
     def create_keys(self):
         self.keys = {}
+        self.create_dir(get_key_dir())
 
-        key_dir = get_key_dir()
-        self.create_dir(key_dir)
-
-        self.keys['KSK_RSASHA1'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-b', '2048', '-a', 'RSASHA1', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_RSASHA1'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-b', '1024', '-a', 'RSASHA1', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['KSK_RSASHA256'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-b', '2048', '-a', 'RSASHA256', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_RSASHA256'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-b', '1024', '-a', 'RSASHA256', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['KSK_ECDSA256'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-a', 'ECDSAP256SHA256', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_ECDSA256'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-a', 'ECDSAP256SHA256', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['KSK_ECDSA384'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-a', 'ECDSAP384SHA384', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_ECDSA384'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-a', 'ECDSAP384SHA384', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['KSK_ED25519'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-a', 'ED25519', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_ED25519'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-a', 'ED25519', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['KSK_ED448'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-f', 'KSK', '-a', 'ED448', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
-        self.keys['ZSK_ED448'] = \
-                subprocess.check_output(['dnssec-keygen', '-q', '-K', key_dir, '-a', 'ED448', ZONE_ORIGIN]) \
-                .decode('utf-8').strip()
+        self.add_key('RSASHA1',   'RSASHA1',   2048, 1024)
+        self.add_key('RSASHA256', 'RSASHA256', 2048, 1024)
+        self.add_key('ECDSA256',  'ECDSAP256SHA256')
+        self.add_key('ECDSA384',  'ECDSAP384SHA384')
+        self.add_key('ED25519',   'ED25519')
+        self.add_key('ED448',     'ED448')
 
     def get_key_file(self, key_type):
         return get_key_file(self.keys[key_type])
