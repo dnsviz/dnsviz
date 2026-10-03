@@ -278,7 +278,7 @@ class AlgorithmNotSupported(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'Validation of DNSSEC algorithm 5 (RSASHA1) is not supported by this code, so the cryptographic status of this RRSIG is unknown.  See ...'
+    'Validation of DNSSEC algorithm 5 (RSA/SHA-1) is not supported by this code, so the cryptographic status of this RRSIG is unknown.  See ...'
     '''
 
     _abstract = False
@@ -298,7 +298,7 @@ class AlgorithmValidationProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC implementers are prohibited from implementing validation of DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are prohibited from implementing validation of DNSSEC algorithm 5 (RSA/SHA-1).  See ...'
     '''
 
     _abstract = False
@@ -318,7 +318,7 @@ class AlgorithmProhibited(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC implementers are prohibited from implementing signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are prohibited from implementing signing with DNSSEC algorithm 5 (RSA/SHA-1).  See ...'
     '''
 
     _abstract = False
@@ -338,7 +338,7 @@ class AlgorithmNotRecommended(RRSIGError):
     >>> e.args
     [5]
     >>> e.description
-    'DNSSEC implementers are recommended against implementing signing with DNSSEC algorithm 5 (RSASHA1).  See ...'
+    'DNSSEC implementers are recommended against implementing signing with DNSSEC algorithm 5 (RSA/SHA-1).  See ...'
     '''
 
     _abstract = False
@@ -1720,7 +1720,7 @@ class MissingRRSIGForAlgDNSKEY(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDNSKEY(algorithm=5)
     >>> e.description
-    'The DNSKEY RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
+    'The DNSKEY RRset for the zone included algorithm 5 (RSA/SHA-1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1731,7 +1731,7 @@ class MissingRRSIGForAlgDS(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDS(algorithm=5)
     >>> e.description
-    'The DS RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
+    'The DS RRset for the zone included algorithm 5 (RSA/SHA-1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1742,7 +1742,7 @@ class MissingRRSIGForAlgDLV(MissingRRSIGForAlg):
     '''
     >>> e = MissingRRSIGForAlgDLV(algorithm=5)
     >>> e.description
-    'The DLV RRset for the zone included algorithm 5 (RSASHA1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
+    'The DLV RRset for the zone included algorithm 5 (RSA/SHA-1), but no RRSIG with algorithm 5 covering the RRset was returned in the response.  See ...'
     '''
 
     _abstract = False
@@ -1975,7 +1975,7 @@ class MissingSEPForAlg(DelegationError):
     '''
     >>> e = MissingSEPForAlg(algorithm=5, source='DS')
     >>> e.description
-    "The DS RRset for the zone included algorithm 5 (RSASHA1), but no DS RR matched a DNSKEY with algorithm 5 that signs the zone's DNSKEY RRset.  See ..."
+    "The DS RRset for the zone included algorithm 5 (RSA/SHA-1), but no DS RR matched a DNSKEY with algorithm 5 that signs the zone's DNSKEY RRset.  See ..."
     '''
 
     _abstract = False
