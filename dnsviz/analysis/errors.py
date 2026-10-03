@@ -37,8 +37,6 @@ try:
 except ImportError:
     from cgi import escape
 
-import dns.dnssec
-
 import dnsviz.format as fmt
 from dnsviz.util import tuple_to_dict
 
@@ -291,7 +289,8 @@ class AlgorithmNotSupported(RRSIGError):
 
     def __init__(self, **kwargs):
         super(AlgorithmNotSupported, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
 
 class AlgorithmValidationProhibited(RRSIGError):
     '''
@@ -310,7 +309,8 @@ class AlgorithmValidationProhibited(RRSIGError):
 
     def __init__(self, **kwargs):
         super(AlgorithmValidationProhibited, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
 
 class AlgorithmProhibited(RRSIGError):
     '''
@@ -329,7 +329,8 @@ class AlgorithmProhibited(RRSIGError):
 
     def __init__(self, **kwargs):
         super(AlgorithmProhibited, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
 
 class AlgorithmNotRecommended(RRSIGError):
     '''
@@ -348,7 +349,8 @@ class AlgorithmNotRecommended(RRSIGError):
 
     def __init__(self, **kwargs):
         super(AlgorithmNotRecommended, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
 
 class DNSKEYRevokedRRSIG(RRSIGError):
     '''
@@ -1710,7 +1712,8 @@ class MissingRRSIGForAlg(ResponseError):
 
     def __init__(self, **kwargs):
         super(MissingRRSIGForAlg, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
         self.template_kwargs['source'] = self.source
 
 class MissingRRSIGForAlgDNSKEY(MissingRRSIGForAlg):
@@ -1983,7 +1986,8 @@ class MissingSEPForAlg(DelegationError):
 
     def __init__(self, **kwargs):
         super(MissingSEPForAlg, self).__init__(**kwargs)
-        self.template_kwargs['algorithm_text'] = dns.dnssec.algorithm_to_text(self.template_kwargs['algorithm'])
+        alg = self.template_kwargs['algorithm']
+        self.template_kwargs['algorithm_text'] = fmt.DNSKEY_ALGORITHMS.get(alg, str(alg))
         try:
             self.template_kwargs['source'] = kwargs['source']
         except KeyError:
