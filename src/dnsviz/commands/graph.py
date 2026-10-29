@@ -26,17 +26,12 @@ from __future__ import unicode_literals
 
 import argparse
 import codecs
+import collections
 import json
 import logging
 import os
 import re
 import sys
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dns.exception, dns.name
 
@@ -336,7 +331,7 @@ class GraphArgHelper:
             raise AnalysisInputError('Version %d.%d of JSON input is incompatible with this software.' % (major_vers, minor_vers))
 
     def ingest_names(self):
-        self.names = OrderedDict()
+        self.names = collections.OrderedDict()
 
         if self.args.domain_name:
             for name in self.args.domain_name:

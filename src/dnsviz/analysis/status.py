@@ -28,15 +28,10 @@
 from __future__ import unicode_literals
 
 import base64
+import collections
 import datetime
 import html
 import logging
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dns.name, dns.rdatatype
 
@@ -310,7 +305,7 @@ class RRSIGStatus(object):
         return 'RRSIG covering %s/%s' % (fmt.humanize_name(self.rrset.rrset.name), dns.rdatatype.to_text(self.rrset.rrset.rdtype))
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         erroneous_status = self.validation_status not in (RRSIG_STATUS_VALID, RRSIG_STATUS_INDETERMINATE_NO_DNSKEY, RRSIG_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
 
@@ -497,7 +492,7 @@ class DSStatus(object):
         return '%s record(s) corresponding to DNSKEY for %s (algorithm %d (%s), key tag %d)' % (dns.rdatatype.to_text(self.ds_meta.rrset.rdtype), fmt.humanize_name(self.ds_meta.rrset.name), self.ds.algorithm, fmt.DNSKEY_ALGORITHMS.get(self.ds.algorithm, self.ds.algorithm), self.ds.key_tag)
 
     def serialize(self, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=True):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         erroneous_status = self.validation_status not in (DS_STATUS_VALID, DS_STATUS_INDETERMINATE_NO_DNSKEY, DS_STATUS_INDETERMINATE_UNKNOWN_ALGORITHM)
 
@@ -660,7 +655,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
         return 'NSEC record(s) proving the non-existence (NXDOMAIN) of %s' % (fmt.humanize_name(self.qname))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -697,7 +692,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
                 qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['sname_covering'] = OrderedDict((
+                d['sname_covering'] = collections.OrderedDict((
                     ('covered_name', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
@@ -706,7 +701,7 @@ class NSECStatusNXDOMAIN(NSECStatus):
                     wildcard, nsec_names = list(self.nsec_names_covering_wildcard.items())[0]
                     nsec_name = list(nsec_names)[0]
                     nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                    d['wildcard_covering'] = OrderedDict((
+                    d['wildcard_covering'] = collections.OrderedDict((
                         ('covered_name', formatter(wildcard.canonicalize().to_text())),
                         ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                         ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
@@ -951,7 +946,7 @@ class NSECStatusNODATA(NSECStatus):
             self.nsec_set_info = nsec_set_info.project(*list(nsec_set_info.rrsets))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         nsec_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -991,7 +986,7 @@ class NSECStatusNODATA(NSECStatus):
                 qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                 nsec_name = list(nsec_names)[0]
                 nsec_rr = self.nsec_set_info.rrsets[nsec_name].rrset[0]
-                d['sname_covering'] = OrderedDict((
+                d['sname_covering'] = collections.OrderedDict((
                     ('covered_name', formatter(qname.canonicalize().to_text())),
                     ('nsec_owner', formatter(nsec_name.canonicalize().to_text())),
                     ('nsec_next', formatter(nsec_rr.next.canonicalize().to_text()))
@@ -1192,7 +1187,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
             self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next).encode('utf-8')))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -1248,7 +1243,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                     qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['next_closest_encloser_covering'] = OrderedDict((
+                    d['next_closest_encloser_covering'] = collections.OrderedDict((
                         ('covered_name', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec_next', formatter(fmt.format_nsec3_name(next_name))),
@@ -1265,7 +1260,7 @@ class NSEC3StatusNXDOMAIN(NSEC3Status):
                     wildcard, nsec_names = list(self.nsec_names_covering_wildcard.items())[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['wildcard_covering'] = OrderedDict((
+                    d['wildcard_covering'] = collections.OrderedDict((
                         ('covered_name', formatter(fmt.format_nsec3_name(wildcard))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
@@ -1576,7 +1571,7 @@ class NSEC3StatusNODATA(NSEC3Status):
             self.errors.append(Errors.InvalidNSEC3Hash(name=fmt.format_nsec3_name(name), nsec3_hash=base32.b32encode(self.nsec_set_info.rrsets[name].rrset[0].next).encode('utf-8')))
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         nsec3_list = []
         for nsec_rrset in self.nsec_set_info.rrsets.values():
@@ -1638,7 +1633,7 @@ class NSEC3StatusNODATA(NSEC3Status):
                     qname, nsec_names = list(self.nsec_names_covering_qname.items())[0]
                     nsec_name = list(nsec_names)[0]
                     next_name = self.nsec_set_info.name_for_nsec3_next(nsec_name)
-                    d['next_closest_encloser_covering'] = OrderedDict((
+                    d['next_closest_encloser_covering'] = collections.OrderedDict((
                         ('covered_name', formatter(fmt.format_nsec3_name(qname))),
                         ('nsec3_owner', formatter(fmt.format_nsec3_name(nsec_name))),
                         ('nsec3_next', formatter(fmt.format_nsec3_name(next_name))),
@@ -1730,7 +1725,7 @@ class CNAMEFromDNAMEStatus(object):
 
     def serialize(self, rrset_info_serializer=None, consolidate_clients=True, loglevel=logging.DEBUG, html_format=False, map_ip_to_ns_name=None):
         values = []
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         dname_serialized = None
         if rrset_info_serializer is not None:
