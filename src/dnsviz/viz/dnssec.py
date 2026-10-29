@@ -28,6 +28,7 @@
 from __future__ import unicode_literals
 
 import codecs
+import collections
 import errno
 import html
 import io
@@ -36,12 +37,6 @@ import os
 import re
 import sys
 import xml.dom.minidom
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dns.name, dns.rdtypes, dns.rdatatype, dns.dnssec
 
@@ -87,7 +82,7 @@ class DNSKEYNonExistent(object):
         self.key_tag = key_tag
 
     def serialize(self):
-        d = OrderedDict()
+        d = collections.OrderedDict()
         d['flags'] = None
         d['protocol'] = None
         d['algorithm'] = self.algorithm
@@ -105,7 +100,7 @@ class RRsetNonExistent(object):
         self.servers_clients = servers_clients
 
     def serialize(self, consolidate_clients, html_format=False, map_ip_to_ns_name=None):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         if html_format:
             formatter = lambda x: html.escape(x, True)
@@ -618,7 +613,7 @@ class DNSAuthGraph:
             self.node_reverse_mapping[zone_obj] = top_name
 
             consolidate_clients = zone_obj.single_client()
-            zone_serialized = OrderedDict()
+            zone_serialized = collections.OrderedDict()
             zone_serialized['description'] = '%s zone' % (zone_obj)
             if zone_obj.zone_errors:
                 zone_serialized['errors'] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in zone_obj.zone_errors]
@@ -870,7 +865,7 @@ class DNSAuthGraph:
 
         consolidate_clients = name_obj.single_client()
 
-        errors_serialized = OrderedDict()
+        errors_serialized = collections.OrderedDict()
 
         errors_serialized['description'] = '%s %s/%s' % (description, fmt.humanize_name(name), dns.rdatatype.to_text(rdtype))
         errors_serialized[category] = [e.serialize(consolidate_clients=consolidate_clients, html_format=True) for e in errors_list]
@@ -1520,7 +1515,7 @@ class DNSAuthGraph:
                 line_style = 'dashed'
 
             consolidate_clients = name_obj.single_client()
-            del_serialized = OrderedDict()
+            del_serialized = collections.OrderedDict()
             del_serialized['description'] = 'Delegation from %s to %s' % (name_obj.parent.name.to_text(), name_obj.name.to_text())
             del_serialized['status'] = Status.delegation_status_mapping[name_obj.delegation_status[rdtype]]
 

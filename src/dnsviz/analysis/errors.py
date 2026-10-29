@@ -23,14 +23,9 @@
 
 from __future__ import unicode_literals
 
+import collections
 import datetime
 import html
-
-# minimal support for python2.6
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordereddict import OrderedDict
 
 import dnsviz.format as fmt
 from dnsviz.util import tuple_to_dict
@@ -123,7 +118,7 @@ class DomainNameAnalysisError(object):
                     del self.servers_clients[(server, client)]
 
     def serialize(self, consolidate_clients=False, html_format=False):
-        d = OrderedDict()
+        d = collections.OrderedDict()
 
         if html_format:
             d['description'] = self.html_description
