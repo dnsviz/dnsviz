@@ -75,6 +75,11 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filen
     if remove_edges:
         G.remove_extra_edges()
 
+    if isinstance(filename, int):
+        kwargs = { 'closefd': False }
+    else:
+        kwargs = {}
+
     if fmt == 'html':
         try:
             js_img = codecs.decode(G.draw('js'), 'utf-8')
@@ -97,14 +102,14 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filen
         template_str = template_str.replace('JS_CODE', js_img)
 
         try:
-            fh = io.open(filename, 'w', encoding='utf-8').write(template_str)
+            fh = io.open(filename, 'w', encoding='utf-8', **kwargs).write(template_str)
         except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, filename))
             sys.exit(3)
 
     else:
         try:
-            fh = io.open(filename, 'wb').write(G.draw(fmt))
+            fh = io.open(filename, 'wb', **kwargs).write(G.draw(fmt))
         except IOError as e:
             if e.strerror:
                 logger.error('%s: "%s"' % (e.strerror, filename))

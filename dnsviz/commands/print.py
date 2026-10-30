@@ -69,8 +69,13 @@ class AnalysisInputError(Exception):
 def finish_graph(G, name_objs, rdtypes, ignore_qnames_rdtypes, trusted_keys, supported_algs, filename, override_show_colors):
     G.add_trust(trusted_keys, supported_algs=supported_algs)
 
+    if isinstance(filename, int):
+        kwargs = { 'closefd': False }
+    else:
+        kwargs = {}
+
     try:
-        fh = io.open(filename, 'w', encoding='utf-8')
+        fh = io.open(filename, 'w', encoding='utf-8', **kwargs)
     except IOError as e:
         logger.error('%s: "%s"' % (e.strerror, filename))
         sys.exit(3)
