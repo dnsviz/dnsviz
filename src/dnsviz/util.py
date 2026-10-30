@@ -170,7 +170,7 @@ def get_hints(s):
 
 def get_root_hints():
     try:
-        with io.open(ROOT_HINTS, 'r', encoding='utf-8') as fh:
+        with open(ROOT_HINTS, 'r', encoding='utf-8') as fh:
             return get_hints(fh.read())
     except IOError:
         return get_hints(ROOT_HINTS_STR_DEFAULT)
@@ -195,7 +195,7 @@ def io_try_buffered(f, mode, closefd=True):
 
     Required to pass tests under pytest."""
     try:
-        return io.open(f.fileno(), mode, closefd=closefd)
+        return open(f.fileno(), mode, closefd=closefd)
     except io.UnsupportedOperation:
         # raised by f.fileno()
         return f

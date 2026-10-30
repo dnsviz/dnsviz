@@ -24,7 +24,6 @@
 from __future__ import unicode_literals
 
 import bisect
-import io
 import logging
 import math
 import random
@@ -127,7 +126,7 @@ class Resolver:
     def from_file(cls, resolv_conf, query_cls, **kwargs):
         servers = []
         try:
-            with io.open(resolv_conf, 'r', encoding='utf-8') as f:
+            with open(resolv_conf, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     words = line.split()

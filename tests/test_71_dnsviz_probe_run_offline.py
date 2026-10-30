@@ -1,4 +1,3 @@
-import io
 import os
 import subprocess
 import tempfile
@@ -46,7 +45,7 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
 
         cmd.append(ZONE_ORIGIN)
 
-        with io.open(output_file, 'wb') as fh:
+        with open(output_file, 'wb') as fh:
             self.assertReturnCode(subprocess.call(cmd, stdout=fh))
 
     def test_dnsviz_probe_auth_local_signed_nsec(self):
@@ -61,24 +60,24 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def test_dnsviz_probe_input(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(input_file, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(input_file, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', '-', ZONE_ORIGIN], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertReturnCode(p.returncode)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', input_file, ZONE_ORIGIN], stdout=fh), 0)
 
     def test_dnsviz_probe_names_input(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             ret = subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', input_file, '-f', self.names_file.name], stdout=fh)
             self.assertReturnCode(ret)
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(self.names_file.name, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(self.names_file.name, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'probe', '-d', '0', '-r', input_file, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
@@ -86,14 +85,14 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def test_dnsviz_probe_output(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             ret = subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', input_file, ZONE_ORIGIN], cwd=self.run_cwd, stdout=fh)
             self.assertReturnCode(ret)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', input_file, '-o', '-', ZONE_ORIGIN], cwd=self.run_cwd, stdout=fh), 0)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'probe', '-d', '0', '-r', input_file, '-o', 'all.json', ZONE_ORIGIN], cwd=self.run_cwd, stdout=fh), 0)
         self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.json')))
 

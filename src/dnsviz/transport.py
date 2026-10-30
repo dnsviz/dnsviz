@@ -29,7 +29,6 @@ import codecs
 import collections
 import errno
 import fcntl
-import io
 import json
 import os
 import queue
@@ -1174,7 +1173,7 @@ class DNSQueryTransportHandlerCmd(DNSQueryTransportHandlerWebSocketServer):
         except OSError as e:
             raise socket.error(str(e))
         else:
-            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+            self.sock = ReaderWriter(open(p.stdout.fileno(), 'rb'), open(p.stdin.fileno(), 'wb'), p)
 
     def _connect_socket(self):
         pass
@@ -1242,7 +1241,7 @@ class DNSQueryTransportHandlerRemoteCmd(DNSQueryTransportHandlerCmd):
         except OSError as e:
             raise socket.error(str(e))
         else:
-            self.sock = ReaderWriter(io.open(p.stdout.fileno(), 'rb'), io.open(p.stdin.fileno(), 'wb'), p)
+            self.sock = ReaderWriter(open(p.stdout.fileno(), 'rb'), open(p.stdin.fileno(), 'wb'), p)
 
     def _connect_socket(self):
         pass

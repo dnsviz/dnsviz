@@ -27,7 +27,6 @@ from __future__ import unicode_literals
 import argparse
 import codecs
 import collections
-import io
 import json
 import logging
 import os

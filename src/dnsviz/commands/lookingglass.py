@@ -23,7 +23,6 @@
 from __future__ import unicode_literals
 
 import codecs
-import io
 import json
 import queue
 import threading
@@ -35,7 +34,7 @@ class RemoteQueryError(Exception):
     pass
 
 def main(argv):
-    sock = transport.ReaderWriter(io.open(sys.stdin.fileno(), 'rb'), io.open(sys.stdout.fileno(), 'wb'))
+    sock = transport.ReaderWriter(open(sys.stdin.fileno(), 'rb'), open(sys.stdout.fileno(), 'wb'))
     sock.lock = threading.Lock()
     qth_reader = transport.DNSQueryTransportHandlerWebSocketClientReader(sock)
     qth_writer = transport.DNSQueryTransportHandlerWebSocketClientWriter(sock)

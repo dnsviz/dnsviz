@@ -26,7 +26,6 @@ from __future__ import unicode_literals
 
 import argparse
 import codecs
-import io
 import json
 import logging
 import os
@@ -87,7 +86,7 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filen
             sys.exit(3)
 
         try:
-            with io.open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8') as fh:
+            with open(DNSSEC_TEMPLATE_FILE, 'r', encoding='utf-8') as fh:
                 template_str = fh.read()
         except IOError as e:
             logger.error('Error reading template file "%s": %s' % (DNSSEC_TEMPLATE_FILE, e.strerror))
@@ -97,14 +96,14 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filen
         template_str = template_str.replace('JS_CODE', js_img)
 
         try:
-            fh = io.open(filename, 'w', encoding='utf-8', **kwargs).write(template_str)
+            fh = open(filename, 'w', encoding='utf-8', **kwargs).write(template_str)
         except IOError as e:
             logger.error('%s: "%s"' % (e.strerror, filename))
             sys.exit(3)
 
     else:
         try:
-            fh = io.open(filename, 'wb', **kwargs).write(G.draw(fmt))
+            fh = open(filename, 'wb', **kwargs).write(G.draw(fmt))
         except IOError as e:
             if e.strerror:
                 logger.error('%s: "%s"' % (e.strerror, filename))

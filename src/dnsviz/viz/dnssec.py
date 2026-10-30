@@ -311,7 +311,7 @@ class DNSAuthGraph:
             if path is None:
                 return img
             else:
-                io.open(path, 'w', encoding='utf-8').write(img)
+                open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
                 with RedirectStderrRaiseOnError():
