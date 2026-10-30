@@ -31,7 +31,6 @@ import codecs
 import collections
 import errno
 import getopt
-import io
 import json
 import logging
 import multiprocessing
@@ -415,7 +414,7 @@ $TTL 600
         args['named_log'] = self.NAMED_LOG % args
 
         named_conf_contents = self.NAMED_CONF_TEMPLATE % args
-        io.open(args['named_conf'], 'w', encoding='utf-8').write(named_conf_contents)
+        open(args['named_conf'], 'w', encoding='utf-8').write(named_conf_contents)
         try:
             p = subprocess.Popen([self.NAMED_CHECKCONF, '-z', args['named_conf']],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
@@ -446,7 +445,7 @@ $TTL 600
 
             stdout = stdout.decode('utf-8')
             try:
-                with io.open(args['named_log'], 'r', encoding='utf-8') as fh:
+                with open(args['named_log'], 'r', encoding='utf-8') as fh:
                     log = fh.read()
             except IOError as e:
                 log = ''
@@ -467,7 +466,7 @@ $TTL 600
             raise ZoneFileServiceError('There was an problem executing %s to serve the "%s" zone:\n%s' % (self.NAMED, args['zone_name'], newlog))
 
         try:
-            with io.open(args['named_pid'], 'r', encoding='utf-8') as fh:
+            with open(args['named_pid'], 'r', encoding='utf-8') as fh:
                 self.pid = int(fh.read())
         except (IOError, ValueError) as e:
             self._cleanup_process()
@@ -733,7 +732,7 @@ class NameServerMappingsForDomain(object):
         # if this is a file containing delegation records, then read the
         # file, create a name=value string, and call name_addrs_from_string()
         try:
-            with io.open(filename, 'r', encoding='utf-8') as fh:
+            with open(filename, 'r', encoding='utf-8') as fh:
                 file_contents = fh.read()
         except IOError as e:
             raise argparse.ArgumentTypeError('%s: "%s"' % (e.strerror, filename))
@@ -798,7 +797,7 @@ class DSForDomain:
         # if this is a file containing delegation records, then read the
         # file, create a name=value string, and call name_addrs_from_string()
         try:
-            with io.open(filename, 'r', encoding='utf-8') as fh:
+            with open(filename, 'r', encoding='utf-8') as fh:
                 file_contents = fh.read()
         except IOError as e:
             raise argparse.ArgumentTypeError('%s: "%s"' % (e.strerror, filename))

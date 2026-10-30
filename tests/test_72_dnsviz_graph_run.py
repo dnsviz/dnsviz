@@ -1,4 +1,3 @@
-import io
 import json
 import os
 import re
@@ -10,7 +9,7 @@ from vars import *
 
 class DNSGraphRunTestCase(unittest.TestCase):
     def setUp(self):
-        self.devnull = io.open('/dev/null', 'wb')
+        self.devnull = open('/dev/null', 'wb')
 
         #TODO
         #with gzip.open(EXAMPLE_RECURSIVE, 'rb') as example_rec_in:
@@ -34,29 +33,29 @@ class DNSGraphRunTestCase(unittest.TestCase):
     def test_dnsviz_graph_input(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(input_file, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(input_file, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'graph'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(input_file, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(input_file, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'graph', '-r', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file], stdout=fh), 0)
 
     def test_dnsviz_graph_names_input(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-f', self.names_file.name], stdout=fh), 0)
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(self.names_file.name, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(self.names_file.name, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'graph', '-r', input_file, '-f', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
@@ -65,11 +64,11 @@ class DNSGraphRunTestCase(unittest.TestCase):
         input_file = get_probe_output_auth_file('signed-nsec')
         tk_file = get_tk_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-t', tk_file], stdout=fh), 0)
 
-        with io.open(self.output.name, 'wb') as fh_out:
-            with io.open(tk_file, 'rb') as fh_in:
+        with open(self.output.name, 'wb') as fh_out:
+            with open(tk_file, 'rb') as fh_in:
                 p = subprocess.Popen(['dnsviz', 'graph', '-r', input_file, '-t', '-'], stdin=subprocess.PIPE, stdout=fh_out)
                 p.communicate(fh_in.read())
                 self.assertEqual(p.returncode, 0)
@@ -77,13 +76,13 @@ class DNSGraphRunTestCase(unittest.TestCase):
     def test_dnsviz_graph_output(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file], cwd=self.run_cwd, stdout=fh), 0)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-Tdot', '-o', '-'], cwd=self.run_cwd, stdout=fh), 0)
 
-        with io.open(self.output.name, 'wb') as fh:
+        with open(self.output.name, 'wb') as fh:
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-o', 'all.dot'], cwd=self.run_cwd, stdout=fh), 0)
 
         self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.dot')))
@@ -103,19 +102,19 @@ class DNSGraphRunTestCase(unittest.TestCase):
             }
 
         for fmt in ('dot', 'png', 'svg', 'html'):
-            with io.open(self.output.name, 'wb') as fh:
+            with open(self.output.name, 'wb') as fh:
                 self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-o', 'all.'+fmt], cwd=self.run_cwd, stdout=fh), 0)
                 self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.'+fmt)))
                 self.assertFalse(os.path.exists(os.path.join(self.run_cwd, ZONE_ORIGIN + '.' + fmt)))
 
-                with io.open(os.path.join(self.run_cwd, 'all.' + fmt), 'rb') as fh:
+                with open(os.path.join(self.run_cwd, 'all.' + fmt), 'rb') as fh:
                     first_bytes = fh.read(len(magic_codes_mapping[fmt]))
                     self.assertEqual(first_bytes, magic_codes_mapping[fmt])
 
             self.assertEqual(subprocess.call(['dnsviz', 'graph', '-r', input_file, '-T', fmt, '-O'], cwd=self.run_cwd), 0)
             self.assertTrue(os.path.exists(os.path.join(self.run_cwd, ZONE_ORIGIN + '.' + fmt)))
 
-            with io.open(os.path.join(self.run_cwd, ZONE_ORIGIN + '.' + fmt), 'rb') as fh:
+            with open(os.path.join(self.run_cwd, ZONE_ORIGIN + '.' + fmt), 'rb') as fh:
                 first_bytes = fh.read(len(magic_codes_mapping[fmt]))
                 self.assertEqual(first_bytes, magic_codes_mapping[fmt])
 

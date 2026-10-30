@@ -26,7 +26,6 @@ from __future__ import unicode_literals
 
 import argparse
 import codecs
-import io
 import json
 import logging
 import os
@@ -74,7 +73,7 @@ def finish_graph(G, name_objs, rdtypes, ignore_qnames_rdtypes, trusted_keys, sup
         kwargs = {}
 
     try:
-        fh = io.open(filename, 'w', encoding='utf-8', **kwargs)
+        fh = open(filename, 'w', encoding='utf-8', **kwargs)
     except IOError as e:
         logger.error('%s: "%s"' % (e.strerror, filename))
         sys.exit(3)
