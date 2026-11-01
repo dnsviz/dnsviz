@@ -24,6 +24,7 @@
 
 from __future__ import unicode_literals
 
+import errno
 import getopt
 import socket
 import subprocess
