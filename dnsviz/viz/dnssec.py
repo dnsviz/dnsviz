@@ -70,7 +70,6 @@ COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
         'indeterminate': '#f4b800',
         'expired': '#6131a3',
         'invalid': '#be1515',
-        'alias': 'black',
         'CDNSKEY': 'lightgray',
         'CDS': 'lightgray',
         'alias': 'black' }
