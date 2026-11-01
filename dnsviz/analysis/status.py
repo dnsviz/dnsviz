@@ -1529,6 +1529,7 @@ class NSEC3StatusNODATA(NSEC3Status):
             if not self.nsec_names_covering_qname:
                 self.validation_status = NSEC_STATUS_INVALID
                 if valid_algs:
+                    next_closest_encloser = self.get_next_closest_encloser()
                     self.errors.append(Errors.NextClosestEncloserNotCoveredWildcardNODATA(next_closest_encloser=fmt.humanize_name(next_closest_encloser)))
                 if invalid_algs:
                     self.errors.append(invalid_alg_err)
