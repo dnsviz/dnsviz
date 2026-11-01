@@ -647,7 +647,7 @@ class FullResolver:
                                 else: # name is in bailiwick
                                     for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
                                         try:
-                                            a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
+                                            a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, dns.rdataclass.IN, a_rdtype)
                                         except KeyError:
                                             pass
                                         else:
@@ -687,7 +687,7 @@ class FullResolver:
                                     else: # name is in bailiwick
                                         for a_rdtype in (dns.rdatatype.A, dns.rdatatype.AAAA):
                                             try:
-                                                a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, a_rdtype, dns.rdataclass.IN)
+                                                a_rrsets[a_rdtype] = response.message.find_rrset(response.message.additional, ns_name, dns.rdataclass.IN, a_rdtype)
                                             except KeyError:
                                                 pass
                                             else:
