@@ -3021,7 +3021,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if wildcard_proof_list:
             d['wildcard_proof'] = wildcard_proof_list
 
-        if loglevel <= logging.INFO and self.response_component_status is not None:
+        if loglevel <= logging.INFO and self.response_component_status is not None and \
+                rrset_info in self.response_component_status:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[rrset_info]]
 
         if loglevel <= logging.INFO and show_servers:
@@ -3103,7 +3104,8 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if soa_list:
             d['soa'] = soa_list
 
-        if loglevel <= logging.INFO and self.response_component_status is not None:
+        if loglevel <= logging.INFO and self.response_component_status is not None and \
+                neg_response_info in self.response_component_status:
             d['status'] = Status.rrset_status_mapping[self.response_component_status[neg_response_info]]
 
         if loglevel <= logging.INFO:
