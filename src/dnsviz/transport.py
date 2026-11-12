@@ -976,12 +976,6 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
     def finalize(self):
         if self.unmask_on_recv:
 
-            # python3/python2 dual compatibility
-            if isinstance(self.msg_recv, str):
-                decode_func = lambda x: struct.unpack(b'!B', x)[0]
-            else:
-                decode_func = lambda x: x
-
             new_msg_recv = b''
             for i, mask_index in enumerate(self.mask_mapping):
                 mask_octets = struct.unpack(b'!BBBB', self.msg_recv[mask_index:mask_index + 4])
@@ -990,7 +984,7 @@ class DNSQueryTransportHandlerWebSocketServer(DNSQueryTransportHandlerMulti):
                 else:
                     buf = self.msg_recv[mask_index + 4:self.mask_mapping[i + 1]]
                 for j in range(len(buf)):
-                    b = decode_func(buf[j])
+                    b = buf[j]
                     new_msg_recv += struct.pack(b'!B', b ^ mask_octets[j % 4])
 
             self.msg_recv = new_msg_recv
@@ -1372,14 +1366,7 @@ class _DNSQueryTransportManager:
         self._event_map = {}
 
         self._close = threading.Event()
-        # python3/python2 dual compatibility
-        try:
-            # python 3
-            t = threading.Thread(target=self._loop, daemon=True)
-        except TypeError:
-            # python 2
-            t = threading.Thread(target=self._loop)
-            t.daemon = True
+        t = threading.Thread(target=self._loop, daemon=True)
         t.start()
 
     def close(self):
