@@ -2684,19 +2684,16 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                 continue
 
             digest_alg_map = {}
+            digest_map = {}
 
             # Create a list of digest algs for every algorithm/key tag.  We use
-            # this for creating a set of DS from the CDNSKEY with digest
-            # algorithms matching those of the DS set.
+            # this for 1) creating a set of DS from the CDNSKEY with digest
+            # algorithms matching those of the DS set and 2) checking the CDS
+            # records against the algorithms and key tags in the DS set.
             for ds_rdata in ds_rrset_info.rrset:
                 if (ds_rdata.algorithm, ds_rdata.key_tag) not in digest_alg_map:
                     digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)] = set()
                 digest_alg_map[(ds_rdata.algorithm, ds_rdata.key_tag)].add(ds_rdata.digest_type)
-
-            # Create a canonicalized list of rdata for comparing DS to CDS
-            # (We cannot just use straight-up set comparison because they are
-            # different types.)
-            ds_rr_list = Response.RRsetInfo.sorted_rdata_list(ds_rrset_info.rrset)
 
             if (self.name, dns.rdatatype.CDS) in self.queries:
                 rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDS)].answer_info
@@ -2706,14 +2703,44 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
                             rrset_info.rrset.rdtype == dns.rdatatype.CDS):
                         continue
 
-                    # Created a sorted list of rdata for comparison
-                    cds_rr_list = Response.RRsetInfo.sorted_rdata_list(rrset_info.rrset)
-                    if ds_rr_list != cds_rr_list:
-                        # If any CDS RRset has contents different than those of
-                        # the DS RRset, then warn.
-                        if rrset_info not in cds_has_error:
-                            self.rrset_warnings[rrset_info].append(Errors.CDSInconsistentWithDS())
-                            cds_has_error.add(rrset_info)
+                    digest_alg_map_cdnskey = {}
+                    for cds_rdata in rrset_info.rrset:
+
+                        # Create a list of digest algs for every algorithm/key
+                        # tag.  We use this for checking the DS records against
+                        # the algorithms and key tags in the CDS set.
+                        if (cds_rdata.algorithm, cds_rdata.key_tag) not in digest_alg_map_cdnskey:
+                            digest_alg_map_cdnskey[(cds_rdata.algorithm, cds_rdata.key_tag)] = set()
+                        digest_alg_map_cdnskey[(cds_rdata.algorithm, cds_rdata.key_tag)].add(cds_rdata.digest_type)
+
+                        # Check that the alg and key tag match one or more DS
+                        # RRs in the DS RRset.
+                        if (cds_rdata.algorithm, cds_rdata.key_tag) not in digest_alg_map:
+                            if rrset_info not in cds_has_error:
+                                self.rrset_warnings[rrset_info].append(Errors.CDSInconsistentWithDS())
+                                cds_has_error.add(rrset_info)
+
+                        if (cds_rdata.algorithm, cds_rdata.key_tag, cds_rdata.digest_type) in digest_map:
+                            # If the digest type also matches, then check that
+                            # the digest matches.
+                            if cds_rdata.digest != \
+                                    digest_map[(cds_rdata.algorithm, cds_rdata.key_tag, cds_rdata.digest_type)]:
+                                if rrset_info not in cds_has_error:
+                                    self.rrset_warnings[rrset_info].append(Errors.CDSInconsistentWithDS())
+                                    cds_has_error.add(rrset_info)
+
+                    # For every DS, check that the alg and key tag match one
+                    # or more CDS RRs in the CDS RRset.
+                    for alg, key_tag in digest_alg_map:
+                        if (alg, key_tag) not in digest_alg_map_cdnskey:
+                            if rrset_info not in cds_has_error:
+                                self.rrset_warnings[rrset_info].append(Errors.CDSInconsistentWithDS())
+                                cds_has_error.add(rrset_info)
+
+            # Create a canonicalized list of rdata for comparing DS to CDNSKEY
+            # (We cannot just use straight-up set comparison because they are
+            # different types.)
+            ds_rr_list = Response.RRsetInfo.sorted_rdata_list(ds_rrset_info.rrset)
 
             if (self.name, dns.rdatatype.CDNSKEY) in self.queries:
                 rrset_answer_info = self.queries[(self.name, dns.rdatatype.CDNSKEY)].answer_info
