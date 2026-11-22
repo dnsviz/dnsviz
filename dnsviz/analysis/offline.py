@@ -2598,6 +2598,12 @@ class OfflineDomainNameAnalysis(OnlineDomainNameAnalysis):
         if self.is_zone() or self.zone is None:
             return
 
+        # A CNAME target inside its own zone is populated while that zone is still being
+        # populated (the zone apex is itself a CNAME into the zone), so the zone's negative
+        # status has not been computed yet.  There is nothing to compare against until then.
+        if self.zone.nodata_status is None or self.zone.nxdomain_status is None:
+            return
+
         for (qname, rdtype), query in self.zone.queries.items():
             if rdtype in (dns.rdatatype.DS, dns.rdatatype.DLV):
                 continue
