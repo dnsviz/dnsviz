@@ -43,7 +43,7 @@ import dns.exception, dns.name
 
 from dnsviz.analysis import deserialize, DNS_RAW_VERSION
 from dnsviz.analysis.errors import ExistingCovered
-from dnsviz.config import DNSVIZ_SHARE_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
+from dnsviz.config import DNSVIZ_SHARE_PATH, DNSVIZ_MEDIA_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
 from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
 
@@ -60,8 +60,8 @@ except ImportError:
         raise
 
 IGNORE_UNLESS_ERRORS = set([dns.rdatatype.HINFO, dns.rdatatype.NSEC3PARAM])
-LOCAL_MEDIA_URL = 'file://' + DNSVIZ_SHARE_PATH
-DNSSEC_TEMPLATE_FILE = os.path.join(DNSVIZ_SHARE_PATH, 'html', 'dnssec-template.html')
+LOCAL_MEDIA_URL = 'file://' + str(DNSVIZ_MEDIA_PATH)
+DNSSEC_TEMPLATE_FILE = str(DNSVIZ_SHARE_PATH / 'templates' / 'dnsviz-graph.html')
 
 logging.basicConfig(level=logging.WARNING, format='%(message)s')
 logger = logging.getLogger()
