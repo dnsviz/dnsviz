@@ -23,18 +23,23 @@
 
 from __future__ import unicode_literals
 
+from importlib.resources import files
 import os
+from pathlib import Path
 import sys
 
-_prefix = '__DNSVIZ_INSTALL_PREFIX__'
-if (hasattr(sys, 'real_prefix') or hasattr(sys, 'base_prefix')) and \
-        not _prefix:
-    DNSVIZ_INSTALL_PREFIX = sys.prefix
+DNSVIZ_SHARE_PATH = os.getenv('DNSVIZ_SHARE_PATH', '')
+if DNSVIZ_SHARE_PATH:
+    DNSVIZ_SHARE_PATH = Path(DNSVIZ_SHARE_PATH)
 else:
-    DNSVIZ_INSTALL_PREFIX = _prefix
-DNSVIZ_SHARE_PATH = os.getenv('DNSVIZ_SHARE_PATH', os.path.join(DNSVIZ_INSTALL_PREFIX, 'share', 'dnsviz'))
-JQUERY_PATH = __JQUERY_PATH__
-JQUERY_UI_PATH = __JQUERY_UI_PATH__
-JQUERY_UI_CSS_PATH = __JQUERY_UI_CSS_PATH__
-RAPHAEL_PATH = __RAPHAEL_PATH__
-RESOLV_CONF = __RESOLV_CONF__
+    DNSVIZ_SHARE_PATH = files('dnsviz.data')
+
+DNSVIZ_MEDIA_PATH = DNSVIZ_SHARE_PATH / 'media'
+DNSVIZ_TEMPLATE_PATH = DNSVIZ_SHARE_PATH / 'templates'
+DNSVIZ_ROOT_DATA_PATH = DNSVIZ_SHARE_PATH / 'root-dns-data'
+
+JQUERY_PATH = 'https://code.jquery.com/jquery-1.11.3.min.js'
+JQUERY_UI_PATH = 'https://code.jquery.com/ui/1.11.4/jquery-ui.min.js'
+JQUERY_UI_CSS_PATH = 'https://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'
+RAPHAEL_PATH = 'https://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'
+RESOLV_CONF = '/etc/resolv.conf'
