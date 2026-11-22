@@ -9,7 +9,7 @@ DOTPNGFILES = $(DOTFILES:$(SRCDIR)/%.dot=$(IMGDIR)/%.png)
 all: $(DOTPNGFILES)
 
 # make png files from dot files
-$(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot
+$(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot icons
 	$(DOT) -Tpng $< > $@ || ( rm $@ && false )
 
 # make icon-sized png files from warning.svg and error.svg
