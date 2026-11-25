@@ -2,6 +2,7 @@ DOT=dot
 INKSCAPE=inkscape
 SRCDIR=src
 IMGDIR=images
+ICONDIR=../src/dnsviz/data/media/icons
 
 DOTFILES = $(wildcard $(SRCDIR)/*dot)
 DOTPNGFILES = $(DOTFILES:$(SRCDIR)/%.dot=$(IMGDIR)/%.png)
@@ -12,14 +13,19 @@ all: $(DOTPNGFILES)
 $(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot icons
 	$(DOT) -Tpng $< > $@ || ( rm $@ && false )
 
-# make icon-sized png files from warning.svg and error.svg
+# make icon-sized png files from notice.svg, warning.svg, and error.svg
 ICONSVGFILES = $(SRCDIR)/notice.svg $(SRCDIR)/warning.svg $(SRCDIR)/error.svg
-ICONPNGFILES = $(ICONSVGFILES:$(SRCDIR)/%.svg=$(IMGDIR)/%.png)
+ICONPNGFILES_DOC = $(ICONSVGFILES:$(SRCDIR)/%.svg=$(IMGDIR)/%.png)
+ICONPNGFILES_DATA = $(ICONSVGFILES:$(SRCDIR)/%.svg=$(ICONDIR)/%.png)
+
 ICONWIDTH = 25
 
-icons: $(ICONPNGFILES)
+icons: $(ICONPNGFILES_DOC) $(ICONPNGFILES_DATA)
 
-$(ICONPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.svg
+$(ICONPNGFILES_DOC) : $(IMGDIR)/%.png: $(SRCDIR)/%.svg
+	HOME=/var/tmp $(INKSCAPE) --export-width=$(ICONWIDTH) --export-type=png --export-filename=$@ $<
+
+$(ICONPNGFILES_DATA) : $(ICONDIR)/%.png: $(SRCDIR)/%.svg
 	HOME=/var/tmp $(INKSCAPE) --export-width=$(ICONWIDTH) --export-type=png --export-filename=$@ $<
 
 # make banner png 220x100 file from logo.svg
@@ -53,5 +59,5 @@ $(LOGOFAVICONPNGFILE): $(LOGOSVGFILE)
 
 clean:
 	rm -rf $(DOTPNGFILES)
-	rm -rf $(ICONPNGFILES)
+	rm -rf $(ICONPNGFILES_DOC) $(ICONPNGFILES_DATA)
 	rm -rf $(LOGOBANNERPNGFILE) $(LOGOICONPNGFILE) $(LOGOFAVICONPNGFILE)
