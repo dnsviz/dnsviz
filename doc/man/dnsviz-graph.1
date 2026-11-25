@@ -513,23 +513,48 @@ trust exists; if any anchors exist then an insecure delegation is demonstrated
 to prove that no chain should exist from the anchors.  This is equivalent to
 DNS without DNSSEC.
 
-.SS Warnings and Errors
+.SS Notices, Warnings, and Errors
+
+.IP Notices
+If one or more notices are detected with the data represented by a node in the
+graph, then a notice icon (blue circle with the letter "i") is displayed in the
+node.
+
+Similarly, the notice icon is displayed alongside edges whose represented data
+has notices.
+
+The notice icon is also displayed within the cluster representing a zone if
+there are zone-related notices.
+
+A notice icon with an italicized label denotes a notice for a response that
+isn't represented elsewhere in the graph, such as a referral with the
+authoritative answer flag set.
+
+.IP Warnings
 If one or more warnings are detected with the data represented by a node in the
-graph, then a warning icon is displayed in the node.
+graph, then a warning icon (yellow triangle with an exclamation point "!") is
+displayed in the node.
 
 Similarly, the warning icon is displayed alongside edges whose represented data
 has warnings.
 
-If one or more errors (more severe than warnings) are detected with the data
-represented by a node in the graph, then an error icon is displayed in the
-node.
-
-Similarly, the error icon is displayed alongside edges whose represented data
-has errors.
+The warning icon is also displayed within the cluster representing a zone if
+there are zone-related warnings.
 
 A warning icon with an italicized label denotes a warning for a response that
 isn't represented elsewhere in the graph, such as a referral with the
 authoritative answer flag set.
+
+.IP Errors
+If one or more errors (more severe than warnings) are detected with the data
+represented by a node in the graph, then an error icon (red triangel with an
+exclamation point "!") is displayed in the node.
+
+Similarly, the error icon is displayed alongside edges whose represented data
+has errors.
+
+The error icon is also displayed within the cluster representing a zone if
+there are zone-related errors.
 
 An error icon with an italicized label denotes a response error, e.g., due to
 timeout, malformed response, or invalid RCODE.
