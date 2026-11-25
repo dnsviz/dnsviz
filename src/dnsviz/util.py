@@ -39,7 +39,7 @@ from .config import DNSVIZ_SHARE_PATH
 from . import format as fmt
 from .ipaddr import IPAddr
 
-ROOT_HINTS = os.path.join(DNSVIZ_SHARE_PATH, 'hints', 'named.root')
+ROOT_HINTS = str(DNSVIZ_SHARE_PATH / 'dns-root-data' / 'root.hints')
 
 CR_RE = re.compile(r'\r\n', re.MULTILINE)
 ZONE_COMMENTS_RE = re.compile(r'\s*;.*', re.MULTILINE)
