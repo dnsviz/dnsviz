@@ -13,7 +13,7 @@ $(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot icons
 	$(DOT) -Tpng $< > $@ || ( rm $@ && false )
 
 # make icon-sized png files from warning.svg and error.svg
-ICONSVGFILES = $(SRCDIR)/warning.svg $(SRCDIR)/error.svg
+ICONSVGFILES = $(SRCDIR)/notice.svg $(SRCDIR)/warning.svg $(SRCDIR)/error.svg
 ICONPNGFILES = $(ICONSVGFILES:$(SRCDIR)/%.svg=$(IMGDIR)/%.png)
 ICONWIDTH = 25
 
