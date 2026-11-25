@@ -55,7 +55,7 @@ from pygraphviz import AGraph
 from dnsviz.analysis import status as Status
 from dnsviz.analysis import errors as Errors
 from dnsviz.analysis.online import ANALYSIS_TYPE_RECURSIVE
-from dnsviz.config import DNSVIZ_SHARE_PATH
+from dnsviz.config import DNSVIZ_MEDIA_PATH
 from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz import query as Q
@@ -81,9 +81,9 @@ INVIS_STYLE_RE = re.compile(r'(^|,)invis(,|$)')
 DASHED_STYLE_RE = re.compile(r'(^|,)dashed(,|$)')
 OPTOUT_STYLE_RE = re.compile(r'BGCOLOR="lightgray"')
 
-ICON_PATH=os.path.join(DNSVIZ_SHARE_PATH, 'icons')
-WARNING_ICON=os.path.join(ICON_PATH, 'warning.png')
-ERROR_ICON=os.path.join(ICON_PATH, 'error.png')
+ICON_PATH = DNSVIZ_MEDIA_PATH / 'icons'
+WARNING_ICON = str(ICON_PATH / 'warning.png')
+ERROR_ICON = str(ICON_PATH / 'error.png')
 
 # python3/python2.6 dual compatibility
 vers0, vers1, vers2 = sys.version_info[:3]
