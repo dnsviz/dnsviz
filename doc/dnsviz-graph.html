@@ -19,7 +19,7 @@
 			<li><a href="#cdnskeycds-rrsets">CDNSKEY/CDS RRsets</a></li>
 			<li><a href="#wildcards">Wildcards</a></li>
 			<li><a href="#node-status">Node Status</a></li>
-			<li><a href="#warnings-errors">Warnings and Errors</a></li>
+			<li><a href="#notices-warnings-errors">Notices, Warnings, and Errors</a></li>
 		</ul>
 
 		<h4><a name="zones">Zones</a></h4>
@@ -430,8 +430,25 @@
 					to DNS without DNSSEC.</p></td></tr>
 		</table>
 
-		<h4><a name="warnings-errors">Warnings and Errors</a></h4>
+		<h4><a name="notices-warnings-errors">Notices, Warnings, and Errors</a></h4>
 		<table>
+			<tr><td><img src="images/nodes-notices.png"
+					alt="Nodes with notices" /></td><td><p>If one or more notices are
+					detected with the data represented by a node in the graph, then a
+					notice icon is displayed in the node.</p></td></tr>
+			<tr><td><img src="images/edges-notices.png"
+					alt="Edges with notices" /></td><td><p>Similarly, the notice icon is
+					displayed alongside edges whose represented data has
+					notices.</p></td></tr>
+			<tr><td><img src="images/zone-notices.png"
+					alt="Zone with notices" /></td><td><p>The notice icon is also
+					displayed within the cluster representing a zone if there are
+					zone-related notices.</p></td></tr>
+			<tr><td><img src="images/response-notice.png"
+					alt="Response notice" /></td><td><p>A notice icon with an italicized
+					label denotes a notice for a response that isn't represented
+					elsewhere in the graph, such as a referral with the authoritative
+					answer flag set.</p></td></tr>
 			<tr><td><img src="images/nodes-warnings.png"
 					alt="Nodes with warnings" /></td><td><p>If one or more warnings are
 					detected with the data represented by a node in the graph, then a
@@ -444,6 +461,11 @@
 					alt="Zone with warnings" /></td><td><p>The warning icon is also
 					displayed within the cluster representing a zone if there are
 					zone-related warnings.</p></td></tr>
+			<tr><td><img src="images/response-warning.png"
+					alt="Response warning" /></td><td><p>A warning icon with an italicized
+					label denotes a warning for a response that isn't represented
+					elsewhere in the graph, such as a referral with the authoritative
+					answer flag set.</p></td></tr>
 			<tr><td><img src="images/nodes-errors.png"
 					alt="Nodes with errors" /></td><td><p>If one or more errors (more
 					severe than warnings) are detected with the data represented by a node
@@ -457,11 +479,6 @@
 					alt="Zone with errors" /></td><td><p>The error icon is also displayed
 					within the cluster representing a zone if there are zone-related
 					errors.</p></td></tr>
-			<tr><td><img src="images/response-warning.png"
-					alt="Response warning" /></td><td><p>A warning icon with an italicized
-					label denotes a warning for a response that isn't represented
-					elsewhere in the graph, such as a referral with the authoritative
-					answer flag set.</p></td></tr>
 			<tr><td><img src="images/response-error.png"
 					alt="Response error" /></td><td><p>An error icon with an italicized
 					label denotes a response error, e.g., due to timeout, malformed response,
