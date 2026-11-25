@@ -7,7 +7,7 @@ ICONDIR=../src/dnsviz/data/media/icons
 DOTFILES = $(wildcard $(SRCDIR)/*dot)
 DOTPNGFILES = $(DOTFILES:$(SRCDIR)/%.dot=$(IMGDIR)/%.png)
 
-all: $(DOTPNGFILES)
+all: $(DOTPNGFILES) logo
 
 # make png files from dot files
 $(DOTPNGFILES): $(IMGDIR)/%.png: $(SRCDIR)/%.dot icons
