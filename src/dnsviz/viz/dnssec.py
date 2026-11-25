@@ -82,6 +82,7 @@ DASHED_STYLE_RE = re.compile(r'(^|,)dashed(,|$)')
 OPTOUT_STYLE_RE = re.compile(r'BGCOLOR="lightgray"')
 
 ICON_PATH = DNSVIZ_MEDIA_PATH / 'icons'
+NOTICE_ICON = str(ICON_PATH / 'notice.png')
 WARNING_ICON = str(ICON_PATH / 'warning.png')
 ERROR_ICON = str(ICON_PATH / 'error.png')
 
