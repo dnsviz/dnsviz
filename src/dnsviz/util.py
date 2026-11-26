@@ -199,3 +199,50 @@ def io_try_buffered(f, mode, closefd=True):
     except io.UnsupportedOperation:
         # raised by f.fileno()
         return f
+
+class RedirectFD:
+    def __init__(self, fd):
+        self.fd = fd
+        self.fd_save = None
+        self.pipe_rfd = None
+        self.pipe_wfd = None
+        self.fd_data = b''
+
+    def __enter__(self):
+        self.pipe_rfd, self.pipe_wfd = os.pipe()
+        # allocate a new file descriptor and point it to the file description
+        # associated with the original file descriptor.
+        self.fd_save = os.dup(self.fd)
+        # Duplicate the write end of the pipe onto the original file
+        # descriptor.
+        os.dup2(self.pipe_wfd, self.fd)
+        # Now it is safe to close the write end of the pipe.
+        os.close(self.pipe_wfd)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Close the original file descriptor to flush the pipe.  Don't worry,
+        # we will re-open it again later, so that it can be used by the program
+        # after this.
+        os.close(self.fd)
+        # Read the data from the read end of the pipe
+        data = os.read(self.pipe_rfd, 1024)
+        while data != b'':
+            self.fd_data += data
+            data = os.read(self.pipe_rfd, 1024)
+        # Restore the old file descriptor to its original file description by
+        # duplicating the saved file descriptor onto the original file
+        # descriptor.
+        os.dup2(self.fd_save, self.fd)
+        # Close all extra file descriptors
+        os.close(self.fd_save)
+        os.close(self.pipe_rfd)
+
+class RedirectStderrRaiseOnError(RedirectFD):
+    def __init__(self):
+        super().__init__(2)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        for line in self.fd_data.decode('utf-8').splitlines():
+            if line.lower().startswith('error'):
+                raise Exception(line)

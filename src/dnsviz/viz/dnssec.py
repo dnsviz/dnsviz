@@ -60,7 +60,7 @@ from dnsviz import crypto
 from dnsviz import format as fmt
 from dnsviz import query as Q
 from dnsviz import response as Response
-from dnsviz.util import tuple_to_dict
+from dnsviz.util import tuple_to_dict, RedirectStderrRaiseOnError
 lb2s = fmt.latin1_binary_to_string
 
 COLORS = { 'secure': '#0a879a', 'secure_non_existent': '#9dcfd6',
@@ -305,7 +305,9 @@ class DNSAuthGraph:
         return s
 
     def to_raphael(self):
-        svg = self.G.draw(format=execv_encode('svg'), prog=execv_encode('dot'))
+        with RedirectStderrRaiseOnError():
+            svg = self.G.draw(format=execv_encode('svg'), prog=execv_encode('dot'))
+
         dom = xml.dom.minidom.parseString(svg)
 
         s = 'AuthGraph.prototype.draw = function () {\n'
@@ -325,9 +327,11 @@ class DNSAuthGraph:
                 io.open(path, 'w', encoding='utf-8').write(img)
         else:
             if path is None:
-                return self.G.draw(format=execv_encode(format), prog=execv_encode('dot'))
+                with RedirectStderrRaiseOnError():
+                    return self.G.draw(format=execv_encode(format), prog=execv_encode('dot'))
             else:
-                return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
+                with RedirectStderrRaiseOnError():
+                    return self.G.draw(path=execv_encode(path), format=execv_encode(format), prog=execv_encode('dot'))
 
     def id_for_dnskey(self, name, dnskey):
         # dnspython 1/2 compatibility
