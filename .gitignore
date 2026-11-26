@@ -4,6 +4,5 @@
 /MANIFEST
 /build/
 /dist/
-dnsviz/config.py
 doc/images/
 .DS_Store
