@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import subprocess
 import tempfile
@@ -85,6 +86,26 @@ class DNSGrokRunTestCase(unittest.TestCase):
             self.assertEqual(subprocess.call(['dnsviz', 'grok', '-r', input_file, '-o', 'all.json'], cwd=self.run_cwd, stdout=fh), 0)
 
         self.assertTrue(os.path.exists(os.path.join(self.run_cwd, 'all.json')))
+
+    def test_dnsviz_grok_broken(self):
+        input_file = get_probe_output_auth_file('signed-nsec-broken')
+
+        contents = subprocess.check_output(['dnsviz', 'grok', '-l', 'warning', '-r', input_file]).decode('utf-8')
+        obj = json.loads(contents)
+        zone_origin = ZONE_ORIGIN.rstrip('.') + '.'
+
+        err = obj[zone_origin]['queries'][f'{zone_origin}/IN/A']['answer'][0]['errors'][0]
+        code = err['code']
+        server = err['servers'][0]
+        self.assertEqual(code, 'MISSING_RRSIG')
+        self.assertIn(server, ('127.0.0.1', '::1'))
+
+        rrsig = obj[zone_origin]['queries'][f'{zone_origin}/IN/AAAA']['answer'][0]['rrsig'][0]
+        status = rrsig['status']
+        err = rrsig['errors'][0]
+        code = err['code']
+        self.assertEqual(status, 'INVALID_SIG')
+        self.assertEqual(code, 'SIGNATURE_INVALID')
 
 if __name__ == '__main__':
     unittest.main()
