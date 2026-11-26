@@ -1,5 +1,7 @@
 import io
+import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -116,6 +118,53 @@ class DNSGraphRunTestCase(unittest.TestCase):
             with io.open(os.path.join(self.run_cwd, ZONE_ORIGIN + '.' + fmt), 'rb') as fh:
                 first_bytes = fh.read(len(magic_codes_mapping[fmt]))
                 self.assertEqual(first_bytes, magic_codes_mapping[fmt])
+
+    def test_dnsviz_graph_broken(self):
+        input_file = get_probe_output_auth_file('signed-nsec-broken')
+
+        contents = subprocess.check_output(['dnsviz', 'graph', '-r', input_file, '-Thtml']).decode('utf-8')
+
+        RRSIG_COLOR = 'be1515'
+        RRSIG_STYLE = 'solid'
+        zone_origin = ZONE_ORIGIN.rstrip('.')
+        RRSET_OBJ_RE = re.compile(r'^RRset-\d+\|' + zone_origin + r'\|A$')
+        RRSIG_OBJ_RE = re.compile(r'^RRSIG-RRset-\d+\|' + zone_origin + \
+                r'\|AAAA\|DNSKEY-\d+\|' + zone_origin + r'\|\d+\|\d+\|' + \
+                RRSIG_COLOR + r'\|' + RRSIG_STYLE + r'$')
+
+        obj = None
+        for line in contents.splitlines():
+            if line.startswith('\tvar node_info = '):
+                line = line[17:-1]
+                obj = json.loads(line)
+
+        self.assertIsNotNone(obj)
+
+        found_rrsig = False
+        found_rrset = False
+        for item in obj:
+            m = RRSET_OBJ_RE.search(item)
+            if m is not None:
+                found_rrset = True
+                rrset = obj[item][0]
+                err = rrset['errors'][0]
+                code = err['code']
+                server = err['servers'][0]
+                self.assertEqual(code, 'MISSING_RRSIG')
+                self.assertIn(server, ('127.0.0.1', '::1'))
+
+            m = RRSIG_OBJ_RE.search(item)
+            if m is not None:
+                found_rrsig = True
+                rrsig = obj[item][0]
+                status = rrsig['status']
+                err = rrsig['errors'][0]
+                code = err['code']
+                self.assertEqual(status, 'INVALID_SIG')
+                self.assertEqual(code, 'SIGNATURE_INVALID')
+
+        self.assertTrue(found_rrsig)
+        self.assertTrue(found_rrset)
 
 if __name__ == '__main__':
     unittest.main()

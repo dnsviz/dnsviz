@@ -55,6 +55,9 @@ class DNSProbeRunOfflineTestCase(unittest.TestCase):
     def test_dnsviz_probe_auth_local_signed_nsec3(self):
         self._probe_zone('signed-nsec3', True)
 
+    def test_dnsviz_probe_auth_local_signed_nsec_broken(self):
+        self._probe_zone('signed-nsec-broken', True)
+
     def test_dnsviz_probe_input(self):
         input_file = get_probe_output_auth_file('signed-nsec')
 

@@ -62,7 +62,7 @@ class ZoneCreator:
     def get_key_file(self, key_type):
         return get_key_file(self.keys[key_type])
 
-    def create_signed_zone(self, subcat, ksk, zsk):
+    def create_signed_zone(self, subcat, ksk, zsk, duplicate_suffix):
         zone_dir = get_zone_dir(subcat)
         self.create_dir(zone_dir)
         key_dir = get_key_dir()
@@ -90,12 +90,59 @@ class ZoneCreator:
             os.remove(tk_file)
         os.symlink(ksk_file, tk_file)
 
+        if duplicate_suffix:
+            duplicate_zone_dir = zone_dir + '-' + duplicate_suffix
+            subprocess.check_call(['cp', '-pr', zone_dir, duplicate_zone_dir])
+
+    def strip_rrsig(self, subcat, rrname, rdtype):
+        rrname = rrname.rstrip('.')
+        zone_file = get_zone_file(subcat, True)
+        zone_contents_orig = subprocess.check_output(['named-checkzone', '-D', ZONE_ORIGIN, zone_file]).decode('utf-8')
+        zone_contents_new = ''
+        for line in zone_contents_orig.splitlines():
+            try:
+                myname, ttl, rdclass, mytype, covers, rest = line.split(maxsplit=5)
+            except ValueError:
+                pass
+            else:
+                if myname.rstrip('.') == rrname and mytype == 'RRSIG' and covers == rdtype:
+                    continue
+            zone_contents_new += '\n' + line
+        with open(zone_file, 'w', encoding='utf-8') as fh:
+            fh.write(zone_contents_new)
+
+    def corrupt_sig(self, subcat, rrname, rdtype):
+        rrname = rrname.rstrip('.')
+        zone_file = get_zone_file(subcat, True)
+        zone_contents_orig = subprocess.check_output(['named-checkzone', '-D', ZONE_ORIGIN, zone_file]).decode('utf-8')
+        zone_contents_new = ''
+        for line in zone_contents_orig.splitlines():
+            try:
+                myname, ttl, rdclass, mytype, covers, rest = line.split(maxsplit=5)
+            except ValueError:
+                pass
+            else:
+                replace_index = -6
+                if myname.rstrip('.') == rrname and mytype == 'RRSIG' and covers == rdtype:
+                    val = line[replace_index]
+                    if val == 'A':
+                        replacement = 'B'
+                    else:
+                        replacement = 'A'
+                    line = line[:replace_index] + replacement + line[replace_index + 1:]
+            zone_contents_new += '\n' + line
+        with open(zone_file, 'w', encoding='utf-8') as fh:
+            fh.write(zone_contents_new)
+
 class TestSetup(unittest.TestCase):
     def test_setup(self):
         z = ZoneCreator('unsigned')
         z.create_keys()
-        z.create_signed_zone('signed-nsec', 'KSK_RSASHA256', 'ZSK_RSASHA256')
-        z.create_signed_zone('signed-nsec3', 'KSK_RSASHA256', 'ZSK_RSASHA256')
+        z.create_signed_zone('signed-nsec', 'KSK_RSASHA256', 'ZSK_RSASHA256', 'broken')
+        z.create_signed_zone('signed-nsec3', 'KSK_RSASHA256', 'ZSK_RSASHA256', '')
+        z.create_signed_zone('signed-nsec-alg15', 'KSK_ED25519', 'ZSK_ED25519', '')
+        z.strip_rrsig('signed-nsec-broken', 'example.com', 'A')
+        z.corrupt_sig('signed-nsec-broken', 'example.com', 'AAAA')
 
 if __name__ == '__main__':
     unittest.main()
