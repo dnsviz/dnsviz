@@ -1,15 +1,7 @@
-include COPYRIGHT LICENSE
+include COPYRIGHT
 include requirements.txt
-include doc/COPYRIGHT
-include doc/Makefile
-include doc/src/*dot
-include doc/src/*svg
-recursive-include contrib *
-# The following are for versions of setuptools that don't seem to pull in the
-# files that are listed in setup.py
-include README.md
+recursive-include doc *
+exclude doc/images/*png
 include doc/images/notice.png doc/images/warning.png doc/images/error.png doc/images/logo*png
-include doc/dnsviz-graph.html
-recursive-include doc/man *
 recursive-include src/dnsviz/data *
 recursive-include tests *
