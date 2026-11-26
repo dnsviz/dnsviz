@@ -35,7 +35,7 @@ jobs:
         sudo apparmor_parser -R /etc/apparmor.d/usr.sbin.named
     - name: Run errors.py doctest
       run: |
-        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+        python3 -m doctest -o ELLIPSIS src/dnsviz/analysis/errors.py
     - name: Test runtime options and functionality
       run: |
         pytest
@@ -67,7 +67,7 @@ jobs:
         pip install .
     - name: Run errors.py doctest
       run: |
-        python3 -m doctest -o ELLIPSIS dnsviz/analysis/errors.py
+        python3 -m doctest -o ELLIPSIS src/dnsviz/analysis/errors.py
     - name: Test runtime options and functionality
       run: |
         pytest
