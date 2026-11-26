@@ -43,7 +43,7 @@ import dns.exception, dns.name
 
 from dnsviz.analysis import deserialize, DNS_RAW_VERSION
 from dnsviz.analysis.errors import ExistingCovered
-from dnsviz.config import DNSVIZ_SHARE_PATH, DNSVIZ_MEDIA_PATH, JQUERY_PATH, JQUERY_UI_PATH, JQUERY_UI_CSS_PATH, RAPHAEL_PATH
+from dnsviz.config import DNSVIZ_SHARE_PATH, DNSVIZ_MEDIA_PATH
 from dnsviz.format import latin1_binary_to_string as lb2s
 from dnsviz.util import get_trusted_keys, get_default_trusted_keys, io_try_buffered
 
@@ -95,10 +95,6 @@ def finish_graph(G, name_objs, rdtypes, trusted_keys, supported_algs, fmt, filen
             sys.exit(3)
 
         template_str = template_str.replace('LOCAL_MEDIA_URL', LOCAL_MEDIA_URL)
-        template_str = template_str.replace('JQUERY_PATH', JQUERY_PATH)
-        template_str = template_str.replace('JQUERY_UI_PATH', JQUERY_UI_PATH)
-        template_str = template_str.replace('JQUERY_UI_CSS_PATH', JQUERY_UI_CSS_PATH)
-        template_str = template_str.replace('RAPHAEL_PATH', RAPHAEL_PATH)
         template_str = template_str.replace('JS_CODE', js_img)
 
         try:

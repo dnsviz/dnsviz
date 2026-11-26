@@ -37,9 +37,4 @@ else:
 DNSVIZ_MEDIA_PATH = DNSVIZ_SHARE_PATH / 'media'
 DNSVIZ_TEMPLATE_PATH = DNSVIZ_SHARE_PATH / 'templates'
 DNSVIZ_ROOT_DATA_PATH = DNSVIZ_SHARE_PATH / 'root-dns-data'
-
-JQUERY_PATH = 'https://code.jquery.com/jquery-1.11.3.min.js'
-JQUERY_UI_PATH = 'https://code.jquery.com/ui/1.11.4/jquery-ui.min.js'
-JQUERY_UI_CSS_PATH = 'https://code.jquery.com/ui/1.11.4/themes/redmond/jquery-ui.css'
-RAPHAEL_PATH = 'https://cdnjs.cloudflare.com/ajax/libs/raphael/2.1.4/raphael-min.js'
 RESOLV_CONF = '/etc/resolv.conf'
