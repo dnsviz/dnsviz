@@ -37,8 +37,7 @@ Instructions for running in a Docker container are also available
 
 ### Dependencies
 
-* Python (2.7, 3.5 - 3.12) - https://www.python.org/
-  (Note that python 2.7 support will be removed in a future release.)
+* Python (3.9 or later) - https://www.python.org/
 
 * dnspython (1.13.0 or later) - https://www.dnspython.org/
 
@@ -48,9 +47,7 @@ Instructions for running in a Docker container are also available
 
 Note that earlier versions of the software listed above might also work with
 DNSViz, but are not supported.  For example, versions of cryptography as early
-as 2.6 seem to work.  Also note that while DNSViz itself still works with
-Python 2.7, some versions of its software dependencies have moved on:
-pygraphviz 1.6 and dnspython 2.0.0 dropped support for Python 2.7.
+as 2.6 seem to work.
 
 
 ### Optional Software
@@ -84,9 +81,9 @@ pygraphviz 1.6 and dnspython 2.0.0 dropped support for Python 2.7.
 To install DNSViz to a virtual environment, first create and activate a virtual
 environment, and install the dependencies:
 ```
-$ virtualenv ~/myenv
+$ python3 ~/myenv
 $ source ~/myenv/bin/activate
-(myenv) $ pip install -r requirements.txt
+(myenv) $ pip3 install -r requirements.txt
 ```
 Note that this installs the dependencies that are Python packages, but some of
 these packages have non-Python dependencies, such as Graphviz (required for
@@ -95,11 +92,11 @@ automatically.
 
 Next download and install DNSViz from the Python Package Index (PyPI):
 ```
-(myenv) $ pip install dnsviz
+(myenv) $ pip3 install dnsviz
 ```
 or locally, from a downloaded or cloned copy of DNSViz:
 ```
-(myenv) $ pip install .
+(myenv) $ pip3 install .
 ```
 
 
