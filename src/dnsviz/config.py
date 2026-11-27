@@ -21,8 +21,6 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __future__ import unicode_literals
-
 from importlib.resources import files
 import os
 from pathlib import Path
