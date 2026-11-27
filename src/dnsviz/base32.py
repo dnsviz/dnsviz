@@ -59,8 +59,6 @@
 # Alphabet, as specified in RFC 4648.  Also, bytes literals are prefixed with
 # 'b'.
 
-from __future__ import unicode_literals
-
 import struct
 
 _b32tab = { 0: b'0', 1: b'1', 2: b'2', 3: b'3', 4: b'4', 5: b'5', 6: b'6', 7: b'7', 8: b'8', 9: b'9',

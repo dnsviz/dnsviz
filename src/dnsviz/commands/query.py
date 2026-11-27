@@ -22,8 +22,6 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __future__ import unicode_literals
-
 import getopt
 import socket
 import subprocess

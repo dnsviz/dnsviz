@@ -25,8 +25,6 @@
 # with DNSViz.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-from __future__ import unicode_literals
-
 import atexit
 import base64
 import binascii
